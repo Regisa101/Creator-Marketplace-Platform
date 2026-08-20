@@ -1,29 +1,29 @@
 from sqlalchemy import create_engine
-from sqlalchemy.orm import sessionmaker, declarative_base
-from app.core.config import (
-    DB_USER,
-    DB_PASSWORD,
-    DB_HOST,
-    DB_PORT,
-    DB_NAME,
-)
-from urllib.parse import quote_plus
+from sqlalchemy.ext.declarative import declarative_base
+from sqlalchemy.orm import sessionmaker
+import os
+from dotenv import load_dotenv
 
+# Load environment variables from .env file
+load_dotenv()
 
-DATABASE_URL = (
-    f"postgresql+psycopg://{DB_USER}:"
-    f"{quote_plus(DB_PASSWORD)}@"
-    f"{DB_HOST}:{DB_PORT}/{DB_NAME}"
-)
+# Get the database URL from environment variables
+DATABASE_URL = os.getenv("DATABASE_URL")
 
+# Create the database engine
 engine = create_engine(DATABASE_URL)
 
-SessionLocal = sessionmaker(
-    autocommit=False,
-    autoflush=False,
-    bind=engine
-)
+# SessionLocal will be used to create database sessions
+SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
+# Base class for all our models
+# All model classes inherit from this
 Base = declarative_base()
 
-from app.models.user import User
+def get_db():
+    """Dependency to get database session"""
+    db = SessionLocal()
+    try:
+        yield db
+    finally:
+        db.close()

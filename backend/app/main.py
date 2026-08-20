@@ -1,20 +1,28 @@
 from fastapi import FastAPI
-
-from app.database import Base, engine
-from app.routes.auth import router as auth_router
+from app.database import engine, Base
+from app.models import User  # Import models
+from app.routes import auth  # Import routes
 
 app = FastAPI(
     title="Creator Marketplace Platform",
+    description="Creator collaboration platform",
     version="1.0.0"
 )
 
+# Create all tables
 Base.metadata.create_all(bind=engine)
 
-app.include_router(auth_router)
-
+# Include routers
+app.include_router(auth.router)
 
 @app.get("/")
 def root():
     return {
-        "message": "Creator Marketplace API is running"
+        "message": "Welcome to Creator Marketplace Platform API",
+        "status": "running",
+        "version": "1.0.0"
     }
+
+@app.get("/health")
+def health_check():
+    return {"status": "healthy", "message": "Server is running smoothly!"}
