@@ -2,9 +2,6 @@
 SCHEMAS PACKAGE
 ---------------
 This makes all schemas available from one place.
-
-Usage:
-    from app.schemas import UserCreate, UserLogin, UserResponse
 """
 
 from app.schemas.user import (
@@ -13,4 +10,13 @@ from app.schemas.user import (
     UserLogin,
     UserResponse,
     TokenResponse
+)
+
+from app.schemas.creator import (
+    CreatorSocialBase,
+    CreatorOnboardingComplete
+)
+
+from app.schemas.business import (
+    BusinessOnboardingComplete
 )

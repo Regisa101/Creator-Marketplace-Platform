@@ -1,0 +1,46 @@
+/**
+ * Design tokens for CreatorHub — dashboard + landing page.
+ * Import this once in your root (main.tsx / App.tsx), then reference
+ * these as CSS vars from Tailwind arbitrary values, e.g.:
+ *   className="bg-[var(--bg)] text-[var(--ink)] border-[var(--line)]"
+ *
+ * Rule of thumb: --accent is for actions only (primary buttons, links,
+ * active nav item, selected tab). Everything else is black/white/gray.
+ * Status colors (--good/--warn/--bad) are reserved for state, never decoration.
+ */
+
+@import url('https://fonts.googleapis.com/css2?family=League+Spartan:wght@600;700;800&family=Poppins:wght@300;400;500;600;700&display=swap');
+
+body {
+  font-family: 'Poppins', -apple-system, Helvetica, Arial, sans-serif;
+}
+
+.font-logo {
+  font-family: 'League Spartan', sans-serif;
+  font-weight: 700;
+  letter-spacing: 0.01em;
+}
+
+:root {
+  --bg: #ffffff;
+  --surface: #fafafa;
+  --ink: #171717;
+  --ink-soft: #737373;
+  --ink-faint: #a3a3a3;
+  --line: #e5e5e5;
+
+  --accent: #2563eb;
+  --accent-soft: #eff4ff;
+  --accent-ink: #ffffff;
+
+  --good: #16a34a;
+  --good-soft: #f0fdf4;
+  --warn: #d97706;
+  --warn-soft: #fffbeb;
+  --bad: #dc2626;
+  --bad-soft: #fef2f2;
+
+  --radius-sm: 8px;
+  --radius-md: 12px;
+  --radius-lg: 16px;
+}

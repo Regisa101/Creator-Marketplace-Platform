@@ -2,6 +2,10 @@ from pydantic import BaseModel, EmailStr, Field
 from typing import Optional
 from datetime import datetime
 
+# ============================================
+# USER SCHEMAS
+# ============================================
+
 class UserBase(BaseModel):
     email: EmailStr
     full_name: str
@@ -9,6 +13,15 @@ class UserBase(BaseModel):
 
 class UserCreate(UserBase):
     password: str = Field(..., min_length=6)
+    
+    # Extra fields for onboarding
+    niche: Optional[str] = None
+    platform: Optional[str] = None
+    audience_size: Optional[str] = None
+    company_name: Optional[str] = None
+    industry: Optional[str] = None
+    team_size: Optional[str] = None
+    website: Optional[str] = None
 
 class UserLogin(BaseModel):
     email: EmailStr
