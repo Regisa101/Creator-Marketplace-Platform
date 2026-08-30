@@ -174,10 +174,13 @@ export const Dashboard = () => {
 
   const profileCompletion = calculateProfileCompletion(user?.profile, role);
 
-  // Both "Complete Profile" and "Edit profile" point at the same place:
-  // the real onboarding form for this role, which doubles as the
-  // profile editor until a dedicated /profile page exists.
+  // "Complete Profile" (sidebar CTA) always goes to the onboarding form
+  // to finish/edit. "Edit profile" in the user menu now goes to the
+  // real, view-only profile page for creators (which has its own Edit
+  // button back into onboarding); business has no profile page yet,
+  // so it still falls back to onboarding directly.
   const profileEditRoute = `/onboarding/${role}`;
+  const profileViewRoute = role === 'creator' ? '/profile' : profileEditRoute;
 
   const NAV = role === 'creator'
     ? [
@@ -215,7 +218,7 @@ export const Dashboard = () => {
   const quickActions = role === 'creator'
     ? [
         { label: 'Browse Campaigns', icon: Compass, to: '/campaigns', color: primary },
-        { label: 'Complete Portfolio', icon: FileText, to: '/profile', color: C.sky },
+        { label: 'Complete Portfolio', icon: FileText, to: '/onboarding/creator', color: C.sky },
         { label: 'Messages', icon: Send, to: '/messages', color: C.amber },
       ]
     : [
@@ -358,7 +361,7 @@ export const Dashboard = () => {
           </button>
           {menuOpen && (
             <div className="absolute bottom-full left-0 mb-2 w-full rounded-lg border py-1 shadow-lg" style={{ background: C.card, borderColor: C.line }}>
-              <Link to={profileEditRoute} className="flex items-center gap-2 px-3 py-2 text-xs" style={{ color: C.ink }} onClick={() => setMenuOpen(false)}>
+              <Link to={profileViewRoute} className="flex items-center gap-2 px-3 py-2 text-xs" style={{ color: C.ink }} onClick={() => setMenuOpen(false)}>
                 <Settings size={13} /> Edit profile
               </Link>
               <button

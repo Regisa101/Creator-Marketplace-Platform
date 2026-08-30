@@ -154,4 +154,63 @@ export const completeBusinessOnboarding = async (data: BusinessOnboardingData): 
   return response.data;
 };
 
+// Partial save — fires on every step's "Continue" (and on "Skip for
+// now") so progress survives a refresh, a different browser, or a
+// cleared localStorage, instead of only living in AuthContext's
+// client-side cache. `Partial<...>` because each step only ever sends
+// the fields that step collected.
+export type CreatorOnboardingProgressData = Partial<CreatorOnboardingData>;
+
+export const saveCreatorProgress = async (
+  data: CreatorOnboardingProgressData
+): Promise<any> => {
+  const response = await api.patch('/onboarding/creator/progress', data);
+  return response.data;
+};
+
+// Fetches whatever's been saved so far (from completeCreatorOnboarding
+// or saveCreatorProgress) so the onboarding form can repopulate itself
+// and resume on the right step instead of starting over blank. No
+// profile saved yet is a normal, expected state for a brand-new
+// creator — the backend 404s for that, and this resolves to `null`
+// rather than throwing, so callers don't need their own try/catch for
+// the "nothing saved yet" case.
+export const getCreatorProgress = async (): Promise<{ profile: any; socials: any[] } | null> => {
+  try {
+    const response = await api.get('/onboarding/creator/profile');
+    return response.data;
+  } catch (error: any) {
+    if (error?.response?.status === 404) {
+      return null;
+    }
+    throw error;
+  }
+};
+
+// ============================================
+// FILE UPLOADS
+// ============================================
+// Deliberately NOT using the shared `api` axios instance here: it
+// defaults every request to 'Content-Type: application/json', and a
+// FormData body needs 'multipart/form-data' with a boundary that only
+// the browser can generate correctly — overriding the header manually
+// (rather than just omitting it) breaks that. Plain axios + a manually
+// attached bearer token sidesteps the shared instance's JSON default.
+export const uploadImage = async (file: File): Promise<{ url: string }> => {
+  const formData = new FormData();
+  formData.append('file', file);
+
+  const token = localStorage.getItem('access_token');
+
+  const response = await axios.post<{ url: string }>(
+    `${API_BASE_URL}/uploads/image`,
+    formData,
+    {
+      headers: token ? { Authorization: `Bearer ${token}` } : undefined,
+    }
+  );
+
+  return response.data;
+};
+
 export default api;

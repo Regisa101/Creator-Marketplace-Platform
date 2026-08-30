@@ -14,7 +14,8 @@ from app.schemas.user import (
 
 from app.schemas.creator import (
     CreatorSocialBase,
-    CreatorOnboardingComplete
+    CreatorOnboardingComplete,
+    CreatorOnboardingProgress
 )
 
 from app.schemas.business import (

@@ -6,6 +6,7 @@ import { Landing } from './pages/Landing';
 import { ProtectedRoute } from './components/ProtectedRoute';
 import { CreatorOnboarding } from './pages/onboarding/CreatorOnboarding';
 import { BusinessOnboarding } from './pages/onboarding/BusinessOnboarding';
+import { CreatorProfile } from './pages/CreatorProfile';
 
 function App() {
   return (
@@ -41,6 +42,15 @@ function App() {
             element={
               <ProtectedRoute>
                 <Dashboard />
+              </ProtectedRoute>
+            }
+          />
+
+          <Route
+            path="/profile"
+            element={
+              <ProtectedRoute>
+                <CreatorProfile />
               </ProtectedRoute>
             }
           />

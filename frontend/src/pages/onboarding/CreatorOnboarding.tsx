@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   ArrowRight,
@@ -8,10 +8,18 @@ import {
   CheckCircle2,
   Info,
   Trash2,
-  Globe,
+  Save,
+  Image as ImageIcon,
+  Video,
+  UploadCloud,
 } from 'lucide-react';
 
-import { completeCreatorOnboarding } from '../../api/client';
+import {
+  completeCreatorOnboarding,
+  getCreatorProgress,
+  saveCreatorProgress,
+  uploadImage,
+} from '../../api/client';
 import type { CreatorOnboardingData } from '../../api/client';
 import { useAuth } from '../../context/AuthContext';
 
@@ -26,6 +34,14 @@ interface Social {
   follower_count: number;
 }
 
+interface PortfolioItem {
+  title: string;
+  description: string;
+  media_url: string;
+  platform: string;
+  type: string;
+}
+
 // ============================================================
 // CONSTANTS
 // ============================================================
@@ -34,114 +50,78 @@ const VIOLET = '#6C5DD3';
 const CORAL = '#FF8A5B';
 const CORAL_DARK = '#E86B3E';
 
-const LANGUAGES = [
-  'English',
-  'Nepali',
-  'Hindi',
-  'Newari',
-  'Maithili',
-];
+const LANGUAGES = ['English', 'Nepali', 'Hindi', 'Newari', 'Maithili'];
 
 const INTERESTS = [
-  'Travel',
-  'Food',
-  'Fashion',
-  'Beauty',
-  'Tech',
-  'Fitness',
-  'Gaming',
-  'Music',
-  'Home',
-  'Wellness',
+  'Travel', 'Food', 'Fashion', 'Beauty', 'Tech',
+  'Fitness', 'Gaming', 'Music', 'Home', 'Wellness',
 ];
 
 const CATEGORIES = [
-  'Beauty',
-  'Fashion',
-  'Food',
-  'Fitness',
-  'Tech',
-  'Travel',
-  'Gaming',
-  'Music',
-  'Home',
-  'Wellness',
+  'Beauty', 'Fashion', 'Food', 'Fitness', 'Tech',
+  'Travel', 'Gaming', 'Music', 'Home', 'Wellness',
 ];
 
 const CONTENT_TYPES = [
-  'Reels',
-  'Photos',
-  'Stories',
-  'YouTube Videos',
-  'Shorts',
-  'Reviews',
-  'UGC',
+  'Reels', 'Photos', 'Stories', 'YouTube Videos', 'Shorts', 'Reviews', 'UGC',
 ];
 
 const CREATOR_TYPES = [
-  'Influencer',
-  'UGC Creator',
-  'Content Creator',
-  'Model',
-  'Photographer',
-  'Videographer',
-  'Other',
+  'Influencer', 'UGC Creator', 'Content Creator', 'Model', 'Photographer', 'Videographer', 'Other',
 ];
 
-const AUDIENCE_AGE_RANGES = [
-  '13-17',
-  '18-24',
-  '25-34',
-  '35-44',
-  '45-54',
-  '55+',
-];
+const AUDIENCE_AGE_RANGES = ['13-17', '18-24', '25-34', '35-44', '45-54', '55+'];
 
 const AUDIENCE_LOCATIONS = [
-  'Kathmandu',
-  'Pokhara',
-  'Lalitpur',
-  'Bhaktapur',
-  'Chitwan',
-  'Biratnagar',
-  'Nationwide',
-  'International',
+  'Kathmandu', 'Pokhara', 'Lalitpur', 'Bhaktapur', 'Chitwan', 'Biratnagar', 'Nationwide', 'International',
 ];
+
+const PORTFOLIO_TYPES = ['image', 'video', 'reel', 'link'];
 
 const USERNAME_REGEX = /^[a-zA-Z0-9_]{3,24}$/;
 
 const PLATFORMS = [
-  {
-    id: 'instagram',
-    label: 'Instagram',
-    handleLabel: 'Followers',
-  },
-  {
-    id: 'youtube',
-    label: 'YouTube',
-    handleLabel: 'Subscribers',
-  },
-  {
-    id: 'tiktok',
-    label: 'TikTok',
-    handleLabel: 'Followers',
-  },
-  {
-    id: 'facebook',
-    label: 'Facebook',
-    handleLabel: 'Followers',
-  },
-  {
-    id: 'twitter',
-    label: 'X / Twitter',
-    handleLabel: 'Followers',
-  },
-  {
-    id: 'other',
-    label: 'Other',
-    handleLabel: 'Followers',
-  },
+  { id: 'instagram', label: 'Instagram', handleLabel: 'Followers' },
+  { id: 'youtube', label: 'YouTube', handleLabel: 'Subscribers' },
+  { id: 'tiktok', label: 'TikTok', handleLabel: 'Followers' },
+  { id: 'facebook', label: 'Facebook', handleLabel: 'Followers' },
+  { id: 'twitter', label: 'X / Twitter', handleLabel: 'Followers' },
+  { id: 'other', label: 'Other', handleLabel: 'Followers' },
 ];
+
+// Figures out which step to land on when resuming: checks each step's
+// required fields against the saved profile and stops at the first
+// incomplete one. Portfolio (step 4) is optional, so completing steps
+// 1–3 always resumes there — the natural next stop — rather than
+// jumping straight to the terminal Publish step.
+function resolveCreatorStep(
+  profile: Record<string, any> | null | undefined,
+  socials: any[] | null | undefined
+): number {
+  if (!profile) return 1;
+
+  const step1Done =
+    Boolean(profile.display_name?.trim?.()) &&
+    USERNAME_REGEX.test(profile.username || '') &&
+    Boolean(profile.bio?.trim?.()) &&
+    Boolean(profile.location?.trim?.());
+  if (!step1Done) return 1;
+
+  const step2Done =
+    Boolean(profile.creator_type) &&
+    Array.isArray(profile.categories) && profile.categories.length > 0 &&
+    Array.isArray(profile.content_types) && profile.content_types.length > 0 &&
+    Array.isArray(profile.languages) && profile.languages.length > 0 &&
+    Array.isArray(profile.interests) && profile.interests.length > 0 &&
+    Array.isArray(profile.audience_age_range) && profile.audience_age_range.length > 0 &&
+    Array.isArray(profile.audience_location) && profile.audience_location.length > 0;
+  if (!step2Done) return 2;
+
+  const step3Done = Array.isArray(socials) && socials.length > 0;
+  if (!step3Done) return 3;
+
+  return 4;
+}
 
 // ============================================================
 // LOGO
@@ -149,21 +129,9 @@ const PLATFORMS = [
 
 function LogoMark({ size = 22 }: { size?: number }) {
   return (
-    <svg
-      width={size}
-      height={size}
-      viewBox="0 0 26 26"
-      aria-hidden="true"
-      style={{ flexShrink: 0 }}
-    >
+    <svg width={size} height={size} viewBox="0 0 26 26" aria-hidden="true" style={{ flexShrink: 0 }}>
       <circle cx="10" cy="13" r="8" fill={VIOLET} />
-      <circle
-        cx="17"
-        cy="9"
-        r="6"
-        fill={CORAL}
-        fillOpacity={0.9}
-      />
+      <circle cx="17" cy="9" r="6" fill={CORAL} fillOpacity={0.9} />
     </svg>
   );
 }
@@ -180,11 +148,7 @@ interface ChipProps {
 
 function Chip({ label, active, onClick }: ChipProps) {
   return (
-    <button
-      type="button"
-      className={`co-chip ${active ? 'co-chip-active' : ''}`}
-      onClick={onClick}
-    >
+    <button type="button" className={`co-chip ${active ? 'co-chip-active' : ''}`} onClick={onClick}>
       {label}
     </button>
   );
@@ -194,50 +158,23 @@ function Chip({ label, active, onClick }: ChipProps) {
 // STEP HEADER
 // ============================================================
 
-function StepHeader({ step }: { step: number }) {
-  const steps = [
-    'About you',
-    'Audience',
-    'Social media',
-    'Creator profile',
-  ];
+const STEP_LABELS = ['Basic Info', 'Type & Niche', 'Socials', 'Portfolio', 'Publish'];
 
+function StepHeader({ step }: { step: number }) {
   return (
     <div className="co-steps">
-      {steps.map((label, index) => {
+      {STEP_LABELS.map((label, index) => {
         const number = index + 1;
-
-        const state =
-          number < step
-            ? 'done'
-            : number === step
-              ? 'active'
-              : 'upcoming';
+        const state = number < step ? 'done' : number === step ? 'active' : 'upcoming';
 
         return (
           <div className="co-step" key={label}>
             <span className={`co-step-dot co-step-${state}`}>
-              {state === 'done' ? (
-                <CheckCircle2 size={14} />
-              ) : (
-                number
-              )}
+              {state === 'done' ? <CheckCircle2 size={14} /> : number}
             </span>
-
-            <span
-              className={`co-step-label co-step-label-${state}`}
-            >
-              {label}
-            </span>
-
-            {number < steps.length && (
-              <span
-                className={`co-step-line ${
-                  number < step
-                    ? 'co-step-line-done'
-                    : ''
-                }`}
-              />
+            <span className={`co-step-label co-step-label-${state}`}>{label}</span>
+            {number < STEP_LABELS.length && (
+              <span className={`co-step-line ${number < step ? 'co-step-line-done' : ''}`} />
             )}
           </div>
         );
@@ -260,12 +197,10 @@ export function CreatorOnboarding() {
   const [error, setError] = useState('');
 
   // ----------------------------------------------------------
-  // STEP 1 — About you
+  // STEP 1 — Basic Info
   // ----------------------------------------------------------
 
-  const [profileImage, setProfileImage] =
-    useState<string | null>(null);
-
+  const [profileImage, setProfileImage] = useState<string | null>(null);
   const [displayName, setDisplayName] = useState(user?.full_name ?? '');
   const [username, setUsername] = useState('');
   const [usernameError, setUsernameError] = useState('');
@@ -283,21 +218,22 @@ export function CreatorOnboarding() {
   };
 
   // ----------------------------------------------------------
-  // STEP 2 — Audience
+  // STEP 2 — Type & Niche (content classification + audience)
   // ----------------------------------------------------------
 
   const [creatorType, setCreatorType] = useState('');
+  const [categories, setCategories] = useState<string[]>([]);
+  const [contentTypes, setContentTypes] = useState<string[]>([]);
   const [languages, setLanguages] = useState<string[]>([]);
   const [interests, setInterests] = useState<string[]>([]);
   const [audienceAgeRanges, setAudienceAgeRanges] = useState<string[]>([]);
   const [audienceLocations, setAudienceLocations] = useState<string[]>([]);
 
   // ----------------------------------------------------------
-  // STEP 3 — Social media
+  // STEP 3 — Socials
   // ----------------------------------------------------------
 
   const [socials, setSocials] = useState<Social[]>([]);
-
   const [socialDraft, setSocialDraft] = useState({
     platform: 'instagram',
     username: '',
@@ -306,25 +242,107 @@ export function CreatorOnboarding() {
   });
 
   // ----------------------------------------------------------
-  // STEP 4 — Creator profile
+  // STEP 4 — Portfolio
   // ----------------------------------------------------------
 
-  const [categories, setCategories] = useState<string[]>([]);
-  const [contentTypes, setContentTypes] =
-    useState<string[]>([]);
+  const [portfolio, setPortfolio] = useState<PortfolioItem[]>([]);
+  const [portfolioDraft, setPortfolioDraft] = useState({
+    title: '',
+    description: '',
+    media_url: '',
+    platform: '',
+    type: 'image',
+  });
+  const [uploadingPortfolioImage, setUploadingPortfolioImage] = useState(false);
+  const [portfolioError, setPortfolioError] = useState('');
 
-  const [startingPrice, setStartingPrice] =
-    useState('');
+  // ----------------------------------------------------------
+  // STEP 5 — Publish
+  // ----------------------------------------------------------
+
+  const [startingPrice, setStartingPrice] = useState('');
+
+  // ----------------------------------------------------------
+  // RESUME PROGRESS / PHOTO UPLOAD / SAVE DRAFT STATE
+  // ----------------------------------------------------------
+
+  const [loadingProgress, setLoadingProgress] = useState(true);
+  const [uploadingPhoto, setUploadingPhoto] = useState(false);
+  const [photoError, setPhotoError] = useState('');
+  const [draftSaved, setDraftSaved] = useState(false);
+
+  // ==========================================================
+  // RESUME WHERE YOU LEFT OFF
+  // ==========================================================
+
+  useEffect(() => {
+    let cancelled = false;
+
+    const loadProgress = async () => {
+      try {
+        const saved = await getCreatorProgress();
+        const profile = saved?.profile ?? user?.profile ?? null;
+        const socialsData = saved?.socials ?? (user?.profile?.socials as any[] | undefined) ?? [];
+
+        if (!cancelled && profile) {
+          setProfileImage(profile.profile_image ?? null);
+          setDisplayName(profile.display_name ?? user?.full_name ?? '');
+          setUsername(profile.username ?? '');
+          setBio(profile.bio ?? '');
+          setLocation(profile.location ?? '');
+
+          setCreatorType(profile.creator_type ?? '');
+          setCategories(profile.categories ?? profile.niches ?? []);
+          setContentTypes(profile.content_types ?? []);
+          setLanguages(profile.languages ?? profile.content_languages ?? []);
+          setInterests(profile.interests ?? profile.audience_interests ?? []);
+          setAudienceAgeRanges(profile.audience_age_range ?? []);
+          setAudienceLocations(profile.audience_location ?? []);
+
+          setSocials(
+            (socialsData || []).map((s: any) => ({
+              platform: s.platform,
+              username: s.username ?? '',
+              profile_url: s.profile_url ?? '',
+              follower_count: s.follower_count ?? 0,
+            }))
+          );
+
+          setPortfolio(
+            (profile.portfolio || []).map((p: any) => ({
+              title: p.title ?? '',
+              description: p.description ?? '',
+              media_url: p.media_url ?? '',
+              platform: p.platform ?? '',
+              type: p.type ?? 'image',
+            }))
+          );
+
+          setStartingPrice(
+            profile.starting_price !== null && profile.starting_price !== undefined
+              ? String(profile.starting_price)
+              : ''
+          );
+
+          setStep(resolveCreatorStep(profile, socialsData));
+        }
+      } catch (err) {
+        console.error('Could not load onboarding progress:', err);
+      } finally {
+        if (!cancelled) setLoadingProgress(false);
+      }
+    };
+
+    loadProgress();
+    return () => { cancelled = true; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // ==========================================================
   // HELPERS
   // ==========================================================
 
-  const toggle = (
-    list: string[],
-    setList: (value: string[]) => void,
-    value: string
-  ) => {
+  const toggle = (list: string[], setList: (value: string[]) => void, value: string) => {
     if (list.includes(value)) {
       setList(list.filter((item) => item !== value));
     } else {
@@ -332,51 +350,86 @@ export function CreatorOnboarding() {
     }
   };
 
-  // Same chip UI as `toggle`, but single-select — picking a new value
-  // replaces the old one; picking the same value again clears it.
-  const toggleSingle = (
-    current: string,
-    setValue: (value: string) => void,
-    value: string
-  ) => {
+  const toggleSingle = (current: string, setValue: (value: string) => void, value: string) => {
     setValue(current === value ? '' : value);
   };
 
-  // Lets a creator finish onboarding later. We don't save anything
-  // yet — just drop them at the dashboard, where the "Complete Profile"
-  // nudge card sends them straight back into this flow.
-  const handleSkip = () => {
-    navigate('/dashboard');
-  };
+  // ==========================================================
+  // PROGRESS SAVING
+  // ==========================================================
 
-  // Push what's been filled in so far into AuthContext, so the
-  // Dashboard's profile-completion % updates immediately — even if
-  // the creator abandons onboarding partway through and comes back
-  // later. `updateProfile` merges (doesn't replace) into user.profile.
-  // Keys match the backend's field names (see CreatorOnboardingComplete)
-  // so the final payload in handleFinish and these partial saves stay
-  // in sync with what Dashboard.tsx checks for completion.
   const saveStep1Progress = () => {
-    updateProfile?.({
+    const payload = {
       display_name: displayName.trim(),
       username: username.trim(),
       bio: bio.trim(),
       location: location.trim(),
-    });
+      profile_image: profileImage,
+    };
+    updateProfile?.(payload);
+    return saveCreatorProgress(payload);
   };
 
   const saveStep2Progress = () => {
-    updateProfile?.({
+    const payload = {
       creator_type: creatorType,
+      niches: categories,
+      content_types: contentTypes,
       content_languages: languages,
       audience_interests: interests,
       audience_age_range: audienceAgeRanges,
       audience_location: audienceLocations,
-    });
+    };
+    updateProfile?.(payload);
+    return saveCreatorProgress(payload);
   };
 
   const saveStep3Progress = () => {
     updateProfile?.({ socials });
+    return saveCreatorProgress({ socials });
+  };
+
+  const saveStep4Progress = () => {
+    updateProfile?.({ portfolio });
+    return saveCreatorProgress({ portfolio });
+  };
+
+  const saveStep5Progress = () => {
+    const payload = { starting_price: Number(startingPrice) || 0 };
+    updateProfile?.(payload);
+    return saveCreatorProgress(payload);
+  };
+
+  const saveCurrentStepProgress = () => {
+    if (step === 1) return saveStep1Progress();
+    if (step === 2) return saveStep2Progress();
+    if (step === 3) return saveStep3Progress();
+    if (step === 4) return saveStep4Progress();
+    if (step === 5) return saveStep5Progress();
+    return Promise.resolve();
+  };
+
+  // Saves the current step and heads back to the dashboard — the same
+  // "don't lose what's filled in" behavior as before, just relabeled
+  // to match the reference design's top-left nav link.
+  const handleBackToDashboard = () => {
+    saveCurrentStepProgress()?.catch((err) => {
+      console.error('Could not save progress:', err);
+    });
+    navigate('/dashboard');
+  };
+
+  // Saves the current step and stays on the page, with a brief
+  // confirmation — matches the reference design's "Save Draft" button.
+  const handleSaveDraft = async () => {
+    try {
+      await saveCurrentStepProgress();
+      setDraftSaved(true);
+      setTimeout(() => setDraftSaved(false), 2200);
+    } catch (err) {
+      console.error('Could not save draft:', err);
+      setError('Could not save your draft. Please try again.');
+    }
   };
 
   // ==========================================================
@@ -384,32 +437,56 @@ export function CreatorOnboarding() {
   // ==========================================================
 
   const addSocial = () => {
-    if (!socialDraft.username.trim()) {
-      return;
-    }
+    if (!socialDraft.username.trim()) return;
 
-    const newSocial: Social = {
+    setSocials([...socials, {
       platform: socialDraft.platform,
       username: socialDraft.username.trim(),
       profile_url: socialDraft.profile_url.trim(),
-      follower_count:
-        Number(socialDraft.follower_count) || 0,
-    };
+      follower_count: Number(socialDraft.follower_count) || 0,
+    }]);
 
-    setSocials([...socials, newSocial]);
-
-    setSocialDraft({
-      platform: 'instagram',
-      username: '',
-      profile_url: '',
-      follower_count: '',
-    });
+    setSocialDraft({ platform: 'instagram', username: '', profile_url: '', follower_count: '' });
   };
 
   const removeSocial = (index: number) => {
-    setSocials(
-      socials.filter((_, i) => i !== index)
-    );
+    setSocials(socials.filter((_, i) => i !== index));
+  };
+
+  // ==========================================================
+  // PORTFOLIO
+  // ==========================================================
+
+  const addPortfolioItem = () => {
+    if (!portfolioDraft.title.trim() || !portfolioDraft.media_url.trim()) return;
+
+    setPortfolio([...portfolio, {
+      title: portfolioDraft.title.trim(),
+      description: portfolioDraft.description.trim(),
+      media_url: portfolioDraft.media_url.trim(),
+      platform: portfolioDraft.platform,
+      type: portfolioDraft.type,
+    }]);
+
+    setPortfolioDraft({ title: '', description: '', media_url: '', platform: '', type: 'image' });
+  };
+
+  const removePortfolioItem = (index: number) => {
+    setPortfolio(portfolio.filter((_, i) => i !== index));
+  };
+
+  const handlePortfolioImageUpload = async (file: File) => {
+    setPortfolioError('');
+    setUploadingPortfolioImage(true);
+    try {
+      const { url } = await uploadImage(file);
+      setPortfolioDraft((d) => ({ ...d, media_url: url, type: 'image' }));
+    } catch (err: any) {
+      console.error('Portfolio image upload failed:', err);
+      setPortfolioError(err?.response?.data?.detail || 'Could not upload image. Please try again.');
+    } finally {
+      setUploadingPortfolioImage(false);
+    }
   };
 
   // ==========================================================
@@ -424,18 +501,19 @@ export function CreatorOnboarding() {
 
   const canContinueStep2 =
     creatorType !== '' &&
+    categories.length > 0 &&
+    contentTypes.length > 0 &&
     languages.length > 0 &&
     interests.length > 0 &&
     audienceAgeRanges.length > 0 &&
     audienceLocations.length > 0;
 
-  const canContinueStep3 =
-    socials.length > 0;
+  const canContinueStep3 = socials.length > 0;
 
-  const canFinish =
-    categories.length > 0 &&
-    contentTypes.length > 0 &&
-    startingPrice !== '';
+  // Portfolio is optional — always fine to move on.
+  const canContinueStep4 = true;
+
+  const canFinish = startingPrice !== '' && Number(startingPrice) >= 0;
 
   // ==========================================================
   // SUBMIT
@@ -459,42 +537,18 @@ export function CreatorOnboarding() {
       audience_location: audienceLocations,
       audience_interests: interests,
       socials,
-      // Portfolio isn't collected by this flow yet — backend defaults
-      // to an empty list, sending it explicitly just documents intent.
-      portfolio: [],
+      portfolio,
       starting_price: Number(startingPrice) || 0,
     };
 
     try {
-      console.log(
-        'Sending creator onboarding data:',
-        payload
-      );
-
-      const response =
-        await completeCreatorOnboarding(payload);
-
-      console.log(
-        'Creator onboarding complete:',
-        response
-      );
-
-      // Final sync — mirrors the full payload into context so the
-      // dashboard shows 100% (well, whatever the formula caps at)
-      // without waiting on a refetch.
+      const response = await completeCreatorOnboarding(payload);
+      console.log('Creator onboarding complete:', response);
       updateProfile?.(payload);
-
       setDone(true);
     } catch (err: any) {
-      console.error(
-        'Creator onboarding failed:',
-        err
-      );
-
-      setError(
-        err?.response?.data?.detail ||
-          'Failed to complete profile. Please try again.'
-      );
+      console.error('Creator onboarding failed:', err);
+      setError(err?.response?.data?.detail || 'Failed to complete profile. Please try again.');
     } finally {
       setIsSubmitting(false);
     }
@@ -520,422 +574,29 @@ export function CreatorOnboarding() {
           --coral: #FF8A5B;
           --good: #16a34a;
 
-          font-family:
-            Inter,
-            Poppins,
-            -apple-system,
-            BlinkMacSystemFont,
-            "Segoe UI",
-            sans-serif;
-
+          font-family: Inter, Poppins, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
           color: var(--ink);
           min-height: 100vh;
-
           background: #fbfaff;
-
-          padding: 40px 20px 80px;
-
+          padding: 32px 20px 80px;
           -webkit-font-smoothing: antialiased;
         }
 
-        .co * {
-          box-sizing: border-box;
-        }
+        .co * { box-sizing: border-box; }
+        .co button { font-family: inherit; cursor: pointer; }
 
-        .co button {
-          font-family: inherit;
-          cursor: pointer;
-        }
+        .co-shell { max-width: 620px; margin: 0 auto; }
 
-        .co-brand {
-          display: flex;
-          align-items: center;
-          gap: 8px;
-          justify-content: center;
-          margin: 0 auto 34px;
-          font-size: 15px;
-          color: var(--ink);
-          background: none;
-          border: none;
-          padding: 6px 10px;
-          border-radius: 8px;
-        }
-
-        .co-brand-clickable {
-          cursor: pointer;
-          transition: opacity .15s ease;
-        }
-
-        .co-brand-clickable:hover {
-          opacity: .7;
-        }
-
-        .co-logo {
-          font-family: 'League Spartan', sans-serif;
-          font-weight: 600;
-          letter-spacing: 0.03em;
-        }
-
-        .co-card {
-          max-width: 560px;
-          margin: 0 auto;
-          background: #fff;
-          border: 1px solid var(--line);
-          border-radius: 18px;
-          padding: 36px 40px 40px;
-          box-shadow:
-            0 30px 60px -24px rgba(232,108,62,0.16),
-            0 4px 14px rgba(17,18,23,0.04);
-        }
-
-        .co-topbar {
-          display: flex;
-          align-items: flex-start;
-          justify-content: space-between;
-          gap: 16px;
-          margin-bottom: 34px;
-        }
-
-        .co-topbar .co-steps {
-          flex: 1;
-          margin-bottom: 0;
-        }
-
-        .co-skip-link {
-          flex-shrink: 0;
-          background: none;
-          border: none;
-          font-family: inherit;
-          font-size: 12.5px;
-          font-weight: 600;
-          color: var(--ink-soft);
-          padding: 4px 2px;
-          margin-top: 2px;
-          text-decoration: underline;
-          text-underline-offset: 2px;
-        }
-
-        .co-skip-link:hover {
-          color: var(--accent);
-        }
-
-        .co-steps {
-          display: flex;
-          align-items: center;
-          margin-bottom: 34px;
-        }
-
-        .co-step {
-          display: flex;
-          align-items: center;
-          flex: 1;
-        }
-
-        .co-step:last-child {
-          flex: 0;
-        }
-
-        .co-step-dot {
-          width: 26px;
-          height: 26px;
-          border-radius: 50%;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          font-size: 12px;
-          font-weight: 700;
-          flex-shrink: 0;
-        }
-
-        .co-step-upcoming {
-          background: var(--surface);
-          color: var(--ink-soft);
-          border: 1.5px solid var(--line);
-        }
-
-        .co-step-active {
-          background: var(--accent);
-          color: #fff;
-        }
-
-        .co-step-done {
-          background: var(--good);
-          color: #fff;
-        }
-
-        .co-step-label {
-          font-size: 12.5px;
-          font-weight: 600;
-          margin-left: 8px;
-          white-space: nowrap;
-          color: var(--ink-soft);
-        }
-
-        .co-step-label-active,
-        .co-step-label-done {
-          color: var(--ink);
-        }
-
-        .co-step-line {
-          flex: 1;
-          height: 1.5px;
-          background: var(--line);
-          margin: 0 12px;
-        }
-
-        .co-step-line-done {
-          background: var(--accent);
-        }
-
-        .co-h2 {
-          font-size: 22px;
-          font-weight: 700;
-          margin: 0 0 5px;
-        }
-
-        .co-sub {
-          font-size: 13px;
-          color: var(--ink-soft);
-          margin: 0 0 28px;
-          line-height: 1.5;
-        }
-
-        .co-field {
-          margin-bottom: 20px;
-        }
-
-        .co-label {
-          display: block;
-          font-size: 12.5px;
-          font-weight: 600;
-          color: var(--ink);
-          margin-bottom: 8px;
-        }
-
-        .co-hint {
-          font-size: 11.5px;
-          color: var(--ink-soft);
-          margin-top: 6px;
-          display: flex;
-          align-items: flex-start;
-          gap: 5px;
-          line-height: 1.5;
-        }
-
-        .co-input,
-        .co-textarea,
-        .co-select {
-          width: 100%;
-          border: 1.5px solid var(--line);
-          border-radius: 9px;
-          padding: 11px 13px;
-          font-size: 13.5px;
-          font-family: inherit;
-          color: var(--ink);
-          background: #fff;
-        }
-
-        .co-input:focus,
-        .co-textarea:focus,
-        .co-select:focus {
-          outline: none;
-          border-color: var(--accent);
-        }
-
-        .co-textarea {
-          resize: vertical;
-          min-height: 76px;
-          line-height: 1.5;
-        }
-
-        .co-avatar-row {
-          display: flex;
-          align-items: center;
-          gap: 16px;
-        }
-
-        .co-avatar {
-          width: 68px;
-          height: 68px;
-          border-radius: 50%;
-          background: var(--accent-soft);
-          color: var(--accent);
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          flex-shrink: 0;
-          overflow: hidden;
-          font-size: 22px;
-          font-weight: 700;
-        }
-
-        .co-avatar img {
-          width: 100%;
-          height: 100%;
-          object-fit: cover;
-        }
-
-        .co-avatar-btn {
-          display: inline-flex;
-          align-items: center;
-          gap: 7px;
-          font-size: 12.5px;
-          font-weight: 600;
-          color: var(--ink);
-          background: #fff;
-          border: 1.5px solid var(--line);
-          padding: 9px 14px;
-          border-radius: 8px;
-        }
-
-        .co-chips {
-          display: flex;
-          flex-wrap: wrap;
-          gap: 8px;
-        }
-
-        .co-chip {
-          font-size: 12.5px;
-          font-weight: 500;
-          color: var(--ink);
-          background: var(--surface);
-          border: 1.5px solid var(--line);
-          padding: 7px 13px;
-          border-radius: 100px;
-        }
-
-        .co-chip-active {
-          background: var(--accent);
-          color: #fff;
-          border-color: var(--accent);
-        }
-
-        .co-social-list {
-          display: flex;
-          flex-direction: column;
-          gap: 8px;
-          margin-bottom: 18px;
-        }
-
-        .co-social-item {
-          display: flex;
-          align-items: center;
-          gap: 11px;
-          border: 1.5px solid var(--line);
-          border-radius: 10px;
-          padding: 10px 12px;
-        }
-
-        .co-social-icon {
-          width: 34px;
-          height: 34px;
-          border-radius: 8px;
-          background: var(--accent-soft);
-          color: var(--accent);
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          flex-shrink: 0;
-          font-size: 12px;
-          font-weight: 700;
-        }
-
-        .co-social-main {
-          flex: 1;
-          min-width: 0;
-        }
-
-        .co-social-handle {
-          font-size: 13px;
-          font-weight: 600;
-        }
-
-        .co-social-meta {
-          font-size: 11.5px;
-          color: var(--ink-soft);
-          margin-top: 1px;
-        }
-
-        .co-social-remove {
-          background: none;
-          border: none;
-          color: var(--ink-soft);
-          padding: 6px;
-          border-radius: 6px;
-        }
-
-        .co-social-form {
-          border: 1.5px dashed var(--line);
-          border-radius: 12px;
-          padding: 16px;
-        }
-
-        .co-social-form-row {
-          display: grid;
-          grid-template-columns: 1fr 1fr;
-          gap: 10px;
-          margin-bottom: 10px;
-        }
-
-        .co-add-btn {
-          width: 100%;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          gap: 7px;
-          background: var(--accent-soft);
-          color: var(--accent);
-          border: none;
-          padding: 10px;
-          border-radius: 8px;
-          font-size: 12.5px;
-          font-weight: 600;
-        }
-
-        .co-add-btn:disabled {
-          opacity: 0.5;
-          cursor: not-allowed;
-        }
-
-        .co-price-row {
-          display: flex;
-          align-items: center;
-          border: 1.5px solid var(--line);
-          border-radius: 9px;
-          overflow: hidden;
-        }
-
-        .co-price-prefix {
-          background: var(--surface);
-          padding: 11px 13px;
-          font-size: 13px;
-          font-weight: 600;
-          color: var(--ink-soft);
-          border-right: 1px solid var(--line);
-        }
-
-        .co-price-row input {
-          border: none;
-          flex: 1;
-          padding: 11px 13px;
-          font-size: 13.5px;
-          font-family: inherit;
-        }
-
-        .co-price-row input:focus {
-          outline: none;
-        }
-
-        .co-footer {
+        .co-header {
           display: flex;
           align-items: center;
           justify-content: space-between;
-          margin-top: 30px;
-          padding-top: 22px;
-          border-top: 1px solid var(--line);
+          padding-bottom: 18px;
+          margin-bottom: 22px;
+          border-bottom: 1px solid var(--line);
         }
 
-        .co-back {
+        .co-back-link {
           display: inline-flex;
           align-items: center;
           gap: 6px;
@@ -944,982 +605,556 @@ export function CreatorOnboarding() {
           color: var(--ink-soft);
           background: none;
           border: none;
-          padding: 8px 4px;
+          padding: 6px 4px;
         }
+        .co-back-link:hover { color: var(--ink); }
 
-        .co-continue {
+        .co-header-right { display: flex; align-items: center; gap: 10px; }
+
+        .co-savedraft-toast {
+          font-size: 11.5px;
+          font-weight: 600;
+          color: var(--good);
           display: inline-flex;
           align-items: center;
-          gap: 8px;
-          font-size: 14px;
-          font-weight: 600;
-          color: #fff;
-          background: var(--accent);
-          border: none;
-          padding: 12px 24px;
-          border-radius: 8px;
+          gap: 4px;
         }
 
-        .co-continue:disabled {
-          background: #ffd3bb;
-          cursor: not-allowed;
-        }
-
-        .co-done {
-          text-align: center;
-          padding: 20px 0 10px;
-        }
-
-        .co-done-icon {
-          width: 64px;
-          height: 64px;
-          border-radius: 50%;
-          background: #E1F6EA;
-          color: #16A34A;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          margin: 0 auto 20px;
-        }
-
-        .co-done-title {
-          font-size: 22px;
-          font-weight: 700;
-          margin: 0 0 8px;
-        }
-
-        .co-done-sub {
-          font-size: 14px;
-          color: var(--ink-soft);
-          margin: 0 0 28px;
-        }
-
-        .co-done-btn {
+        .co-savedraft-btn {
           display: inline-flex;
           align-items: center;
-          gap: 8px;
-          font-size: 14px;
+          gap: 7px;
+          font-size: 12.5px;
           font-weight: 600;
-          color: #fff;
-          background: var(--accent);
-          border: none;
-          padding: 13px 26px;
+          color: var(--ink);
+          background: #fff;
+          border: 1.5px solid var(--line);
+          padding: 9px 15px;
           border-radius: 8px;
+        }
+        .co-savedraft-btn:hover { border-color: var(--accent); color: var(--accent); }
+        .co-savedraft-btn:disabled { opacity: 0.6; cursor: not-allowed; }
+
+        .co-steps { display: flex; align-items: center; margin-bottom: 28px; }
+        .co-step { display: flex; align-items: center; flex: 1; }
+        .co-step:last-child { flex: 0; }
+
+        .co-step-dot {
+          width: 26px; height: 26px; border-radius: 50%;
+          display: flex; align-items: center; justify-content: center;
+          font-size: 12px; font-weight: 700; flex-shrink: 0;
+        }
+        .co-step-upcoming { background: var(--surface); color: var(--ink-soft); border: 1.5px solid var(--line); }
+        .co-step-active { background: var(--accent); color: #fff; }
+        .co-step-done { background: var(--good); color: #fff; }
+
+        .co-step-label { font-size: 11.5px; font-weight: 600; margin-left: 8px; white-space: nowrap; color: var(--ink-soft); }
+        .co-step-label-active, .co-step-label-done { color: var(--ink); }
+
+        .co-step-line { flex: 1; height: 1.5px; background: var(--line); margin: 0 10px; }
+        .co-step-line-done { background: var(--accent); }
+
+        .co-card {
+          background: #fff;
+          border: 1px solid var(--line);
+          border-radius: 18px;
+          padding: 36px 40px 40px;
+          box-shadow: 0 30px 60px -24px rgba(232,108,62,0.16), 0 4px 14px rgba(17,18,23,0.04);
         }
 
-        .co-error {
-          margin-top: 16px;
-          padding: 12px;
-          background: #fdecee;
-          color: #d1293d;
-          border-radius: 8px;
-          font-size: 13px;
-          text-align: center;
+        .co-h2 { font-size: 22px; font-weight: 700; margin: 0 0 5px; }
+        .co-sub { font-size: 13px; color: var(--ink-soft); margin: 0 0 28px; line-height: 1.5; }
+        .co-section-label { font-size: 12.5px; font-weight: 700; color: var(--ink); margin: 26px 0 14px; }
+        .co-section-label:first-of-type { margin-top: 0; }
+
+        .co-field { margin-bottom: 20px; }
+        .co-label { display: block; font-size: 12.5px; font-weight: 600; color: var(--ink); margin-bottom: 8px; }
+        .co-hint { font-size: 11.5px; color: var(--ink-soft); margin-top: 6px; display: flex; align-items: flex-start; gap: 5px; line-height: 1.5; }
+
+        .co-input, .co-textarea, .co-select {
+          width: 100%; border: 1.5px solid var(--line); border-radius: 9px;
+          padding: 11px 13px; font-size: 13.5px; font-family: inherit; color: var(--ink); background: #fff;
         }
+        .co-input:focus, .co-textarea:focus, .co-select:focus { outline: none; border-color: var(--accent); }
+        .co-textarea { resize: vertical; min-height: 76px; line-height: 1.5; }
+
+        .co-avatar-row { display: flex; align-items: center; gap: 16px; }
+        .co-avatar {
+          width: 68px; height: 68px; border-radius: 50%;
+          background: var(--accent-soft); color: var(--accent);
+          display: flex; align-items: center; justify-content: center;
+          flex-shrink: 0; overflow: hidden; font-size: 22px; font-weight: 700;
+        }
+        .co-avatar img { width: 100%; height: 100%; object-fit: cover; }
+        .co-avatar-btn { display: inline-flex; align-items: center; gap: 7px; font-size: 12.5px; font-weight: 600; color: var(--ink); background: #fff; border: 1.5px solid var(--line); padding: 9px 14px; border-radius: 8px; }
+
+        .co-chips { display: flex; flex-wrap: wrap; gap: 8px; }
+        .co-chip { font-size: 12.5px; font-weight: 500; color: var(--ink); background: var(--surface); border: 1.5px solid var(--line); padding: 7px 13px; border-radius: 100px; }
+        .co-chip-active { background: var(--accent); color: #fff; border-color: var(--accent); }
+
+        .co-social-list, .co-portfolio-list { display: flex; flex-direction: column; gap: 8px; margin-bottom: 18px; }
+        .co-social-item, .co-portfolio-item { display: flex; align-items: center; gap: 11px; border: 1.5px solid var(--line); border-radius: 10px; padding: 10px 12px; }
+        .co-social-icon, .co-portfolio-thumb {
+          width: 34px; height: 34px; border-radius: 8px; background: var(--accent-soft); color: var(--accent);
+          display: flex; align-items: center; justify-content: center; flex-shrink: 0; font-size: 12px; font-weight: 700; overflow: hidden;
+        }
+        .co-portfolio-thumb img { width: 100%; height: 100%; object-fit: cover; }
+        .co-social-main, .co-portfolio-main { flex: 1; min-width: 0; }
+        .co-social-handle, .co-portfolio-item-title { font-size: 13px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .co-social-meta, .co-portfolio-item-desc { font-size: 11.5px; color: var(--ink-soft); margin-top: 1px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .co-social-remove { background: none; border: none; color: var(--ink-soft); padding: 6px; border-radius: 6px; flex-shrink: 0; }
+        .co-social-remove:hover { color: #d1293d; }
+
+        .co-social-form, .co-portfolio-form { border: 1.5px dashed var(--line); border-radius: 12px; padding: 16px; }
+        .co-social-form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 10px; }
+        .co-portfolio-upload-row { display: flex; align-items: center; gap: 8px; margin-bottom: 12px; }
+        .co-portfolio-upload-btn { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 600; color: var(--accent); background: var(--accent-soft); border: none; padding: 9px 13px; border-radius: 8px; white-space: nowrap; }
+        .co-portfolio-upload-btn:disabled { opacity: 0.6; cursor: not-allowed; }
+        .co-portfolio-or { font-size: 11px; color: var(--ink-soft); }
+
+        .co-add-btn { width: 100%; display: flex; align-items: center; justify-content: center; gap: 7px; background: var(--accent-soft); color: var(--accent); border: none; padding: 10px; border-radius: 8px; font-size: 12.5px; font-weight: 600; }
+        .co-add-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+        .co-price-row { display: flex; align-items: center; border: 1.5px solid var(--line); border-radius: 9px; overflow: hidden; }
+        .co-price-prefix { background: var(--surface); padding: 11px 13px; font-size: 13px; font-weight: 600; color: var(--ink-soft); border-right: 1px solid var(--line); }
+        .co-price-row input { border: none; flex: 1; padding: 11px 13px; font-size: 13.5px; font-family: inherit; }
+        .co-price-row input:focus { outline: none; }
+
+        .co-recap { display: flex; flex-direction: column; gap: 14px; margin-bottom: 24px; }
+        .co-recap-card { border: 1.5px solid var(--line); border-radius: 12px; padding: 14px 16px; }
+        .co-recap-label { font-size: 11px; font-weight: 700; letter-spacing: 0.05em; text-transform: uppercase; color: var(--ink-soft); margin: 0 0 8px; }
+        .co-recap-row { display: flex; align-items: center; gap: 10px; }
+        .co-recap-name { font-size: 14px; font-weight: 700; margin: 0; }
+        .co-recap-sub { font-size: 12px; color: var(--ink-soft); margin: 1px 0 0; }
+        .co-recap-chips { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+        .co-recap-empty { font-size: 12.5px; color: var(--ink-soft); }
+
+        .co-footer { display: flex; align-items: center; justify-content: space-between; margin-top: 30px; padding-top: 22px; border-top: 1px solid var(--line); }
+        .co-back { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; font-weight: 600; color: var(--ink-soft); background: none; border: none; padding: 8px 4px; }
+        .co-continue { display: inline-flex; align-items: center; gap: 8px; font-size: 14px; font-weight: 600; color: #fff; background: var(--accent); border: none; padding: 12px 24px; border-radius: 8px; }
+        .co-continue:disabled { background: #ffd3bb; cursor: not-allowed; }
+
+        .co-done { text-align: center; padding: 20px 0 10px; }
+        .co-done-icon { width: 64px; height: 64px; border-radius: 50%; background: #E1F6EA; color: #16A34A; display: flex; align-items: center; justify-content: center; margin: 0 auto 20px; }
+        .co-done-title { font-size: 22px; font-weight: 700; margin: 0 0 8px; }
+        .co-done-sub { font-size: 14px; color: var(--ink-soft); margin: 0 0 28px; }
+        .co-done-btn { display: inline-flex; align-items: center; gap: 8px; font-size: 14px; font-weight: 600; color: #fff; background: var(--accent); border: none; padding: 13px 26px; border-radius: 8px; }
+
+        .co-error { margin-top: 16px; padding: 12px; background: #fdecee; color: #d1293d; border-radius: 8px; font-size: 13px; text-align: center; }
 
         @media (max-width: 480px) {
-          .co {
-            padding: 20px 12px 50px;
-          }
-
-          .co-card {
-            padding: 25px 20px 30px;
-          }
-
-          .co-step-label {
-            display: none;
-          }
-
-          .co-social-form-row {
-            grid-template-columns: 1fr;
-          }
-
-          .co-topbar {
-            flex-direction: column;
-            align-items: stretch;
-            gap: 10px;
-          }
-
-          .co-skip-link {
-            align-self: flex-end;
-          }
+          .co { padding: 16px 12px 50px; }
+          .co-card { padding: 25px 20px 30px; }
+          .co-step-label { display: none; }
+          .co-social-form-row { grid-template-columns: 1fr; }
+          .co-header { flex-direction: column; align-items: stretch; gap: 10px; }
         }
       `}</style>
 
-      {/* ======================================================
-          BRAND — click to jump straight to the dashboard
-      ====================================================== */}
+      <div className="co-shell">
 
-      <button
-        type="button"
-        className="co-brand co-brand-clickable"
-        onClick={() => navigate('/dashboard')}
-      >
-        <LogoMark size={20} />
-        <span className="co-logo">
-          creatorhub
-        </span>
-      </button>
+        {/* ==================================================
+            HEADER — Back to Dashboard / Save Draft
+        ================================================== */}
 
-      <div className="co-card">
+        <div className="co-header">
+          <button type="button" className="co-back-link" onClick={handleBackToDashboard}>
+            <ArrowLeft size={15} /> Back to Dashboard
+          </button>
 
-        {/* ====================================================
-            COMPLETED
-        ==================================================== */}
-
-        {done ? (
-          <div className="co-done">
-
-            <div className="co-done-icon">
-              <CheckCircle2 size={30} />
-            </div>
-
-            <p className="co-done-title">
-              Profile complete
-            </p>
-
-            <p className="co-done-sub">
-              Welcome to CreatorHub!
-            </p>
-
-            <button
-              className="co-done-btn"
-              onClick={() =>
-                navigate('/dashboard')
-              }
-            >
-              Go to Dashboard
-              <ArrowRight size={15} />
-            </button>
-
-          </div>
-        ) : (
-          <>
-            <div className="co-topbar">
-              <StepHeader step={step} />
-
-              <button
-                type="button"
-                className="co-skip-link"
-                onClick={handleSkip}
-              >
-                Skip for now
+          {!done && !loadingProgress && (
+            <div className="co-header-right">
+              {draftSaved && (
+                <span className="co-savedraft-toast">
+                  <CheckCircle2 size={13} /> Draft saved
+                </span>
+              )}
+              <button type="button" className="co-savedraft-btn" onClick={handleSaveDraft}>
+                <Save size={13} /> Save Draft
               </button>
             </div>
+          )}
+        </div>
 
-            {/* =================================================
-                STEP 1
-            ================================================= */}
+        {!done && !loadingProgress && <StepHeader step={step} />}
 
-            {step === 1 && (
-              <>
-                <h2 className="co-h2">
-                  Welcome 👋
-                </h2>
+        <div className="co-card">
 
-                <p className="co-sub">
-                  Let's set up your creator profile so
-                  businesses know who they're working with.
-                </p>
+          {done ? (
+            <div className="co-done">
+              <div className="co-done-icon"><CheckCircle2 size={30} /></div>
+              <p className="co-done-title">Profile complete</p>
+              <p className="co-done-sub">Welcome to CreatorHub!</p>
+              <button className="co-done-btn" onClick={() => navigate('/dashboard')}>
+                Go to Dashboard <ArrowRight size={15} />
+              </button>
+            </div>
+          ) : loadingProgress ? (
+            <div className="co-done" style={{ color: 'var(--ink-soft)' }}>
+              Loading your profile...
+            </div>
+          ) : (
+            <>
 
-                {/* PROFILE IMAGE */}
+              {/* ============================================
+                  STEP 1 — BASIC INFO
+              ============================================ */}
 
-                <div className="co-field">
+              {step === 1 && (
+                <>
+                  <h2 className="co-h2">Basic Info</h2>
+                  <p className="co-sub">Tell us about yourself — this is what brands will see first.</p>
 
-                  <label className="co-label">
-                    Profile picture
-                  </label>
-
-                  <div className="co-avatar-row">
-
-                    <div className="co-avatar">
-
-                      {profileImage ? (
-                        <img
-                          src={profileImage}
-                          alt="Profile"
+                  <div className="co-field">
+                    <label className="co-label">Profile picture</label>
+                    <div className="co-avatar-row">
+                      <div className="co-avatar">
+                        {profileImage ? <img src={profileImage} alt="Profile" /> : <Camera size={22} />}
+                      </div>
+                      <label className="co-avatar-btn" style={uploadingPhoto ? { opacity: 0.6, pointerEvents: 'none' } : undefined}>
+                        <Camera size={14} />
+                        {uploadingPhoto ? 'Uploading...' : 'Upload photo'}
+                        <input
+                          type="file"
+                          accept="image/*"
+                          style={{ display: 'none' }}
+                          disabled={uploadingPhoto}
+                          onChange={async (event) => {
+                            const file = event.target.files?.[0];
+                            if (!file) return;
+                            setPhotoError('');
+                            setUploadingPhoto(true);
+                            try {
+                              const { url } = await uploadImage(file);
+                              setProfileImage(url);
+                            } catch (err: any) {
+                              console.error('Photo upload failed:', err);
+                              setPhotoError(err?.response?.data?.detail || 'Could not upload photo. Please try again.');
+                            } finally {
+                              setUploadingPhoto(false);
+                              event.target.value = '';
+                            }
+                          }}
                         />
-                      ) : (
-                        'C'
-                      )}
+                      </label>
+                    </div>
+                    <p className="co-hint"><Info size={13} style={{ marginTop: 1, flexShrink: 0 }} />JPG, PNG or WebP — up to 20 MB</p>
+                    {photoError && (
+                      <p className="co-hint" style={{ color: '#E8544E' }}>
+                        <Info size={13} style={{ marginTop: 1, flexShrink: 0 }} />{photoError}
+                      </p>
+                    )}
+                  </div>
 
+                  <div className="co-field">
+                    <label className="co-label">Display Name *</label>
+                    <input className="co-input" value={displayName} onChange={(e) => setDisplayName(e.target.value)} placeholder="How brands should address you" />
+                  </div>
+
+                  <div className="co-field">
+                    <label className="co-label">Username *</label>
+                    <input className="co-input" value={username} onChange={(e) => handleUsernameChange(e.target.value)} placeholder="yourusername" />
+                    {usernameError ? (
+                      <p className="co-hint" style={{ color: '#E8544E' }}><Info size={13} style={{ marginTop: 1, flexShrink: 0 }} />{usernameError}</p>
+                    ) : username && USERNAME_REGEX.test(username) ? (
+                      <p className="co-hint" style={{ color: '#16a34a' }}><CheckCircle2 size={13} style={{ marginTop: 1, flexShrink: 0 }} />@{username} looks good</p>
+                    ) : null}
+                  </div>
+
+                  <div className="co-field">
+                    <label className="co-label">Bio</label>
+                    <textarea className="co-textarea" maxLength={500} value={bio} onChange={(e) => setBio(e.target.value)} placeholder="A short intro brands will see on your profile" />
+                    <p className="co-hint">{bio.length}/500</p>
+                  </div>
+
+                  <div className="co-field">
+                    <label className="co-label">Location *</label>
+                    <input className="co-input" value={location} onChange={(e) => setLocation(e.target.value)} placeholder="City, Province, Country" />
+                  </div>
+                </>
+              )}
+
+              {/* ============================================
+                  STEP 2 — TYPE & NICHE
+              ============================================ */}
+
+              {step === 2 && (
+                <>
+                  <h2 className="co-h2">Type & Niche</h2>
+                  <p className="co-sub">What kind of creator are you, and who's your audience?</p>
+
+                  <p className="co-section-label">Creator type *</p>
+                  <div className="co-chips" style={{ marginBottom: 22 }}>
+                    {CREATOR_TYPES.map((t) => (
+                      <Chip key={t} label={t} active={creatorType === t} onClick={() => toggleSingle(creatorType, setCreatorType, t)} />
+                    ))}
+                  </div>
+
+                  <p className="co-section-label">Content niches *</p>
+                  <div className="co-chips" style={{ marginBottom: 22 }}>
+                    {CATEGORIES.map((c) => (
+                      <Chip key={c} label={c} active={categories.includes(c)} onClick={() => toggle(categories, setCategories, c)} />
+                    ))}
+                  </div>
+
+                  <p className="co-section-label">Content types *</p>
+                  <div className="co-chips" style={{ marginBottom: 22 }}>
+                    {CONTENT_TYPES.map((c) => (
+                      <Chip key={c} label={c} active={contentTypes.includes(c)} onClick={() => toggle(contentTypes, setContentTypes, c)} />
+                    ))}
+                  </div>
+
+                  <p className="co-section-label">Languages you create in *</p>
+                  <div className="co-chips" style={{ marginBottom: 22 }}>
+                    {LANGUAGES.map((l) => (
+                      <Chip key={l} label={l} active={languages.includes(l)} onClick={() => toggle(languages, setLanguages, l)} />
+                    ))}
+                  </div>
+
+                  <p className="co-section-label">Your audience's interests *</p>
+                  <div className="co-chips" style={{ marginBottom: 22 }}>
+                    {INTERESTS.map((i) => (
+                      <Chip key={i} label={i} active={interests.includes(i)} onClick={() => toggle(interests, setInterests, i)} />
+                    ))}
+                  </div>
+
+                  <p className="co-section-label">Audience age range *</p>
+                  <div className="co-chips" style={{ marginBottom: 22 }}>
+                    {AUDIENCE_AGE_RANGES.map((a) => (
+                      <Chip key={a} label={a} active={audienceAgeRanges.includes(a)} onClick={() => toggle(audienceAgeRanges, setAudienceAgeRanges, a)} />
+                    ))}
+                  </div>
+
+                  <p className="co-section-label">Audience location *</p>
+                  <div className="co-chips">
+                    {AUDIENCE_LOCATIONS.map((l) => (
+                      <Chip key={l} label={l} active={audienceLocations.includes(l)} onClick={() => toggle(audienceLocations, setAudienceLocations, l)} />
+                    ))}
+                  </div>
+                </>
+              )}
+
+              {/* ============================================
+                  STEP 3 — SOCIALS
+              ============================================ */}
+
+              {step === 3 && (
+                <>
+                  <h2 className="co-h2">Socials</h2>
+                  <p className="co-sub">Add at least one social account so brands can verify your reach.</p>
+
+                  {socials.length > 0 && (
+                    <div className="co-social-list">
+                      {socials.map((s, i) => (
+                        <div className="co-social-item" key={`${s.platform}-${i}`}>
+                          <span className="co-social-icon">{s.platform.slice(0, 2).toUpperCase()}</span>
+                          <span className="co-social-main">
+                            <div className="co-social-handle">@{s.username}</div>
+                            <div className="co-social-meta">{s.platform} · {s.follower_count.toLocaleString()} followers</div>
+                          </span>
+                          <button className="co-social-remove" onClick={() => removeSocial(i)}><Trash2 size={15} /></button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+
+                  <div className="co-social-form">
+                    <div className="co-social-form-row">
+                      <select className="co-select" value={socialDraft.platform} onChange={(e) => setSocialDraft({ ...socialDraft, platform: e.target.value })}>
+                        {PLATFORMS.map((p) => <option key={p.id} value={p.id}>{p.label}</option>)}
+                      </select>
+                      <input className="co-input" placeholder="Username" value={socialDraft.username} onChange={(e) => setSocialDraft({ ...socialDraft, username: e.target.value })} />
+                    </div>
+                    <div className="co-social-form-row">
+                      <input className="co-input" placeholder="Profile URL (optional)" value={socialDraft.profile_url} onChange={(e) => setSocialDraft({ ...socialDraft, profile_url: e.target.value })} />
+                      <input className="co-input" type="number" min={0} placeholder="Follower count" value={socialDraft.follower_count} onChange={(e) => setSocialDraft({ ...socialDraft, follower_count: e.target.value })} />
+                    </div>
+                    <button className="co-add-btn" onClick={addSocial} disabled={!socialDraft.username.trim()}>
+                      <Plus size={14} /> Add account
+                    </button>
+                  </div>
+                </>
+              )}
+
+              {/* ============================================
+                  STEP 4 — PORTFOLIO
+              ============================================ */}
+
+              {step === 4 && (
+                <>
+                  <h2 className="co-h2">Portfolio</h2>
+                  <p className="co-sub">Show brands your best work. Optional — you can add these later too.</p>
+
+                  {portfolio.length > 0 && (
+                    <div className="co-portfolio-list">
+                      {portfolio.map((p, i) => (
+                        <div className="co-portfolio-item" key={`${p.title}-${i}`}>
+                          <span className="co-portfolio-thumb">
+                            {p.media_url ? (
+                              p.type === 'video' ? <Video size={16} /> : <img src={p.media_url} alt={p.title} />
+                            ) : (
+                              <ImageIcon size={16} />
+                            )}
+                          </span>
+                          <span className="co-portfolio-main">
+                            <div className="co-portfolio-item-title">{p.title}</div>
+                            <div className="co-portfolio-item-desc">{p.description || p.type}</div>
+                          </span>
+                          <button className="co-social-remove" onClick={() => removePortfolioItem(i)}><Trash2 size={15} /></button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+
+                  <div className="co-portfolio-form">
+                    <div className="co-field" style={{ marginBottom: 10 }}>
+                      <input className="co-input" placeholder="Title" value={portfolioDraft.title} onChange={(e) => setPortfolioDraft({ ...portfolioDraft, title: e.target.value })} />
+                    </div>
+                    <div className="co-field" style={{ marginBottom: 10 }}>
+                      <textarea className="co-textarea" style={{ minHeight: 56 }} placeholder="Description (optional)" value={portfolioDraft.description} onChange={(e) => setPortfolioDraft({ ...portfolioDraft, description: e.target.value })} />
                     </div>
 
-                    <label className="co-avatar-btn">
-
-                      <Camera size={14} />
-
-                      Upload photo
-
-                      <input
-                        type="file"
-                        accept="image/*"
-                        style={{ display: 'none' }}
-                        onChange={(event) => {
-
-                          const file =
-                            event.target.files?.[0];
-
-                          if (!file) return;
-
-                          const imageUrl =
-                            URL.createObjectURL(file);
-
-                          setProfileImage(imageUrl);
-
-                        }}
-                      />
-
-                    </label>
-
-                  </div>
-
-                </div>
-
-                {/* DISPLAY NAME */}
-
-                <div className="co-field">
-
-                  <label className="co-label">
-                    Display name
-                  </label>
-
-                  <input
-                    className="co-input"
-                    placeholder="How businesses will see your name"
-                    value={displayName}
-                    onChange={(event) =>
-                      setDisplayName(event.target.value)
-                    }
-                  />
-
-                </div>
-
-                {/* USERNAME */}
-
-                <div className="co-field">
-
-                  <label className="co-label">
-                    Username
-                  </label>
-
-                  <input
-                    className="co-input"
-                    placeholder="yourname"
-                    value={username}
-                    onChange={(event) =>
-                      handleUsernameChange(event.target.value)
-                    }
-                  />
-
-                  <p className="co-hint">
-
-                    <Info
-                      size={13}
-                      style={{
-                        marginTop: 1,
-                        flexShrink: 0,
-                      }}
-                    />
-
-                    {usernameError
-                      ? usernameError
-                      : "This becomes your CreatorHub profile URL — 3–24 characters, letters, numbers, and underscores only."}
-
-                  </p>
-
-                </div>
-
-                {/* BIO */}
-
-                <div className="co-field">
-
-                  <label className="co-label">
-                    Bio
-                  </label>
-
-                  <textarea
-                    className="co-textarea"
-                    placeholder="Tell businesses a bit about who you are and what you create..."
-                    value={bio}
-                    onChange={(event) =>
-                      setBio(event.target.value)
-                    }
-                  />
-
-                </div>
-
-                {/* LOCATION */}
-
-                <div
-                  className="co-field"
-                  style={{ marginBottom: 4 }}
-                >
-
-                  <label className="co-label">
-                    Location
-                  </label>
-
-                  <input
-                    className="co-input"
-                    placeholder="Kathmandu, Nepal"
-                    value={location}
-                    onChange={(event) =>
-                      setLocation(event.target.value)
-                    }
-                  />
-
-                </div>
-
-                <div
-                  className="co-footer"
-                  style={{
-                    justifyContent: 'flex-end',
-                  }}
-                >
-
-                  <button
-                    className="co-continue"
-                    disabled={!canContinueStep1}
-                    onClick={() => {
-                      saveStep1Progress();
-                      setStep(2);
-                    }}
-                  >
-                    Continue
-                    <ArrowRight size={15} />
-                  </button>
-
-                </div>
-
-              </>
-            )}
-
-            {/* =================================================
-                STEP 2 — AUDIENCE
-            ================================================= */}
-
-            {step === 2 && (
-              <>
-                <h2 className="co-h2">
-                  Tell us about your audience
-                </h2>
-
-                <p className="co-sub">
-                  This helps businesses understand who
-                  your content reaches.
-                </p>
-
-                {/* CREATOR TYPE */}
-
-                <div className="co-field">
-
-                  <label className="co-label">
-                    Creator type
-                  </label>
-
-                  <div className="co-chips">
-
-                    {CREATOR_TYPES.map((type) => (
-
-                      <Chip
-                        key={type}
-                        label={type}
-                        active={creatorType === type}
-                        onClick={() =>
-                          toggleSingle(
-                            creatorType,
-                            setCreatorType,
-                            type
-                          )
-                        }
-                      />
-
-                    ))}
-
-                  </div>
-
-                </div>
-
-                {/* LANGUAGES */}
-
-                <div className="co-field">
-
-                  <label className="co-label">
-                    Languages you create in
-                  </label>
-
-                  <div className="co-chips">
-
-                    {LANGUAGES.map((language) => (
-
-                      <Chip
-                        key={language}
-                        label={language}
-                        active={languages.includes(
-                          language
-                        )}
-                        onClick={() =>
-                          toggle(
-                            languages,
-                            setLanguages,
-                            language
-                          )
-                        }
-                      />
-
-                    ))}
-
-                  </div>
-
-                </div>
-
-                {/* AUDIENCE INTERESTS */}
-
-                <div className="co-field">
-
-                  <label className="co-label">
-                    What does your audience care about?
-                  </label>
-
-                  <div className="co-chips">
-
-                    {INTERESTS.map((interest) => (
-
-                      <Chip
-                        key={interest}
-                        label={interest}
-                        active={interests.includes(
-                          interest
-                        )}
-                        onClick={() =>
-                          toggle(
-                            interests,
-                            setInterests,
-                            interest
-                          )
-                        }
-                      />
-
-                    ))}
-
-                  </div>
-
-                </div>
-
-                {/* AUDIENCE AGE RANGE */}
-
-                <div className="co-field">
-
-                  <label className="co-label">
-                    Audience age range
-                  </label>
-
-                  <div className="co-chips">
-
-                    {AUDIENCE_AGE_RANGES.map((range) => (
-
-                      <Chip
-                        key={range}
-                        label={range}
-                        active={audienceAgeRanges.includes(
-                          range
-                        )}
-                        onClick={() =>
-                          toggle(
-                            audienceAgeRanges,
-                            setAudienceAgeRanges,
-                            range
-                          )
-                        }
-                      />
-
-                    ))}
-
-                  </div>
-
-                </div>
-
-                {/* AUDIENCE LOCATION */}
-
-                <div
-                  className="co-field"
-                  style={{ marginBottom: 4 }}
-                >
-
-                  <label className="co-label">
-                    Where is your audience based?
-                  </label>
-
-                  <div className="co-chips">
-
-                    {AUDIENCE_LOCATIONS.map((place) => (
-
-                      <Chip
-                        key={place}
-                        label={place}
-                        active={audienceLocations.includes(
-                          place
-                        )}
-                        onClick={() =>
-                          toggle(
-                            audienceLocations,
-                            setAudienceLocations,
-                            place
-                          )
-                        }
-                      />
-
-                    ))}
-
-                  </div>
-
-                </div>
-
-                <div className="co-footer">
-
-                  <button
-                    type="button"
-                    className="co-back"
-                    onClick={() => setStep(1)}
-                  >
-                    <ArrowLeft size={14} />
-                    Back
-                  </button>
-
-                  <button
-                    className="co-continue"
-                    disabled={!canContinueStep2}
-                    onClick={() => {
-                      saveStep2Progress();
-                      setStep(3);
-                    }}
-                  >
-                    Continue
-                    <ArrowRight size={15} />
-                  </button>
-
-                </div>
-
-              </>
-            )}
-
-            {/* =================================================
-                STEP 3 — SOCIAL MEDIA
-            ================================================= */}
-
-            {step === 3 && (
-              <>
-                <h2 className="co-h2">
-                  Connect your social profiles
-                </h2>
-
-                <p className="co-sub">
-                  Add every platform where you post
-                  content. You can add more later.
-                </p>
-
-                {/* EXISTING SOCIALS */}
-
-                {socials.length > 0 && (
-
-                  <div className="co-social-list">
-
-                    {socials.map((social, index) => {
-
-                      const platform =
-                        PLATFORMS.find(
-                          (item) =>
-                            item.id === social.platform
-                        );
-
-                      return (
-                        <div
-                          className="co-social-item"
-                          key={`${social.platform}-${index}`}
-                        >
-
-                          <span className="co-social-icon">
-
-                            {social.platform
-                              .substring(0, 2)
-                              .toUpperCase()}
-
-                          </span>
-
-                          <span className="co-social-main">
-
-                            <div className="co-social-handle">
-                              {social.username}
-                            </div>
-
-                            <div className="co-social-meta">
-
-                              {platform?.label ||
-                                social.platform}
-
-                              {' · '}
-
-                              {social.follower_count.toLocaleString()}
-
-                              {' '}
-
-                              {(
-                                platform?.handleLabel ||
-                                'Followers'
-                              ).toLowerCase()}
-
-                            </div>
-
-                          </span>
-
-                          <button
-                            type="button"
-                            className="co-social-remove"
-                            onClick={() =>
-                              removeSocial(index)
-                            }
-                          >
-                            <Trash2 size={14} />
-                          </button>
-
-                        </div>
-                      );
-
-                    })}
-
-                  </div>
-
-                )}
-
-                {/* ADD SOCIAL */}
-
-                <div className="co-social-form">
-
-                  <div className="co-social-form-row">
-
-                    <select
-                      className="co-select"
-                      value={socialDraft.platform}
-                      onChange={(event) =>
-                        setSocialDraft({
-                          ...socialDraft,
-                          platform:
-                            event.target.value,
-                        })
-                      }
-                    >
-
-                      {PLATFORMS.map((platform) => (
-
-                        <option
-                          value={platform.id}
-                          key={platform.id}
-                        >
-                          {platform.label}
-                        </option>
-
-                      ))}
-
-                    </select>
-
-                    <input
-                      className="co-input"
-                      placeholder="@username"
-                      value={socialDraft.username}
-                      onChange={(event) =>
-                        setSocialDraft({
-                          ...socialDraft,
-                          username:
-                            event.target.value,
-                        })
-                      }
-                    />
-
-                  </div>
-
-                  <div
-                    className="co-social-form-row"
-                    style={{ marginBottom: 12 }}
-                  >
-
-                    <input
-                      className="co-input"
-                      placeholder="Profile URL"
-                      value={socialDraft.profile_url}
-                      onChange={(event) =>
-                        setSocialDraft({
-                          ...socialDraft,
-                          profile_url:
-                            event.target.value,
-                        })
-                      }
-                    />
-
-                    <input
-                      className="co-input"
-                      type="number"
-                      min="0"
-                      placeholder={
-                        PLATFORMS.find(
-                          (p) =>
-                            p.id ===
-                            socialDraft.platform
-                        )?.handleLabel ||
-                        'Followers'
-                      }
-                      value={
-                        socialDraft.follower_count
-                      }
-                      onChange={(event) =>
-                        setSocialDraft({
-                          ...socialDraft,
-                          follower_count:
-                            event.target.value,
-                        })
-                      }
-                    />
-
-                  </div>
-
-                  <button
-                    type="button"
-                    className="co-add-btn"
-                    onClick={addSocial}
-                    disabled={
-                      !socialDraft.username.trim()
-                    }
-                  >
-                    <Plus size={14} />
-                    Add platform
-                  </button>
-
-                  <p className="co-hint">
-
-                    <Info
-                      size={13}
-                      style={{
-                        marginTop: 1,
-                        flexShrink: 0,
-                      }}
-                    />
-
-                    Follower and subscriber counts
-                    are self-reported for now.
-
-                  </p>
-
-                </div>
-
-                {/* FOOTER */}
-
-                <div className="co-footer">
-
-                  <button
-                    type="button"
-                    className="co-back"
-                    onClick={() => setStep(2)}
-                  >
-                    <ArrowLeft size={14} />
-                    Back
-                  </button>
-
-                  <button
-                    type="button"
-                    className="co-continue"
-                    disabled={!canContinueStep3}
-                    onClick={() => {
-                      saveStep3Progress();
-                      setStep(4);
-                    }}
-                  >
-                    Continue
-                    <ArrowRight size={15} />
-                  </button>
-
-                </div>
-
-              </>
-            )}
-
-            {/* =================================================
-                STEP 4 — CREATOR PROFILE
-            ================================================= */}
-
-            {step === 4 && (
-              <>
-                <h2 className="co-h2">
-                  What do you create?
-                </h2>
-
-                <p className="co-sub">
-                  This helps businesses find creators
-                  that fit their campaign.
-                </p>
-
-                {/* CATEGORIES */}
-
-                <div className="co-field">
-
-                  <label className="co-label">
-                    Categories
-                  </label>
-
-                  <div className="co-chips">
-
-                    {CATEGORIES.map((category) => (
-
-                      <Chip
-                        key={category}
-                        label={category}
-                        active={categories.includes(
-                          category
-                        )}
-                        onClick={() =>
-                          toggle(
-                            categories,
-                            setCategories,
-                            category
-                          )
-                        }
-                      />
-
-                    ))}
-
-                  </div>
-
-                </div>
-
-                {/* CONTENT TYPES */}
-
-                <div className="co-field">
-
-                  <label className="co-label">
-                    Content types
-                  </label>
-
-                  <div className="co-chips">
-
-                    {CONTENT_TYPES.map(
-                      (contentType) => (
-
-                        <Chip
-                          key={contentType}
-                          label={contentType}
-                          active={contentTypes.includes(
-                            contentType
-                          )}
-                          onClick={() =>
-                            toggle(
-                              contentTypes,
-                              setContentTypes,
-                              contentType
-                            )
-                          }
+                    <div className="co-portfolio-upload-row">
+                      <label className="co-portfolio-upload-btn" style={uploadingPortfolioImage ? { opacity: 0.6, pointerEvents: 'none' } : undefined}>
+                        <UploadCloud size={13} />
+                        {uploadingPortfolioImage ? 'Uploading...' : 'Upload image'}
+                        <input
+                          type="file"
+                          accept="image/*"
+                          style={{ display: 'none' }}
+                          disabled={uploadingPortfolioImage}
+                          onChange={(e) => {
+                            const file = e.target.files?.[0];
+                            if (file) handlePortfolioImageUpload(file);
+                            e.target.value = '';
+                          }}
                         />
+                      </label>
+                      <span className="co-portfolio-or">or paste a link below</span>
+                    </div>
 
-                      )
+                    <div className="co-social-form-row">
+                      <input className="co-input" placeholder="Media URL" value={portfolioDraft.media_url} onChange={(e) => setPortfolioDraft({ ...portfolioDraft, media_url: e.target.value })} />
+                      <select className="co-select" value={portfolioDraft.type} onChange={(e) => setPortfolioDraft({ ...portfolioDraft, type: e.target.value })}>
+                        {PORTFOLIO_TYPES.map((t) => <option key={t} value={t}>{t}</option>)}
+                      </select>
+                    </div>
+
+                    {portfolioError && (
+                      <p className="co-hint" style={{ color: '#E8544E', marginBottom: 10 }}>
+                        <Info size={13} style={{ marginTop: 1, flexShrink: 0 }} />{portfolioError}
+                      </p>
                     )}
 
+                    <button className="co-add-btn" onClick={addPortfolioItem} disabled={!portfolioDraft.title.trim() || !portfolioDraft.media_url.trim()}>
+                      <Plus size={14} /> Add to portfolio
+                    </button>
+                  </div>
+                </>
+              )}
+
+              {/* ============================================
+                  STEP 5 — PUBLISH
+              ============================================ */}
+
+              {step === 5 && (
+                <>
+                  <h2 className="co-h2">Publish</h2>
+                  <p className="co-sub">Review everything, set your starting price, and go live.</p>
+
+                  <div className="co-recap">
+                    <div className="co-recap-card">
+                      <p className="co-recap-label">Basic Info</p>
+                      <div className="co-recap-row">
+                        <div className="co-avatar" style={{ width: 40, height: 40, fontSize: 15 }}>
+                          {profileImage ? <img src={profileImage} alt="" /> : (displayName[0] || 'C').toUpperCase()}
+                        </div>
+                        <span>
+                          <p className="co-recap-name">{displayName || 'Unnamed creator'}</p>
+                          <p className="co-recap-sub">@{username || 'username'} · {location || 'No location'}</p>
+                        </span>
+                      </div>
+                    </div>
+
+                    <div className="co-recap-card">
+                      <p className="co-recap-label">Type & Niche</p>
+                      {creatorType && <p className="co-recap-sub" style={{ marginBottom: 8 }}>{creatorType}</p>}
+                      <div className="co-recap-chips">
+                        {[...categories, ...contentTypes].map((c) => <span className="co-chip" key={c}>{c}</span>)}
+                      </div>
+                    </div>
+
+                    <div className="co-recap-card">
+                      <p className="co-recap-label">Socials</p>
+                      {socials.length === 0 ? (
+                        <p className="co-recap-empty">None added</p>
+                      ) : (
+                        <p className="co-recap-sub">{socials.map((s) => `@${s.username} (${s.platform})`).join(', ')}</p>
+                      )}
+                    </div>
+
+                    <div className="co-recap-card">
+                      <p className="co-recap-label">Portfolio</p>
+                      <p className="co-recap-empty">
+                        {portfolio.length === 0 ? 'No items yet' : `${portfolio.length} item${portfolio.length > 1 ? 's' : ''} added`}
+                      </p>
+                    </div>
                   </div>
 
-                </div>
-
-                {/* PRICE */}
-
-                <div
-                  className="co-field"
-                  style={{ marginBottom: 4 }}
-                >
-
-                  <label className="co-label">
-                    Starting price
-                  </label>
-
-                  <div className="co-price-row">
-
-                    <span className="co-price-prefix">
-                      NPR
-                    </span>
-
-                    <input
-                      type="number"
-                      min="0"
-                      placeholder="5000"
-                      value={startingPrice}
-                      onChange={(event) =>
-                        setStartingPrice(
-                          event.target.value
-                        )
-                      }
-                    />
-
+                  <div className="co-field">
+                    <label className="co-label">Starting price (per collab) *</label>
+                    <div className="co-price-row">
+                      <span className="co-price-prefix">Rs.</span>
+                      <input type="number" min={0} value={startingPrice} onChange={(e) => setStartingPrice(e.target.value)} placeholder="5000" />
+                    </div>
                   </div>
 
-                  <p className="co-hint">
+                  {error && <div className="co-error">{error}</div>}
+                </>
+              )}
 
-                    <Info
-                      size={13}
-                      style={{
-                        marginTop: 1,
-                        flexShrink: 0,
-                      }}
-                    />
+              {/* ============================================
+                  FOOTER NAV
+              ============================================ */}
 
-                    What you'd typically charge
-                    for a single deliverable.
-
-                  </p>
-
-                </div>
-
-                {/* ERROR */}
-
-                {error && (
-                  <div className="co-error">
-                    ❌ {error}
-                  </div>
-                )}
-
-                {/* FOOTER */}
-
-                <div className="co-footer">
-
-                  <button
-                    type="button"
-                    className="co-back"
-                    onClick={() => setStep(3)}
-                  >
-                    <ArrowLeft size={14} />
-                    Back
+              <div className="co-footer">
+                {step > 1 ? (
+                  <button className="co-back" onClick={() => setStep(step - 1)}>
+                    <ArrowLeft size={14} /> Previous
                   </button>
+                ) : <span />}
 
+                {step < 5 ? (
                   <button
-                    type="button"
                     className="co-continue"
                     disabled={
-                      !canFinish ||
-                      isSubmitting
+                      (step === 1 && !canContinueStep1) ||
+                      (step === 2 && !canContinueStep2) ||
+                      (step === 3 && !canContinueStep3) ||
+                      (step === 4 && !canContinueStep4)
                     }
-                    onClick={handleFinish}
+                    onClick={() => {
+                      if (step === 1) saveStep1Progress()?.catch((e) => console.error(e));
+                      if (step === 2) saveStep2Progress()?.catch((e) => console.error(e));
+                      if (step === 3) saveStep3Progress()?.catch((e) => console.error(e));
+                      if (step === 4) saveStep4Progress()?.catch((e) => console.error(e));
+                      setStep(step + 1);
+                    }}
                   >
-
-                    {isSubmitting
-                      ? 'Saving...'
-                      : 'Complete Profile'}
-
-                    <ArrowRight size={15} />
-
+                    Next <ArrowRight size={15} />
                   </button>
+                ) : (
+                  <button className="co-continue" disabled={!canFinish || isSubmitting} onClick={handleFinish}>
+                    {isSubmitting ? 'Publishing...' : 'Publish Profile'}
+                    <ArrowRight size={15} />
+                  </button>
+                )}
+              </div>
 
-                </div>
+            </>
+          )}
 
-              </>
-            )}
-
-          </>
-        )}
-
+        </div>
       </div>
     </div>
   );

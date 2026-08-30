@@ -82,3 +82,41 @@ class CreatorOnboardingComplete(BaseModel):
 
     # ===== PRICING =====
     starting_price: float = Field(..., ge=0)
+
+# ============================================
+# PARTIAL PROGRESS (resume-where-you-left-off)
+# ============================================
+# Same fields as CreatorOnboardingComplete, but every field is optional
+# and unconstrained (no min_items/min_length) since a single step's
+# "Continue" click only ever has a slice of the full picture filled
+# in. The PATCH /creator/progress route below only touches whatever
+# fields are actually present in the request (`exclude_unset=True`),
+# so this never wipes out data from a step the client didn't send.
+
+class CreatorOnboardingProgress(BaseModel):
+    # ===== BASIC INFO =====
+    display_name: Optional[str] = None
+    username: Optional[str] = Field(None, min_length=3, max_length=24, pattern=r"^[a-zA-Z0-9_]+$")
+    bio: Optional[str] = Field(None, max_length=500)
+    location: Optional[str] = None
+    profile_image: Optional[str] = None
+
+    # ===== TYPE & NICHE =====
+    creator_type: Optional[str] = None
+    niches: Optional[List[str]] = None
+    content_languages: Optional[List[str]] = None
+    content_types: Optional[List[str]] = None
+
+    # ===== AUDIENCE =====
+    audience_age_range: Optional[List[str]] = None
+    audience_location: Optional[List[str]] = None
+    audience_interests: Optional[List[str]] = None
+
+    # ===== SOCIALS =====
+    socials: Optional[List[CreatorSocialBase]] = None
+
+    # ===== PORTFOLIO =====
+    portfolio: Optional[List[CreatorPortfolioItem]] = None
+
+    # ===== PRICING =====
+    starting_price: Optional[float] = Field(None, ge=0)

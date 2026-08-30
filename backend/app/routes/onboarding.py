@@ -4,7 +4,7 @@ from sqlalchemy.exc import IntegrityError
 
 from app.database import get_db
 from app.models import User, CreatorProfile, CreatorSocial, BusinessProfile
-from app.schemas.creator import CreatorOnboardingComplete
+from app.schemas.creator import CreatorOnboardingComplete, CreatorOnboardingProgress
 from app.schemas.business import BusinessOnboardingComplete
 from app.dependencies.auth import get_current_user
 
@@ -96,6 +96,97 @@ async def complete_creator_onboarding(
     return {
         "message": "Creator onboarding completed successfully",
         "profile": profile
+    }
+
+
+# ============================================
+# CREATOR ONBOARDING — PARTIAL PROGRESS
+# ============================================
+# This is the endpoint that was missing before: `saveStep1Progress` /
+# `saveStep2Progress` / `saveStep3Progress` on the frontend used to
+# only update AuthContext's client-side, localStorage-backed cache —
+# nothing was ever sent to the server. So refreshing, switching
+# browsers, or the cache getting cleared would silently drop all
+# progress. This upserts just the fields the current step actually
+# collected, without requiring the full onboarding payload and without
+# marking the profile complete/published.
+
+@router.patch("/creator/progress")
+async def save_creator_progress(
+    data: CreatorOnboardingProgress,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    if current_user.role != "creator":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Only creators can update creator onboarding progress"
+        )
+
+    profile = db.query(CreatorProfile).filter(CreatorProfile.user_id == current_user.id).first()
+    if not profile:
+        profile = CreatorProfile(user_id=current_user.id)
+        db.add(profile)
+
+    # Only fields actually present in this step's payload — a step 2
+    # save must never overwrite step 1's fields with None just because
+    # they weren't part of this particular request.
+    fields = data.dict(exclude_unset=True, exclude={"socials", "portfolio"})
+
+    # Client-facing field name -> DB column name, same mapping as
+    # complete_creator_onboarding above (niches -> categories,
+    # content_languages -> languages, audience_interests -> interests).
+    field_map = {
+        "display_name": "display_name",
+        "username": "username",
+        "bio": "bio",
+        "location": "location",
+        "profile_image": "profile_image",
+        "creator_type": "creator_type",
+        "niches": "categories",
+        "content_types": "content_types",
+        "content_languages": "languages",
+        "audience_age_range": "audience_age_range",
+        "audience_location": "audience_location",
+        "audience_interests": "interests",
+        "starting_price": "starting_price",
+    }
+
+    for client_field, value in fields.items():
+        column = field_map.get(client_field)
+        if column:
+            setattr(profile, column, value)
+
+    if data.portfolio is not None:
+        profile.portfolio = [item.dict() for item in data.portfolio]
+
+    if data.socials is not None:
+        db.query(CreatorSocial).filter(CreatorSocial.creator_id == profile.id).delete()
+
+        for social in data.socials:
+            db.add(CreatorSocial(
+                creator_id=profile.id,
+                platform=social.platform,
+                username=social.username,
+                profile_url=social.profile_url,
+                follower_count=social.follower_count or 0,
+                is_verified=social.is_verified or False,
+            ))
+
+    try:
+        db.commit()
+    except IntegrityError:
+        db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="That username is already taken. Please choose another."
+        )
+
+    db.refresh(profile)
+
+    return {
+        "profile": profile,
+        "socials": profile.socials
     }
 
 
