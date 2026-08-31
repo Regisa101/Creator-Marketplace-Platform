@@ -75,23 +75,32 @@ const BASE_COMPLETION = 22;
 // CreatorOnboardingComplete in app/schemas/creator.py). `profile_image`
 // and `portfolio` are intentionally excluded: both are optional on the
 // backend, so they shouldn't gate completion.
-const CREATOR_PROFILE_FIELDS = [
+//
+// Some entries are arrays of aliases rather than a single string: the
+// backend's computed User.profile property (models/user.py) returns
+// client-facing names (niches, content_languages, audience_interests),
+// but a couple of older code paths — namely GET /onboarding/creator/profile
+// via getCreatorProgress() — still return raw DB column names
+// (categories, languages, interests) for the same data. Checking both
+// means completion % stays correct regardless of which one populated
+// user.profile at the time.
+const CREATOR_PROFILE_FIELDS: Array<string | string[]> = [
   'display_name',
   'username',
   'bio',
   'location',
   'creator_type',
-  'niches',
+  ['niches', 'categories'],
   'content_types',
-  'content_languages',
+  ['content_languages', 'languages'],
+  ['audience_interests', 'interests'],
   'audience_age_range',
   'audience_location',
-  'audience_interests',
   'socials',
   'starting_price',
 ];
 
-const BUSINESS_PROFILE_FIELDS = [
+const BUSINESS_PROFILE_FIELDS: Array<string | string[]> = [
   'company_name',
   'business_type',
   'industry',
@@ -113,10 +122,15 @@ function isFieldFilled(value: unknown): boolean {
   return Boolean(value);
 }
 
+function isAnyAliasFilled(profile: Record<string, any>, key: string | string[]): boolean {
+  const aliases = Array.isArray(key) ? key : [key];
+  return aliases.some((alias) => isFieldFilled(profile[alias]));
+}
+
 function calculateProfileCompletion(profile: Record<string, any> | undefined, role: 'creator' | 'business'): number {
   const fields = role === 'creator' ? CREATOR_PROFILE_FIELDS : BUSINESS_PROFILE_FIELDS;
   if (!profile) return BASE_COMPLETION;
-  const filled = fields.filter((key) => isFieldFilled(profile[key])).length;
+  const filled = fields.filter((key) => isAnyAliasFilled(profile, key)).length;
   const onboardingPortion = (filled / fields.length) * (100 - BASE_COMPLETION);
   return Math.min(100, Math.round(BASE_COMPLETION + onboardingPortion));
 }
@@ -175,12 +189,16 @@ export const Dashboard = () => {
   const profileCompletion = calculateProfileCompletion(user?.profile, role);
 
   // "Complete Profile" (sidebar CTA) always goes to the onboarding form
-  // to finish/edit. "Edit profile" in the user menu now goes to the
-  // real, view-only profile page for creators (which has its own Edit
-  // button back into onboarding); business has no profile page yet,
-  // so it still falls back to onboarding directly.
+  // to finish/edit. "Edit profile" in the user menu goes to the real,
+  // view-only profile page — /profile now renders CreatorProfile or
+  // BusinessProfile depending on role (see App.tsx), so both roles use
+  // the same URL.
   const profileEditRoute = `/onboarding/${role}`;
-  const profileViewRoute = role === 'creator' ? '/profile' : profileEditRoute;
+  const profileViewRoute = '/profile';
+
+  // Prefer the actual uploaded photo/logo; initials are the fallback
+  // for accounts that haven't uploaded one yet.
+  const avatarUrl: string | null = user?.profile?.profile_image || user?.profile?.logo_url || null;
 
   const NAV = role === 'creator'
     ? [
@@ -350,8 +368,12 @@ export const Dashboard = () => {
         {/* User chip */}
         <div className="relative mt-4">
           <button onClick={() => setMenuOpen((v) => !v)} className="flex w-full items-center gap-2.5 rounded-lg px-2 py-2">
-            <div className="flex h-8 w-8 items-center justify-center rounded-full text-xs font-semibold text-white" style={{ background: primary }}>
-              {initials}
+            <div className="flex h-8 w-8 items-center justify-center overflow-hidden rounded-full text-xs font-semibold text-white" style={{ background: primary }}>
+              {avatarUrl ? (
+                <img src={avatarUrl} alt="" className="h-full w-full object-cover" />
+              ) : (
+                initials
+              )}
             </div>
             <div className="flex-1 text-left">
               <div className="text-xs font-medium leading-tight" style={{ color: C.ink }}>{user?.full_name}</div>

@@ -1,19 +1,10 @@
-from app.schemas.user import (
-    UserBase,
-    UserCreate,
-    UserLogin,
-    UserResponse,
-    TokenResponse
-)
+"""
+ROUTES PACKAGE
+--------------
+This makes all routes available from one place.
+"""
 
-from app.schemas.creator import (
-    CreatorPortfolioItem,
-    CreatorSocialBase,
-    CreatorSocialConnect,
-    CreatorSocialsData,
-    CreatorOnboardingComplete
-)
-
-from app.schemas.business import (
-    BusinessOnboardingComplete
-)
+from app.routes import auth
+from app.routes import onboarding
+from app.routes import campaigns
+from app.routes import applications

@@ -1,5 +1,5 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
-import { AuthProvider } from './context/AuthContext';
+import { AuthProvider, useAuth } from './context/AuthContext';
 import { AuthCard } from './pages/Authcard';
 import { Dashboard } from './pages/Dashboard';
 import { Landing } from './pages/Landing';
@@ -7,6 +7,16 @@ import { ProtectedRoute } from './components/ProtectedRoute';
 import { CreatorOnboarding } from './pages/onboarding/CreatorOnboarding';
 import { BusinessOnboarding } from './pages/onboarding/BusinessOnboarding';
 import { CreatorProfile } from './pages/CreatorProfile';
+import { BusinessProfile } from './pages/BusinessProfile';
+
+// /profile renders the right page for whoever's logged in, so both
+// roles share one URL (Dashboard.tsx's "Edit profile" link just points
+// at /profile regardless of role) instead of needing two routes.
+function ProfileRouter() {
+  const { user } = useAuth();
+  if (user?.role === 'business') return <BusinessProfile />;
+  return <CreatorProfile />;
+}
 
 function App() {
   return (
@@ -50,7 +60,7 @@ function App() {
             path="/profile"
             element={
               <ProtectedRoute>
-                <CreatorProfile />
+                <ProfileRouter />
               </ProtectedRoute>
             }
           />

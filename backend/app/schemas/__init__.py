@@ -1,9 +1,3 @@
-"""
-SCHEMAS PACKAGE
----------------
-This makes all schemas available from one place.
-"""
-
 from app.schemas.user import (
     UserBase,
     UserCreate,
@@ -13,11 +7,27 @@ from app.schemas.user import (
 )
 
 from app.schemas.creator import (
+    CreatorPortfolioItem,
     CreatorSocialBase,
-    CreatorOnboardingComplete,
-    CreatorOnboardingProgress
+    CreatorSocialConnect,
+    CreatorSocialsData,
+    CreatorOnboardingComplete
 )
 
 from app.schemas.business import (
     BusinessOnboardingComplete
+)
+
+from app.schemas.campaign import (
+    CampaignBase,
+    CampaignCreate,
+    CampaignUpdate,
+    CampaignResponse
+)
+
+from app.schemas.application import (
+    ApplicationBase,
+    ApplicationCreate,
+    ApplicationUpdate,
+    ApplicationResponse
 )

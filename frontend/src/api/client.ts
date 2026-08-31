@@ -52,13 +52,11 @@ export interface User {
   is_active: boolean;
   created_at: string;
   last_login: string | null;
-  // Not returned by GET /auth/me today — there's no backend field or
-  // partial-save endpoint for onboarding-in-progress yet. This exists
-  // purely so AuthContext's client-side updateProfile() (localStorage-
-  // backed, same-browser only) can attach onboarding data to `user`
-  // without `any` casts. Once a real partial-save endpoint exists and
-  // /auth/me starts returning saved profile data, this becomes the
-  // real source of truth too.
+  // Returned by /auth/register, /auth/login, and /auth/me — see the
+  // computed `profile` property on the User model (models/user.py).
+  // This is the real, server-persisted profile; AuthContext's
+  // updateProfile() also writes here optimistically before the network
+  // round-trip finishes, so this can briefly hold client-only data too.
   profile?: Record<string, any>;
 }
 
@@ -114,11 +112,13 @@ export interface BusinessOnboardingData {
   location?: string;
   website?: string;
   description?: string;
-  logo_url?: string;
+  logo_url?: string | null;
   contact_phone?: string;
   interested_categories?: string[];
   preferred_content_types?: string[];
   typical_budget?: number;
+  team_size?: string;
+  year_established?: number;
 }
 
 // ============================================
@@ -178,6 +178,28 @@ export const saveCreatorProgress = async (
 export const getCreatorProgress = async (): Promise<{ profile: any; socials: any[] } | null> => {
   try {
     const response = await api.get('/onboarding/creator/profile');
+    return response.data;
+  } catch (error: any) {
+    if (error?.response?.status === 404) {
+      return null;
+    }
+    throw error;
+  }
+};
+
+// Same pattern as the creator progress functions above, for business.
+export type BusinessOnboardingProgressData = Partial<BusinessOnboardingData>;
+
+export const saveBusinessProgress = async (
+  data: BusinessOnboardingProgressData
+): Promise<any> => {
+  const response = await api.patch('/onboarding/business/progress', data);
+  return response.data;
+};
+
+export const getBusinessProgress = async (): Promise<{ profile: any } | null> => {
+  try {
+    const response = await api.get('/onboarding/business/profile');
     return response.data;
   } catch (error: any) {
     if (error?.response?.status === 404) {

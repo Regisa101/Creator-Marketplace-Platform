@@ -5,7 +5,7 @@ from sqlalchemy.exc import IntegrityError
 from app.database import get_db
 from app.models import User, CreatorProfile, CreatorSocial, BusinessProfile
 from app.schemas.creator import CreatorOnboardingComplete, CreatorOnboardingProgress
-from app.schemas.business import BusinessOnboardingComplete
+from app.schemas.business import BusinessOnboardingComplete, BusinessOnboardingProgress
 from app.dependencies.auth import get_current_user
 
 router = APIRouter(prefix="/api/onboarding", tags=["Onboarding"])
@@ -243,6 +243,43 @@ async def complete_business_onboarding(
         "message": "Business onboarding completed successfully",
         "profile": profile
     }
+
+
+# ============================================
+# BUSINESS ONBOARDING — PARTIAL PROGRESS
+# ============================================
+# Mirrors PATCH /creator/progress: upserts just the fields the current
+# step collected, without requiring the full onboarding payload and
+# without marking the profile complete/published. No field-name
+# remapping needed here (unlike creator's niches->categories etc.) —
+# BusinessOnboardingProgress's field names already match the
+# BusinessProfile column names 1:1.
+
+@router.patch("/business/progress")
+async def save_business_progress(
+    data: BusinessOnboardingProgress,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    if current_user.role != "business":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Only businesses can update business onboarding progress"
+        )
+
+    profile = db.query(BusinessProfile).filter(BusinessProfile.user_id == current_user.id).first()
+    if not profile:
+        profile = BusinessProfile(user_id=current_user.id, company_name=data.company_name or "")
+        db.add(profile)
+
+    fields = data.dict(exclude_unset=True)
+    for field_name, value in fields.items():
+        setattr(profile, field_name, value)
+
+    db.commit()
+    db.refresh(profile)
+
+    return {"profile": profile}
 
 
 # ============================================

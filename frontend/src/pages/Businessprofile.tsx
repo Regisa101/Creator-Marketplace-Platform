@@ -1,0 +1,358 @@
+import { useEffect, useState } from 'react';
+import { Link, useNavigate } from 'react-router-dom';
+import {
+  ArrowLeft,
+  MapPin,
+  Globe,
+  Pencil,
+  BadgeCheck,
+  Clock,
+  Phone,
+  ExternalLink,
+  Building2,
+  Users,
+} from 'lucide-react';
+
+import { useAuth } from '../context/AuthContext';
+import { getBusinessProgress } from '../api/client';
+
+const CORAL = '#FF8A5B';
+const VIOLET = '#6C5DD3';
+const VIOLET_DARK = '#4A3BA8';
+
+export function BusinessProfile() {
+  const { user } = useAuth();
+  const navigate = useNavigate();
+
+  const [profile, setProfile] = useState<any>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+
+  useEffect(() => {
+    let cancelled = false;
+
+    (async () => {
+      try {
+        const data = await getBusinessProgress();
+        if (!cancelled) {
+          setProfile(data?.profile ?? null);
+        }
+      } catch (err) {
+        console.error('Could not load profile:', err);
+        if (!cancelled) setError('Could not load your profile right now.');
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const companyName = profile?.company_name || user?.full_name || 'Business';
+  const initial = companyName[0]?.toUpperCase() ?? 'B';
+
+  return (
+    <div className="bp">
+      <style>{`
+        .bp {
+          --coral: ${CORAL};
+          --violet: ${VIOLET};
+          --violet-dark: ${VIOLET_DARK};
+          --ink: #111217;
+          --ink-soft: #6c6d73;
+          --line: #e6e6ea;
+          font-family: 'Poppins', -apple-system, Helvetica, Arial, sans-serif;
+          min-height: 100vh;
+          background: #fbfaff;
+          color: var(--ink);
+        }
+        .bp * { box-sizing: border-box; }
+        .bp-topbar {
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          padding: 16px 32px;
+          border-bottom: 1px solid var(--line);
+          background: #fff;
+        }
+        .bp-back {
+          display: inline-flex;
+          align-items: center;
+          gap: 6px;
+          font-size: 13.5px;
+          font-weight: 500;
+          color: var(--ink-soft);
+          background: none;
+          border: none;
+          cursor: pointer;
+          padding: 6px 4px;
+        }
+        .bp-back:hover { color: var(--ink); }
+
+        .bp-body { max-width: 880px; margin: 0 auto; padding: 32px 24px 64px; }
+
+        .bp-card {
+          background: #fff;
+          border: 1px solid var(--line);
+          border-radius: 18px;
+          overflow: hidden;
+        }
+        .bp-cover {
+          height: 150px;
+          background: linear-gradient(120deg, var(--violet) 0%, var(--violet-dark) 55%, var(--coral) 130%);
+        }
+        .bp-header {
+          padding: 0 32px 24px;
+          position: relative;
+        }
+        .bp-avatar {
+          width: 104px;
+          height: 104px;
+          border-radius: 24px;
+          border: 5px solid #fff;
+          margin-top: -52px;
+          background: var(--violet);
+          color: #fff;
+          font-size: 34px;
+          font-weight: 700;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          overflow: hidden;
+        }
+        .bp-avatar img { width: 100%; height: 100%; object-fit: cover; }
+
+        .bp-header-row {
+          display: flex;
+          align-items: flex-start;
+          justify-content: space-between;
+          gap: 16px;
+          margin-top: 14px;
+          flex-wrap: wrap;
+        }
+        .bp-name { font-size: 24px; font-weight: 700; margin: 0; }
+        .bp-type { font-size: 13.5px; color: var(--ink-soft); margin: 2px 0 10px; }
+        .bp-meta { display: flex; flex-wrap: wrap; gap: 16px; font-size: 13px; color: var(--ink-soft); }
+        .bp-meta span { display: inline-flex; align-items: center; gap: 5px; }
+        .bp-meta a { color: inherit; text-decoration: none; }
+        .bp-meta a:hover { color: var(--violet); }
+
+        .bp-edit-btn {
+          display: inline-flex;
+          align-items: center;
+          gap: 6px;
+          font-size: 13px;
+          font-weight: 600;
+          color: #fff;
+          background: var(--violet);
+          border: none;
+          padding: 9px 16px;
+          border-radius: 9px;
+          cursor: pointer;
+          white-space: nowrap;
+          text-decoration: none;
+          transition: background 0.15s ease;
+        }
+        .bp-edit-btn:hover { background: var(--violet-dark); }
+
+        .bp-badges { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 16px; }
+        .bp-badge {
+          font-size: 11.5px;
+          font-weight: 600;
+          padding: 5px 12px;
+          border-radius: 100px;
+        }
+        .bp-badge-pending { background: #F1EEFC; color: #6c6d73; }
+        .bp-badge-verified { background: #E1F6EA; color: #16a34a; display: inline-flex; align-items: center; gap: 4px; }
+        .bp-badge-tag { background: #EDEAFB; color: var(--violet-dark); }
+
+        .bp-section { padding: 24px 32px; border-top: 1px solid var(--line); }
+        .bp-section-title {
+          font-size: 11.5px;
+          font-weight: 700;
+          letter-spacing: 0.06em;
+          text-transform: uppercase;
+          color: var(--ink-soft);
+          margin: 0 0 12px;
+        }
+        .bp-about {
+          font-size: 14px;
+          line-height: 1.65;
+          color: var(--ink);
+          margin: 0;
+          white-space: pre-wrap;
+        }
+
+        .bp-chip-row { display: flex; flex-wrap: wrap; gap: 8px; }
+        .bp-chip {
+          font-size: 12.5px;
+          font-weight: 600;
+          padding: 6px 13px;
+          border-radius: 100px;
+          background: #FFEEE5;
+          color: #E86B3E;
+        }
+
+        .bp-info-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 12px; }
+        .bp-info-card {
+          display: flex;
+          align-items: center;
+          gap: 12px;
+          border: 1px solid var(--line);
+          border-radius: 12px;
+          padding: 12px 14px;
+        }
+        .bp-info-icon {
+          width: 36px;
+          height: 36px;
+          border-radius: 9px;
+          background: #EDEAFB;
+          color: var(--violet-dark);
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          flex-shrink: 0;
+        }
+        .bp-info-label { font-size: 11px; color: var(--ink-soft); margin: 0; }
+        .bp-info-value { font-size: 13px; font-weight: 600; margin: 1px 0 0; }
+        .bp-info-value a { color: inherit; text-decoration: none; display: inline-flex; align-items: center; gap: 4px; }
+        .bp-info-value a:hover { color: var(--violet); }
+
+        .bp-empty { font-size: 13.5px; color: var(--ink-soft); }
+        .bp-loading, .bp-error { text-align: center; padding: 80px 20px; color: var(--ink-soft); font-size: 14px; }
+      `}</style>
+
+      <div className="bp-topbar">
+        <button className="bp-back" onClick={() => navigate('/dashboard')}>
+          <ArrowLeft size={15} /> Back to Dashboard
+        </button>
+      </div>
+
+      <div className="bp-body">
+        {loading ? (
+          <div className="bp-loading">Loading your profile...</div>
+        ) : error ? (
+          <div className="bp-error">{error}</div>
+        ) : (
+          <div className="bp-card">
+            <div className="bp-cover" />
+
+            <div className="bp-header">
+              <div className="bp-avatar">
+                {profile?.logo_url ? (
+                  <img src={profile.logo_url} alt={companyName} />
+                ) : (
+                  initial
+                )}
+              </div>
+
+              <div className="bp-header-row">
+                <div>
+                  <p className="bp-name">{companyName}</p>
+                  {profile?.business_type && (
+                    <p className="bp-type">{profile.business_type}</p>
+                  )}
+                  <div className="bp-meta">
+                    {profile?.industry && (
+                      <span><Building2 size={13} /> {profile.industry}</span>
+                    )}
+                    {profile?.location && (
+                      <span><MapPin size={13} /> {profile.location}</span>
+                    )}
+                    {profile?.website && (
+                      <span>
+                        <Globe size={13} />
+                        <a href={profile.website} target="_blank" rel="noreferrer">{profile.website}</a>
+                      </span>
+                    )}
+                  </div>
+                </div>
+
+                <Link to="/onboarding/business" className="bp-edit-btn">
+                  <Pencil size={13} /> Edit Profile
+                </Link>
+              </div>
+
+              <div className="bp-badges">
+                {profile?.is_onboarding_complete ? (
+                  <span className="bp-badge bp-badge-verified">
+                    <BadgeCheck size={13} /> Published
+                  </span>
+                ) : (
+                  <span className="bp-badge bp-badge-pending">
+                    <Clock size={12} style={{ marginRight: 3 }} />
+                    Verification Pending
+                  </span>
+                )}
+                {Array.isArray(profile?.interested_categories) &&
+                  profile.interested_categories.map((c: string) => (
+                    <span className="bp-badge bp-badge-tag" key={c}>{c}</span>
+                  ))}
+              </div>
+            </div>
+
+            {profile?.description && (
+              <div className="bp-section">
+                <p className="bp-section-title">About</p>
+                <p className="bp-about">{profile.description}</p>
+              </div>
+            )}
+
+            {Array.isArray(profile?.preferred_content_types) && profile.preferred_content_types.length > 0 && (
+              <div className="bp-section">
+                <p className="bp-section-title">Preferred Content Types</p>
+                <div className="bp-chip-row">
+                  {profile.preferred_content_types.map((c: string) => (
+                    <span className="bp-chip" key={c}>{c}</span>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            <div className="bp-section">
+              <p className="bp-section-title">Company Info</p>
+              <div className="bp-info-grid">
+                <div className="bp-info-card">
+                  <span className="bp-info-icon"><Users size={16} /></span>
+                  <span>
+                    <p className="bp-info-label">Team size</p>
+                    <p className="bp-info-value">{profile?.team_size || 'Not specified'}</p>
+                  </span>
+                </div>
+                <div className="bp-info-card">
+                  <span className="bp-info-icon"><Phone size={16} /></span>
+                  <span>
+                    <p className="bp-info-label">Contact</p>
+                    <p className="bp-info-value">{profile?.contact_phone || 'Not specified'}</p>
+                  </span>
+                </div>
+                {typeof profile?.typical_budget === 'number' && profile.typical_budget > 0 && (
+                  <div className="bp-info-card">
+                    <span className="bp-info-icon"><ExternalLink size={16} /></span>
+                    <span>
+                      <p className="bp-info-label">Typical budget</p>
+                      <p className="bp-info-value">Rs. {profile.typical_budget.toLocaleString()}</p>
+                    </span>
+                  </div>
+                )}
+                {profile?.year_established && (
+                  <div className="bp-info-card">
+                    <span className="bp-info-icon"><Building2 size={16} /></span>
+                    <span>
+                      <p className="bp-info-label">Established</p>
+                      <p className="bp-info-value">{profile.year_established}</p>
+                    </span>
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+export default BusinessProfile;

@@ -1,5 +1,5 @@
 from pydantic import BaseModel, EmailStr, Field
-from typing import Optional
+from typing import Optional, Dict, Any
 from datetime import datetime
 
 # ============================================
@@ -32,6 +32,10 @@ class UserResponse(UserBase):
     is_active: bool
     created_at: datetime
     last_login: Optional[datetime] = None
+    # Populated from User.profile (a computed property in models/user.py,
+    # not a DB column) — this is what makes profile data survive a
+    # logout/login instead of only existing in the frontend's cache.
+    profile: Optional[Dict[str, Any]] = None
     
     class Config:
         from_attributes = True
