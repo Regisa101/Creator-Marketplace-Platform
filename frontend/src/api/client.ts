@@ -210,6 +210,195 @@ export const getBusinessProgress = async (): Promise<{ profile: any } | null> =>
 };
 
 // ============================================
+// CAMPAIGNS
+// ============================================
+
+// Mirrors backend/app/schemas/campaign.py::ChecklistItem
+export interface ChecklistItem {
+  text: string;
+  checked: boolean;
+}
+
+// Mirrors backend/app/schemas/campaign.py::VideoSpec
+export interface VideoSpec {
+  platform: string;
+  duration?: string;
+  aspect_ratio?: string;
+  voiceover_required: boolean;
+  subtitles_required: boolean;
+}
+
+export type CampaignType = 'paid' | 'gifted';
+export type CampaignStatus =
+  | 'draft'
+  | 'published'
+  | 'in_progress'
+  | 'completed'
+  | 'cancelled'
+  | 'closed';
+
+// Mirrors backend/app/schemas/campaign.py::CampaignResponse
+export interface Campaign {
+  id: number;
+  business_id: number;
+  title: string;
+  tagline?: string | null;
+  description: string;
+  brief?: string | null;
+  category: string;
+  sub_category?: string | null;
+  campaign_type: CampaignType;
+  brand_name?: string | null;
+  brand_location?: string | null;
+  budget?: number | null;
+  compensation_description?: string | null;
+  requirements?: string | null;
+  deliverables?: string[] | null;
+  checklist?: ChecklistItem[] | null;
+  required_scenes?: string[] | null;
+  video_specs?: VideoSpec[] | null;
+  dos?: string[] | null;
+  donts?: string[] | null;
+  suggested_caption?: string | null;
+  hashtags?: string[] | null;
+  deadline?: string | null;
+  hero_image?: string | null;
+  status: CampaignStatus;
+  is_active: boolean;
+  created_at: string;
+  updated_at?: string | null;
+  application_count: number;
+}
+
+export interface CampaignListResponse {
+  campaigns: Campaign[];
+  total: number;
+  page: number;
+  limit: number;
+  pages: number;
+}
+
+export interface CampaignListParams {
+  status?: string;
+  category?: string;
+  search?: string;
+  page?: number;
+  limit?: number;
+}
+
+// GET /api/campaigns - list (creators see published only, businesses see their own)
+export const getCampaigns = async (
+  params?: CampaignListParams
+): Promise<CampaignListResponse> => {
+  const response = await api.get<CampaignListResponse>('/campaigns', { params });
+  return response.data;
+};
+
+// GET /api/campaigns/{id} - single campaign detail
+export const getCampaign = async (id: number | string): Promise<Campaign> => {
+  const response = await api.get<Campaign>(`/campaigns/${id}`);
+  return response.data;
+};
+
+// Payload for POST /api/campaigns. Every field here mirrors
+// CampaignCreate in backend/app/schemas/campaign.py — only `title`,
+// `description`, and `category` are actually required server-side,
+// everything else is optional and can be filled in across later form
+// slices without breaking this type.
+export interface CampaignCreateData {
+  title: string;
+  tagline?: string;
+  description: string;
+  brief?: string;
+  category: string;
+  sub_category?: string;
+  campaign_type?: CampaignType;
+  brand_name?: string;
+  brand_location?: string;
+  budget?: number;
+  compensation_description?: string;
+  requirements?: string;
+  deliverables?: string[];
+  checklist?: ChecklistItem[];
+  required_scenes?: string[];
+  video_specs?: VideoSpec[];
+  dos?: string[];
+  donts?: string[];
+  suggested_caption?: string;
+  hashtags?: string[];
+  deadline?: string;
+  hero_image?: string;
+}
+
+// POST /api/campaigns - business-only (backend enforces via
+// get_current_business). New campaigns always land in "draft" status
+// server-side — call publishCampaign() afterwards to make it live.
+export const createCampaign = async (data: CampaignCreateData): Promise<Campaign> => {
+  const response = await api.post<Campaign>('/campaigns', data);
+  return response.data;
+};
+
+export const updateCampaign = async (
+  id: number | string,
+  data: Partial<CampaignCreateData>
+): Promise<Campaign> => {
+  const response = await api.put<Campaign>(`/campaigns/${id}`, data);
+  return response.data;
+};
+
+// PUT /api/campaigns/{id}/publish - flips a draft to published.
+// Backend rejects this if the campaign isn't currently "draft".
+export const publishCampaign = async (id: number | string): Promise<Campaign> => {
+  const response = await api.put<Campaign>(`/campaigns/${id}/publish`, {});
+  return response.data;
+};
+
+// ============================================
+// APPLICATIONS
+// ============================================
+
+export type ApplicationStatus = 'pending' | 'accepted' | 'rejected' | 'withdrawn';
+
+export interface Application {
+  id: number;
+  campaign_id: number;
+  creator_id: number;
+  proposal: string;
+  rate?: number | null;
+  message?: string | null;
+  status: ApplicationStatus;
+  created_at: string;
+  updated_at?: string | null;
+}
+
+export interface ApplicationCreateData {
+  campaign_id: number;
+  proposal: string;
+  rate?: number | null;
+  message?: string | null;
+}
+
+// POST /api/applications - creator applies to a campaign.
+// Backend enforces: campaign must be published, creator can't apply twice,
+// and only role="creator" accounts may call this at all.
+export const createApplication = async (data: ApplicationCreateData): Promise<Application> => {
+  const response = await api.post<Application>('/applications', data);
+  return response.data;
+};
+
+// GET /api/applications - server scopes results to the logged-in user
+// automatically (creators see their own, businesses see applicants to
+// their campaigns), so `campaign_id` here is just an extra filter, not
+// an access check.
+export const getApplications = async (params?: {
+  campaign_id?: number;
+  status?: string;
+}): Promise<Application[]> => {
+  const response = await api.get<Application[]>('/applications', { params });
+  return response.data;
+};
+
+// ============================================
 // FILE UPLOADS
 // ============================================
 // Deliberately NOT using the shared `api` axios instance here: it

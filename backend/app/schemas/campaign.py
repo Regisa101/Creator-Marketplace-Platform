@@ -16,6 +16,20 @@ class CampaignStatus(str, Enum):
     CANCELLED = "cancelled"
     CLOSED = "closed"
 
+# ===== NESTED SHAPES =====
+class ChecklistItem(BaseModel):
+    """One row in the 'Quick Checklist' grid, e.g. 'Format: 15 sec or longer, 9:16'."""
+    text: str
+    checked: bool = True
+
+class VideoSpec(BaseModel):
+    """One platform tab under 'Video Specs' (e.g. TikTok, Instagram Reel)."""
+    platform: str
+    duration: Optional[str] = None        # "15-30 seconds"
+    aspect_ratio: Optional[str] = None     # "9:16"
+    voiceover_required: bool = False
+    subtitles_required: bool = False
+
 # ===== BASE SCHEMA =====
 class CampaignBase(BaseModel):
     title: str = Field(..., min_length=3, max_length=255)
@@ -31,7 +45,9 @@ class CampaignBase(BaseModel):
     compensation_description: Optional[str] = None
     requirements: Optional[str] = None
     deliverables: Optional[List[str]] = None
+    checklist: Optional[List[ChecklistItem]] = None
     required_scenes: Optional[List[str]] = None
+    video_specs: Optional[List[VideoSpec]] = None
     dos: Optional[List[str]] = None
     donts: Optional[List[str]] = None
     suggested_caption: Optional[str] = None
@@ -58,7 +74,9 @@ class CampaignUpdate(BaseModel):
     compensation_description: Optional[str] = None
     requirements: Optional[str] = None
     deliverables: Optional[List[str]] = None
+    checklist: Optional[List[ChecklistItem]] = None
     required_scenes: Optional[List[str]] = None
+    video_specs: Optional[List[VideoSpec]] = None
     dos: Optional[List[str]] = None
     donts: Optional[List[str]] = None
     suggested_caption: Optional[str] = None

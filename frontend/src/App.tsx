@@ -7,7 +7,9 @@ import { ProtectedRoute } from './components/ProtectedRoute';
 import { CreatorOnboarding } from './pages/onboarding/CreatorOnboarding';
 import { BusinessOnboarding } from './pages/onboarding/BusinessOnboarding';
 import { CreatorProfile } from './pages/CreatorProfile';
-import { BusinessProfile } from './pages/BusinessProfile';
+import { BusinessProfile } from './pages/Businessprofile';
+import { CampaignDetail } from './pages/CampaignDetail';
+import { CampaignCreate } from './pages/Campaigncreate';
 
 // /profile renders the right page for whoever's logged in, so both
 // roles share one URL (Dashboard.tsx's "Edit profile" link just points
@@ -65,6 +67,24 @@ function App() {
             }
           />
           
+          <Route
+            path="/campaigns/new"
+            element={
+              <ProtectedRoute>
+                <CampaignCreate />
+              </ProtectedRoute>
+            }
+          />
+
+          <Route
+            path="/campaigns/:id"
+            element={
+              <ProtectedRoute>
+                <CampaignDetail />
+              </ProtectedRoute>
+            }
+          />
+
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </AuthProvider>
