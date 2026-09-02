@@ -10,7 +10,8 @@ from app.models import (
     BusinessProfile,
     CreatorSocial,
     Campaign,
-    Application
+    Application,
+    SavedCampaign
 )
 
 print("=" * 50)

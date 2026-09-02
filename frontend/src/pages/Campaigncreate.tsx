@@ -1,9 +1,10 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ArrowLeft, Loader2, Plus, X, Trash2 } from 'lucide-react';
+import { ArrowLeft, Loader2, Plus, X, Trash2, Camera, Info } from 'lucide-react';
 import {
   createCampaign,
   publishCampaign,
+  uploadImage,
   type CampaignType,
   type ChecklistItem,
   type VideoSpec,
@@ -94,6 +95,9 @@ export function CampaignCreate() {
 
   const [title, setTitle] = useState('');
   const [tagline, setTagline] = useState('');
+  const [heroImage, setHeroImage] = useState('');
+  const [uploadingHero, setUploadingHero] = useState(false);
+  const [heroError, setHeroError] = useState('');
   const [category, setCategory] = useState('');
   const [campaignType, setCampaignType] = useState<CampaignType>('gifted');
   const [description, setDescription] = useState('');
@@ -173,6 +177,7 @@ export function CampaignCreate() {
         donts: donts.length > 0 ? donts : undefined,
         suggested_caption: suggestedCaption.trim() || undefined,
         hashtags: hashtags.length > 0 ? hashtags : undefined,
+        hero_image: heroImage || undefined,
       });
 
       if (mode === 'publish') {
@@ -258,7 +263,58 @@ export function CampaignCreate() {
           outline: none;
           border-color: var(--violet);
         }
-        .cc-hint { font-size: 12px; color: var(--ink-soft); margin-top: 5px; }
+        .cc-hint { font-size: 12px; color: var(--ink-soft); margin-top: 5px; display: flex; align-items: flex-start; gap: 5px; }
+
+        .cc-hero {
+          width: 100%;
+          height: 160px;
+          border-radius: 12px;
+          border: 1.5px dashed var(--line);
+          background: #fafafd;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          overflow: hidden;
+          position: relative;
+          margin-bottom: 10px;
+        }
+        .cc-hero img { width: 100%; height: 100%; object-fit: cover; }
+        .cc-hero-placeholder {
+          display: flex;
+          flex-direction: column;
+          align-items: center;
+          gap: 6px;
+          color: var(--ink-soft);
+          font-size: 12.5px;
+        }
+        .cc-hero-btn {
+          display: inline-flex;
+          align-items: center;
+          gap: 7px;
+          font-size: 13px;
+          font-weight: 600;
+          color: var(--violet-dark);
+          background: #f2f0fc;
+          border: 1px solid #ded8f7;
+          border-radius: 8px;
+          padding: 9px 16px;
+          cursor: pointer;
+        }
+        .cc-hero-remove {
+          position: absolute;
+          top: 10px;
+          right: 10px;
+          width: 26px;
+          height: 26px;
+          border-radius: 50%;
+          background: rgba(17,18,23,0.55);
+          color: #fff;
+          border: none;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          cursor: pointer;
+        }
 
         .cc-row { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
         @media (max-width: 540px) { .cc-row { grid-template-columns: 1fr; } }
@@ -408,6 +464,69 @@ export function CampaignCreate() {
 
         <div className="cc-card">
           {error && <div className="cc-error">{error}</div>}
+
+          <div className="cc-field">
+            <label className="cc-label">Cover Image</label>
+            <div className="cc-hero">
+              {heroImage ? (
+                <>
+                  <img src={heroImage} alt="Campaign cover" />
+                  <button
+                    type="button"
+                    className="cc-hero-remove"
+                    onClick={() => setHeroImage('')}
+                    aria-label="Remove cover image"
+                  >
+                    <X size={14} />
+                  </button>
+                </>
+              ) : (
+                <div className="cc-hero-placeholder">
+                  <Camera size={22} />
+                  No cover image yet
+                </div>
+              )}
+            </div>
+            <label
+              className="cc-hero-btn"
+              style={uploadingHero ? { opacity: 0.6, pointerEvents: 'none' } : undefined}
+            >
+              <Camera size={14} />
+              {uploadingHero ? 'Uploading…' : heroImage ? 'Replace image' : 'Upload image'}
+              <input
+                type="file"
+                accept="image/*"
+                style={{ display: 'none' }}
+                disabled={uploadingHero}
+                onChange={async (e) => {
+                  const file = e.target.files?.[0];
+                  if (!file) return;
+                  setHeroError('');
+                  setUploadingHero(true);
+                  try {
+                    const { url } = await uploadImage(file);
+                    setHeroImage(url);
+                  } catch (err: any) {
+                    console.error('Cover image upload failed:', err);
+                    setHeroError(err?.response?.data?.detail || 'Could not upload image. Please try again.');
+                  } finally {
+                    setUploadingHero(false);
+                    e.target.value = '';
+                  }
+                }}
+              />
+            </label>
+            <div className="cc-hint">
+              <Info size={13} style={{ marginTop: 1, flexShrink: 0 }} />
+              JPG, PNG or WebP — shown at the top of the campaign page.
+            </div>
+            {heroError && (
+              <div className="cc-hint" style={{ color: '#d64545' }}>
+                <Info size={13} style={{ marginTop: 1, flexShrink: 0 }} />
+                {heroError}
+              </div>
+            )}
+          </div>
 
           <div className="cc-field">
             <label className="cc-label">Campaign Title *</label>

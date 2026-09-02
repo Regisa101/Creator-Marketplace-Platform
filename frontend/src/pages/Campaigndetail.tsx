@@ -1,11 +1,14 @@
 import { useEffect, useState } from 'react';
 import { Link, useParams, useNavigate } from 'react-router-dom';
-import { ArrowLeft, MapPin, Building2, DollarSign, Calendar, CheckCircle2, Target, ListChecks, Film, X, Hash, Quote, ClipboardList, Music2, Smartphone, Volume2, Captions, Loader2 } from 'lucide-react';
+import { ArrowLeft, MapPin, Building2, DollarSign, Calendar, CheckCircle2, Target, ListChecks, Film, X, Hash, Quote, ClipboardList, Music2, Smartphone, Volume2, Captions, Loader2, Bookmark, BookmarkCheck } from 'lucide-react';
 import {
   getCampaign,
   getCampaigns,
   getApplications,
   createApplication,
+  saveCampaign,
+  unsaveCampaign,
+  getSavedCampaigns,
   type Campaign,
   type Application,
 } from '../api/client';
@@ -48,6 +51,10 @@ export function CampaignDetail() {
   const [applying, setApplying] = useState(false);
   const [applyError, setApplyError] = useState('');
 
+  // Save/bookmark state
+  const [isSaved, setIsSaved] = useState(false);
+  const [savingBookmark, setSavingBookmark] = useState(false);
+
   useEffect(() => {
     if (!id) return;
     let cancelled = false;
@@ -69,6 +76,13 @@ export function CampaignDetail() {
             if (!cancelled) setMyApplication(apps[0] ?? null);
           } catch (appErr) {
             console.error('Could not check application status:', appErr);
+          }
+
+          try {
+            const saved = await getSavedCampaigns();
+            if (!cancelled) setIsSaved(saved.some((s) => s.campaign_id === data.id));
+          } catch (savedErr) {
+            console.error('Could not check saved status:', savedErr);
           }
         }
 
@@ -96,6 +110,28 @@ export function CampaignDetail() {
       cancelled = true;
     };
   }, [id, user?.role]);
+
+  const handleToggleSave = async () => {
+    if (!campaign || savingBookmark) return;
+    setSavingBookmark(true);
+    // Optimistic — flip immediately, roll back on failure. A save/unsave
+    // toggle should feel instant; the network round-trip isn't worth
+    // making the person wait to see their own click register.
+    const previous = isSaved;
+    setIsSaved(!previous);
+    try {
+      if (previous) {
+        await unsaveCampaign(campaign.id);
+      } else {
+        await saveCampaign(campaign.id);
+      }
+    } catch (err) {
+      console.error('Could not update saved status:', err);
+      setIsSaved(previous);
+    } finally {
+      setSavingBookmark(false);
+    }
+  };
 
   const handleApplySubmit = async () => {
     if (!campaign) return;
@@ -192,6 +228,20 @@ export function CampaignDetail() {
         }
         .cd-back:hover { color: var(--ink); }
 
+        .cd-hero-banner {
+          width: 100%;
+          max-width: 1080px;
+          margin: 0 auto;
+          padding: 20px 24px 0;
+        }
+        .cd-hero-banner img {
+          width: 100%;
+          max-height: 320px;
+          object-fit: cover;
+          border-radius: 16px;
+          display: block;
+        }
+
         .cd-badge {
           display: inline-flex;
           align-items: center;
@@ -274,6 +324,7 @@ export function CampaignDetail() {
           font-size: 14px;
           cursor: pointer;
         }
+        .cd-save:disabled { opacity: 0.6; cursor: not-allowed; }
 
         .cd-brand-row { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; }
         .cd-brand-avatar {
@@ -579,7 +630,7 @@ export function CampaignDetail() {
 
       <div className="cd-topbar">
         <span className="cd-logo">CreatorKhoj</span>
-        <Link to="/dashboard" className="cd-nav-link">Browse Campaigns</Link>
+        <Link to="/campaigns" className="cd-nav-link">Browse Campaigns</Link>
       </div>
 
       {loading && (
@@ -600,8 +651,14 @@ export function CampaignDetail() {
       {!loading && !error && campaign && (
         <>
           <div className="cd-crumb">
-            <Link to="/dashboard">Campaigns</Link> / {campaign.title}
+            <Link to="/campaigns">Campaigns</Link> / {campaign.title}
           </div>
+
+          {campaign.hero_image && (
+            <div className="cd-hero-banner">
+              <img src={campaign.hero_image} alt={campaign.title} />
+            </div>
+          )}
 
           <div className="cd-body">
             {/* MAIN COLUMN */}
@@ -1002,8 +1059,20 @@ export function CampaignDetail() {
                   );
                 })()}
 
-                {!myApplication && (!showApplyForm || user?.role !== 'creator') && (
-                  <button className="cd-save">☆ Save Campaign</button>
+                {!myApplication && !showApplyForm && user?.role === 'creator' && (
+                  <button className="cd-save" onClick={handleToggleSave} disabled={savingBookmark}>
+                    {isSaved ? (
+                      <>
+                        <BookmarkCheck size={15} style={{ verticalAlign: -3, marginRight: 6 }} />
+                        Saved
+                      </>
+                    ) : (
+                      <>
+                        <Bookmark size={15} style={{ verticalAlign: -3, marginRight: 6 }} />
+                        Save Campaign
+                      </>
+                    )}
+                  </button>
                 )}
               </div>
 

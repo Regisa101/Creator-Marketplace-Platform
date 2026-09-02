@@ -4,7 +4,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 
-from app.routes import auth, onboarding, campaigns, applications, uploads
+from app.routes import auth, onboarding, campaigns, applications, uploads, saved_campaigns
 
 app = FastAPI()
 
@@ -28,6 +28,7 @@ app.include_router(onboarding.router)
 app.include_router(campaigns.router)
 app.include_router(applications.router)
 app.include_router(uploads.router)
+app.include_router(saved_campaigns.router)
 
 # Serves whatever uploads.py writes to backend/app/static/uploads at
 # http://localhost:8000/static/uploads/<filename> — this mount was

@@ -23,3 +23,27 @@ class Application(Base):
     # Relationships
     campaign = relationship("Campaign", back_populates="applications")
     creator = relationship("User", foreign_keys=[creator_id])
+
+    # ============================================
+    # COMPUTED (not columns) — read by ApplicationResponse
+    # (schemas/application.py) via from_attributes, same pattern as
+    # User.profile in models/user.py. Lets the applications inbox show
+    # a name/avatar/campaign title without extra round-trips per row.
+    # ============================================
+    @property
+    def creator_name(self):
+        if self.creator and self.creator.role == "creator" and self.creator.profile:
+            name = self.creator.profile.get("display_name")
+            if name:
+                return name
+        return self.creator.full_name if self.creator else None
+
+    @property
+    def creator_avatar(self):
+        if self.creator and self.creator.role == "creator" and self.creator.profile:
+            return self.creator.profile.get("profile_image")
+        return None
+
+    @property
+    def campaign_title(self):
+        return self.campaign.title if self.campaign else None

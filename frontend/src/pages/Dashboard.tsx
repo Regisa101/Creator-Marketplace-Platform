@@ -6,7 +6,8 @@ import {
   Wallet, FileText, Users, CircleDashed, CheckCircle2, MessageSquare,
   Calendar, PackageCheck,
 } from 'lucide-react';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import { getApplications, getCampaigns, type Application, type Campaign } from '../api/client';
 
 /**
  * /dashboard — increment 1, single file on purpose.
@@ -183,6 +184,49 @@ export const Dashboard = () => {
   const firstName = user?.full_name?.split(' ')[0] ?? 'there';
   const initials = user?.full_name?.[0]?.toUpperCase() ?? '?';
 
+  // Backs the top stat cards below. GET /api/applications is already
+  // role-scoped server-side (creators get their own, businesses get
+  // applicants to their campaigns), so no extra filtering needed here.
+  // GET /api/campaigns is the same for the business "Active Campaigns"
+  // count. There's deliberately no "Profile Views" / "Earnings" /
+  // "Deliverables Due" / "Spend" fetch — those have no backing model
+  // anywhere in the API yet (no analytics, payments, or deliverable
+  // tracking), so those four cards stay at their zero-state below
+  // rather than being wired to numbers that don't exist.
+  const [applications, setApplications] = useState<Application[]>([]);
+  const [ownCampaigns, setOwnCampaigns] = useState<Campaign[]>([]);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    (async () => {
+      try {
+        const apps = await getApplications();
+        if (!cancelled) setApplications(apps);
+      } catch (err) {
+        console.error('Could not load applications for dashboard stats:', err);
+      }
+
+      if (role === 'business') {
+        try {
+          const data = await getCampaigns({ limit: 50 });
+          if (!cancelled) setOwnCampaigns(data.campaigns);
+        } catch (err) {
+          console.error('Could not load campaigns for dashboard stats:', err);
+        }
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [role]);
+
+  const activeCollabsCount = applications.filter((a) => a.status === 'accepted').length;
+  const activeCampaignsCount = ownCampaigns.filter(
+    (c) => c.status === 'published' || c.status === 'in_progress'
+  ).length;
+
   const hour = new Date().getHours();
   const greeting = hour < 12 ? 'Good morning' : hour < 17 ? 'Good afternoon' : 'Good evening';
 
@@ -217,14 +261,14 @@ export const Dashboard = () => {
 
   const STATS = role === 'creator'
     ? [
-        { label: 'Active Collabs', value: 0, icon: Briefcase, color: primary },
-        { label: 'Applications Sent', value: 0, icon: Send, color: C.mint },
+        { label: 'Active Collabs', value: activeCollabsCount, icon: Briefcase, color: primary },
+        { label: 'Applications Sent', value: applications.length, icon: Send, color: C.mint },
         { label: 'Profile Views', value: 0, icon: Eye, color: C.sky },
         { label: 'Earnings this month', value: 'Rs. 0', icon: Wallet, color: C.amber },
       ]
     : [
-        { label: 'Active Campaigns', value: 0, icon: Megaphone, color: primary },
-        { label: 'Applications Received', value: 0, icon: Inbox, color: C.mint },
+        { label: 'Active Campaigns', value: activeCampaignsCount, icon: Megaphone, color: primary },
+        { label: 'Applications Received', value: applications.length, icon: Inbox, color: C.mint },
         { label: 'Deliverables Due', value: 0, icon: FileText, color: C.sky },
         { label: 'Spend this month', value: 'Rs. 0', icon: Wallet, color: C.amber },
       ];

@@ -363,6 +363,13 @@ export interface Application {
   id: number;
   campaign_id: number;
   creator_id: number;
+  // Computed server-side from the applicant's profile / the parent
+  // campaign — see ApplicationResponse in
+  // backend/app/schemas/application.py. Optional because a creator
+  // with no profile filled in yet still has a valid application.
+  creator_name?: string | null;
+  creator_avatar?: string | null;
+  campaign_title?: string | null;
   proposal: string;
   rate?: number | null;
   message?: string | null;
@@ -395,6 +402,47 @@ export const getApplications = async (params?: {
   status?: string;
 }): Promise<Application[]> => {
   const response = await api.get<Application[]>('/applications', { params });
+  return response.data;
+};
+
+// PUT /api/applications/{id} - business-only, accept/reject a pending
+// application. Backend rejects this if the application isn't
+// currently "pending", or if the caller doesn't own the campaign.
+export const updateApplicationStatus = async (
+  id: number,
+  status: 'accepted' | 'rejected'
+): Promise<Application> => {
+  const response = await api.put<Application>(`/applications/${id}`, { status });
+  return response.data;
+};
+
+// ============================================
+// SAVED CAMPAIGNS
+// ============================================
+// Creator-only bookmarking — the "Save Campaign" button on the
+// campaign detail page. Backend enforces creator-only via
+// get_current_creator, same as applications.
+
+export interface SavedCampaignEntry {
+  id: number;
+  creator_id: number;
+  campaign_id: number;
+  created_at: string;
+}
+
+// POST /api/saved-campaigns - idempotent: saving an already-saved
+// campaign just returns the existing row rather than erroring.
+export const saveCampaign = async (campaignId: number): Promise<SavedCampaignEntry> => {
+  const response = await api.post<SavedCampaignEntry>('/saved-campaigns', { campaign_id: campaignId });
+  return response.data;
+};
+
+export const unsaveCampaign = async (campaignId: number): Promise<void> => {
+  await api.delete(`/saved-campaigns/${campaignId}`);
+};
+
+export const getSavedCampaigns = async (): Promise<SavedCampaignEntry[]> => {
+  const response = await api.get<SavedCampaignEntry[]>('/saved-campaigns');
   return response.data;
 };
 
