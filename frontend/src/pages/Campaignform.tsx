@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
+import { Link, useNavigate, useParams } from 'react-router-dom';
 import { ArrowLeft, Loader2, Plus, X, Trash2, Camera, Info, Settings, Sparkles } from 'lucide-react';
 import {
   createCampaign,
@@ -157,7 +157,10 @@ function addUnique(existing: string[], incoming: string[]): string[] {
 // Supports pasting multiple comma/newline-separated values at once, in
 // addition to the normal one-at-a-time Enter behavior. Both paths dedupe
 // case-insensitively against what's already in the list.
-function TagListField({
+// Exported so other pages (e.g. Settings.tsx's Campaign Defaults
+// editor) can reuse the exact same chip/paste input instead of
+// re-implementing it.
+export function TagListField({
   label,
   placeholder,
   items,
@@ -905,7 +908,11 @@ export function CampaignForm({ mode }: { mode: 'create' | 'edit' }) {
                     <div className="cc-hint" style={{ marginBottom: 12 }}>
                       <Info size={13} style={{ marginTop: 1, flexShrink: 0 }} />
                       These prefill new campaigns automatically. Editing them here won't change campaigns you've
-                      already created.
+                      already created. You can also manage these anytime from{' '}
+                      <Link to="/settings" style={{ color: 'var(--violet-dark)', fontWeight: 600 }}>
+                        Settings → Campaign Defaults
+                      </Link>
+                      .
                     </div>
                     <TagListField
                       label="Default Do's"

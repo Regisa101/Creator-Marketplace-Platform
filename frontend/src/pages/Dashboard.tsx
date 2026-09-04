@@ -1,3 +1,4 @@
+// frontend/src/pages/Dashboard.tsx
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import {
@@ -168,6 +169,16 @@ export const Dashboard = () => {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
   const [menuOpen, setMenuOpen] = useState(false);
+
+  // Campaign Defaults nudge dismissal — persisted so it doesn't
+  // reappear every visit once someone's closed it.
+  const [defaultsHintDismissed, setDefaultsHintDismissed] = useState(
+    () => localStorage.getItem('ck_defaults_hint_dismissed') === '1'
+  );
+  const dismissDefaultsHint = () => {
+    localStorage.setItem('ck_defaults_hint_dismissed', '1');
+    setDefaultsHintDismissed(true);
+  };
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
 
   const toggleExpanded = (label: string) => {
@@ -410,6 +421,38 @@ export const Dashboard = () => {
           </div>
         )}
 
+        {/* Campaign Defaults nudge — points business users at the new
+            Settings page. Dismissible (localStorage) rather than tied
+            to whether defaults are actually set, since that would
+            need an extra profile fetch just for this hint; a one-time
+            nudge is enough to make the feature discoverable without
+            nagging indefinitely. */}
+        {role === 'business' && !defaultsHintDismissed && (
+          <div className="mt-4 rounded-xl p-4" style={{ background: C.violetSoft, border: `1px solid #ded8f7` }}>
+            <div className="flex items-start justify-between gap-2">
+              <div className="text-xs font-semibold" style={{ color: C.violet }}>Save time on your next campaign</div>
+              <button
+                onClick={() => dismissDefaultsHint()}
+                className="text-[11px] leading-none"
+                style={{ color: '#9992AD' }}
+                aria-label="Dismiss"
+              >
+                ✕
+              </button>
+            </div>
+            <p className="mt-1 text-xs" style={{ color: C.inkSoft }}>
+              Set your usual Do's, Don'ts &amp; video specs once — they'll auto-fill every new campaign.
+            </p>
+            <Link
+              to="/settings"
+              className="mt-2 flex items-center justify-center gap-1.5 rounded-lg py-2 text-xs font-semibold"
+              style={{ background: '#fff', color: C.violet, border: `1px solid #ded8f7` }}
+            >
+              Set up Campaign Defaults <ArrowRight size={12} />
+            </Link>
+          </div>
+        )}
+
         {/* User chip */}
         <div className="relative mt-4">
           <button onClick={() => setMenuOpen((v) => !v)} className="flex w-full items-center gap-2.5 rounded-lg px-2 py-2">
@@ -431,6 +474,11 @@ export const Dashboard = () => {
               <Link to={profileViewRoute} className="flex items-center gap-2 px-3 py-2 text-xs" style={{ color: C.ink }} onClick={() => setMenuOpen(false)}>
                 <Settings size={13} /> Edit profile
               </Link>
+              {role === 'business' && (
+                <Link to="/settings" className="flex items-center gap-2 px-3 py-2 text-xs" style={{ color: C.ink }} onClick={() => setMenuOpen(false)}>
+                  <Settings size={13} /> Settings
+                </Link>
+              )}
               <button
                 onClick={() => { setMenuOpen(false); logout(); navigate('/login'); }}
                 className="flex w-full items-center gap-2 px-3 py-2 text-left text-xs"

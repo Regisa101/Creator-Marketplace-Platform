@@ -1,3 +1,4 @@
+// frontend/src/App.tsx
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { AuthCard } from './pages/Authcard';
@@ -8,6 +9,7 @@ import { CreatorOnboarding } from './pages/onboarding/CreatorOnboarding';
 import { BusinessOnboarding } from './pages/onboarding/BusinessOnboarding';
 import { CreatorProfile } from './pages/CreatorProfile';
 import { BusinessProfile } from './pages/Businessprofile';
+import { BusinessSettings } from './pages/Settings';
 import { CampaignDetail } from './pages/Campaigndetail';
 import { CampaignCreate, CampaignEdit } from './pages/Campaignform';
 import { CampaignBrowse } from './pages/Campaignbrowse';
@@ -70,6 +72,15 @@ function App() {
             }
           />
           
+          <Route
+            path="/settings"
+            element={
+              <ProtectedRoute>
+                <BusinessSettings />
+              </ProtectedRoute>
+            }
+          />
+
           <Route
             path="/campaigns"
             element={
