@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Link, useParams, useNavigate } from 'react-router-dom';
-import { ArrowLeft, MapPin, Building2, DollarSign, Calendar, CheckCircle2, Target, ListChecks, Film, X, Hash, Quote, ClipboardList, Music2, Smartphone, Volume2, Captions, Loader2, Bookmark, BookmarkCheck } from 'lucide-react';
+import { ArrowLeft, MapPin, Building2, DollarSign, Calendar, CheckCircle2, Target, ListChecks, Film, X, Hash, Quote, ClipboardList, Music2, Smartphone, Volume2, Captions, Loader2, Bookmark, BookmarkCheck, Copy, Rocket, Trash2 } from 'lucide-react';
 import {
   getCampaign,
   getCampaigns,
@@ -9,6 +9,9 @@ import {
   saveCampaign,
   unsaveCampaign,
   getSavedCampaigns,
+  publishCampaign,
+  deleteCampaign,
+  duplicateCampaign,
   type Campaign,
   type Application,
 } from '../api/client';
@@ -41,6 +44,12 @@ export function CampaignDetail() {
   const [error, setError] = useState('');
   const [activeSpecTab, setActiveSpecTab] = useState(0);
   const [related, setRelated] = useState<Campaign[]>([]);
+
+  // Owner management actions (publish / delete / duplicate). Separate
+  // from `applying` etc below since these are business-only and act on
+  // the campaign itself rather than an application.
+  const [managing, setManaging] = useState<'publish' | 'delete' | 'duplicate' | null>(null);
+  const [manageError, setManageError] = useState('');
 
   // Apply flow state
   const [myApplication, setMyApplication] = useState<Application | null>(null);
@@ -157,6 +166,53 @@ export function CampaignDetail() {
       );
     } finally {
       setApplying(false);
+    }
+  };
+
+  const handlePublish = async () => {
+    if (!campaign) return;
+    setManaging('publish');
+    setManageError('');
+    try {
+      const updated = await publishCampaign(campaign.id);
+      setCampaign(updated);
+    } catch (err: any) {
+      console.error('Could not publish campaign:', err);
+      setManageError(err?.response?.data?.detail || 'Could not publish. Please try again.');
+    } finally {
+      setManaging(null);
+    }
+  };
+
+  const handleDelete = async () => {
+    if (!campaign) return;
+    if (!window.confirm(`Delete "${campaign.title}"? This can't be undone.`)) return;
+    setManaging('delete');
+    setManageError('');
+    try {
+      await deleteCampaign(campaign.id);
+      navigate('/campaigns');
+    } catch (err: any) {
+      console.error('Could not delete campaign:', err);
+      setManageError(err?.response?.data?.detail || 'Could not delete. Please try again.');
+      setManaging(null);
+    }
+  };
+
+  const handleDuplicate = async () => {
+    if (!campaign) return;
+    setManaging('duplicate');
+    setManageError('');
+    try {
+      const copy = await duplicateCampaign(campaign.id);
+      // Land the business straight in the editor for the new draft —
+      // that's almost always the next thing they want to do with a
+      // "Title - Copy" campaign, rather than re-navigating from the list.
+      navigate(`/campaigns/${copy.id}/edit`);
+    } catch (err: any) {
+      console.error('Could not duplicate campaign:', err);
+      setManageError(err?.response?.data?.detail || 'Could not duplicate. Please try again.');
+      setManaging(null);
     }
   };
 
@@ -958,6 +1014,9 @@ export function CampaignDetail() {
                   <div style={{ fontSize: 13, color: 'var(--ink-soft)', marginBottom: 10 }}>
                     Manage
                   </div>
+
+                  {manageError && <div className="cd-apply-error">{manageError}</div>}
+
                   <Link
                     to={`/campaigns/${campaign.id}/edit`}
                     className="cd-cta"
@@ -965,6 +1024,47 @@ export function CampaignDetail() {
                   >
                     Edit Campaign
                   </Link>
+
+                  {campaign.status === 'draft' && (
+                    <button
+                      className="cd-save"
+                      style={{ marginTop: 8, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}
+                      onClick={handlePublish}
+                      disabled={managing !== null}
+                    >
+                      {managing === 'publish' ? <Loader2 size={14} className="cd-spin" /> : <Rocket size={14} />}
+                      {managing === 'publish' ? 'Publishing…' : 'Publish Campaign'}
+                    </button>
+                  )}
+
+                  <button
+                    className="cd-save"
+                    style={{ marginTop: 8, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}
+                    onClick={handleDuplicate}
+                    disabled={managing !== null}
+                  >
+                    {managing === 'duplicate' ? <Loader2 size={14} className="cd-spin" /> : <Copy size={14} />}
+                    {managing === 'duplicate' ? 'Duplicating…' : 'Duplicate Campaign'}
+                  </button>
+
+                  <button
+                    className="cd-save"
+                    style={{
+                      marginTop: 8,
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      gap: 6,
+                      color: '#d64545',
+                      borderColor: '#f3caca',
+                    }}
+                    onClick={handleDelete}
+                    disabled={managing !== null}
+                  >
+                    {managing === 'delete' ? <Loader2 size={14} className="cd-spin" /> : <Trash2 size={14} />}
+                    {managing === 'delete' ? 'Deleting…' : 'Delete Campaign'}
+                  </button>
+
                   {campaign.status === 'draft' && (
                     <div style={{ marginTop: 8, textAlign: 'center', fontSize: 12, color: 'var(--ink-soft)' }}>
                       This campaign is a draft — only you can see it.

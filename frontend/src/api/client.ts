@@ -368,6 +368,12 @@ export const publishCampaign = async (id: number | string): Promise<Campaign> =>
   return response.data;
 };
 
+// DELETE /api/campaigns/{id} - business-only, and only for campaigns
+// you own (backend enforces both).
+export const deleteCampaign = async (id: number | string): Promise<void> => {
+  await api.delete(`/campaigns/${id}`);
+};
+
 // ============================================
 // APPLICATIONS
 // ============================================
