@@ -1,14 +1,18 @@
-import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useEffect, useState } from 'react';
+import { useNavigate, useParams } from 'react-router-dom';
 import { ArrowLeft, Loader2, Plus, X, Trash2, Camera, Info } from 'lucide-react';
 import {
   createCampaign,
+  updateCampaign,
   publishCampaign,
   uploadImage,
+  getCampaign,
+  type Campaign,
   type CampaignType,
   type ChecklistItem,
   type VideoSpec,
 } from '../api/client';
+import { useAuth } from '../context/AuthContext';
 
 const VIOLET = '#6C5DD3';
 const VIOLET_DARK = '#4A3BA8';
@@ -90,8 +94,10 @@ function TagListField({
   );
 }
 
-export function CampaignCreate() {
+export function CampaignForm({ mode }: { mode: 'create' | 'edit' }) {
   const navigate = useNavigate();
+  const { user } = useAuth();
+  const { id } = useParams<{ id: string }>();
 
   const [title, setTitle] = useState('');
   const [tagline, setTagline] = useState('');
@@ -120,6 +126,72 @@ export function CampaignCreate() {
   const [saving, setSaving] = useState<'draft' | 'publish' | null>(null);
   const [error, setError] = useState('');
 
+  // Edit-mode only: load the existing campaign and populate every
+  // field above. `loadingExisting` gates the form so we don't render
+  // (and let someone submit) blank fields for a split second before
+  // the real data arrives. `accessDenied`/`notFound` mirror the two
+  // ways the backend's ownership check (business_id must match) can
+  // fail — same guard the server already enforces, just surfaced
+  // before the person fills out a form they can't actually save.
+  const [loadingExisting, setLoadingExisting] = useState(mode === 'edit');
+  const [notFound, setNotFound] = useState(false);
+  const [accessDenied, setAccessDenied] = useState(false);
+  const [originalStatus, setOriginalStatus] = useState<Campaign['status'] | null>(null);
+
+  useEffect(() => {
+    if (mode !== 'edit' || !id) return;
+    let cancelled = false;
+
+    (async () => {
+      setLoadingExisting(true);
+      try {
+        const c = await getCampaign(id);
+        if (cancelled) return;
+
+        if (user && c.business_id !== user.id) {
+          setAccessDenied(true);
+          return;
+        }
+        if (c.status === 'completed') {
+          // Backend rejects edits to completed campaigns outright —
+          // catch it here too so the person sees why up front instead
+          // of filling out the whole form and hitting an error on submit.
+          setError('This campaign is completed and can no longer be edited.');
+        }
+
+        setOriginalStatus(c.status);
+        setTitle(c.title);
+        setTagline(c.tagline || '');
+        setHeroImage(c.hero_image || '');
+        setCategory(c.category);
+        setCampaignType(c.campaign_type);
+        setDescription(c.description);
+        setBudget(c.budget != null ? String(c.budget) : '');
+        setCompensationDescription(c.compensation_description || '');
+        setBrandLocation(c.brand_location || '');
+        setDeadline(c.deadline ? c.deadline.slice(0, 10) : '');
+        setRequirements(c.requirements || '');
+        setDeliverables(c.deliverables || []);
+        setChecklist(c.checklist || []);
+        setRequiredScenes(c.required_scenes || []);
+        setDos(c.dos || []);
+        setDonts(c.donts || []);
+        setSuggestedCaption(c.suggested_caption || '');
+        setHashtags(c.hashtags || []);
+        setVideoSpecs(c.video_specs || []);
+      } catch (err) {
+        console.error('Could not load campaign for editing:', err);
+        if (!cancelled) setNotFound(true);
+      } finally {
+        if (!cancelled) setLoadingExisting(false);
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [mode, id, user]);
+
   const addVideoSpec = () => {
     setVideoSpecs([
       ...videoSpecs,
@@ -145,17 +217,17 @@ export function CampaignCreate() {
     return null;
   };
 
-  const handleSubmit = async (mode: 'draft' | 'publish') => {
+  const handleSubmit = async (action: 'draft' | 'publish') => {
     const validationError = validate();
     if (validationError) {
       setError(validationError);
       return;
     }
 
-    setSaving(mode);
+    setSaving(action);
     setError('');
     try {
-      const created = await createCampaign({
+      const payload = {
         title: title.trim(),
         tagline: tagline.trim() || undefined,
         category,
@@ -178,15 +250,29 @@ export function CampaignCreate() {
         suggested_caption: suggestedCaption.trim() || undefined,
         hashtags: hashtags.length > 0 ? hashtags : undefined,
         hero_image: heroImage || undefined,
-      });
+      };
 
-      if (mode === 'publish') {
-        await publishCampaign(created.id);
+      let campaignId: number;
+      if (mode === 'edit' && id) {
+        const updated = await updateCampaign(id, payload);
+        campaignId = updated.id;
+        // Only hit publish if it isn't already published/further along —
+        // calling it on an already-published campaign just 400s for no
+        // reason, since the backend only allows draft -> published.
+        if (action === 'publish' && originalStatus === 'draft') {
+          await publishCampaign(campaignId);
+        }
+      } else {
+        const created = await createCampaign(payload);
+        campaignId = created.id;
+        if (action === 'publish') {
+          await publishCampaign(campaignId);
+        }
       }
 
-      navigate(`/campaigns/${created.id}`);
+      navigate(`/campaigns/${campaignId}`);
     } catch (err: any) {
-      console.error('Could not create campaign:', err);
+      console.error('Could not save campaign:', err);
       setError(err?.response?.data?.detail || 'Could not save this campaign. Please try again.');
     } finally {
       setSaving(null);
@@ -457,10 +543,32 @@ export function CampaignCreate() {
           <ArrowLeft size={15} /> Back
         </button>
 
-        <h1 className="cc-title">Create a Campaign</h1>
-        <p className="cc-sub">
-          Fill in the basics now — you can add requirements, checklists, and video specs after.
-        </p>
+        {mode === 'edit' && loadingExisting && (
+          <div className="cc-card" style={{ textAlign: 'center', padding: '48px 20px', color: 'var(--ink-soft)' }}>
+            Loading campaign…
+          </div>
+        )}
+
+        {mode === 'edit' && !loadingExisting && notFound && (
+          <div className="cc-card" style={{ textAlign: 'center', padding: '48px 20px', color: 'var(--ink-soft)' }}>
+            This campaign couldn't be found.
+          </div>
+        )}
+
+        {mode === 'edit' && !loadingExisting && accessDenied && (
+          <div className="cc-card" style={{ textAlign: 'center', padding: '48px 20px', color: 'var(--ink-soft)' }}>
+            You don't have access to edit this campaign.
+          </div>
+        )}
+
+        {(mode === 'create' || (!loadingExisting && !notFound && !accessDenied)) && (
+          <>
+            <h1 className="cc-title">{mode === 'edit' ? 'Edit Campaign' : 'Create a Campaign'}</h1>
+            <p className="cc-sub">
+              {mode === 'edit'
+                ? 'Update any field below — changes save when you click one of the buttons at the bottom.'
+                : 'Fill in the basics now — you can add requirements, checklists, and video specs after.'}
+            </p>
 
         <div className="cc-card">
           {error && <div className="cc-error">{error}</div>}
@@ -831,19 +939,31 @@ export function CampaignCreate() {
               disabled={saving !== null}
             >
               {saving === 'draft' && <Loader2 size={15} className="cc-spin" />}
-              Save as Draft
+              {mode === 'edit' ? 'Save Changes' : 'Save as Draft'}
             </button>
-            <button
-              className="cc-btn-publish"
-              onClick={() => handleSubmit('publish')}
-              disabled={saving !== null}
-            >
-              {saving === 'publish' && <Loader2 size={15} className="cc-spin" />}
-              Publish Campaign
-            </button>
+            {(mode === 'create' || originalStatus === 'draft') && (
+              <button
+                className="cc-btn-publish"
+                onClick={() => handleSubmit('publish')}
+                disabled={saving !== null}
+              >
+                {saving === 'publish' && <Loader2 size={15} className="cc-spin" />}
+                Publish Campaign
+              </button>
+            )}
           </div>
         </div>
+          </>
+        )}
       </div>
     </div>
   );
+}
+
+export function CampaignCreate() {
+  return <CampaignForm mode="create" />;
+}
+
+export function CampaignEdit() {
+  return <CampaignForm mode="edit" />;
 }

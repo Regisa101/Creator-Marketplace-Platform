@@ -9,9 +9,10 @@ import { BusinessOnboarding } from './pages/onboarding/BusinessOnboarding';
 import { CreatorProfile } from './pages/CreatorProfile';
 import { BusinessProfile } from './pages/Businessprofile';
 import { CampaignDetail } from './pages/Campaigndetail';
-import { CampaignCreate } from './pages/Campaigncreate';
+import { CampaignCreate, CampaignEdit } from './pages/Campaignform';
 import { CampaignBrowse } from './pages/Campaignbrowse';
 import { ApplicationsInbox } from './pages/Applicationsinbox';
+import { SavedCampaigns } from './pages/Savedcampaigns';
 
 // /profile renders the right page for whoever's logged in, so both
 // roles share one URL (Dashboard.tsx's "Edit profile" link just points
@@ -79,6 +80,15 @@ function App() {
           />
 
           <Route
+            path="/saved"
+            element={
+              <ProtectedRoute>
+                <SavedCampaigns />
+              </ProtectedRoute>
+            }
+          />
+
+          <Route
             path="/applications"
             element={
               <ProtectedRoute>
@@ -92,6 +102,15 @@ function App() {
             element={
               <ProtectedRoute>
                 <CampaignCreate />
+              </ProtectedRoute>
+            }
+          />
+
+          <Route
+            path="/campaigns/:id/edit"
+            element={
+              <ProtectedRoute>
+                <CampaignEdit />
               </ProtectedRoute>
             }
           />

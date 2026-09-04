@@ -953,6 +953,26 @@ export function CampaignDetail() {
 
             {/* SIDEBAR */}
             <div className="cd-sidebar">
+              {user?.role === 'business' && campaign.business_id === user.id && (
+                <div className="cd-card">
+                  <div style={{ fontSize: 13, color: 'var(--ink-soft)', marginBottom: 10 }}>
+                    Manage
+                  </div>
+                  <Link
+                    to={`/campaigns/${campaign.id}/edit`}
+                    className="cd-cta"
+                    style={{ display: 'block', textAlign: 'center', textDecoration: 'none' }}
+                  >
+                    Edit Campaign
+                  </Link>
+                  {campaign.status === 'draft' && (
+                    <div style={{ marginTop: 8, textAlign: 'center', fontSize: 12, color: 'var(--ink-soft)' }}>
+                      This campaign is a draft — only you can see it.
+                    </div>
+                  )}
+                </div>
+              )}
+
               <div className="cd-card">
                 <div className="cd-sidebar-title">Interested?</div>
                 <div className="cd-sidebar-sub">

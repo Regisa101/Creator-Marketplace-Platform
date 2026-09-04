@@ -428,6 +428,7 @@ export interface SavedCampaignEntry {
   creator_id: number;
   campaign_id: number;
   created_at: string;
+  campaign: Campaign;
 }
 
 // POST /api/saved-campaigns - idempotent: saving an already-saved

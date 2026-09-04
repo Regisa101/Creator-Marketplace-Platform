@@ -4,7 +4,7 @@ import {
   LayoutDashboard, Megaphone, Compass, Inbox, Briefcase, Search, Bell,
   ChevronDown, ChevronRight, LogOut, Settings, Plus, ArrowRight, Send, Eye,
   Wallet, FileText, Users, CircleDashed, CheckCircle2, MessageSquare,
-  Calendar, PackageCheck,
+  Calendar, PackageCheck, Bookmark,
 } from 'lucide-react';
 import { useState, useEffect } from 'react';
 import { getApplications, getCampaigns, type Application, type Campaign } from '../api/client';
@@ -249,6 +249,7 @@ export const Dashboard = () => {
         { label: 'Home', icon: LayoutDashboard, active: true, to: '/dashboard' },
         { label: 'Discover Collabs', icon: Compass, to: '/campaigns' },
         { label: 'My Applications', icon: Inbox, to: '/applications' },
+        { label: 'Saved Campaigns', icon: Bookmark, to: '/saved' },
         { label: 'Workspace', icon: Briefcase, to: '/workspace', children: WORKSPACE_CHILDREN },
       ]
     : [
