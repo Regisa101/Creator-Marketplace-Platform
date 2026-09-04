@@ -119,8 +119,14 @@ export interface BusinessOnboardingData {
   typical_budget?: number;
   team_size?: string;
   year_established?: number;
+  // Brand-level campaign defaults — read/written through the same
+  // saveBusinessProgress()/getBusinessProgress() pair as the rest of
+  // this interface. See Campaignform.tsx's "Manage my campaign
+  // defaults" panel and its create-mode autofill effect.
+  default_dos?: string[];
+  default_donts?: string[];
+  default_video_spec?: VideoSpec;
 }
-
 // ============================================
 // API FUNCTIONS - MUST BE EXPORTED
 // ============================================
@@ -335,6 +341,15 @@ export interface CampaignCreateData {
 // server-side — call publishCampaign() afterwards to make it live.
 export const createCampaign = async (data: CampaignCreateData): Promise<Campaign> => {
   const response = await api.post<Campaign>('/campaigns', data);
+  return response.data;
+};
+
+// POST /api/campaigns/{id}/duplicate - business-only, and only for
+// campaigns you own (backend enforces both). Always returns a new
+// "draft" campaign — applications, timestamps, and id are never
+// copied. Deadline is deliberately dropped too (see backend comment).
+export const duplicateCampaign = async (id: number | string): Promise<Campaign> => {
+  const response = await api.post<Campaign>(`/campaigns/${id}/duplicate`, {});
   return response.data;
 };
 

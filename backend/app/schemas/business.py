@@ -33,6 +33,19 @@ class BusinessOnboardingComplete(BaseModel):
 # either. The route only touches whatever fields are actually present
 # in the request (`exclude_unset=True`), same pattern as
 # CreatorOnboardingProgress.
+#
+# default_dos / default_donts / default_video_spec are also saved
+# through this same endpoint (PATCH /onboarding/business/progress) —
+# Campaignform.tsx's "Manage my campaign defaults" panel calls
+# saveBusinessProgress() with just these three fields, so no separate
+# defaults endpoint was needed.
+
+class VideoSpecDict(BaseModel):
+    platform: str = "General"
+    duration: Optional[str] = None
+    aspect_ratio: Optional[str] = None
+    voiceover_required: bool = False
+    subtitles_required: bool = False
 
 class BusinessOnboardingProgress(BaseModel):
     company_name: Optional[str] = None
@@ -51,3 +64,7 @@ class BusinessOnboardingProgress(BaseModel):
 
     team_size: Optional[str] = None
     year_established: Optional[int] = None
+
+    default_dos: Optional[List[str]] = None
+    default_donts: Optional[List[str]] = None
+    default_video_spec: Optional[VideoSpecDict] = None

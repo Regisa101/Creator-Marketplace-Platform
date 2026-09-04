@@ -46,6 +46,64 @@ async def create_campaign(
     return campaign
 
 
+@router.post("/{campaign_id}/duplicate", response_model=CampaignResponse)
+async def duplicate_campaign(
+    campaign_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_business)
+):
+    """
+    Creates a new draft campaign copied from an existing one.
+
+    Copied: everything that describes what the campaign IS (title,
+    category, requirements, checklist, dos/donts, video specs, etc.)
+
+    NOT copied: id, created_at/updated_at (new row gets its own),
+    status (always starts "draft" regardless of the original's status),
+    applications (never touched — original's `applications` relationship
+    is simply not referenced here), and deadline (a stale/passed
+    deadline copied onto a brand-new draft is almost never useful —
+    the business re-sets it when they actually publish).
+    """
+    original = db.query(Campaign).filter(Campaign.id == campaign_id).first()
+    if not original:
+        raise HTTPException(status_code=404, detail="Campaign not found")
+
+    if original.business_id != current_user.id:
+        raise HTTPException(status_code=403, detail="Access denied")
+
+    duplicate = Campaign(
+        business_id=current_user.id,
+        title=f"{original.title} - Copy",
+        tagline=original.tagline,
+        description=original.description,
+        brief=original.brief,
+        category=original.category,
+        sub_category=original.sub_category,
+        campaign_type=original.campaign_type,
+        brand_name=original.brand_name,
+        brand_location=original.brand_location,
+        budget=original.budget,
+        compensation_description=original.compensation_description,
+        requirements=original.requirements,
+        deliverables=original.deliverables,
+        checklist=original.checklist,
+        required_scenes=original.required_scenes,
+        video_specs=original.video_specs,
+        dos=original.dos,
+        donts=original.donts,
+        suggested_caption=original.suggested_caption,
+        hashtags=original.hashtags,
+        hero_image=original.hero_image,
+        status="draft",
+    )
+    db.add(duplicate)
+    db.commit()
+    db.refresh(duplicate)
+    duplicate.application_count = 0  # brand new campaign, no applications yet
+    return duplicate
+
+
 @router.get("/", response_model=dict)
 async def get_campaigns(
     status: Optional[str] = None,

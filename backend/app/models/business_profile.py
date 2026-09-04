@@ -25,6 +25,14 @@ class BusinessProfile(Base):
     
     team_size = Column(String(50), nullable=True)
     year_established = Column(Integer, nullable=True)
+
+    # Brand-level campaign defaults (Increment: campaign creation speedup).
+    # Copied INTO a campaign at creation time (see Campaignform.tsx's
+    # autofill effect) — never referenced dynamically afterwards, so
+    # changing these later never touches campaigns already created.
+    default_dos = Column(JSON, nullable=True)          # ["Use good lighting", ...]
+    default_donts = Column(JSON, nullable=True)         # ["Do not use competitor products", ...]
+    default_video_spec = Column(JSON, nullable=True)    # {"platform": "General", "duration": "...", "aspect_ratio": "...", "voiceover_required": bool, "subtitles_required": bool}
     
     is_onboarding_complete = Column(Boolean, default=False)
     is_published = Column(Boolean, default=False)
