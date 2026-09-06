@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { ArrowLeft, Check, X, DollarSign, Loader2 } from 'lucide-react';
 import { getApplications, updateApplicationStatus, type Application, type ApplicationStatus } from '../api/client';
 import { useAuth } from '../context/AuthContext';
+import { LogoMark, BRAND_NAME, PAGE_GRADIENT_BG } from '../components/Brand';
 
 const VIOLET = '#6C5DD3';
 const VIOLET_DARK = '#4A3BA8';
@@ -96,7 +97,7 @@ export function ApplicationsInbox() {
           --line: #e6e6ea;
           font-family: 'Poppins', -apple-system, Helvetica, Arial, sans-serif;
           min-height: 100vh;
-          background: #fbfaff;
+          background: ${PAGE_GRADIENT_BG};
           color: var(--ink);
         }
         .ai * { box-sizing: border-box; }
@@ -109,7 +110,7 @@ export function ApplicationsInbox() {
           border-bottom: 1px solid var(--line);
           background: #fff;
         }
-        .ai-logo { font-weight: 700; font-size: 17px; }
+        .ai-logo { display: inline-flex; align-items: center; gap: 8px; font-weight: 700; font-size: 17px; }
 
         .ai-body { max-width: 880px; margin: 0 auto; padding: 32px 24px 80px; }
 
@@ -215,7 +216,7 @@ export function ApplicationsInbox() {
       `}</style>
 
       <div className="ai-topbar">
-        <span className="ai-logo">CreatorKhoj</span>
+        <span className="ai-logo"><LogoMark size={20} /> {BRAND_NAME}</span>
       </div>
 
       <div className="ai-body">

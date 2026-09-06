@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { ArrowLeft, MapPin, Building2, BookmarkX } from 'lucide-react';
+import { ArrowLeft, MapPin, Building2, BookmarkX, DollarSign, Gift } from 'lucide-react';
 import { getSavedCampaigns, unsaveCampaign, type SavedCampaignEntry } from '../api/client';
+import { LogoMark, BRAND_NAME, PAGE_GRADIENT_BG } from '../components/Brand';
 
 const CORAL = '#FF8A5B';
 const CORAL_DARK = '#E86B3E';
@@ -61,7 +62,7 @@ export function SavedCampaigns() {
           --line: #e6e6ea;
           font-family: 'Poppins', -apple-system, Helvetica, Arial, sans-serif;
           min-height: 100vh;
-          background: #fbfaff;
+          background: ${PAGE_GRADIENT_BG};
           color: var(--ink);
         }
         .sc * { box-sizing: border-box; }
@@ -74,7 +75,7 @@ export function SavedCampaigns() {
           border-bottom: 1px solid var(--line);
           background: #fff;
         }
-        .sc-logo { font-weight: 700; font-size: 17px; }
+        .sc-logo { display: inline-flex; align-items: center; gap: 8px; font-weight: 700; font-size: 17px; }
 
         .sc-body { max-width: 1080px; margin: 0 auto; padding: 32px 24px 80px; }
 
@@ -115,6 +116,9 @@ export function SavedCampaigns() {
 
         .sc-card-top { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 10px; }
         .sc-card-type {
+          display: inline-flex;
+          align-items: center;
+          gap: 3px;
           font-size: 11px;
           font-weight: 700;
           padding: 4px 10px;
@@ -166,7 +170,7 @@ export function SavedCampaigns() {
       `}</style>
 
       <div className="sc-topbar">
-        <span className="sc-logo">CreatorKhoj</span>
+        <span className="sc-logo"><LogoMark size={20} /> {BRAND_NAME}</span>
       </div>
 
       <div className="sc-body">
@@ -207,7 +211,11 @@ export function SavedCampaigns() {
                   <Link to={`/campaigns/${c.id}`} className="sc-card-link">
                     <div className="sc-card-top">
                       <span className="sc-card-type">
-                        {c.campaign_type === 'paid' ? '$ paid' : '🎁 gifted'}
+                        {c.campaign_type === 'paid' ? (
+                          <><DollarSign size={11} style={{ verticalAlign: -2 }} /> paid</>
+                        ) : (
+                          <><Gift size={11} style={{ verticalAlign: -2 }} /> gifted</>
+                        )}
                       </span>
                     </div>
                     <h3 className="sc-card-title">{c.title}</h3>

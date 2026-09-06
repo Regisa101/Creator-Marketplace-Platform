@@ -3,53 +3,75 @@ import { Link } from "react-router-dom";
 import {
   ChevronDown,
   ArrowRight,
-  FileText,
   Search,
-  Wallet,
-  Bell,
-  Plus,
-  LayoutGrid,
-  Megaphone,
   Compass,
   Inbox,
   Briefcase as BriefcaseIcon,
-  ChevronRight,
   UserPlus,
-  ClipboardCheck,
-  Circle,
-  CheckCircle2,
   PlayCircle,
-  TrendingUp,
-  Clock,
-  Map,
   BarChart3,
-  Plug,
   User,
+  Users,
   Send,
-  Handshake,
-  Star,
-  Zap,
   X,
   Check,
   Sparkles,
   Tag,
+  Mail,
+  FileSpreadsheet,
+  MessageCircle,
+  Camera,
+  Video,
+  Wallet,
+  FileSignature,
+  CreditCard,
 } from "lucide-react";
 
-const VIOLET = "#6C5DD3";
-const VIOLET_LIGHT = "#9C8FE8";
-const VIOLET_DARK = "#4A3BA8";
-const CORAL = "#FF8A5B";
-const CORAL_LIGHT = "#FFB08A";
-const CORAL_DARK = "#E86B3E";
-const VIOLET_SOFT = "#EDEAFB";
-const CORAL_SOFT = "#FFEEE5";
+// ============================================
+// 🔥 BRAND COLORS — official palette
+// Brand Navy + Brand Coral
+// ============================================
+const MIDNIGHT_BLUE = "#1E2A78";
+const MIDNIGHT_BLUE_LIGHT = "#4A4F96";
+const MIDNIGHT_BLUE_SOFT = "#F2F4FC";
+
+const ELECTRIC_ORANGE = "#FF6B5A";
+const ELECTRIC_ORANGE_DARK = "#F0523F";
+const ELECTRIC_ORANGE_LIGHT = "#FF9686";
+const ELECTRIC_ORANGE_SOFT = "#FFF4F2";
+
+const SOFT_PURPLE = "#7B2CBF";
+const SOFT_PURPLE_LIGHT = "#9D4EDD";
+const SOFT_PURPLE_SOFT = "#F3E8FF";
+
+const LIGHT_BG = "#F8F9FA";
+const TEXT_DARK = "#0D0D0D";
+const TEXT_SOFT = "#6B7280";
+
+// Keep VIOLET as alias for Soft Purple for backwards compatibility
+const VIOLET = SOFT_PURPLE;
+const VIOLET_LIGHT = SOFT_PURPLE_LIGHT;
+const VIOLET_DARK = "#5A1E8A";
+const VIOLET_SOFT = SOFT_PURPLE_SOFT;
+const CORAL = ELECTRIC_ORANGE;
+const CORAL_DARK = ELECTRIC_ORANGE_DARK;
+const CORAL_LIGHT = ELECTRIC_ORANGE_LIGHT;
+const CORAL_SOFT = ELECTRIC_ORANGE_SOFT;
+
+// "Brand Navy" / "Brand Coral" — aliased directly to the official brand
+// colors above so every section shares one single source of truth.
+const FIND_NAVY = MIDNIGHT_BLUE;
+const FIND_CORAL = ELECTRIC_ORANGE;
+const FIND_CORAL_DARK = ELECTRIC_ORANGE_DARK;
+const FIND_CORAL_SOFT = ELECTRIC_ORANGE_SOFT;
+const FIND_BLOB = MIDNIGHT_BLUE_SOFT;
 
 const NAV_MENUS = {
   creator: {
     label: "For Creators",
     href: "/creators",
-    accent: CORAL,
-    accentSoft: CORAL_SOFT,
+    accent: ELECTRIC_ORANGE,
+    accentSoft: ELECTRIC_ORANGE_SOFT,
     items: [
       {
         title: "Features",
@@ -74,8 +96,8 @@ const NAV_MENUS = {
   business: {
     label: "For Business",
     href: "/business",
-    accent: VIOLET,
-    accentSoft: VIOLET_SOFT,
+    accent: MIDNIGHT_BLUE,
+    accentSoft: MIDNIGHT_BLUE_SOFT,
     items: [
       {
         title: "Features",
@@ -99,40 +121,41 @@ const NAV_MENUS = {
   },
 };
 
-const BUSINESS_FEATURES = [
+// ============================================
+// "Find the right creators instantly" section
+// ============================================
+const FIND_FEATURES = [
   {
-    title: "Campaign briefs",
-    desc: "Turn a product and a budget into a full brief in minutes.",
-    icon: FileText,
+    title: "Discover creators that fit your brand",
+    desc: "Find relevant Nepali based on niche, audience, engagement, location, and campaign needs.",
+    visual: "avatars",
+    badge: "3 creators matched",
+    badgeIcon: Users,
+    cardPhoto: "https://i.pravatar.cc/160?img=68",
   },
   {
-    title: "Creator discovery",
-    desc: "Filter by niche, audience size, and engagement.",
-    icon: Search,
+    title: "Launch campaigns without the hassle",
+    desc: "Create campaigns, set requirements and deadlines, and let creators apply — all in one place.",
+    visual: "badge",
+    badge: "12 creators applied",
+    badgeIcon: Users,
+    cardPhoto:
+      "https://plus.unsplash.com/premium_photo-1715015440855-7d95cf92608a?q=80&w=388&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D",
   },
   {
-    title: "Spend reports",
-    desc: "See what each campaign cost and what it earned back.",
-    icon: BarChart3,
+    title: "Manage collaborations. Measure what matters.",
+    desc: "Keep creator communication, deliverables, deadlines, and campaign performance organized in one workspace.",
+    visual: "hub",
+    badge: "65% complete",
+    badgeIcon: BarChart3,
+    cardPhoto: "https://images.unsplash.com/photo-1597400473368-b2f08a070bde?q=80&w=436&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D",
   },
 ];
 
-const CREATOR_FEATURES = [
-  {
-    title: "One-click apply",
-    desc: "Apply to campaigns instantly with your saved profile.",
-    icon: Send,
-  },
-  {
-    title: "Deliverable tracking",
-    desc: "Every draft, revision, and approval in one thread.",
-    icon: Clock,
-  },
-  {
-    title: "Payments, handled",
-    desc: "Get paid on approval — no invoices, no screenshots.",
-    icon: Plug,
-  },
+const FIND_AVATAR_PHOTOS = [
+  "https://i.pravatar.cc/64?img=47",
+  "https://i.pravatar.cc/64?img=12",
+  "https://i.pravatar.cc/64?img=32",
 ];
 
 const CATEGORIES = [
@@ -148,45 +171,23 @@ const CATEGORIES = [
   "Wellness",
 ];
 
-const HIW_STEPS = [
-  {
-    title: "Create Your Profile",
-    desc: "Sign up in under 2 minutes. Add your niche, socials, and portfolio.",
-    icon: UserPlus,
-  },
-  {
-    title: "Discover Campaigns",
-    desc: "Browse PR drops, gifted collabs, and paid opportunities from top brands.",
-    icon: Search,
-  },
-  {
-    title: "Apply Instantly",
-    desc: "One-click apply with your profile — no cold pitching or awkward DMs.",
-    icon: Send,
-  },
-  {
-    title: "Land the Collab",
-    desc: "Brands review your profile, shortlist, and reach out directly.",
-    icon: Handshake,
-  },
+// ============================================
+// "DIFFERENT GOALS. SAME PLATFORM." DATA
+// ============================================
+const GOALS_CREATOR_POINTS = [
+  { text: "Discover relevant campaigns that match your niche", icon: Compass },
+  { text: "Build a professional creator profile", icon: User },
+  { text: "Apply with AI-powered proposals", icon: Send },
+  { text: "Manage collaborations and deliverables", icon: BriefcaseIcon },
+  { text: "Get paid securely", icon: Wallet },
 ];
 
-const WHY_ITEMS = [
-  {
-    title: "Engagement Over Vanity",
-    desc: "Brands care about real engagement, not inflated numbers.",
-    icon: TrendingUp,
-  },
-  {
-    title: "Quality Content Wins",
-    desc: "Great content creators get discovered regardless of size.",
-    icon: Star,
-  },
-  {
-    title: "Zero Gatekeeping",
-    desc: "No agency needed. Apply directly and build your portfolio.",
-    icon: Zap,
-  },
+const GOALS_BRAND_POINTS = [
+  { text: "Create and publish campaigns", icon: Sparkles },
+  { text: "Search and filter creators by niche, platform, location & more", icon: Search },
+  { text: "Review applications and compare performance", icon: Users },
+  { text: "Chat and collaborate in one place", icon: MessageCircle },
+  { text: "Track deliverables and payments", icon: BarChart3 },
 ];
 
 const COMPARE_BEFORE = [
@@ -205,9 +206,18 @@ const COMPARE_AFTER = [
   "Full campaign management in one dashboard",
 ];
 
-// FIX: these were previously declared inside DashboardPreview(), so the
-// FAQ section in Landing() couldn't see them (ReferenceError: FAQ_CREATOR
-// is not defined). Moved to module scope alongside the other constant data.
+const MERGE_ICONS = [
+  { label: "Email", icon: Mail, x: 70, y: 90, variant: "light" },
+  { label: "Sheets", icon: FileSpreadsheet, x: 380, y: 80, variant: "light" },
+  { label: "Chat", icon: MessageCircle, x: 420, y: 210, variant: "navy" },
+  { label: "Social", icon: Camera, x: 390, y: 370, variant: "light" },
+  { label: "Reels", icon: Video, x: 250, y: 410, variant: "navy" },
+  { label: "Payments", icon: Wallet, x: 110, y: 380, variant: "light" },
+  { label: "Contracts", icon: FileSignature, x: 60, y: 230, variant: "orange" },
+  { label: "Invoices", icon: CreditCard, x: 200, y: 50, variant: "navy" },
+  { label: "Reports", icon: BarChart3, x: 300, y: 140, variant: "light" },
+];
+
 const FAQ_CREATOR = [
   {
     q: "Is it free to join as a creator?",
@@ -262,442 +272,10 @@ const LogoMark = ({ size = 22 }: { size?: number }) => (
     aria-hidden="true"
     style={{ flexShrink: 0 }}
   >
-    <circle cx="10" cy="13" r="8" fill={VIOLET} />
-    <circle cx="17" cy="9" r="6" fill={CORAL} fillOpacity={0.9} />
+    <circle cx="10" cy="13" r="8" fill={MIDNIGHT_BLUE} />
+    <circle cx="17" cy="9" r="6" fill={ELECTRIC_ORANGE} fillOpacity={0.9} />
   </svg>
 );
-
-const PALETTE = {
-  business: [
-    { tint: VIOLET_SOFT, fg: VIOLET },
-    { tint: "#E4DFFB", fg: VIOLET_DARK },
-    { tint: "#F1EEFC", fg: VIOLET_LIGHT },
-    { tint: "#DCD5F7", fg: VIOLET_DARK },
-  ],
-  creator: [
-    { tint: CORAL_SOFT, fg: CORAL },
-    { tint: "#FFE3D1", fg: CORAL_DARK },
-    { tint: "#FFF1E8", fg: CORAL_LIGHT },
-    { tint: "#FFD9BE", fg: CORAL_DARK },
-  ],
-};
-
-const DONUT_STOPS = {
-  business: [VIOLET, VIOLET_LIGHT, "#D8D5F2"],
-  creator: [CORAL, CORAL_LIGHT, "#FFE1CC"],
-};
-
-const CAMPAIGN_LIST = [
-  { name: "Summer Glow — Skincare", applicants: 12, status: "Live" },
-  { name: "Back to School — Fashion", applicants: 8, status: "Draft" },
-  { name: "Festive Gadgets", applicants: 19, status: "Live" },
-];
-
-const APPLICATION_LIST = [
-  {
-    name: "Summer Glow — Skincare",
-    brand: "Herbivore Nepal",
-    status: "Shortlisted",
-  },
-  { name: "Trail Run Gear", brand: "Kaski Outdoors", status: "Applied" },
-  { name: "Cafe Launch Reel", brand: "Brew & Co.", status: "In review" },
-];
-
-// ============================================
-// DASHBOARD TOGGLE
-// ============================================
-
-type DashboardRole = "creator" | "business";
-
-function DashboardToggle({
-  role,
-  setRole,
-}: {
-  role: DashboardRole;
-  setRole: (r: DashboardRole) => void;
-}) {
-  return (
-    <div className="dashboard-toggle">
-      <button
-        className={`toggle-btn ${role === "creator" ? "active-coral" : ""}`}
-        onClick={() => setRole("creator")}
-      >
-        <User size={14} /> Creator
-      </button>
-      <button
-        className={`toggle-btn ${role === "business" ? "active-violet" : ""}`}
-        onClick={() => setRole("business")}
-      >
-        <BriefcaseIcon size={14} /> Business
-      </button>
-    </div>
-  );
-}
-
-// ============================================
-// DASHBOARD COMPONENT
-// ============================================
-
-interface DashboardPreviewProps {
-  role: "creator" | "business";
-}
-
-const DashboardPreview = memo(function DashboardPreview({ role }: DashboardPreviewProps) {
-  const isCreator = role === "creator";
-  const accentColor = isCreator ? CORAL : VIOLET;
-  const accentSoft = isCreator ? "#FFEEE5" : "#EDEAFB";
-  const userInitial = "R";
-  const userName = isCreator ? "Ram Thapa" : "Regisha Maharjan";
-  const userRole = isCreator ? "Creator" : "Business";
-
-  const sideNav = [
-    { label: "Home", icon: LayoutGrid, active: true },
-    { label: "My Campaigns", icon: Megaphone },
-    { label: "Discover Creators", icon: Compass },
-    { label: "Applications", icon: Inbox },
-    { label: "Workspace", icon: BriefcaseIcon },
-  ];
-
-  const roleKey = isCreator ? "creator" : "business";
-  const pal = PALETTE[roleKey];
-  const donutColors = DONUT_STOPS[roleKey];
-
-  const stats = isCreator
-    ? [
-        { label: "Active Applications", value: "4", icon: Inbox, ...pal[0] },
-        { label: "Active Collabs", value: "2", icon: Megaphone, ...pal[1] },
-        {
-          label: "Total Earnings",
-          value: "Rs. 34,500",
-          icon: Wallet,
-          ...pal[2],
-        },
-        { label: "Profile Completion", value: "85%", icon: User, ...pal[3] },
-      ]
-    : [
-        { label: "Active Campaigns", value: "3", icon: Megaphone, ...pal[0] },
-        { label: "Applications Received", value: "24", icon: Inbox, ...pal[1] },
-        { label: "Deliverables Due", value: "6", icon: FileText, ...pal[2] },
-        {
-          label: "Spend this month",
-          value: "Rs. 68,400",
-          icon: Wallet,
-          ...pal[3],
-        },
-      ];
-
-  const recentActivity = isCreator
-    ? [
-        {
-          name: "Priya Karki",
-          action: "accepted your proposal",
-          time: "2h ago",
-          initial: "P",
-          ...pal[0],
-        },
-        {
-          name: "Aayush Rai",
-          action: "requested revisions",
-          time: "5h ago",
-          initial: "A",
-          ...pal[1],
-        },
-        {
-          name: "Sneha Maharjan",
-          action: "paid you Rs. 8,000",
-          time: "Yesterday",
-          initial: "S",
-          ...pal[2],
-        },
-        {
-          name: "Bibek Thapa",
-          action: "approved your deliverable",
-          time: "2 days ago",
-          initial: "B",
-          ...pal[3],
-        },
-      ]
-    : [
-        {
-          name: "Priya Karki",
-          action: "submitted a deliverable for review",
-          time: "2h ago",
-          initial: "P",
-          ...pal[0],
-        },
-        {
-          name: "Aayush Rai",
-          action: "applied to Summer Glow campaign",
-          time: "5h ago",
-          initial: "A",
-          ...pal[1],
-        },
-        {
-          name: "Sneha Maharjan",
-          action: "was paid Rs. 8,000",
-          time: "Yesterday",
-          initial: "S",
-          ...pal[2],
-        },
-        {
-          name: "Bibek Thapa",
-          action: "had a deliverable approved",
-          time: "2 days ago",
-          initial: "B",
-          ...pal[3],
-        },
-      ];
-
-  const gettingStarted = isCreator
-    ? [
-        { label: "Complete your profile", done: true },
-        { label: "Apply to 3 campaigns", done: false },
-        { label: "Submit your first deliverable", done: false },
-      ]
-    : [
-        { label: "Complete your business profile", done: true },
-        { label: "Publish your first campaign", done: true },
-        { label: "Review your first application", done: false },
-      ];
-
-  const workItems = isCreator ? APPLICATION_LIST : CAMPAIGN_LIST;
-
-  return (
-    <div className="dash-full">
-      <div className="dash-sidebar">
-        <div className="dash-logo">
-          <LogoMark size={20} /> creatorhub
-        </div>
-
-        <nav className="dash-nav">
-          {sideNav.map((item) => {
-            const Icon = item.icon;
-            return (
-              <span
-                key={item.label}
-                className={`dash-navitem ${item.active ? "active" : ""}`}
-              >
-                <Icon size={16} /> {item.label}
-                {item.label === "Workspace" && (
-                  <ChevronRight size={13} style={{ marginLeft: "auto" }} />
-                )}
-              </span>
-            );
-          })}
-        </nav>
-
-        <div className="dash-profile-card">
-          <p className="dash-profile-title">Complete your profile</p>
-          <p className="dash-profile-desc">
-            A complete profile builds trust with{" "}
-            {isCreator ? "brands" : "creators"}.
-          </p>
-          <div className="dash-progress">
-            <div
-              className="dash-progress-fill"
-              style={{ width: isCreator ? "85%" : "22%" }}
-            />
-          </div>
-          <span className="dash-progress-pct">{isCreator ? "85" : "22"}%</span>
-          <button
-            className="dash-profile-btn"
-            style={{ background: accentColor }}
-          >
-            Complete profile <ArrowRight size={13} />
-          </button>
-        </div>
-
-        <div className="dash-user">
-          <span
-            className="dash-user-avatar"
-            style={{ background: accentColor }}
-          >
-            {userInitial}
-          </span>
-          <span>
-            <div className="dash-user-name">{userName}</div>
-            <div className="dash-user-role">{userRole}</div>
-          </span>
-        </div>
-      </div>
-
-      <div className="dash-main">
-        <div className="dash-topbar">
-          <div>
-            <p className="dash-greeting">
-              Good evening, {isCreator ? "Ram" : "Regisha"} 👋
-            </p>
-            <p className="dash-greeting-sub">
-              Here's what's happening across your{" "}
-              {isCreator ? "applications" : "campaigns"}.
-            </p>
-          </div>
-          <div className="dash-topbar-actions">
-            <span className="dash-search">
-              <Search size={14} /> Search anything…
-            </span>
-            <span className="dash-bell">
-              <Bell size={16} />
-            </span>
-            <button
-              className="dash-new-campaign"
-              style={{ background: accentColor }}
-            >
-              <Plus size={14} /> {isCreator ? "Apply Now" : "New Campaign"}
-            </button>
-          </div>
-        </div>
-
-        <div className="dash-stats">
-          {stats.map((s) => {
-            const Icon = s.icon;
-            return (
-              <div className="dash-stat" key={s.label}>
-                <span
-                  className="dash-stat-icon"
-                  style={{ background: s.tint, color: s.fg }}
-                >
-                  <Icon size={15} />
-                </span>
-                <div className="dash-stat-value">{s.value}</div>
-                <div className="dash-stat-label">{s.label}</div>
-              </div>
-            );
-          })}
-        </div>
-
-        <div
-          className="dash-hero-card"
-          style={{
-            background: `radial-gradient(circle at 85% 20%, ${accentColor}80 0%, #14101f 55%)`,
-          }}
-        >
-          <span className="dash-hero-eyebrow">
-            ✦ {isCreator ? "Featured" : "Active campaign"}
-          </span>
-          <p className="dash-hero-title">
-            {isCreator
-              ? "Summer Glow — Apply Now!"
-              : "Summer Glow — Skincare Launch"}
-          </p>
-          <p className="dash-hero-sub">
-            {isCreator
-              ? "Beauty · NPR 15,000 · 12 applicants already"
-              : "12 creators submitted content · 4 deliverables pending review."}
-          </p>
-          <button className="dash-hero-btn" style={{ background: accentColor }}>
-            {isCreator ? "View Details" : "View Campaign"}{" "}
-            <ArrowRight size={14} />
-          </button>
-        </div>
-
-        <div className="dash-bottom">
-          <div className="dash-quick">
-            <p className="dash-panel-title">
-              {isCreator ? "My Applications" : "Active Campaigns"}
-            </p>
-            <div className="dash-camp-list">
-              {workItems.map((item) => (
-                <div className="dash-camp-item" key={item.name}>
-                  <div className="dash-camp-info">
-                    <span className="dash-camp-name">{item.name}</span>
-                    <span className="dash-camp-meta">
-                      {isCreator
-                        ? (item as (typeof APPLICATION_LIST)[number]).brand
-                        : `${(item as (typeof CAMPAIGN_LIST)[number]).applicants} applicants`}
-                    </span>
-                  </div>
-                  <span
-                    className="dash-status-badge"
-                    style={{
-                      background:
-                        item.status === "Draft" ? "#F1EEFC" : accentSoft,
-                      color: item.status === "Draft" ? "#8B7FD1" : accentColor,
-                    }}
-                  >
-                    {item.status}
-                  </span>
-                </div>
-              ))}
-            </div>
-          </div>
-          <div className="dash-recent">
-            <p className="dash-panel-title">Recent Activity</p>
-            <div className="dash-recent-list">
-              {recentActivity.map((a) => (
-                <div className="dash-recent-item" key={a.name}>
-                  <span
-                    className="dash-recent-avatar"
-                    style={{ background: a.tint, color: a.fg }}
-                  >
-                    {a.initial}
-                  </span>
-                  <span className="dash-recent-text">
-                    <span className="dash-recent-name">{a.name}</span>{" "}
-                    {a.action}
-                  </span>
-                  <span className="dash-recent-time">{a.time}</span>
-                </div>
-              ))}
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <div className="dash-right">
-        <div className="dash-status-card">
-          <div className="dash-panel-head">
-            <p className="dash-panel-title">Application Status</p>
-            <span className="dash-panel-period">This month</span>
-          </div>
-
-          <div style={{ position: "relative" }}>
-            <div className="dash-donut-shadow" />
-            <div
-              className="dash-donut"
-              style={{
-                background: `conic-gradient(${donutColors[0]} 0% 58%, ${donutColors[1]} 58% 87%, ${donutColors[2]} 87% 100%)`,
-                boxShadow: isCreator
-                  ? "0 20px 34px -10px rgba(255,138,91,0.55), 0 6px 14px -4px rgba(255,138,91,0.35)"
-                  : "0 20px 34px -10px rgba(108,93,211,0.55), 0 6px 14px -4px rgba(108,93,211,0.35)",
-              }}
-            >
-              <span className="dash-donut-center">
-                <b>24</b>
-                <span>total</span>
-              </span>
-            </div>
-          </div>
-
-          <div className="dash-legend">
-            <span>
-              <i style={{ background: donutColors[0] }} /> Approved <b>14</b>
-            </span>
-            <span>
-              <i style={{ background: donutColors[1] }} /> In review <b>7</b>
-            </span>
-            <span>
-              <i style={{ background: donutColors[2] }} /> Draft <b>3</b>
-            </span>
-          </div>
-        </div>
-        <div className="dash-getting-started">
-          <p className="dash-panel-title">Getting Started</p>
-          {gettingStarted.map((g) => (
-            <span className="dash-checklist-item" key={g.label}>
-              {g.done ? (
-                <CheckCircle2 size={15} color="#16A34A" />
-              ) : (
-                <Circle size={15} />
-              )}
-              {g.label}
-            </span>
-          ))}
-        </div>
-      </div>
-    </div>
-  );
-});
 
 // ============================================
 // NAV MEGA MENU
@@ -738,85 +316,495 @@ const NavMegaMenu = memo(function NavMegaMenu({
 });
 
 // ============================================
-// FINAL CTA — join as creator / request brand access
+// "FIND THE RIGHT CREATORS INSTANTLY" SECTION
 // ============================================
 
-const FinalCta = memo(function FinalCta() {
-  return (
-    <section className="ch-section" id="get-started">
-      <div className="cta-row">
-        <div className="cta-card cta-card-creator">
-          <span className="cta-kicker cta-kicker-creator">For Creators</span>
-          <h3 className="cta-title">
-            Start landing
-            <br />
-            collabs
-          </h3>
-          <p className="cta-desc">
-            Free forever. Join 200+ creators already on the platform.
-          </p>
-          <Link to="/register/creator" className="cta-btn cta-btn-creator">
-            Join as Creator <ArrowRight size={15} />
-          </Link>
+function FindCreatorsVisual({ kind, photo }: { kind: string; photo: string }) {
+  if (kind === "avatars") {
+    return (
+      <div className="find-campaign-wrap">
+        <div className="find-campaign-card find-campaign-card--back">
+          <div className="find-campaign-skeleton">
+            <div className="find-skeleton-line" style={{ width: "60%" }} />
+            <div className="find-skeleton-line" style={{ width: "40%" }} />
+            <div className="find-skeleton-line" style={{ width: "75%" }} />
+            <div className="find-skeleton-line" style={{ width: "55%" }} />
+          </div>
+        </div>
+        <div className="find-campaign-card find-campaign-card--front">
+          <div className="find-creator-top">
+            <img className="find-creator-avatar" src={photo} alt="" />
+            <div>
+              <div className="find-creator-name">
+                Aayusha K. <Check size={11} className="find-creator-verified" />
+              </div>
+              <div className="find-creator-niche">Food & Lifestyle · Kathmandu</div>
+            </div>
+            <span className="find-creator-match">98% match</span>
+          </div>
+          <div className="find-campaign-desc">
+            Reels-first creator known for cozy home-baking content and high save rates.
+          </div>
+          <div className="find-creator-stats">
+            <div>
+              <strong>24.5K</strong>
+              <span>Followers</span>
+            </div>
+            <div>
+              <strong>6.8%</strong>
+              <span>Engagement</span>
+            </div>
+            <div>
+              <strong>4.9</strong>
+              <span>Rating</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
-          <div className="cta-preview cta-preview-creator">
-            <span className="cta-preview-avatar">
-              <User size={20} />
+  if (kind === "badge") {
+    return (
+      <div className="find-campaign-wrap">
+        <div className="find-campaign-card find-campaign-card--back">
+          <div className="find-campaign-skeleton">
+            <div className="find-skeleton-line" style={{ width: "60%" }} />
+            <div className="find-skeleton-line" style={{ width: "40%" }} />
+            <div className="find-skeleton-line" style={{ width: "75%" }} />
+            <div className="find-skeleton-line" style={{ width: "55%" }} />
+          </div>
+        </div>
+        <div className="find-campaign-card find-campaign-card--front">
+          <div className="find-campaign-top">
+            <span className="find-campaign-paid">
+              <Tag size={10} /> paid
             </span>
-            <div className="cta-preview-line cta-preview-line-lg" />
-            <div className="cta-preview-line cta-preview-line-sm" />
-            <div className="cta-preview-tags">
-              <span className="cta-tag">Beauty</span>
-              <span className="cta-tag">UGC</span>
+            <span className="find-campaign-status">Published</span>
+          </div>
+          <div className="find-campaign-body">
+            <div className="find-campaign-copy">
+              <div className="find-campaign-title">Sweet Moments with CloudeBakes</div>
+              <div className="find-campaign-meta">CloudeBakes · Food · Kathmandu</div>
+              <div className="find-campaign-desc">
+                We're looking for food and lifestyle creators to showcase our freshly baked treats…
+              </div>
             </div>
-            <span className="cta-preview-btn">View profile</span>
+            <img className="find-campaign-media" src={photo} alt="" />
+          </div>
+          <div className="find-campaign-footer">
+            <span>0 applicants</span>
+            <span className="find-campaign-due">Due Sep 17</span>
           </div>
         </div>
+      </div>
+    );
+  }
 
-        <div className="cta-card cta-card-business">
-          <span className="cta-kicker cta-kicker-business">For Brands</span>
-          <h3 className="cta-title">
-            Find your
+  // "hub" — collaboration/progress mockup
+  return (
+    <div className="find-campaign-wrap">
+      <div className="find-campaign-card find-campaign-card--back">
+          <div className="find-campaign-skeleton">
+            <div className="find-skeleton-line" style={{ width: "60%" }} />
+            <div className="find-skeleton-line" style={{ width: "40%" }} />
+            <div className="find-skeleton-line" style={{ width: "75%" }} />
+            <div className="find-skeleton-line" style={{ width: "55%" }} />
+          </div>
+        </div>
+      <div className="find-campaign-card find-campaign-card--front">
+        <div className="find-campaign-top">
+          <span className="find-campaign-paid find-campaign-paid--purple">In progress</span>
+          <span className="find-campaign-status">Reel</span>
+        </div>
+        <div className="find-campaign-body">
+          <div className="find-campaign-copy">
+            <div className="find-campaign-title">PaperMadePaper × @creator</div>
+            <div className="find-campaign-meta">Deliverable: Handmade Paper Reel</div>
+            <div className="find-progress-track">
+              <div className="find-progress-fill" style={{ width: "65%" }} />
+            </div>
+          </div>
+          <img className="find-campaign-media" src={photo} alt="" />
+        </div>
+        <div className="find-campaign-footer">
+          <span>Rs. 8,000</span>
+          <span className="find-campaign-due">Due Sep 20</span>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+const FindCreatorsSection = memo(function FindCreatorsSection() {
+  const [active, setActive] = useState(0);
+  const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  function stopTimer() {
+    if (timerRef.current) {
+      clearInterval(timerRef.current);
+      timerRef.current = null;
+    }
+  }
+  function startTimer() {
+    stopTimer();
+    timerRef.current = setInterval(() => {
+      setActive((i) => (i + 1) % FIND_FEATURES.length);
+    }, 5000);
+  }
+
+  useEffect(() => {
+    startTimer();
+    return () => stopTimer();
+  }, []);
+
+  function goTo(i: number) {
+    setActive(i);
+    startTimer();
+  }
+  function prev() {
+    goTo((active - 1 + FIND_FEATURES.length) % FIND_FEATURES.length);
+  }
+  function next() {
+    goTo((active + 1) % FIND_FEATURES.length);
+  }
+
+  const current = FIND_FEATURES[active];
+  const BadgeIcon = current.badgeIcon;
+
+  return (
+    <section className="ch-section" id="features">
+      <div
+        className="find-split"
+        onMouseEnter={stopTimer}
+        onMouseLeave={startTimer}
+      >
+        <div className="find-copy">
+          <span className="find-dash" />
+          <h2 className="find-h2">
+            Find the right creators
             <br />
-            creators
-          </h3>
-          <p className="cta-desc">
-            Authentic Nepali creators, ready for your next campaign.
+            <span className="find-h2-accent">instantly</span>.
+          </h2>
+          <p className="find-sub" key={active}>
+            {current.desc}
           </p>
-          <Link to="/register/business" className="cta-btn cta-btn-business">
-            Request Brand Access <ArrowRight size={15} />
+          <Link to="/register" className="find-cta">
+            Get Started Free <ArrowRight size={16} />
           </Link>
+        </div>
 
-          <div className="cta-preview cta-preview-business">
-            <span className="cta-preview-new">+ New</span>
-            <div className="cta-preview-stats">
-              <div>
-                <span className="cta-preview-stat-label">Active</span>
-                <b>12</b>
-              </div>
-              <div>
-                <span className="cta-preview-stat-label">Apps</span>
-                <b className="stat-coral">186</b>
-              </div>
-              <div>
-                <span className="cta-preview-stat-label">Done</span>
-                <b className="stat-accent">48</b>
-              </div>
+        <div className="find-card" key={active}>
+          <div className="find-visual-scene">
+            <span className="find-blob" />
+            <span className="find-scene-dot find-scene-dot--a" />
+            <span className="find-scene-dot find-scene-dot--b" />
+
+            <svg
+              className="find-scene-swirl"
+              viewBox="0 0 460 320"
+              aria-hidden="true"
+            >
+              <path
+                d="M 425 6 C 452 22, 458 60, 448 92 C 440 118, 442 140, 452 155 C 460 168, 452 182, 432 180"
+                fill="none"
+                stroke={FIND_CORAL}
+                strokeWidth="2"
+                strokeDasharray="1 8"
+                strokeLinecap="round"
+                opacity="0.55"
+              />
+              <path
+                d="M 438 174 L 430 181 L 439 187"
+                fill="none"
+                stroke={FIND_CORAL}
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                opacity="0.6"
+              />
+            </svg>
+
+            <div className="find-avatar-stack">
+              {FIND_AVATAR_PHOTOS.map((src) => (
+                <img className="find-avatar-chip" src={src} alt="" key={src} />
+              ))}
             </div>
-            <div className="cta-preview-row">
-              <div className="cta-preview-line cta-preview-line-sm" />
-              <span className="cta-status-badge cta-status-approved">
-                Approved
-              </span>
+
+            <div className="find-callout">
+              <svg className="find-callout-curl" width="16" height="16" viewBox="0 0 24 24" aria-hidden="true">
+                <path
+                  d="M4 4 C4 14, 14 14, 14 8 C14 4, 9 3, 9 8 C9 12, 15 16, 20 15"
+                  fill="none"
+                  stroke={FIND_CORAL}
+                  strokeWidth="1.8"
+                  strokeLinecap="round"
+                />
+                <path d="M17 12 L20 15 L16 17" fill="none" stroke={FIND_CORAL} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+              </svg>
+              <span>{current.title}</span>
             </div>
-            <div className="cta-preview-row">
-              <div className="cta-preview-line cta-preview-line-sm" />
-              <span className="cta-status-badge cta-status-review">
-                Review
+
+            <div className="find-visual">
+              <FindCreatorsVisual kind={current.visual} photo={current.cardPhoto} />
+            </div>
+
+            <div className="find-mini-badge">
+              <span className="find-mini-badge-sparkle">
+                <Sparkles size={11} />
               </span>
+              <BadgeIcon size={14} className="find-mini-badge-icon" />
+              {current.badge}
+            </div>
+          </div>
+
+          <div className="find-nav">
+            <button className="find-nav-btn" onClick={prev} aria-label="Previous">
+              <ArrowRight size={16} style={{ transform: "rotate(180deg)" }} />
+            </button>
+            <div className="find-dots">
+              {FIND_FEATURES.map((f, i) => (
+                <button
+                  key={f.title}
+                  className={`find-dot ${i === active ? "find-dot-active" : ""}`}
+                  onClick={() => goTo(i)}
+                  aria-label={`Go to slide ${i + 1}`}
+                />
+              ))}
+            </div>
+            <button className="find-nav-btn" onClick={next} aria-label="Next">
+              <ArrowRight size={16} />
+            </button>
+          </div>
+        </div>
+      </div>
+    </section>
+  );
+});
+
+// ============================================
+// "DIFFERENT GOALS. SAME PLATFORM." SECTION
+// Refactored: compact, balanced, modern SaaS proportions
+// ============================================
+
+// ============================================
+// "DIFFERENT GOALS. SAME PLATFORM." SECTION
+// With properly visible buttons
+// ============================================
+
+const GoalsSection = memo(function GoalsSection() {
+  return (
+    <section className="ch-section goals-section" id="goals">
+      <div className="goals-head">
+        <div className="goals-kicker-wrap">
+          <span className="goals-kicker-line" />
+          <span className="ch-kicker goals-kicker">Built For Everyone</span>
+          <span className="goals-kicker-line" />
+        </div>
+        <h2 className="goals-h2">
+          Different goals. <span className="goals-h2-accent">Same platform.</span>
+        </h2>
+        <p className="goals-sub">
+          Whether you're a creator looking for opportunities or a business looking for the
+          right creator, creatorhub gives you the tools, support, and opportunities to grow.
+        </p>
+      </div>
+
+      <div className="goals-grid">
+        {/* ===== CREATOR CARD ===== */}
+        <div className="goals-card goals-card--creator">
+          <div className="goals-copy">
+            <span className="goals-badge goals-badge--creator">For Creators</span>
+            <h3 className="goals-title">
+              Turn your creativity
+              <br />
+              into opportunities.
+            </h3>
+            <p className="goals-desc">
+              Discover campaigns, showcase your work, collaborate with brands, and get paid —
+              all in one place.
+            </p>
+            <ul className="goals-list">
+              {GOALS_CREATOR_POINTS.map((p) => {
+                const Icon = p.icon;
+                return (
+                  <li key={p.text}>
+                    <span className="goals-icon-circle goals-icon-circle--creator">
+                      <Icon size={14} />
+                    </span>
+                    {p.text}
+                  </li>
+                );
+              })}
+            </ul>
+            {/* 🔥 BUTTON - clearly visible */}
+            <Link 
+              to="/register/creator" 
+              className="goals-btn goals-btn--creator"
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '8px',
+                backgroundColor: '#FF6B5A',
+                color: '#FFFFFF',
+                padding: '12px 24px',
+                borderRadius: '999px',
+                fontSize: '14px',
+                fontWeight: '600',
+                textDecoration: 'none',
+                border: 'none',
+                cursor: 'pointer',
+                marginTop: '8px',
+                alignSelf: 'flex-start',
+                boxShadow: '0 12px 20px -10px rgba(255,107,90,0.4)',
+                transition: 'all 0.2s ease',
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.backgroundColor = '#F0523F';
+                e.currentTarget.style.transform = 'translateY(-2px)';
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.backgroundColor = '#FF6B5A';
+                e.currentTarget.style.transform = 'translateY(0)';
+              }}
+            >
+              Join as a Creator <ArrowRight size={16} />
+            </Link>
+          </div>
+
+          <div className="goals-visual">
+            <div className="goals-visual-inner">
+              <img
+                className="goals-photo"
+                src="https://images.unsplash.com/photo-1531123897727-8f129e1688ce?q=80&w=500&auto=format&fit=crop"
+                alt="Creator working"
+              />
+              <div className="goals-float-card goals-float-card--top">
+                <span className="goals-float-icon goals-float-icon--creator">
+                  <Inbox size={12} />
+                </span>
+                <div>
+                  <div className="goals-float-title">New Campaign Match!</div>
+                  <div className="goals-float-meta">Skincare Brand</div>
+                  <div className="goals-float-meta">NPR 15,000 · 2 weeks</div>
+                </div>
+                <ArrowRight size={12} className="goals-float-arrow" />
+              </div>
+              <div className="goals-float-card goals-float-card--stat">
+                <span className="goals-stat-label">
+                  <BarChart3 size={11} /> Your Growth
+                </span>
+                <div className="goals-stat-row">
+                  <strong>+12%</strong>
+                  <span>More views this month</span>
+                </div>
+              </div>
             </div>
           </div>
         </div>
+
+        {/* ===== BRAND CARD ===== */}
+        <div className="goals-card goals-card--brand">
+          <div className="goals-copy">
+            <span className="goals-badge goals-badge--brand">For Brands</span>
+            <h3 className="goals-title">
+              Find the right creators
+              <br />
+              for your brand.
+            </h3>
+            <p className="goals-desc">
+              Launch campaigns, discover verified creators, manage collaborations, and track
+              results — with less hassle and more impact.
+            </p>
+            <ul className="goals-list">
+              {GOALS_BRAND_POINTS.map((p) => {
+                const Icon = p.icon;
+                return (
+                  <li key={p.text}>
+                    <span className="goals-icon-circle goals-icon-circle--brand">
+                      <Icon size={14} />
+                    </span>
+                    {p.text}
+                  </li>
+                );
+              })}
+            </ul>
+            {/* 🔥 BUTTON - clearly visible */}
+            <Link 
+              to="/register/business" 
+              className="goals-btn goals-btn--brand"
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '8px',
+                backgroundColor: '#1E2A78',
+                color: '#FFFFFF',
+                padding: '12px 24px',
+                borderRadius: '999px',
+                fontSize: '14px',
+                fontWeight: '600',
+                textDecoration: 'none',
+                border: 'none',
+                cursor: 'pointer',
+                marginTop: '8px',
+                alignSelf: 'flex-start',
+                boxShadow: '0 12px 20px -10px rgba(30,42,120,0.4)',
+                transition: 'all 0.2s ease',
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.backgroundColor = '#4A4F96';
+                e.currentTarget.style.transform = 'translateY(-2px)';
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.backgroundColor = '#1E2A78';
+                e.currentTarget.style.transform = 'translateY(0)';
+              }}
+            >
+              Join as a Brand <ArrowRight size={16} />
+            </Link>
+          </div>
+
+          <div className="goals-visual">
+            <div className="goals-visual-inner">
+              <img
+                className="goals-photo"
+                src="https://images.unsplash.com/photo-1519085360753-af0119f7cbe7?q=80&w=500&auto=format&fit=crop"
+                alt="Business team"
+              />
+              <div className="goals-float-card goals-float-card--top">
+                <img
+                  className="goals-float-thumb"
+                  src="https://images.unsplash.com/photo-1500835556837-99ac94a94552?q=80&w=100&auto=format&fit=crop"
+                  alt=""
+                />
+                <div>
+                  <div className="goals-float-title">Campaign Launch</div>
+                  <div className="goals-float-meta">Travel Brand</div>
+                </div>
+                <span className="goals-float-status">Active</span>
+              </div>
+              <div className="goals-float-card goals-float-card--avatars">
+                <span className="goals-stat-label">
+                  <Users size={11} /> Top Creator Matches
+                </span>
+                <div className="goals-avatar-row">
+                  {FIND_AVATAR_PHOTOS.map((src) => (
+                    <img key={src} className="goals-avatar-chip" src={src} alt="" />
+                  ))}
+                  <Link to="/business" className="goals-view-all">
+                    View all <ArrowRight size={10} />
+                  </Link>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div className="goals-tagline">
+        <span className="goals-tagline-dash" />
+        One marketplace. Infinite possibilities.
+        <span className="goals-tagline-dash" />
       </div>
     </section>
   );
@@ -895,7 +883,9 @@ export function Landing() {
   const [openMenu, setOpenMenu] = useState<OpenMenu>(null);
   const [mobileOpen, setMobileOpen] = useState(false);
   const [scrolled, setScrolled] = useState(false);
-  const [dashboardRole, setDashboardRole] = useState<DashboardRole>("business");
+  const [merged, setMerged] = useState(false);
+  const [mergeNoTransition, setMergeNoTransition] = useState(false);
+  const mergeRef = useRef<HTMLDivElement | null>(null);
   const closeTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   function clearCloseTimer() {
@@ -935,1378 +925,1375 @@ export function Landing() {
     return () => window.removeEventListener("scroll", onScroll);
   }, []);
 
+  useEffect(() => {
+    const el = mergeRef.current;
+    if (!el) return;
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        if (entry.isIntersecting) setMerged(true);
+      },
+      { threshold: 0.4 }
+    );
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, []);
+
+  function replayMerge() {
+    setMergeNoTransition(true);
+    setMerged(false);
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        setMergeNoTransition(false);
+        setMerged(true);
+      });
+    });
+  }
+
   return (
     <div className="ch">
       <style>{`
         @import url('https://fonts.googleapis.com/css2?family=League+Spartan:wght@500;600;700;800&family=Poppins:wght@300;400;500;600;700&display=swap');
 
-        .ch {
-          --bg: #fbfaff;
-          --ink: #111217;
-          --ink-soft: #6c6d73;
-          --line: #e6e6ea;
-          --surface: #f7f7f9;
-          --accent: #6C5DD3;
-          --accent-soft: #EDEAFB;
-          --coral: #FF8A5B;
-          --coral-soft: #FFEEE5;
-          --good: #16a34a;
-          --bad: #E8544E;
-          --bad-soft: #FCE8E7;
-          font-family: 'Poppins', -apple-system, Helvetica, Arial, sans-serif;
-          color: var(--ink);
-          background:
-            radial-gradient(ellipse 1000px 640px at 20% 0%, rgba(108,93,211,0.13), transparent 65%),
-            radial-gradient(ellipse 1000px 640px at 85% 5%, rgba(255,138,91,0.11), transparent 65%),
-            var(--bg);
-          -webkit-font-smoothing: antialiased;
-          scroll-behavior: smooth;
-          overflow-x: hidden;
-        }
-        .ch * { box-sizing: border-box; }
-        .ch a { text-decoration: none; color: inherit; }
-        .ch button { font-family: inherit; cursor: pointer; }
-        .ch-logo { font-family: 'League Spartan', sans-serif; font-weight: 600; letter-spacing: 0.03em; }
+.ch {
+  --midnight: #1E2A78;
+  --midnight-light: #4A4F96;
+  --midnight-soft: #F2F4FC;
+  --orange: #FF6B5A;
+  --orange-dark: #F0523F;
+  --orange-light: #FF9686;
+  --orange-soft: #FFF4F2;
+  --purple: #7B2CBF;
+  --purple-light: #9D4EDD;
+  --purple-soft: #F3E8FF;
+  --bg: #F8F9FA;
+  --ink: #0D0D0D;
+  --ink-soft: #6B7280;
+  --line: #e6e6ea;
+  --surface: #f7f7f9;
+  --good: #16a34a;
+  --bad: #E8544E;
+  --bad-soft: #FCE8E7;
+  font-family: 'Poppins', -apple-system, Helvetica, Arial, sans-serif;
+  color: var(--ink);
+  background:
+    radial-gradient(ellipse 1000px 640px at 20% 0%, rgba(10,17,40,0.08), transparent 65%),
+    radial-gradient(ellipse 1000px 640px at 85% 5%, rgba(255,109,0,0.10), transparent 65%),
+    var(--bg);
+  -webkit-font-smoothing: antialiased;
+  scroll-behavior: smooth;
+  overflow-x: hidden;
+}
+.ch * { box-sizing: border-box; }
+.ch a { text-decoration: none; color: inherit; }
+.ch button { font-family: inherit; cursor: pointer; }
+.ch-logo { font-family: 'League Spartan', sans-serif; font-weight: 600; letter-spacing: 0.03em; }
 
-        .ch-nav {
-          position: sticky; top: 0; z-index: 50;
-          display: flex; align-items: center; justify-content: space-between;
-          padding: 16px clamp(24px, 5vw, 72px);
-          background: transparent;
-          box-shadow: none;
-          transition: background 0.2s ease, box-shadow 0.2s ease, backdrop-filter 0.2s ease;
-        }
-        .ch-nav-scrolled {
-          background: rgba(251, 250, 255, 0.92);
-          backdrop-filter: blur(12px);
-          box-shadow: 0 1px 0 var(--line);
-          padding: 10px clamp(24px, 5vw, 72px);
-        }
-        .ch-nav-left { display: flex; align-items: center; gap: 48px; position: relative; }
-        .ch-nav-logo { display: flex; align-items: center; gap: 10px; font-size: 22px; color: var(--ink); }
-        .ch-nav-links { display: flex; align-items: center; gap: 28px; position: relative; }
-        .ch-nav-mega-wrap { display: flex; }
-        .ch-nav-item {
-          position: relative; display: flex; align-items: center; gap: 4px;
-          font-size: 14px; font-weight: 400; color: var(--ink);
-          background: none; border: none; padding: 6px 0;
-          transition: opacity 0.15s ease, color 0.15s ease;
-        }
-        .ch-nav-item:hover { opacity: 0.6; }
-        .ch-nav-item-creator:hover { opacity: 1; color: var(--coral); }
-        .ch-nav-item-business:hover { opacity: 1; color: var(--accent); }
+.ch-nav {
+  position: sticky; top: 0; z-index: 50;
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 16px clamp(24px, 5vw, 72px);
+  background: transparent;
+  box-shadow: none;
+  transition: background 0.2s ease, box-shadow 0.2s ease, backdrop-filter 0.2s ease;
+}
+.ch-nav-scrolled {
+  background: rgba(255, 255, 255, 0.92);
+  backdrop-filter: blur(12px);
+  box-shadow: 0 1px 0 var(--line);
+  padding: 10px clamp(24px, 5vw, 72px);
+}
+.ch-nav-left { display: flex; align-items: center; gap: 48px; position: relative; }
+.ch-nav-logo { display: flex; align-items: center; gap: 10px; font-size: 22px; color: var(--ink); }
+.ch-nav-links { display: flex; align-items: center; gap: 28px; position: relative; }
+.ch-nav-mega-wrap { display: flex; }
+.ch-nav-item {
+  position: relative; display: flex; align-items: center; gap: 4px;
+  font-size: 14px; font-weight: 400; color: var(--ink);
+  background: none; border: none; padding: 6px 0;
+  transition: opacity 0.15s ease, color 0.15s ease;
+}
+.ch-nav-item:hover { opacity: 0.6; }
+.ch-nav-item-creator:hover { opacity: 1; color: var(--orange); }
+.ch-nav-item-business:hover { opacity: 1; color: var(--midnight); }
 
-        .ch-chevron { transition: transform 0.15s ease; }
+.ch-chevron { transition: transform 0.15s ease; }
 
-        .ch-nav-right { display: flex; align-items: center; gap: 12px; }
-        .ch-btn-outline {
-          font-size: 14px; font-weight: 450; color: var(--ink);
-          background: none; border: none; padding: 8px 12px; border-radius: 8px;
-          transition: color 0.15s ease;
-        }
-        .ch-btn-outline:hover { color: var(--ink-soft); }
+.ch-nav-right { display: flex; align-items: center; gap: 12px; }
+.ch-btn-outline {
+  font-size: 14px; font-weight: 450; color: var(--ink);
+  background: none; border: none; padding: 8px 12px; border-radius: 8px;
+  transition: color 0.15s ease;
+}
+.ch-btn-outline:hover { color: var(--ink-soft); }
 
-        .ch-btn-solid {
-          font-size: 14px; font-weight: 450;
-          background: var(--accent); border: none; padding: 9px 22px; border-radius: 8px;
-          display: inline-flex; align-items: center; gap: 8px;
-          transition: background 0.15s ease, transform 0.15s ease;
-        }
-        .ch-btn-solid, .ch-btn-solid * { color: #ffffff !important; }
-        .ch-btn-solid:hover { background: #5A4CC2; transform: translateY(-1px); }
+.ch-btn-solid {
+  font-size: 14px; font-weight: 450;
+  background: var(--midnight); border: none; padding: 9px 22px; border-radius: 8px;
+  display: inline-flex; align-items: center; gap: 8px;
+  transition: background 0.15s ease, transform 0.15s ease;
+}
+.ch-btn-solid, .ch-btn-solid * { color: #ffffff !important; }
+.ch-btn-solid:hover { background: var(--midnight-light); transform: translateY(-1px); }
 
-        .ch-burger { display: none; background: none; border: none; padding: 4px; color: var(--ink); font-size: 24px; }
+.ch-burger { display: none; background: none; border: none; padding: 4px; color: var(--ink); font-size: 24px; }
 
-        .ch-nav-menu-wrap { position: relative; }
+.ch-nav-menu-wrap { position: relative; }
 
-        /* ---- Mega Dropdown - anchored to nav-links, same position for both menus ---- */
-        .ch-dropdown {
-          position: absolute;
-          top: calc(100% + 14px);
-          left: 0;
-          transform: none;
-          width: 520px;
-          background: #ffffff;
-          border: 1px solid var(--line);
-          border-radius: 16px;
-          box-shadow: 0 32px 64px -18px rgba(17,18,23,0.22), 0 8px 20px rgba(17,18,23,0.07);
-          z-index: 60;
-          padding: 20px 16px;
-        }
+.ch-dropdown {
+  position: absolute;
+  top: calc(100% + 14px);
+  left: 0;
+  transform: none;
+  width: 520px;
+  background: #ffffff;
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  box-shadow: 0 32px 64px -18px rgba(17,18,23,0.22), 0 8px 20px rgba(17,18,23,0.07);
+  z-index: 60;
+  padding: 20px 16px;
+}
 
-        .ch-dropdown-left {
-          display: flex;
-          flex-direction: column;
-          gap: 4px;
-          width: 100%;
-        }
+.ch-dropdown-left {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  width: 100%;
+}
 
-        .ch-drop-item {
-          display: flex;
-          align-items: flex-start;
-          gap: 14px;
-          padding: 12px 14px;
-          border-radius: 10px;
-          transition: background 0.15s ease;
-        }
+.ch-drop-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 14px;
+  padding: 12px 14px;
+  border-radius: 10px;
+  transition: background 0.15s ease;
+}
 
-        .ch-drop-item:hover {
-          background: var(--surface);
-        }
+.ch-drop-item:hover {
+  background: var(--surface);
+}
 
-        .ch-drop-icon {
-          flex-shrink: 0;
-          width: 22px;
-          margin-top: 1px;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          color: var(--ink-soft);
-        }
+.ch-drop-icon {
+  flex-shrink: 0;
+  width: 22px;
+  margin-top: 1px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--ink-soft);
+}
 
-        .ch-drop-title {
-          display: block;
-          font-size: 15px;
-          font-weight: 500;
-          color: var(--ink);
-        }
+.ch-drop-title {
+  display: block;
+  font-size: 15px;
+  font-weight: 500;
+  color: var(--ink);
+}
 
-        .ch-drop-desc {
-          font-size: 13px;
-          color: var(--ink-soft);
-          margin-top: 2px;
-          line-height: 1.4;
-          max-width: 100%;
-        }
+.ch-drop-desc {
+  font-size: 13px;
+  color: var(--ink-soft);
+  margin-top: 2px;
+  line-height: 1.4;
+  max-width: 100%;
+}
 
-        .ch-chevron-open { transform: rotate(180deg); }
+.ch-chevron-open { transform: rotate(180deg); }
 
-        .ch-login-dropdown {
-          position: absolute; top: calc(100% + 4px); right: 0; width: 220px;
-          background: #fff; border: 1px solid var(--line); border-radius: 14px;
-          box-shadow: 0 24px 48px -16px rgba(17,18,23,0.20), 0 4px 12px rgba(17,18,23,0.06);
-          padding: 12px; z-index: 60;
-        }
-        .ch-login-label {
-          font-size: 11px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase;
-          color: var(--ink-soft); margin: 2px 6px 8px;
-        }
-        .ch-login-item {
-          display: flex; align-items: center; gap: 10px;
-          padding: 8px 8px; border-radius: 8px;
-          font-size: 13px; font-weight: 500; color: var(--ink);
-          transition: background 0.15s ease;
-        }
-        .ch-login-item:hover { background: var(--surface); }
-        .ch-login-icon {
-          width: 18px; flex-shrink: 0; color: var(--ink-soft);
-          display: flex; align-items: center; justify-content: center;
-        }
+.ch-login-dropdown {
+  position: absolute; top: calc(100% + 4px); right: 0; width: 220px;
+  background: #fff; border: 1px solid var(--line); border-radius: 14px;
+  box-shadow: 0 24px 48px -16px rgba(17,18,23,0.20), 0 4px 12px rgba(17,18,23,0.06);
+  padding: 12px; z-index: 60;
+}
+.ch-login-label {
+  font-size: 11px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase;
+  color: var(--ink-soft); margin: 2px 6px 8px;
+}
+.ch-login-item {
+  display: flex; align-items: center; gap: 10px;
+  padding: 8px 8px; border-radius: 8px;
+  font-size: 13px; font-weight: 500; color: var(--ink);
+  transition: background 0.15s ease;
+}
+.ch-login-item:hover { background: var(--surface); }
+.ch-login-icon {
+  width: 18px; flex-shrink: 0; color: var(--ink-soft);
+  display: flex; align-items: center; justify-content: center;
+}
 
-        .ch-btn-textarrow {
-          display: inline-flex; align-items: center; gap: 6px;
-          font-size: 14.5px; font-weight: 500; color: var(--ink);
-          background: none; border: none; padding: 8px 2px;
-          transition: gap 0.15s ease, color 0.15s ease;
-        }
-        .ch-btn-textarrow:hover { gap: 10px; color: var(--ink-soft); }
+.ch-btn-textarrow {
+  display: inline-flex; align-items: center; gap: 6px;
+  font-size: 14.5px; font-weight: 500; color: var(--ink);
+  background: none; border: none; padding: 8px 2px;
+  transition: gap 0.15s ease, color 0.15s ease;
+}
+.ch-btn-textarrow:hover { gap: 10px; color: var(--ink-soft); }
 
-        .ch-btn-hero-link {
-          display: inline-flex;
-          align-items: center;
-          gap: 8px;
-          font-size: 15.5px;
-          font-weight: 600;
-          color: var(--ink);
-          background: none;
-          border: none;
-          padding: 11px 4px;
-          position: relative;
-          transition: color 0.2s ease, gap 0.2s ease;
-        }
-        .ch-btn-hero-link::after {
-          content: '';
-          position: absolute;
-          left: 4px;
-          right: 4px;
-          bottom: 4px;
-          height: 2px;
-          background: var(--accent);
-          transform: scaleX(0);
-          transform-origin: left;
-          transition: transform 0.25s ease;
-        }
-        .ch-btn-hero-link:hover {
-          color: var(--accent);
-          gap: 12px;
-        }
-        .ch-btn-hero-link:hover::after {
-          transform: scaleX(1);
-        }
-        .ch-btn-hero-link svg {
-          transition: transform 0.25s ease;
-        }
-        .ch-btn-hero-link:hover svg {
-          transform: translateX(3px);
-        }
+.ch-btn-hero-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 15.5px;
+  font-weight: 600;
+  color: var(--ink);
+  background: none;
+  border: none;
+  padding: 11px 4px;
+  position: relative;
+  transition: color 0.2s ease, gap 0.2s ease;
+}
+.ch-btn-hero-link::after {
+  content: '';
+  position: absolute;
+  left: 4px;
+  right: 4px;
+  bottom: 4px;
+  height: 2px;
+  background: var(--midnight);
+  transform: scaleX(0);
+  transform-origin: left;
+  transition: transform 0.25s ease;
+}
+.ch-btn-hero-link:hover {
+  color: var(--midnight);
+  gap: 12px;
+}
+.ch-btn-hero-link:hover::after {
+  transform: scaleX(1);
+}
+.ch-btn-hero-link svg {
+  transition: transform 0.25s ease;
+}
+.ch-btn-hero-link:hover svg {
+  transform: translateX(3px);
+}
 
-        .dashboard-toggle {
-          display: inline-flex;
-          background: white;
-          border: 1px solid var(--line);
-          border-radius: 100px;
-          padding: 4px;
-          gap: 4px;
-        }
-        .toggle-btn {
-          display: flex;
-          align-items: center;
-          gap: 6px;
-          padding: 6px 14px;
-          border: none;
-          border-radius: 100px;
-          font-size: 11.5px;
-          font-weight: 600;
-          color: var(--ink-soft);
-          background: transparent;
-          transition: all 0.15s ease;
-        }
-        .toggle-btn.active-coral { background: var(--coral); color: white; }
-        .toggle-btn.active-violet { background: var(--accent); color: white; }
-        .toggle-btn:not(.active-coral):not(.active-violet):hover { color: var(--ink); }
+.ch-hero {
+  position: relative; padding: 48px clamp(24px, 5vw, 72px) 0; max-width: 1320px; margin: 0 auto;
+}
+.ch-hero-copy { max-width: 640px; margin: 0 auto; text-align: center; }
+.ch-h1 { font-size: clamp(36px, 4.5vw, 52px); font-weight: 700; line-height: 1.15; letter-spacing: -0.02em; margin: 18px 0 0; color: var(--ink); }
+.ch-h1-accent-violet { color: var(--midnight); }
+.ch-h1-accent-coral { color: var(--orange); }
+.ch-h1-swash { display: block; margin: 0 auto; width: 60%; max-width: 200px; }
+.ch-sub { font-size: 16px; line-height: 1.65; color: var(--ink-soft); margin: 20px auto 0; font-weight: 400; max-width: 480px; }
+.ch-hero-ctas { display: flex; gap: 14px; margin-top: 30px; flex-wrap: wrap; justify-content: center; }
+.ch-btn-ghost-play {
+  display: inline-flex; align-items: center; gap: 8px;
+  font-size: 14px; font-weight: 600; color: var(--ink);
+  background: #fff; border: 1.5px solid var(--line); padding: 9px 22px; border-radius: 8px;
+  transition: border-color 0.15s ease;
+}
+.ch-btn-ghost-play:hover { border-color: var(--midnight); }
 
-        .dash-full {
-          display: grid;
-          grid-template-columns: 200px 1fr 260px;
-          background: var(--surface);
-          border-radius: 18px;
-          overflow: hidden;
-          min-height: 520px;
-          border: 1px solid var(--line);
-        }
-        .dash-sidebar {
-          background: #fff;
-          border-right: 1px solid var(--line);
-          padding: 20px 16px;
-          display: flex;
-          flex-direction: column;
-          gap: 4px;
-        }
-        .dash-logo {
-          display: flex;
-          align-items: center;
-          gap: 8px;
-          font-size: 15px;
-          color: var(--ink);
-          padding: 0 4px 16px;
-          font-weight: 700;
-        }
-        .dash-nav {
-          display: flex;
-          flex-direction: column;
-          gap: 2px;
-        }
-        .dash-navitem {
-          display: flex;
-          align-items: center;
-          gap: 10px;
-          font-size: 13px;
-          font-weight: 500;
-          color: var(--ink-soft);
-          padding: 9px 10px;
-          border-radius: 8px;
-        }
-        .dash-navitem.active {
-          background: var(--accent-soft);
-          color: var(--accent);
-          font-weight: 600;
-        }
-        .dash-profile-card {
-          margin-top: auto;
-          background: var(--ink);
-          border-radius: 12px;
-          padding: 14px;
-        }
-        .dash-profile-title {
-          font-size: 12.5px;
-          font-weight: 600;
-          color: #fff;
-          margin: 0;
-        }
-        .dash-profile-desc {
-          font-size: 11px;
-          color: #a9a9b2;
-          margin: 5px 0 10px;
-          line-height: 1.4;
-        }
-        .dash-progress {
-          height: 4px;
-          background: #3a3a42;
-          border-radius: 100px;
-          overflow: hidden;
-        }
-        .dash-progress-fill {
-          height: 100%;
-          background: var(--accent);
-          border-radius: 100px;
-        }
-        .dash-progress-pct {
-          font-size: 10.5px;
-          color: #a9a9b2;
-          display: block;
-          margin: 5px 0 10px;
-        }
-        .dash-profile-btn {
-          width: 100%;
-          background: var(--accent);
-          color: #fff;
-          border: none;
-          padding: 8px;
-          border-radius: 7px;
-          font-size: 12px;
-          font-weight: 600;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          gap: 5px;
-        }
-        .dash-user {
-          display: flex;
-          align-items: center;
-          gap: 9px;
-          padding: 14px 4px 2px;
-          border-top: 1px solid var(--line);
-          margin-top: 12px;
-        }
-        .dash-user-avatar {
-          width: 30px;
-          height: 30px;
-          border-radius: 50%;
-          background: var(--accent);
-          color: #fff;
-          font-size: 12px;
-          font-weight: 600;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-        }
-        .dash-user-name { font-size: 12.5px; font-weight: 600; color: var(--ink); }
-        .dash-user-role { font-size: 11px; color: var(--ink-soft); }
+.ch-marquee { border-top: 1px solid var(--line); border-bottom: 1px solid var(--line); overflow: hidden; padding: 22px 0; background: var(--surface); margin-top: 60px; }
+.ch-marquee-track { display: flex; width: max-content; gap: 44px; animation: ch-scroll 28s linear infinite; }
+@keyframes ch-scroll { from { transform: translateX(0); } to { transform: translateX(-50%); } }
+.ch-chip { font-family: 'League Spartan', sans-serif; font-weight: 600; font-size: 14.5px; letter-spacing: 0.02em; text-transform: uppercase; color: var(--ink-soft); white-space: nowrap; display: flex; align-items: center; }
+.ch-chip::after { content: '·'; margin-left: 44px; color: var(--line); font-style: normal; }
 
-        .dash-main {
-          padding: 20px 22px;
-          min-width: 0;
-        }
-        .dash-topbar {
-          display: flex;
-          align-items: flex-start;
-          justify-content: space-between;
-          margin-bottom: 16px;
-          gap: 12px;
-          flex-wrap: wrap;
-        }
-        .dash-greeting {
-          font-size: 16px;
-          font-weight: 700;
-          margin: 0;
-          color: var(--ink);
-        }
-        .dash-greeting-sub {
-          font-size: 12px;
-          color: var(--ink-soft);
-          margin: 2px 0 0;
-        }
-        .dash-topbar-actions {
-          display: flex;
-          align-items: center;
-          gap: 8px;
-        }
-        .dash-search {
-          display: flex;
-          align-items: center;
-          gap: 6px;
-          font-size: 11px;
-          color: var(--ink-soft);
-          background: #fff;
-          border: 1px solid var(--line);
-          padding: 6px 12px;
-          border-radius: 8px;
-        }
-        .dash-bell {
-          width: 32px;
-          height: 32px;
-          border-radius: 8px;
-          border: 1px solid var(--line);
-          background: #fff;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          color: var(--ink-soft);
-        }
-        .dash-new-campaign {
-          display: flex;
-          align-items: center;
-          gap: 6px;
-          background: var(--accent);
-          color: #fff;
-          border: none;
-          padding: 7px 14px;
-          border-radius: 8px;
-          font-size: 11px;
-          font-weight: 600;
-        }
+.ch-section { padding: 80px clamp(24px, 5vw, 72px); max-width: 1120px; margin: 0 auto; position: relative; }
+.ch-section + .ch-section::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 50%;
+  right: 50%;
+  margin-left: -50vw;
+  margin-right: -50vw;
+  border-top: 1px solid rgba(17,18,23,0.07);
+}
+.ch-section-head { max-width: 520px; margin-bottom: 56px; }
+.ch-kicker { font-size: 18px; font-weight: 600; letter-spacing: 0.02em; text-transform: uppercase; color: var(--ink-soft); }
+.ch-h2 { font-family: 'League Spartan', sans-serif; font-weight: 700; font-size: clamp(28px, 3.6vw, 36px); letter-spacing: -0.01em; margin: 12px 0 0; color: var(--ink); }
+.merge-h2 { font-size: clamp(34px, 4.4vw, 46px); color: var(--midnight); }
 
-        .dash-stats {
-          display: grid;
-          grid-template-columns: repeat(4, 1fr);
-          gap: 10px;
-          margin-bottom: 14px;
-        }
-        .dash-stat {
-          background: #fff;
-          border: 1px solid var(--line);
-          border-radius: 10px;
-          padding: 12px 14px;
-        }
-        .dash-stat-icon {
-          width: 28px;
-          height: 28px;
-          border-radius: 8px;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-        }
-        .dash-stat-value {
-          font-family: 'League Spartan', sans-serif;
-          font-weight: 700;
-          font-size: 18px;
-          margin-top: 10px;
-          color: var(--ink);
-        }
-        .dash-stat-label {
-          font-size: 10.5px;
-          color: var(--ink-soft);
-          margin-top: 2px;
-        }
+/* ===== Find the right creators instantly ===== */
+.find-split {
+  display: grid;
+  grid-template-columns: 0.85fr 1fr;
+  gap: 64px;
+  align-items: center;
+}
+.find-copy { max-width: 420px; }
+.find-dash {
+  display: block;
+  width: 40px;
+  height: 4px;
+  border-radius: 2px;
+  background: #FF6B5A;
+  margin-bottom: 18px;
+}
+.find-h2 {
+  font-family: 'League Spartan', sans-serif;
+  font-weight: 800;
+  font-size: clamp(32px, 4vw, 42px);
+  line-height: 1.15;
+  letter-spacing: -0.01em;
+  margin: 0;
+  color: #1E2A78;
+}
+.find-h2-accent { color: #FF6B5A; }
+.find-sub {
+  font-size: 15px; line-height: 1.65; color: var(--ink-soft); margin: 18px 0 0; max-width: 400px;
+  animation: find-sub-fade 0.4s ease;
+}
+@keyframes find-sub-fade {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+.find-cta {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 28px;
+  background: #FF6B5A;
+  color: #fff !important;
+  font-size: 14.5px;
+  font-weight: 600;
+  padding: 13px 26px;
+  border-radius: 999px;
+  border: none;
+  box-shadow: 0 14px 26px -12px rgba(255,107,90,0.55);
+  transition: background 0.15s ease, transform 0.15s ease, box-shadow 0.15s ease;
+}
+.find-cta:hover {
+  background: #F0523F;
+  transform: translateY(-1px);
+  box-shadow: 0 16px 30px -12px rgba(255,107,90,0.6);
+}
+.find-nav { display: flex; align-items: center; justify-content: center; gap: 16px; margin-top: 24px; }
+.find-nav-btn {
+  width: 38px; height: 38px; border-radius: 50%;
+  background: #fff; border: 1px solid var(--line);
+  display: flex; align-items: center; justify-content: center;
+  color: var(--ink); flex-shrink: 0;
+  transition: border-color 0.15s ease, color 0.15s ease, transform 0.15s ease;
+}
+.find-nav-btn:hover { border-color: var(--midnight); color: var(--midnight); transform: translateY(-2px); }
+.find-dots { display: flex; align-items: center; gap: 7px; }
+.find-dot {
+  width: 8px; height: 8px; border-radius: 999px; padding: 0; border: none;
+  background: var(--line);
+  transition: width 0.25s ease, background 0.25s ease;
+}
+.find-dot:hover { background: var(--ink-soft); }
+.find-dot-active { width: 24px; background: var(--midnight); }
+.find-dot-active:hover { background: var(--midnight); }
 
-        .dash-hero-card {
-          background: radial-gradient(circle at 85% 20%, #3c2f6e 0%, #14101f 55%);
-          border-radius: 12px;
-          padding: 18px 22px;
-          margin-bottom: 14px;
-        }
-        .dash-hero-eyebrow {
-          font-size: 11px;
-          font-weight: 600;
-          color: #b6acf0;
-        }
-        .dash-hero-title {
-          font-size: 17px;
-          font-weight: 700;
-          color: #fff;
-          margin: 6px 0 3px;
-        }
-        .dash-hero-sub {
-          font-size: 12px;
-          color: #b9b9c4;
-          margin: 0 0 14px;
-        }
-        .dash-hero-btn {
-          display: inline-flex;
-          align-items: center;
-          gap: 6px;
-          background: var(--accent);
-          color: #fff;
-          border: none;
-          padding: 7px 16px;
-          border-radius: 8px;
-          font-size: 12px;
-          font-weight: 600;
-        }
+.find-card { animation: find-zoom-in 0.4s ease; }
+@keyframes find-zoom-in {
+  from { opacity: 0; transform: scale(0.9); }
+  to { opacity: 1; transform: scale(1); }
+}
+.find-visual-scene {
+  position: relative;
+  padding: 56px 40px 40px 20px;
+}
+.find-blob {
+  position: absolute;
+  top: 30px;
+  left: -6px;
+  right: -6px;
+  bottom: 4px;
+  background: #F2F4FC;
+  border-radius: 62% 38% 55% 45% / 44% 48% 52% 56%;
+  z-index: 0;
+}
+.find-scene-dot {
+  position: absolute;
+  border-radius: 50%;
+  background: #FF6B5A;
+  opacity: 0.7;
+  z-index: 1;
+}
+.find-scene-dot--a { width: 9px; height: 9px; top: 12px; left: 34px; }
+.find-scene-dot--b { width: 12px; height: 12px; bottom: 46px; left: -2px; opacity: 0.55; }
+.find-scene-swirl {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  z-index: 0;
+}
+.find-avatar-stack {
+  position: absolute;
+  top: 2px;
+  right: 6px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  z-index: 2;
+}
+.find-avatar-chip {
+  width: 32px; height: 32px; border-radius: 50%;
+  object-fit: cover;
+  border: 2.5px solid #fff;
+  box-shadow: 0 6px 14px -6px rgba(17,18,23,0.35);
+}
+.find-callout {
+  position: absolute;
+  top: 8px;
+  right: 84px;
+  max-width: 116px;
+  display: flex;
+  align-items: flex-start;
+  gap: 5px;
+  font-size: 12px;
+  font-weight: 600;
+  font-style: italic;
+  line-height: 1.35;
+  color: #1E2A78;
+  text-align: right;
+  z-index: 2;
+  transform: rotate(-4deg);
+  transform-origin: right top;
+}
+.find-callout-curl {
+  flex-shrink: 0;
+  margin-top: 2px;
+  transform: scaleX(-1);
+}
+.find-mini-badge {
+  position: absolute;
+  left: 4px;
+  bottom: 68px;
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  background: #fff;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  padding: 10px 16px;
+  font-size: 12.5px;
+  font-weight: 700;
+  color: var(--ink);
+  box-shadow: 0 16px 28px -14px rgba(17,18,23,0.28);
+  z-index: 2;
+  white-space: nowrap;
+}
+.find-mini-badge-sparkle {
+  position: absolute;
+  top: -13px;
+  left: -11px;
+  color: #FF6B5A;
+  transform: rotate(-14deg);
+}
+.find-mini-badge-icon {
+  color: #FF6B5A;
+  flex-shrink: 0;
+}
 
-        .dash-bottom {
-          display: grid;
-          grid-template-columns: 1fr 1.4fr;
-          gap: 12px;
-        }
-        .dash-quick, .dash-recent, .dash-status-card, .dash-getting-started {
-          background: #fff;
-          border: 1px solid var(--line);
-          border-radius: 12px;
-          padding: 14px;
-        }
-        
-        .dash-status-card { position: relative; overflow: visible; }
+.find-visual {
+  background: #fff;
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  height: 236px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 18px;
+  padding: 24px;
+  position: relative;
+  overflow: hidden;
+  z-index: 1;
+}
+.find-visual:hover .find-campaign-card--front {
+  transform: translateY(-6px);
+  box-shadow: 0 22px 36px -14px rgba(17,18,23,0.24);
+}
+.find-visual:hover .find-campaign-card--back {
+  transform: rotate(6deg) translateY(4px);
+}
 
-        .dash-panel-title {
-          font-size: 12.5px;
-          font-weight: 600;
-          color: var(--ink);
-          margin: 0 0 10px;
-        }
+.find-creator-top { display: flex; align-items: flex-start; gap: 9px; margin-bottom: 10px; }
+.find-creator-avatar {
+  width: 32px; height: 32px; border-radius: 50%; flex-shrink: 0;
+  object-fit: cover;
+}
+.find-creator-name {
+  font-size: 12px; font-weight: 700; color: var(--ink);
+  display: flex; align-items: center; gap: 4px;
+}
+.find-creator-verified { color: var(--good); flex-shrink: 0; }
+.find-creator-niche { font-size: 9px; color: var(--ink-soft); margin-top: 2px; }
+.find-creator-match {
+  margin-left: auto; font-size: 8.5px; font-weight: 700; white-space: nowrap;
+  background: var(--orange-soft); color: var(--orange-dark);
+  border-radius: 999px; padding: 3px 7px;
+}
+.find-creator-stats {
+  display: flex; justify-content: space-between;
+  border-top: 1px solid var(--line);
+  padding-top: 9px; margin-top: auto;
+}
+.find-creator-stats > div { display: flex; flex-direction: column; align-items: center; gap: 2px; }
+.find-creator-stats strong { font-size: 11.5px; color: var(--ink); }
+.find-creator-stats span { font-size: 8px; color: var(--ink-soft); text-transform: uppercase; letter-spacing: 0.03em; }
 
-        /* ---- Campaign / application list (replaces generic quick actions) ---- */
-        .dash-camp-list { display: flex; flex-direction: column; gap: 10px; }
-        .dash-camp-item {
-          display: flex; align-items: center; justify-content: space-between;
-          gap: 8px; padding: 8px 4px;
-          border-bottom: 1px solid var(--line);
-        }
-        .dash-camp-item:last-child { border-bottom: none; }
-        .dash-camp-info { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
-        .dash-camp-name {
-          font-size: 12px; font-weight: 600; color: var(--ink);
-          white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
-        }
-        .dash-camp-meta { font-size: 10.5px; color: var(--ink-soft); }
-        .dash-status-badge {
-          font-size: 10px; font-weight: 600; padding: 4px 10px; border-radius: 100px;
-          white-space: nowrap; flex-shrink: 0;
-        }
+.find-campaign-paid--purple { background: var(--midnight-soft); color: var(--midnight); }
+.find-progress-track {
+  height: 5px; border-radius: 999px; background: var(--surface);
+  margin: 8px 0 10px; overflow: hidden;
+}
+.find-progress-fill { height: 100%; border-radius: 999px; background: var(--midnight); }
 
-        .dash-recent-list {
-          display: flex;
-          flex-direction: column;
-          gap: 2px;
-        }
-        .dash-recent-item {
-          display: flex;
-          align-items: center;
-          gap: 8px;
-          padding: 6px 2px;
-        }
-        .dash-recent-avatar {
-          width: 26px;
-          height: 26px;
-          border-radius: 50%;
-          flex-shrink: 0;
-          font-size: 11px;
-          font-weight: 700;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-        }
-        .dash-recent-text {
-          font-size: 12px;
-          color: var(--ink-soft);
-          line-height: 1.4;
-          flex: 1;
-          min-width: 0;
-        }
-        .dash-recent-name {
-          color: var(--ink);
-          font-weight: 600;
-        }
-        .dash-recent-time {
-          font-size: 10.5px;
-          color: var(--ink-soft);
-          flex-shrink: 0;
-          white-space: nowrap;
-        }
+.find-campaign-wrap { position: relative; width: 100%; height: 100%; }
+.find-campaign-card {
+  position: absolute;
+  background: #fff;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  transition: transform 0.3s ease, box-shadow 0.3s ease;
+}
+.find-campaign-card--back {
+  top: 14px; left: 24px; right: 4px; bottom: 4px;
+  padding: 16px 14px;
+  transform: rotate(3deg);
+  box-shadow: 0 10px 20px -10px rgba(17,18,23,0.12);
+}
+.find-campaign-skeleton { display: flex; flex-direction: column; gap: 9px; }
+.find-skeleton-line { height: 6px; border-radius: 4px; background: var(--surface); border: 1px solid var(--line); }
+.find-campaign-card--front {
+  top: 4px; left: 4px; right: 24px; bottom: 14px;
+  padding: 12px 14px;
+  box-shadow: 0 16px 28px -12px rgba(17,18,23,0.18);
+  display: flex;
+  flex-direction: column;
+}
+.find-campaign-body { display: flex; gap: 10px; flex: 1; }
+.find-campaign-copy { flex: 1; min-width: 0; }
+.find-campaign-media {
+  width: 54px; height: 54px; border-radius: 10px; flex-shrink: 0;
+  object-fit: cover;
+  box-shadow: 0 6px 14px -8px rgba(17,18,23,0.3);
+}
+.find-campaign-top { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; }
+.find-campaign-paid {
+  display: inline-flex; align-items: center; gap: 3px;
+  font-size: 9.5px; font-weight: 700;
+  background: var(--orange-soft); color: var(--orange-dark);
+  border-radius: 999px; padding: 3px 8px;
+}
+.find-campaign-status {
+  font-size: 9px; font-weight: 600;
+  background: var(--surface); color: var(--ink-soft);
+  border-radius: 999px; padding: 3px 8px;
+}
+.find-campaign-title { font-size: 12.5px; font-weight: 700; line-height: 1.3; color: var(--ink); margin-bottom: 5px; }
+.find-campaign-meta { font-size: 9.5px; color: var(--ink-soft); margin-bottom: 6px; }
+.find-campaign-desc {
+  font-size: 9.5px;
+  color: var(--ink-soft);
+  line-height: 1.45;
+  margin-bottom: 8px;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.find-campaign-footer {
+  display: flex; justify-content: space-between; align-items: center;
+  font-size: 9.5px; color: var(--ink-soft);
+  border-top: 1px solid var(--line);
+  padding-top: 7px;
+  margin-top: auto;
+}
+.find-campaign-due { color: var(--midnight); font-weight: 600; }
 
-        .dash-right {
-          padding: 20px 16px 20px 0;
-          display: flex;
-          flex-direction: column;
-          gap: 12px;
-        }
-        .dash-panel-head {
-          display: flex;
-          align-items: center;
-          justify-content: space-between;
-          margin-bottom: 10px;
-        }
-        .dash-panel-period {
-          font-size: 10.5px;
-          color: var(--ink-soft);
-        }
+/* ===== Different goals. Same platform. ===== */
+.goals-section { 
+  background: transparent; 
+  padding: 48px clamp(24px, 5vw, 72px);
+}
+.goals-head { text-align: center; margin: 0 auto 40px; max-width: 700px; }
+.goals-kicker-wrap {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  margin-bottom: 10px;
+}
+.goals-kicker-line {
+  width: 100px;
+  height: 1px;
+  background: #E5E7EB;
+}
+.goals-kicker {
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: #6B7280;
+  margin: 0;
+}
+.goals-h2 {
+  font-family: 'League Spartan', sans-serif;
+  font-size: clamp(34px, 4.2vw, 46px);
+  font-weight: 700;
+  line-height: 1.15;
+  color: #1E2A78;
+  margin: 0 0 12px;
+}
+.goals-h2-accent { color: #FF6B5A; }
+.goals-sub {
+  font-size: 15px;
+  line-height: 1.6;
+  color: #64748B;
+  max-width: 640px;
+  margin: 0 auto;
+}
 
-        /* ---- 3D glossy donut ---- */
-        .dash-donut {
-          position: relative;
-          width: 118px;
-          height: 118px;
-          border-radius: 50%;
-          margin: 6px auto 18px;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          transform: translateY(-4px);
-          transition: transform 0.2s ease;
-        }
-        .dash-donut::before {
-          content: '';
-          position: absolute;
-          inset: 0;
-          border-radius: 50%;
-          background: inherit;
-          mask: radial-gradient(farthest-side, transparent calc(100% - 15px), #000 calc(100% - 15px));
-          -webkit-mask: radial-gradient(farthest-side, transparent calc(100% - 15px), #000 calc(100% - 15px));
-        }
-        /* glossy top-left highlight */
-        .dash-donut::after {
-          content: '';
-          position: absolute;
-          inset: 0;
-          border-radius: 50%;
-          background: radial-gradient(circle at 28% 18%, rgba(255,255,255,0.95), rgba(255,255,255,0) 55%);
-          mix-blend-mode: overlay;
-          pointer-events: none;
-        }
-        /* soft dark contact shadow underneath, like it's lifted off the card */
-        .dash-donut-shadow {
-          position: absolute;
-          left: 50%;
-          bottom: -14px;
-          transform: translateX(-50%);
-          width: 78px;
-          height: 16px;
-          border-radius: 50%;
-          background: radial-gradient(ellipse, rgba(17,18,23,0.16) 0%, rgba(17,18,23,0) 72%);
-          z-index: 0;
-        }
-        .dash-donut-center {
-          position: relative;
-          z-index: 1;
-          background: #fff;
-          border-radius: 50%;
-          width: 80px;
-          height: 80px;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          flex-direction: column;
-          box-shadow: inset 0 2px 8px rgba(17,18,23,0.07);
-        }
-        .dash-donut-center b { font-size: 17px; color: var(--ink); font-weight: 700; }
-        .dash-donut-center span { font-size: 10px; color: var(--ink-soft); }
+.goals-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 22px;
+  align-items: stretch;
+  max-width: 1240px;
+  margin: 0 auto;
+}
 
-        .dash-legend {
-          display: flex;
-          flex-direction: column;
-          gap: 6px;
-        }
-        .dash-legend span {
-          display: flex;
-          align-items: center;
-          gap: 7px;
-          font-size: 11.5px;
-          color: var(--ink);
-        }
-        .dash-legend i {
-          width: 8px;
-          height: 8px;
-          border-radius: 50%;
-          display: inline-block;
-        }
-        .dash-legend b {
-          margin-left: auto;
-          font-weight: 600;
-        }
-        .dash-checklist-item {
-          display: flex;
-          align-items: center;
-          gap: 8px;
-          font-size: 12px;
-          color: var(--ink-soft);
-          padding: 5px 0;
-        }
+.goals-card {
+  display: grid;
+  grid-template-columns: 58% 42%;
+  gap: 0;
+  padding: 0;
+  border-radius: 22px;
+  height: 416px;
+  overflow: hidden;
+  align-items: stretch;
+  border: 1px solid transparent;
+  transition: box-shadow 0.2s ease, transform 0.2s ease;
+}
+.goals-card:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 20px 40px -16px rgba(17,18,23,0.12);
+}
+.goals-card--creator { 
+  background: #FFF4F2;
+  border-color: rgba(255, 107, 90, 0.12);
+}
+.goals-card--brand { 
+  background: #F2F4FC;
+  border-color: rgba(30, 42, 120, 0.08);
+}
 
-        .ch-dash-wrap { position: relative; margin: 30px auto 0; max-width: 1180px; }
-        .ch-dash-frame {
-          border-radius: 16px;
-          overflow: hidden;
-          border: 1px solid var(--line);
-          background: #f8f9fc;
-          padding: 20px;
-          box-shadow: 0 50px 90px -30px rgba(76,60,150,0.28), 0 10px 30px rgba(17,18,23,0.06);
-        }
+.goals-copy {
+  padding: 30px 30px 30px 32px;
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  justify-content: center;
+}
+.goals-copy .goals-btn { 
+  margin-top: 6px;
+}
 
-        .ch-hero {
-          position: relative; padding: 48px clamp(24px, 5vw, 72px) 0; max-width: 1320px; margin: 0 auto;
-        }
-        .ch-hero-copy { max-width: 640px; margin: 0 auto; text-align: center; }
-        .ch-h1 { font-size: clamp(36px, 4.5vw, 52px); font-weight: 700; line-height: 1.15; letter-spacing: -0.02em; margin: 18px 0 0; color: var(--ink); }
-        .ch-h1-accent-violet { color: var(--accent); }
-        .ch-h1-accent-coral { color: var(--coral); }
-        .ch-h1-swash { display: block; margin: 0 auto; width: 60%; max-width: 200px; }
-        .ch-sub { font-size: 16px; line-height: 1.65; color: var(--ink-soft); margin: 20px auto 0; font-weight: 400; max-width: 480px; }
-        .ch-hero-ctas { display: flex; gap: 14px; margin-top: 30px; flex-wrap: wrap; justify-content: center; }
-        .ch-btn-ghost-play {
-          display: inline-flex; align-items: center; gap: 8px;
-          font-size: 14px; font-weight: 600; color: var(--ink);
-          background: #fff; border: 1.5px solid var(--line); padding: 9px 22px; border-radius: 8px;
-          transition: border-color 0.15s ease;
-        }
-        .ch-btn-ghost-play:hover { border-color: var(--ink); }
+.goals-badge {
+  display: inline-block;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  padding: 4px 12px;
+  border-radius: 999px;
+  margin-bottom: 12px;
+  align-self: flex-start;
+}
+.goals-badge--creator { background: #FFFFFF; color: #FF6B5A; }
+.goals-badge--brand { background: #FFFFFF; color: #1E2A78; }
 
-        .ch-marquee { border-top: 1px solid var(--line); border-bottom: 1px solid var(--line); overflow: hidden; padding: 22px 0; background: var(--surface); margin-top: 60px; }
-        .ch-marquee-track { display: flex; width: max-content; gap: 44px; animation: ch-scroll 28s linear infinite; }
-        @keyframes ch-scroll { from { transform: translateX(0); } to { transform: translateX(-50%); } }
-        .ch-chip { font-family: 'League Spartan', sans-serif; font-weight: 600; font-size: 14.5px; letter-spacing: 0.02em; text-transform: uppercase; color: var(--ink-soft); white-space: nowrap; display: flex; align-items: center; }
-        .ch-chip::after { content: '·'; margin-left: 44px; color: var(--line); font-style: normal; }
+.goals-title {
+  font-family: 'League Spartan', sans-serif;
+  font-size: clamp(22px, 1.8vw, 27px);
+  font-weight: 700;
+  line-height: 1.2;
+  color: #1E2A78;
+  margin: 0 0 10px;
+}
+.goals-desc {
+  font-size: 14px;
+  line-height: 1.55;
+  color: #64748B;
+  margin: 0 0 18px;
+  max-width: 300px;
+}
 
-        .ch-section { padding: 80px clamp(24px, 5vw, 72px); max-width: 1120px; margin: 0 auto; position: relative; }
-        .ch-section + .ch-section::before {
-          content: '';
-          position: absolute;
-          top: 0;
-          left: 50%;
-          right: 50%;
-          margin-left: -50vw;
-          margin-right: -50vw;
-          border-top: 1px solid rgba(17,18,23,0.07);
-        }
-        .ch-section-head { max-width: 520px; margin-bottom: 56px; }
-        .ch-kicker { font-size: 18px; font-weight: 600; letter-spacing: 0.02em; text-transform: uppercase; color: var(--ink-soft); }
-        .ch-h2 { font-family: 'League Spartan', sans-serif; font-weight: 700; font-size: clamp(28px, 3.6vw, 36px); letter-spacing: -0.01em; margin: 12px 0 0; color: var(--ink); }
-        .ch-h2-sub { font-size: 15.5px; color: var(--ink-soft); margin-top: 16px; line-height: 1.65; }
+.goals-list {
+  list-style: none;
+  margin: 0 0 20px;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 11px;
+}
+.goals-list li {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 14px;
+  color: #1E293B;
+  line-height: 1.4;
+}
+.goals-icon-circle {
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #FFFFFF;
+}
+.goals-icon-circle--creator { color: #FF6B5A; }
+.goals-icon-circle--brand { color: #1E2A78; }
 
-        .ch-feature-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 18px; }
-        .feat-groups {
-          display: flex;
-          flex-direction: column;
-          gap: 44px;
-        }
-        .feat-group-head {
-          display: inline-flex;
-          align-items: center;
-          gap: 8px;
-          font-size: 12.5px;
-          font-weight: 700;
-          letter-spacing: 0.04em;
-          text-transform: uppercase;
-          padding: 6px 14px;
-          border-radius: 100px;
-          margin-bottom: 18px;
-        }
-        .feat-group-head-business { background: var(--accent-soft); color: var(--accent); }
-        .feat-group-head-creator { background: var(--coral-soft); color: var(--coral); }
-        .feat-group-icon { display: flex; align-items: center; }
+.goals-btn {
+  display: inline-flex !important;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  font-weight: 600;
+  color: #FFFFFF !important;
+  padding: 10px 20px;
+  border-radius: 999px;
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+  border: none;
+  cursor: pointer;
+  align-self: flex-start;
+  text-decoration: none !important;
+  opacity: 1 !important;
+  visibility: visible !important;
+  position: relative;
+  z-index: 5;
+}
+.goals-btn--creator {
+  background: #FF6B5A;
+  box-shadow: 0 12px 20px -10px rgba(255,107,90,0.35);
+}
+.goals-btn--creator:hover {
+  background: #F0523F;
+  transform: translateY(-2px);
+}
+.goals-btn--brand {
+  background: #1E2A78;
+  box-shadow: 0 12px 20px -10px rgba(30,42,120,0.35);
+}
+.goals-btn--brand:hover {
+  background: #4A4F96;
+  transform: translateY(-2px);
+}
 
-        .feat-grid-single { grid-template-columns: repeat(3, 1fr); }
+.goals-visual {
+  position: relative;
+  height: 100%;
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.goals-visual-inner {
+  position: relative;
+  width: 100%;
+  max-width: 220px;
+  height: 340px;
+  margin: 0 auto;
+}
 
-        .feat-card-business { border-top: 3px solid var(--accent); }
-        .feat-card-creator { border-top: 3px solid var(--coral); }
-        .ch-feature-card { background: #fff; border: 1px solid var(--line); border-radius: 14px; padding: 28px 24px; transition: border-color 0.15s ease, transform 0.15s ease; }
-        .ch-feature-card:hover { border-color: #d8d8dc; transform: translateY(-2px); }
-        .ch-feature-icon {
-          width: 40px; height: 40px; border-radius: 11px;
-          display: flex; align-items: center; justify-content: center;
-          transition: transform 0.25s ease, box-shadow 0.25s ease;
-        }
-        .ch-feature-card:hover .ch-feature-icon {
-          transform: translateY(-3px) scale(1.08);
-        }
-        .feat-card-business:hover .ch-feature-icon {
-          box-shadow: 0 12px 22px -10px rgba(108,93,211,0.45);
-        }
-        .feat-card-creator:hover .ch-feature-icon {
-          box-shadow: 0 12px 22px -10px rgba(255,138,91,0.45);
-        }
-        .ch-feature-title { font-size: 15.5px; font-weight: 600; margin: 16px 0 6px; color: var(--ink); }
-        .ch-feature-desc { font-size: 13.5px; color: var(--ink-soft); line-height: 1.6; margin: 0; }
+.goals-photo {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: center 22%;
+  border-radius: 16px;
+  box-shadow: 0 10px 28px -14px rgba(17,18,23,0.22);
+}
 
-        /* ---- Final CTA: join as creator / request brand access ---- */
-        .cta-row {
-          display: grid;
-          grid-template-columns: 1fr 1fr;
-          gap: 20px;
-        }
-        .cta-card {
-          position: relative;
-          border-radius: 20px;
-          padding: 40px 44px;
-          overflow: hidden;
-          min-height: 300px;
-        }
-        .cta-card-creator {
-          background: var(--coral-soft);
-        }
-        .cta-card-business {
-          background: linear-gradient(135deg, #EDEAFB 0%, #E1DBF7 100%);
-          border: 1px solid rgba(108,93,211,0.14);
-        }
-        .cta-kicker {
-          font-size: 11.5px;
-          font-weight: 700;
-          letter-spacing: 0.08em;
-          text-transform: uppercase;
-          display: block;
-          margin-bottom: 14px;
-        }
-        .cta-kicker-creator { color: var(--coral); }
-        .cta-kicker-business { color: var(--accent); }
-        .cta-title {
-          font-family: 'League Spartan', sans-serif;
-          font-weight: 700;
-          font-size: clamp(24px, 2.6vw, 30px);
-          line-height: 1.15;
-          letter-spacing: -0.01em;
-          color: var(--ink);
-          margin: 0 0 14px;
-          max-width: 260px;
-        }
-        .cta-desc {
-          font-size: 14px;
-          color: var(--ink-soft);
-          line-height: 1.6;
-          max-width: 300px;
-          margin: 0 0 28px;
-        }
-        .cta-btn {
-          display: inline-flex;
-          align-items: center;
-          gap: 8px;
-          font-size: 14px;
-          font-weight: 600;
-          padding: 12px 22px;
-          border-radius: 9px;
-          transition: transform 0.15s ease, background 0.15s ease;
-        }
-        .cta-btn, .cta-btn * { color: #ffffff !important; }
-        .cta-btn-creator { background: var(--coral); }
-        .cta-btn-creator:hover { background: #E86B3E; transform: translateY(-1px); }
-        .cta-btn-business { background: var(--accent); }
-        .cta-btn-business:hover { background: #5A4CC2; transform: translateY(-1px); }
+.goals-float-card {
+  position: absolute;
+  background: #FFFFFF;
+  border-radius: 12px;
+  box-shadow: 0 12px 24px -12px rgba(17,18,23,0.25);
+  padding: 8px 12px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  z-index: 2;
+  max-width: 180px;
+  border: 1px solid rgba(0,0,0,0.04);
+}
+.goals-float-card--top { top: 16px; right: 8px; }
+.goals-float-icon {
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.goals-float-icon--creator { background: #FFF4F2; color: #FF6B5A; }
+.goals-float-title { font-size: 10.5px; font-weight: 700; color: #1E293B; line-height: 1.2; }
+.goals-float-meta { font-size: 9px; color: #64748B; line-height: 1.3; }
+.goals-float-arrow { color: #64748B; flex-shrink: 0; }
+.goals-float-thumb { width: 28px; height: 28px; border-radius: 6px; object-fit: cover; flex-shrink: 0; }
+.goals-float-status {
+  margin-left: auto;
+  font-size: 8px;
+  font-weight: 700;
+  background: #E1F6EA;
+  color: #16a34a;
+  padding: 2px 8px;
+  border-radius: 999px;
+}
+.goals-float-card--stat { left: 4px; bottom: 16px; flex-direction: column; align-items: flex-start; gap: 4px; padding: 8px 12px; }
+.goals-stat-label { display: flex; align-items: center; gap: 4px; font-size: 9px; font-weight: 700; color: #64748B; }
+.goals-stat-row { display: flex; align-items: baseline; gap: 6px; }
+.goals-stat-row strong { font-size: 15px; color: #FF6B5A; font-weight: 800; }
+.goals-stat-row span { font-size: 9px; color: #64748B; }
 
-        .cta-preview {
-          position: absolute;
-          right: 32px;
-          bottom: 28px;
-          box-shadow: 0 24px 44px -18px rgba(17,18,23,0.20), 0 6px 14px rgba(17,18,23,0.06);
-          border-radius: 14px;
-        }
-        .cta-preview-creator {
-          width: 148px;
-          background: #fff;
-          padding: 16px 14px;
-          display: flex;
-          flex-direction: column;
-          align-items: center;
-          gap: 8px;
-        }
-        .cta-preview-avatar {
-          width: 44px;
-          height: 44px;
-          border-radius: 50%;
-          background: var(--coral);
-          color: #fff;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-        }
-        .cta-preview-line {
-          height: 6px;
-          border-radius: 100px;
-          background: var(--line);
-        }
-        .cta-preview-line-lg { width: 82%; height: 7px; background: var(--ink); opacity: 0.85; }
-        .cta-preview-line-sm { width: 52%; }
-        .cta-preview-tags { display: flex; gap: 6px; margin-top: 2px; }
-        .cta-tag {
-          font-size: 9.5px;
-          font-weight: 600;
-          padding: 3px 9px;
-          border-radius: 100px;
-          background: var(--coral-soft);
-          color: var(--coral);
-        }
-        .cta-preview-btn {
-          margin-top: 4px;
-          width: 100%;
-          text-align: center;
-          font-size: 10.5px;
-          font-weight: 700;
-          color: #fff;
-          background: var(--coral);
-          padding: 7px;
-          border-radius: 8px;
-        }
+.goals-float-card--avatars { left: 4px; bottom: 16px; flex-direction: column; align-items: flex-start; gap: 6px; padding: 8px 12px; }
+.goals-avatar-row { display: flex; align-items: center; }
+.goals-avatar-chip {
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  object-fit: cover;
+  border: 2px solid #FFFFFF;
+  margin-left: -6px;
+}
+.goals-avatar-chip:first-child { margin-left: 0; }
+.goals-view-all {
+  margin-left: 8px;
+  font-size: 9px;
+  font-weight: 600;
+  color: #1E2A78;
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+}
 
-        .cta-preview-business {
-          width: 224px;
-          background: #fff;
-          border: 1px solid var(--line);
-          padding: 16px;
-          right: -28px;
-          bottom: 34px;
-        }
-        .cta-preview-new {
-          position: absolute;
-          top: 12px;
-          right: 12px;
-          background: var(--accent);
-          color: #fff;
-          font-size: 9px;
-          font-weight: 700;
-          padding: 4px 9px;
-          border-radius: 100px;
-        }
-        .cta-preview-stats {
-          display: flex;
-          gap: 16px;
-          margin: 8px 0 12px;
-        }
-        .cta-preview-stats > div {
-          display: flex;
-          flex-direction: column;
-          gap: 2px;
-        }
-        .cta-preview-stat-label {
-          font-size: 9px;
-          color: var(--ink-soft);
-          text-transform: uppercase;
-          letter-spacing: 0.04em;
-        }
-        .cta-preview-stats b { font-size: 15px; font-weight: 700; color: var(--ink); }
-        .cta-preview-stats .stat-coral { color: var(--coral); }
-        .cta-preview-stats .stat-accent { color: var(--accent); }
-        .cta-preview-row {
-          display: flex;
-          align-items: center;
-          justify-content: space-between;
-          gap: 8px;
-          padding: 8px 0;
-          border-top: 1px solid var(--line);
-        }
-        .cta-status-badge {
-          font-size: 9px;
-          font-weight: 700;
-          padding: 3px 9px;
-          border-radius: 100px;
-          white-space: nowrap;
-        }
-        .cta-status-approved { background: #E1F6EA; color: var(--good); }
-        .cta-status-review { background: var(--coral-soft); color: var(--coral); }
+.goals-tagline {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 18px;
+  margin-top: 40px;
+  font-family: 'League Spartan', sans-serif;
+  font-size: 17px;
+  font-weight: 700;
+  letter-spacing: 0.01em;
+  color: #1E2A78;
+}
+.goals-tagline-dash {
+  width: 36px;
+  height: 2px;
+  background: #E5E7EB;
+}
 
-        .faq-cols {
-          display: grid;
-          grid-template-columns: 1fr 1fr;
-          gap: 48px;
-          position: relative;
-        }
-        .faq-cols::before {
-          content: '';
-          position: absolute;
-          top: 0; bottom: 0; left: 50%;
-          border-left: 1.5px dashed var(--line);
-        }
-        .faq-col-label {
-          font-size: 11.5px;
-          font-weight: 700;
-          letter-spacing: 0.08em;
-          text-transform: uppercase;
-          margin-bottom: 16px;
-        }
-        .faq-col-label.creator { color: var(--coral); }
-        .faq-col-label.business { color: var(--accent); }
+/* ===== FAQ ===== */
+.faq-cols {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 48px;
+  position: relative;
+}
+.faq-cols::before {
+  content: '';
+  position: absolute;
+  top: 0; bottom: 0; left: 50%;
+  border-left: 1.5px dashed var(--line);
+}
+.faq-col-label {
+  font-size: 11.5px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  margin-bottom: 16px;
+}
+.faq-col-label.creator { color: var(--orange); }
+.faq-col-label.business { color: var(--midnight); }
 
-        .faq-list {
-          background: #fff;
-          border: 1px solid var(--line);
-          border-radius: 14px;
-          padding: 4px 20px;
-        }
-        .faq-item {
-          border-bottom: 1px solid var(--line);
-          padding: 16px 0;
-        }
-        .faq-item:last-child { border-bottom: none; }
+.faq-list {
+  background: #fff;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  padding: 4px 20px;
+}
+.faq-item {
+  border-bottom: 1px solid var(--line);
+  padding: 16px 0;
+}
+.faq-item:last-child { border-bottom: none; }
 
-        .faq-question {
-          display: flex;
-          align-items: center;
-          justify-content: space-between;
-          gap: 12px;
-          width: 100%;
-          background: none;
-          border: none;
-          text-align: left;
-          font-size: 14px;
-          font-weight: 500;
-          color: var(--ink);
-          padding: 0;
-          transition: color 0.2s ease;
-        }
-        .faq-question-text {
-          text-decoration: underline;
-          text-decoration-color: transparent;
-          text-underline-offset: 3px;
-          transition: text-decoration-color 0.2s ease;
-        }
-        .faq-question:hover .faq-question-text {
-          text-decoration-color: currentColor;
-        }
-        .faq-item.open.creator .faq-question {
-          color: var(--coral);
-          font-weight: 600;
-          padding-bottom: 12px;
-          border-bottom: 1.5px solid var(--coral);
-          margin-bottom: 4px;
-        }
-        .faq-item.open.business .faq-question {
-          color: var(--accent);
-          font-weight: 600;
-          padding-bottom: 12px;
-          border-bottom: 1.5px solid var(--accent);
-          margin-bottom: 4px;
-        }
+.faq-question {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  width: 100%;
+  background: none;
+  border: none;
+  text-align: left;
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--ink);
+  padding: 0;
+  transition: color 0.2s ease;
+}
+.faq-question-text {
+  text-decoration: underline;
+  text-decoration-color: transparent;
+  text-underline-offset: 3px;
+  transition: text-decoration-color 0.2s ease;
+}
+.faq-question:hover .faq-question-text {
+  text-decoration-color: currentColor;
+}
+.faq-item.open.creator .faq-question {
+  color: var(--orange);
+  font-weight: 600;
+  padding-bottom: 12px;
+  border-bottom: 1.5px solid var(--orange);
+  margin-bottom: 4px;
+}
+.faq-item.open.business .faq-question {
+  color: var(--midnight);
+  font-weight: 600;
+  padding-bottom: 12px;
+  border-bottom: 1.5px solid var(--midnight);
+  margin-bottom: 4px;
+}
 
-        .faq-chevron {
-          flex-shrink: 0;
-          transition: transform 0.25s ease;
-          color: var(--ink-soft);
-        }
-        .faq-item.open .faq-chevron { transform: rotate(180deg); }
-        .faq-item.open.creator .faq-chevron { color: var(--coral); }
-        .faq-item.open.business .faq-chevron { color: var(--accent); }
+.faq-chevron {
+  flex-shrink: 0;
+  transition: transform 0.25s ease;
+  color: var(--ink-soft);
+}
+.faq-item.open .faq-chevron { transform: rotate(180deg); }
+.faq-item.open.creator .faq-chevron { color: var(--orange); }
+.faq-item.open.business .faq-chevron { color: var(--midnight); }
 
-        .faq-answer {
-          overflow: hidden;
-          max-height: 0;
-          transition: max-height 0.3s ease;
-        }
-        .faq-item.open .faq-answer {
-          max-height: 200px;
-        }
-        .faq-answer-inner {
-          font-size: 13.5px;
-          color: var(--ink-soft);
-          line-height: 1.6;
-          padding-top: 4px;
-        }
+.faq-answer {
+  overflow: hidden;
+  max-height: 0;
+  transition: max-height 0.3s ease;
+}
+.faq-item.open .faq-answer {
+  max-height: 200px;
+}
+.faq-answer-inner {
+  font-size: 13.5px;
+  color: var(--ink-soft);
+  line-height: 1.6;
+  padding-top: 4px;
+}
 
-        .ch-why {
-          display: grid;
-          grid-template-columns: 1fr 1fr;
-          gap: 60px;
-          align-items: center;
-        }
-        .why-kicker { font-size: 12.5px; font-weight: 600; letter-spacing: 0.07em; text-transform: uppercase; color: var(--ink-soft); }
-        .why-h2 { font-family: 'League Spartan', sans-serif; font-weight: 700; font-size: clamp(26px, 3.2vw, 32px); letter-spacing: -0.01em; margin: 10px 0 16px; color: var(--ink); }
-        .why-sub { font-size: 14.5px; line-height: 1.7; color: var(--ink-soft); margin: 0 0 32px; max-width: 440px; }
-        .why-list { display: flex; flex-direction: column; gap: 20px; }
-        .why-item { display: flex; align-items: flex-start; gap: 14px; }
-        .why-icon { width: 38px; height: 38px; flex-shrink: 0; border-radius: 10px; background: var(--coral-soft); color: var(--coral); display: flex; align-items: center; justify-content: center; }
-        .why-item-title { font-size: 14.5px; font-weight: 600; color: var(--ink); margin: 0 0 3px; }
-        .why-item-desc { font-size: 13px; color: var(--ink-soft); margin: 0; line-height: 1.55; }
+/* ===== Merge / Tool Replace ===== */
+.merge-card {
+  display: grid;
+  grid-template-columns: 1fr 1.15fr;
+  align-items: stretch;
+  gap: 40px;
+}
+.merge-copy {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: flex-start;
+}
+.merge-sub {
+  font-size: 14.5px;
+  line-height: 1.7;
+  color: var(--ink-soft);
+  margin: 18px 0 28px;
+  max-width: 380px;
+}
+.merge-cta {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  align-self: flex-start;
+  background: none;
+  border: none;
+  padding: 11px 4px;
+  font-size: 15.5px;
+  font-weight: 600;
+  color: var(--ink);
+  position: relative;
+  transition: gap 0.2s ease, color 0.2s ease;
+}
+.merge-cta::after {
+  content: '';
+  position: absolute;
+  left: 4px;
+  right: 4px;
+  bottom: 4px;
+  height: 2px;
+  background: var(--midnight);
+  transform: scaleX(0);
+  transform-origin: left;
+  transition: transform 0.25s ease;
+}
+.merge-cta:hover { gap: 12px; color: var(--midnight); }
+.merge-cta:hover::after { transform: scaleX(1); }
+.merge-cta svg { transition: transform 0.25s ease; }
+.merge-cta:hover svg { transform: translateX(3px); }
 
-        .why-visual {
-          position: relative;
-          height: 400px;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-        }
+.merge-visual {
+  position: relative;
+  min-height: 460px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+}
 
-        /* ---- "In their words": two-voice statement cards, business (violet) vs creator (coral) ---- */
-        .why-convo {
-          position: relative;
-          z-index: 1;
-          width: 100%;
-          max-width: 380px;
-          display: flex;
-          flex-direction: column;
-          gap: 16px;
-        }
-        .why-convo-label {
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          gap: 8px;
-          font-size: 11px;
-          font-weight: 700;
-          text-transform: uppercase;
-          letter-spacing: 0.08em;
-          color: var(--ink-soft);
-          margin-bottom: 6px;
-        }
-        .why-convo-label i { width: 14px; height: 1.5px; background: var(--line); display: inline-block; }
+.icon-collage {
+  position: relative;
+  width: 460px;
+  height: 460px;
+  flex-shrink: 0;
+  z-index: 1;
+}
+.merge-icon {
+  position: absolute;
+  transform: translate(-50%, -50%);
+  width: 52px;
+  height: 52px;
+  border-radius: 14px;
+  background: #fff;
+  border: 1px solid var(--line);
+  box-shadow: 0 10px 22px -12px rgba(17,18,23,0.18);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--ink-soft);
+  opacity: 1;
+  transition: color 0.2s ease, box-shadow 0.2s ease, background 0.2s ease, border-color 0.2s ease;
+}
+.merge-icon-navy {
+  background: var(--midnight);
+  border-color: var(--midnight);
+  color: #fff;
+  box-shadow: 0 14px 26px -12px rgba(10,17,40,0.45);
+}
+.merge-icon-orange {
+  background: var(--orange);
+  border-color: var(--orange);
+  color: #fff;
+  box-shadow: 0 14px 26px -12px rgba(255,109,0,0.45);
+}
+.merge-icon:hover {
+  color: var(--orange);
+  animation-play-state: paused;
+  transform: translate(-50%, -50%) translateY(-3px);
+  box-shadow: 0 14px 26px -12px rgba(255,109,0,0.35);
+}
+.merge-icon-navy:hover,
+.merge-icon-orange:hover {
+  color: #fff;
+}
+@keyframes icon-converge {
+  0%   { transform: translate(-50%, -50%) translate(0, 0) scale(1); opacity: 1; }
+  40%  { transform: translate(-50%, -50%) translate(calc(var(--dx) * 0.4), calc(var(--dy) * 0.4)) scale(1.08); opacity: 1; }
+  58%  { transform: translate(-50%, -50%) translate(calc(var(--dx) * 0.4), calc(var(--dy) * 0.4)) scale(1.08); opacity: 1; }
+  88%  { transform: translate(-50%, -50%) translate(var(--dx), var(--dy)) scale(0.5); opacity: 1; }
+  100% { transform: translate(-50%, -50%) translate(var(--dx), var(--dy)) scale(0.1); opacity: 0; }
+}
+.icon-collage.in-view .merge-icon {
+  animation: icon-converge 3s cubic-bezier(0.45,0,0.3,1) forwards;
+}
+.icon-collage.no-transition .merge-icon { animation: none; }
+.merge-logo {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%) scale(0.3);
+  opacity: 0;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: #fff;
+  padding: 14px 22px;
+  border-radius: 16px;
+  border: 1px solid var(--line);
+  box-shadow: 0 16px 28px -12px rgba(17,18,23,0.18);
+  z-index: 2;
+}
+@keyframes logo-pop {
+  0% { transform: translate(-50%, -50%) scale(0.3); opacity: 0; }
+  65% { transform: translate(-50%, -50%) scale(1.15); opacity: 1; }
+  100% { transform: translate(-50%, -50%) scale(1); opacity: 1; }
+}
+.icon-collage.in-view .merge-logo {
+  animation: logo-pop 0.5s cubic-bezier(0.34, 1.56, 0.64, 1) 2.9s both;
+}
+.icon-collage.no-transition .merge-icon,
+.icon-collage.no-transition .merge-logo {
+  animation: none !important;
+  transition: none !important;
+}
+.merge-logo-text {
+  font-family: 'League Spartan', sans-serif;
+  font-weight: 600;
+  font-size: 22px;
+  color: var(--ink);
+}
 
-        .why-voice-card {
-          position: relative;
-          width: 84%;
-          border-radius: 18px;
-          padding: 18px 20px 16px;
-          color: #fff;
-          overflow: hidden;
-          box-shadow: 0 22px 40px -20px rgba(17,18,23,0.35);
-          transition: transform 0.25s ease;
-        }
-        .why-voice-card.business {
-          align-self: flex-start;
-          background: linear-gradient(135deg, ${VIOLET} 0%, ${VIOLET_DARK} 100%);
-          transform: rotate(-1.4deg);
-          border-bottom-left-radius: 4px;
-        }
-        .why-voice-card.creator {
-          align-self: flex-end;
-          background: linear-gradient(135deg, ${CORAL} 0%, ${CORAL_DARK} 100%);
-          transform: rotate(1.4deg);
-          border-bottom-right-radius: 4px;
-        }
-        .why-voice-card:hover { transform: rotate(0deg) translateY(-3px); }
-        .why-voice-card::before {
-          content: '\u201C';
-          position: absolute;
-          top: -22px;
-          font-family: 'League Spartan', sans-serif;
-          font-weight: 800;
-          font-size: 96px;
-          line-height: 1;
-          color: rgba(255,255,255,0.16);
-          pointer-events: none;
-        }
-        .why-voice-card.business::before { left: 10px; }
-        .why-voice-card.creator::before { right: 10px; }
+/* ===== Compare ===== */
+.compare-row {
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  align-items: stretch;
+  gap: 0;
+  max-width: 980px;
+  margin: 0 auto;
+}
+.compare-card {
+  background: #fff;
+  border: 1px solid var(--line);
+  border-top: 3px solid transparent;
+  border-radius: 16px;
+  padding: 30px 32px;
+}
+.compare-before { border-top-color: var(--bad); }
+.compare-after { border-top-color: var(--good); }
+.compare-label {
+  font-size: 11.5px;
+  font-weight: 700;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  display: block;
+  margin-bottom: 20px;
+}
+.compare-label-before { color: var(--bad); }
+.compare-label-after { color: var(--good); }
+.compare-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 16px; }
+.compare-list li { display: flex; align-items: flex-start; gap: 12px; font-size: 14px; color: var(--ink); line-height: 1.55; }
+.compare-icon {
+  width: 20px; height: 20px; border-radius: 50%; flex-shrink: 0; margin-top: 1px;
+  display: flex; align-items: center; justify-content: center;
+}
+.compare-icon-before { background: var(--bad-soft); color: var(--bad); }
+.compare-icon-after { background: #E1F6EA; color: var(--good); }
+.compare-divider {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 28px;
+}
+.compare-divider::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 50%;
+  border-left: 1.5px dashed var(--line);
+}
+.compare-vs {
+  position: relative;
+  z-index: 1;
+  width: 42px;
+  height: 42px;
+  border-radius: 50%;
+  background: #fff;
+  border: 1px solid var(--line);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  color: var(--bad);
+}
 
-        .why-voice-head { position: relative; display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
-        .why-voice-avatar {
-          width: 24px; height: 24px; border-radius: 50%; flex-shrink: 0;
-          background: rgba(255,255,255,0.22);
-          display: flex; align-items: center; justify-content: center;
-        }
-        .why-voice-role { font-size: 10.5px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; opacity: 0.85; }
-        .why-voice-text {
-          position: relative;
-          margin: 0;
-          font-family: 'League Spartan', sans-serif;
-          font-weight: 600;
-          font-size: 14.5px;
-          line-height: 1.45;
-          letter-spacing: -0.005em;
-        }
+/* ===== How It Works ===== */
+.hiw-row {
+  position: relative;
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 20px;
+  margin-top: 20px;
+}
+.hiw-line {
+  position: absolute;
+  top: 32px;
+  left: 64px;
+  right: 64px;
+  height: 2px;
+  background: repeating-linear-gradient(
+    to right,
+    var(--orange) 0px, var(--orange) 8px,
+    transparent 8px, transparent 16px
+  );
+  opacity: 0.55;
+  z-index: 0;
+  border-top: none;
+}
+.hiw-step {
+  position: relative;
+  z-index: 1;
+  text-align: center;
+  padding: 0 8px;
+}
+.hiw-icon-box {
+  width: 64px;
+  height: 64px;
+  border-radius: 18px;
+  background: var(--orange-soft);
+  color: var(--orange);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin: 0 auto 16px;
+  transition: transform 0.25s ease, box-shadow 0.25s ease, background 0.25s ease, color 0.25s ease;
+}
+.hiw-step:hover .hiw-icon-box {
+  transform: translateY(-5px) scale(1.06);
+  background: var(--orange);
+  color: #fff;
+  box-shadow: 0 16px 28px -12px rgba(255,109,0,0.55);  
+}
+.hiw-step-label {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--ink-soft);
+  margin-bottom: 10px;
+}
+.hiw-title {
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--ink);
+  margin: 0 0 6px;
+}
+.hiw-desc {
+  font-size: 13px;
+  color: var(--ink-soft);
+  line-height: 1.6;
+  margin: 0;
+}
 
-        .why-convo-outcome {
-          align-self: center;
-          display: inline-flex;
-          align-items: center;
-          gap: 7px;
-          margin-top: 4px;
-          padding: 9px 16px;
-          border-radius: 100px;
-          font-size: 11.5px;
-          font-weight: 600;
-          color: var(--ink);
-          background: #fff;
-          border: 1px solid var(--line);
-          box-shadow: 0 12px 24px -14px rgba(17,18,23,0.18);
-        }
-        .why-convo-outcome b { font-weight: 700; }
+/* ===== Footer ===== */
+.ch-footer {
+  border-top: 1px solid var(--line);
+  padding: 56px clamp(24px, 5vw, 72px) 36px;
+  background: var(--surface);
+}
+.ch-footer-top {
+  display: flex; justify-content: space-between; align-items: flex-start;
+  max-width: 1120px; margin: 0 auto; flex-wrap: wrap; gap: 40px;
+}
+.ch-footer-brand { max-width: 260px; }
+.ch-footer-brand-row { display: flex; align-items: center; gap: 9px; }
+.ch-footer-tag { font-size: 13.5px; color: var(--ink-soft); margin-top: 14px; line-height: 1.65; }
+.ch-footer-cols { display: flex; gap: 72px; flex-wrap: wrap; }
+.ch-footer-col h4 {
+  font-size: 12.5px; font-weight: 600; text-transform: uppercase;
+  letter-spacing: 0.06em; color: var(--ink-soft); margin: 0 0 18px;
+}
+.ch-footer-col a {
+  display: block; font-size: 14px; color: var(--ink); margin-bottom: 13px;
+  transition: opacity 0.15s ease;
+}
+.ch-footer-col a:hover { opacity: 0.6; }
+.ch-footer-bottom {
+  max-width: 1120px; margin: 48px auto 0; padding-top: 28px;
+  border-top: 1px solid var(--line);
+  font-size: 13px; color: var(--ink-soft);
+  display: flex; justify-content: space-between; flex-wrap: wrap; gap: 12px;
+}
 
-        .compare-row {
-          display: grid;
-          grid-template-columns: 1fr auto 1fr;
-          align-items: stretch;
-          gap: 0;
-          max-width: 980px;
-          margin: 0 auto;
-        }
-        .compare-card {
-          background: #fff;
-          border: 1px solid var(--line);
-          border-top: 3px solid transparent;
-          border-radius: 16px;
-          padding: 30px 32px;
-        }
-        .compare-before { border-top-color: var(--bad); }
-        .compare-after { border-top-color: var(--good); }
-        .compare-label {
-          font-size: 11.5px;
-          font-weight: 700;
-          letter-spacing: 0.07em;
-          text-transform: uppercase;
-          display: block;
-          margin-bottom: 20px;
-        }
-        .compare-label-before { color: var(--bad); }
-        .compare-label-after { color: var(--good); }
-        .compare-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 16px; }
-        .compare-list li { display: flex; align-items: flex-start; gap: 12px; font-size: 14px; color: var(--ink); line-height: 1.55; }
-        .compare-icon {
-          width: 20px; height: 20px; border-radius: 50%; flex-shrink: 0; margin-top: 1px;
-          display: flex; align-items: center; justify-content: center;
-        }
-        .compare-icon-before { background: var(--bad-soft); color: var(--bad); }
-        .compare-icon-after { background: #E1F6EA; color: var(--good); }
-        .compare-divider {
-          position: relative;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          padding: 0 28px;
-        }
-        .compare-divider::before {
-          content: '';
-          position: absolute;
-          top: 0;
-          bottom: 0;
-          left: 50%;
-          border-left: 1.5px dashed var(--line);
-        }
-        .compare-vs {
-          position: relative;
-          z-index: 1;
-          width: 42px;
-          height: 42px;
-          border-radius: 50%;
-          background: #fff;
-          border: 1px solid var(--line);
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          font-size: 11px;
-          font-weight: 700;
-          letter-spacing: 0.03em;
-          text-transform: uppercase;
-          color: var(--bad);
-        }
-
-        .hiw-row {
-          position: relative;
-          display: grid;
-          grid-template-columns: repeat(4, 1fr);
-          gap: 20px;
-          margin-top: 20px;
-        }
-        .hiw-line {
-          position: absolute;
-          top: 32px;
-          left: 64px;
-          right: 64px;
-          height: 2px;
-          background: repeating-linear-gradient(
-            to right,
-            var(--coral) 0px, var(--coral) 8px,
-            transparent 8px, transparent 16px
-          );
-          opacity: 0.55;
-          z-index: 0;
-          border-top: none;
-        }
-        .hiw-step {
-          position: relative;
-          z-index: 1;
-          text-align: center;
-          padding: 0 8px;
-        }
-        .hiw-icon-box {
-          width: 64px;
-          height: 64px;
-          border-radius: 18px;
-          background: var(--coral-soft);
-          color: var(--coral);
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          margin: 0 auto 16px;
-          transition: transform 0.25s ease, box-shadow 0.25s ease, background 0.25s ease, color 0.25s ease;
-        }
-        .hiw-step:hover .hiw-icon-box {
-          transform: translateY(-5px) scale(1.06);
-          background: var(--coral);
-          color: #fff;
-          box-shadow: 0 16px 28px -12px rgba(255,138,91,0.55);  
-        }
-        .hiw-step-label {
-          font-size: 11px;
-          font-weight: 600;
-          letter-spacing: 0.08em;
-          text-transform: uppercase;
-          color: var(--ink-soft);
-          margin-bottom: 10px;
-        }
-        .hiw-title {
-          font-size: 16px;
-          font-weight: 700;
-          color: var(--ink);
-          margin: 0 0 6px;
-        }
-        .hiw-desc {
-          font-size: 13px;
-          color: var(--ink-soft);
-          line-height: 1.6;
-          margin: 0;
-        }
-
-        .ch-footer {
-          border-top: 1px solid var(--line);
-          padding: 56px clamp(24px, 5vw, 72px) 36px;
-          background: var(--surface);
-        }
-        .ch-footer-top {
-          display: flex; justify-content: space-between; align-items: flex-start;
-          max-width: 1120px; margin: 0 auto; flex-wrap: wrap; gap: 40px;
-        }
-        .ch-footer-brand { max-width: 260px; }
-        .ch-footer-brand-row { display: flex; align-items: center; gap: 9px; }
-        .ch-footer-tag { font-size: 13.5px; color: var(--ink-soft); margin-top: 14px; line-height: 1.65; }
-        .ch-footer-cols { display: flex; gap: 72px; flex-wrap: wrap; }
-        .ch-footer-col h4 {
-          font-size: 12.5px; font-weight: 600; text-transform: uppercase;
-          letter-spacing: 0.06em; color: var(--ink-soft); margin: 0 0 18px;
-        }
-        .ch-footer-col a {
-          display: block; font-size: 14px; color: var(--ink); margin-bottom: 13px;
-          transition: opacity 0.15s ease;
-        }
-        .ch-footer-col a:hover { opacity: 0.6; }
-        .ch-footer-bottom {
-          max-width: 1120px; margin: 48px auto 0; padding-top: 28px;
-          border-top: 1px solid var(--line);
-          font-size: 13px; color: var(--ink-soft);
-          display: flex; justify-content: space-between; flex-wrap: wrap; gap: 12px;
-        }
-
-        @media (max-width: 1100px) {
-          .dash-full { grid-template-columns: 180px 1fr 220px; }
-          .ch-dropdown { width: 440px; }
-        }
-        @media (max-width: 900px) {
-          .dash-full { grid-template-columns: 1fr; }
-          .dash-sidebar { flex-direction: row; flex-wrap: wrap; border-right: none; border-bottom: 1px solid var(--line); }
-          .dash-nav, .dash-profile-card, .dash-user { display: none; }
-          .dash-right { padding: 0 20px 20px; }
-          .dash-stats { grid-template-columns: 1fr 1fr; }
-          .dash-bottom { grid-template-columns: 1fr; }
-          .hiw-row { grid-template-columns: repeat(2, 1fr); row-gap: 32px; }
-          .hiw-line { display: none; }
-          .ch-why { grid-template-columns: 1fr; gap: 40px; }
-          .why-visual { height: auto; padding: 24px 0; order: -1; }
-          .compare-row { grid-template-columns: 1fr; gap: 20px; }
-          .compare-divider { padding: 0; }
-          .compare-divider::before { display: none; }
-          .ch-dropdown { width: 360px; left: 0; transform: none; }
-          .faq-cols { grid-template-columns: 1fr; gap: 32px; }
-          .cta-row { grid-template-columns: 1fr; gap: 16px; }
-          .cta-card { padding: 32px 28px; min-height: 0; }
-          .cta-preview { display: none; }
-          .faq-cols::before { display: none; }
-        }
-        @media (max-width: 860px) {
-          .ch-nav-links, .ch-nav-right .ch-btn-outline { display: none; }
-          .ch-burger { display: block; }
-          .ch-feature-grid { grid-template-columns: 1fr 1fr; }
-          .feat-grid-single { grid-template-columns: 1fr 1fr; }
-          .ch-mobile-panel {
-            position: fixed; inset: 78px 0 0 0; background: #fff; z-index: 55;
-            padding: 28px 24px; display: flex; flex-direction: column; gap: 4px; overflow-y: auto;
-          }
-          .ch-mobile-panel a, .ch-mobile-panel button {
-            font-size: 16px; font-weight: 500; padding: 18px 4px;
-            border-bottom: 1px solid var(--line); text-align: left;
-            background: none; border-left: none; border-right: none; border-top: none; color: var(--ink);
-          }
-        }
-        @media (max-width: 560px) {
-          .ch-feature-grid { grid-template-columns: 1fr; }
-          .dash-stats { grid-template-columns: 1fr; }
-          .hiw-row { grid-template-columns: 1fr; }
-          .ch-dropdown { width: 300px; padding: 16px 12px; }
-          .ch-drop-item { padding: 10px 12px; }
-          .feat-grid-single { grid-template-columns: 1fr; }
-        }
+/* ===== Responsive ===== */
+@media (max-width: 1100px) {
+  .ch-dropdown { width: 440px; }
+}
+@media (max-width: 900px) {
+  .hiw-row { grid-template-columns: repeat(2, 1fr); row-gap: 32px; }
+  .hiw-line { display: none; }
+  .merge-card { grid-template-columns: 1fr; gap: 32px; }
+  .merge-copy { text-align: center; align-items: center; }
+  .merge-sub { max-width: 420px; }
+  .merge-cta { align-self: center; }
+  .merge-visual { min-height: 380px; }
+  .icon-collage { transform: scale(0.75); }
+  .compare-row { grid-template-columns: 1fr; gap: 20px; }
+  .compare-divider { padding: 0; }
+  .compare-divider::before { display: none; }
+  .ch-dropdown { width: 360px; left: 0; transform: none; }
+  .faq-cols { grid-template-columns: 1fr; gap: 32px; }
+  .find-split { grid-template-columns: 1fr; gap: 32px; }
+  .find-copy { max-width: 100%; text-align: center; }
+  .find-dash { margin-left: auto; margin-right: auto; }
+  .find-cta { margin-left: auto; margin-right: auto; }
+  .faq-cols::before { display: none; }
+  .goals-grid {
+    grid-template-columns: 1fr;
+    gap: 20px;
+  }
+  .goals-card {
+    grid-template-columns: 1fr;
+    height: auto;
+    min-height: 0;
+    padding: 24px 28px;
+  }
+  .goals-copy { 
+    padding: 0; 
+    height: auto; 
+    justify-content: flex-start; 
+  }
+  .goals-copy .goals-btn { 
+    margin-top: 8px; 
+  }
+  .goals-visual { 
+    height: auto; 
+    margin-top: 16px; 
+  }
+  .goals-visual-inner { 
+    max-width: 260px; 
+    height: 260px; 
+    margin: 0 auto; 
+  }
+  .goals-photo { 
+    border-radius: 14px; 
+    object-position: center 25%; 
+  }
+  .goals-kicker-line { width: 60px; }
+}
+@media (max-width: 860px) {
+  .ch-nav-links, .ch-nav-right .ch-btn-outline { display: none; }
+  .ch-burger { display: block; }
+  .ch-mobile-panel {
+    position: fixed; inset: 78px 0 0 0; background: #fff; z-index: 55;
+    padding: 28px 24px; display: flex; flex-direction: column; gap: 4px; overflow-y: auto;
+  }
+  .ch-mobile-panel a, .ch-mobile-panel button {
+    font-size: 16px; font-weight: 500; padding: 18px 4px;
+    border-bottom: 1px solid var(--line); text-align: left;
+    background: none; border-left: none; border-right: none; border-top: none; color: var(--ink);
+  }
+}
+@media (max-width: 560px) {
+  .hiw-row { grid-template-columns: 1fr; }
+  .ch-dropdown { width: 300px; padding: 16px 12px; }
+  .ch-drop-item { padding: 10px 12px; }
+  .icon-collage { transform: scale(0.55); }
+  .find-mini-badge { left: -8px; font-size: 11px; padding: 7px 11px; }
+  .find-callout { max-width: 120px; font-size: 11px; }
+  .goals-card { padding: 20px; }
+  .goals-visual-inner { max-width: 200px; height: 220px; }
+  .goals-float-card { display: none; }
+  .goals-tagline { font-size: 14px; gap: 10px; }
+  .goals-tagline-dash { width: 20px; }
+  .goals-kicker-line { width: 30px; }
+}
       `}</style>
 
       {/* ===== NAVBAR ===== */}
@@ -2466,7 +2453,7 @@ export function Landing() {
             >
               <path
                 d="M2 8 C60 2, 160 2, 218 8"
-                stroke={CORAL}
+                stroke={ELECTRIC_ORANGE}
                 strokeWidth="3"
                 fill="none"
                 strokeLinecap="round"
@@ -2487,25 +2474,6 @@ export function Landing() {
             </a>
           </div>
         </div>
-
-        <div className="ch-dash-wrap">
-          <div className="ch-dash-frame">
-            <div
-              style={{
-                display: "flex",
-                justifyContent: "flex-end",
-                marginBottom: 12,
-                paddingRight: 4,
-              }}
-            >
-              <DashboardToggle
-                role={dashboardRole}
-                setRole={setDashboardRole}
-              />
-            </div>
-            <DashboardPreview role={dashboardRole} />
-          </div>
-        </div>
       </section>
 
       {/* ===== MARQUEE ===== */}
@@ -2519,123 +2487,67 @@ export function Landing() {
         </div>
       </div>
 
-      {/* ===== HOW IT WORKS ===== */}
-      <section className="ch-section" id="how-it-works">
-        <div
-          className="ch-section-head"
-          style={{ textAlign: "center", margin: "0 auto 56px" }}
-        >
-          <span className="ch-kicker">How It Works</span>
-          <h2 className="ch-h2">
-            From signup to your first brand collab in 4 simple steps
-          </h2>
-        </div>
-
-        <div className="hiw-row">
-          <div className="hiw-line" />
-          {HIW_STEPS.map((step, i) => {
-            const Icon = step.icon;
-            return (
-              <div className="hiw-step" key={step.title}>
-                <div className="hiw-icon-box">
-                  <Icon size={20} />
-                </div>
-                <div className="hiw-step-label">
-                  Step {String(i + 1).padStart(2, "0")}
-                </div>
-                <h3 className="hiw-title">{step.title}</h3>
-                <p className="hiw-desc">{step.desc}</p>
-              </div>
-            );
-          })}
-        </div>
-      </section>
-
-      {/* ===== WHY CREATORHUB ===== */}
-      <section className="ch-section" id="why-creatorhub">
-        <div className="ch-why">
-          <div>
-            <h2 className="why-h2">Why creatorhub?</h2>
-            <p className="why-sub">
-              We believe in creator potential — not just follower counts. Brands
-              on CreatorHub value engagement, content quality, and authentic
-              storytelling.
+      {/* ===== TOOL MERGE ===== */}
+      <section className="ch-section" id="tool-merge">
+        <div className="merge-card">
+          <div className="merge-copy">
+            <span className="find-dash" />
+            <h2 className="find-h2">
+              Replace <span className="find-h2-accent">multiple</span> tools
+              <br />
+              with one <span className="find-h2-accent">platform</span>
+            </h2>
+            <p className="merge-sub">
+              Search. Brief. Chat. Approve. Pay. Report. Most teams run each
+              of these in a different app. CreatorHub runs all of them in one
+              place.
             </p>
-            <div className="why-list">
-              {WHY_ITEMS.map((item) => {
+            <Link to="/register" className="find-cta">
+              Get Started Free <ArrowRight size={16} />
+            </Link>
+          </div>
+
+          <div className="merge-visual" ref={mergeRef} onMouseEnter={replayMerge}>
+            <div
+              className={`icon-collage ${merged ? "in-view" : ""} ${
+                mergeNoTransition ? "no-transition" : ""
+              }`}
+            >
+              {MERGE_ICONS.map((item, i) => {
                 const Icon = item.icon;
                 return (
-                  <div className="why-item" key={item.title}>
-                    <span className="why-icon">
-                      <Icon size={17} />
-                    </span>
-                    <div>
-                      <p className="why-item-title">{item.title}</p>
-                      <p className="why-item-desc">{item.desc}</p>
-                    </div>
-                  </div>
+                  <span
+                    key={item.label}
+                    className={`merge-icon ${
+                      item.variant && item.variant !== "light"
+                        ? `merge-icon-${item.variant}`
+                        : ""
+                    }`}
+                    style={
+                      {
+                        left: `${item.x}px`,
+                        top: `${item.y}px`,
+                        "--dx": `${230 - item.x}px`,
+                        "--dy": `${230 - item.y}px`,
+                        animationDelay: `${i * 0.04}s`,
+                      } as React.CSSProperties
+                    }
+                  >
+                    <Icon size={20} />
+                  </span>
                 );
               })}
-            </div>
-          </div>
-
-          <div className="why-visual">
-            <div className="why-convo">
-              <div className="why-voice-card business">
-                <div className="why-voice-head">
-                  <span className="why-voice-avatar">
-                    <BriefcaseIcon size={12} />
-                  </span>
-                  <span className="why-voice-role">Business</span>
-                </div>
-                <p className="why-voice-text">
-                  We posted one brief and had matches by morning — not a
-                  follower count in sight.
-                </p>
-              </div>
-
-              <div className="why-voice-card creator">
-                <div className="why-voice-head">
-                  <span className="why-voice-avatar">
-                    <User size={12} />
-                  </span>
-                  <span className="why-voice-role">Creator</span>
-                </div>
-                <p className="why-voice-text">
-                  One click to apply. No cold DMs, no chasing brands that never
-                  reply.
-                </p>
-              </div>
-
-              <div className="why-voice-card business">
-                <div className="why-voice-head">
-                  <span className="why-voice-avatar">
-                    <BriefcaseIcon size={12} />
-                  </span>
-                  <span className="why-voice-role">Business</span>
-                </div>
-                <p className="why-voice-text">
-                  Every draft and approval lives in one thread — no more
-                  screenshots in a group chat.
-                </p>
-              </div>
-
-              <div className="why-voice-card creator">
-                <div className="why-voice-head">
-                  <span className="why-voice-avatar">
-                    <User size={12} />
-                  </span>
-                  <span className="why-voice-role">Creator</span>
-                </div>
-                <p className="why-voice-text">
-                  And I get paid the moment it's approved — no invoices, no
-                  waiting around.
-                </p>
+              <div className="merge-logo">
+                <LogoMark size={30} />
+                <span className="merge-logo-text">creatorhub</span>
               </div>
             </div>
           </div>
         </div>
       </section>
+
+      {/* ===== DIFFERENT GOALS. SAME PLATFORM. ===== */}
+      <GoalsSection />
 
       {/* ===== WHY WE EXIST — before / after ===== */}
       <section className="ch-section" id="why-we-exist">
@@ -2686,77 +2598,8 @@ export function Landing() {
         </div>
       </section>
 
-      {/* ===== FEATURES ===== */}
-      <section className="ch-section" id="features">
-        <div
-          className="ch-section-head"
-          style={{ margin: "0 auto 56px", textAlign: "center", maxWidth: 460 }}
-        >
-          <span className="ch-kicker">Features</span>
-          <h2 className="ch-h2">
-            Everything a collab needs
-            <br />
-            to get done right
-          </h2>
-        </div>
-
-        <div className="feat-groups">
-          <div className="feat-group">
-            <div className="ch-feature-grid feat-grid-single">
-              {BUSINESS_FEATURES.map((f) => {
-                const Icon = f.icon;
-                return (
-                  <div
-                    className="ch-feature-card feat-card-business"
-                    key={f.title}
-                  >
-                    <span
-                      className="ch-feature-icon"
-                      style={{
-                        background: "var(--accent-soft)",
-                        color: "var(--accent)",
-                      }}
-                    >
-                      <Icon size={19} />
-                    </span>
-                    <h3 className="ch-feature-title">{f.title}</h3>
-                    <p className="ch-feature-desc">{f.desc}</p>
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-
-          <div className="feat-group">
-            <div className="ch-feature-grid feat-grid-single">
-              {CREATOR_FEATURES.map((f) => {
-                const Icon = f.icon;
-                return (
-                  <div
-                    className="ch-feature-card feat-card-creator"
-                    key={f.title}
-                  >
-                    <span
-                      className="ch-feature-icon"
-                      style={{
-                        background: "var(--coral-soft)",
-                        color: "var(--coral)",
-                      }}
-                    >
-                      <Icon size={19} />
-                    </span>
-                    <h3 className="ch-feature-title">{f.title}</h3>
-                    <p className="ch-feature-desc">{f.desc}</p>
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* ===== FINAL CTA ===== */}
-      <FinalCta />
+      {/* ===== FIND THE RIGHT CREATORS INSTANTLY ===== */}
+      <FindCreatorsSection />
 
       {/* ===== FAQ ===== */}
       <FaqSection />
@@ -2780,7 +2623,7 @@ export function Landing() {
             <div className="ch-footer-col">
               <h4>Product</h4>
               <a href="#features">Features</a>
-              <a href="#how-it-works">How it works</a>
+              <a href="#goals">How it works</a>
               <Link to="/register">Get started</Link>
             </div>
             <div className="ch-footer-col">

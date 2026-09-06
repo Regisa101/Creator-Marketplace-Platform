@@ -1,8 +1,9 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Search, MapPin, Building2, Plus, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Search, MapPin, Building2, Plus, ChevronLeft, ChevronRight, DollarSign, Gift } from 'lucide-react';
 import { getCampaigns, type Campaign, type CampaignListParams } from '../api/client';
 import { useAuth } from '../context/AuthContext';
+import { LogoMark, BRAND_NAME, PAGE_GRADIENT_BG } from '../components/Brand';
 
 const CORAL = '#FF8A5B';
 const CORAL_DARK = '#E86B3E';
@@ -83,7 +84,7 @@ export function CampaignBrowse() {
           --line: #e6e6ea;
           font-family: 'Poppins', -apple-system, Helvetica, Arial, sans-serif;
           min-height: 100vh;
-          background: #fbfaff;
+          background: ${PAGE_GRADIENT_BG};
           color: var(--ink);
         }
         .cb * { box-sizing: border-box; }
@@ -96,7 +97,7 @@ export function CampaignBrowse() {
           border-bottom: 1px solid var(--line);
           background: #fff;
         }
-        .cb-logo { font-weight: 700; font-size: 17px; }
+        .cb-logo { display: inline-flex; align-items: center; gap: 8px; font-weight: 700; font-size: 17px; }
 
         .cb-body { max-width: 1080px; margin: 0 auto; padding: 32px 24px 80px; }
 
@@ -177,6 +178,9 @@ export function CampaignBrowse() {
 
         .cb-card-top { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 10px; }
         .cb-card-type {
+          display: inline-flex;
+          align-items: center;
+          gap: 3px;
           font-size: 11px;
           font-weight: 700;
           padding: 4px 10px;
@@ -252,7 +256,7 @@ export function CampaignBrowse() {
       `}</style>
 
       <div className="cb-topbar">
-        <span className="cb-logo">CreatorKhoj</span>
+        <span className="cb-logo"><LogoMark size={20} /> {BRAND_NAME}</span>
       </div>
 
       <div className="cb-body">
@@ -346,7 +350,11 @@ export function CampaignBrowse() {
                 <Link key={c.id} to={`/campaigns/${c.id}`} className="cb-card">
                   <div className="cb-card-top">
                     <span className="cb-card-type">
-                      {c.campaign_type === 'paid' ? '$ paid' : '🎁 gifted'}
+                      {c.campaign_type === 'paid' ? (
+                        <><DollarSign size={11} style={{ verticalAlign: -2 }} /> paid</>
+                      ) : (
+                        <><Gift size={11} style={{ verticalAlign: -2 }} /> gifted</>
+                      )}
                     </span>
                     {isBusiness && <span className="cb-card-status">{c.status}</span>}
                   </div>

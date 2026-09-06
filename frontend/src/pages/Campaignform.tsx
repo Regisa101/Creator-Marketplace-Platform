@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
-import { ArrowLeft, Loader2, Plus, X, Trash2, Camera, Info, Settings, Sparkles } from 'lucide-react';
+import { ArrowLeft, ArrowRight, Loader2, Plus, X, Trash2, Camera, Info, Settings, Sparkles, CheckCircle2, Gift, DollarSign, ChevronDown, LogOut } from 'lucide-react';
 import {
   createCampaign,
   updateCampaign,
@@ -234,6 +234,162 @@ export function TagListField({
   );
 }
 
+const STEP_LABELS = ['Basics', 'Requirements', 'Guidelines', 'Caption', 'Video Specs'];
+
+// One-line descriptions shown under each step's title in the sidebar
+// while that step hasn't been reached yet — swapped for a live status
+// ("Filling in now" / "Done") once you're on it or past it.
+const STEP_DESCRIPTIONS = [
+  'Title, category & compensation',
+  'Deliverables & checklist',
+  "Do's and don'ts for creators",
+  'Suggested caption & hashtags',
+  'Format rules per platform',
+];
+
+// Big editorial-style heading shown above the fields for each step —
+// framed as a question, same spirit as a qualification-gate wizard.
+const STEP_QUESTIONS = [
+  "What's this campaign about?",
+  'What do creators need to deliver?',
+  'What are your creative guardrails?',
+  'How should creators caption it?',
+  'Any platform-specific video rules?',
+];
+
+const STEP_SUBTITLES = [
+  'The essentials creators see first — title, category, and what you\'re offering.',
+  'Tell creators what to bring, and what they owe you.',
+  'Set the creative guardrails up front.',
+  'Give creators a starting point they can tweak.',
+  'One card per platform (e.g. TikTok, Instagram Reel). Optional — skip if you don\'t need this yet.',
+];
+
+// Persistent left-hand sidebar replacing the old horizontal dot
+// stepper — same idea (numbered progress, clickable since every step
+// past Basics is optional) but laid out as a vertical "qualification
+// gates" list: title + a one-line description that swaps for a live
+// status once you're on or past that step.
+//
+// Logo mark and the profile chip at the bottom are the exact same
+// markup/behavior as Dashboard.tsx's sidebar (same SVG circles,
+// "creatorhub" wordmark, avatar-or-initials chip with a menu that
+// opens Edit profile / Settings / Log out) so this page's chrome
+// matches Dashboard's instead of introducing a separate brand mark.
+function StepSidebar({
+  step,
+  onStepClick,
+  mode,
+}: {
+  step: number;
+  onStepClick: (n: number) => void;
+  mode: 'create' | 'edit';
+}) {
+  const { user, logout } = useAuth();
+  const navigate = useNavigate();
+  const [menuOpen, setMenuOpen] = useState(false);
+
+  const role = user?.role === 'creator' ? 'creator' : 'business';
+  const primary = role === 'creator' ? '#FF8A5B' : VIOLET;
+  const initials = user?.full_name?.[0]?.toUpperCase() ?? '?';
+  const avatarUrl: string | null = user?.profile?.profile_image || user?.profile?.logo_url || null;
+
+  return (
+    <aside className="cc-sidebar">
+      <div className="cc-sidebar-top">
+        <div className="cc-sidebar-brand">
+          <svg width="28" height="28" viewBox="0 0 26 26" aria-hidden="true">
+            <circle cx="10" cy="13" r="8" fill={VIOLET} />
+            <circle cx="17" cy="9" r="6" fill="#FF8A5B" fillOpacity="0.9" />
+          </svg>
+          <span
+            style={{
+              fontFamily: "'League Spartan', sans-serif",
+              fontWeight: 600,
+              letterSpacing: '0.03em',
+              fontSize: '1.05rem',
+              color: 'var(--ink)',
+            }}
+          >
+            creatorhub
+          </span>
+        </div>
+
+        <div className="cc-sidebar-eyebrow">Campaign Step's</div>
+        <div className="cc-sidebar-meta">5 sections- only Basics is required</div>
+        <hr className="cc-sidebar-divider" />
+
+        <div className="cc-sidebar-steps">
+          {STEP_LABELS.map((label, index) => {
+            const number = index + 1;
+            const state = number < step ? 'done' : number === step ? 'active' : 'upcoming';
+            const caption =
+              state === 'done' ? 'Done' : state === 'active' ? 'Filling in now' : STEP_DESCRIPTIONS[index];
+
+            return (
+              <button
+                type="button"
+                className="cc-sidebar-step"
+                key={label}
+                onClick={() => onStepClick(number)}
+              >
+                <span className="cc-sidebar-dotcol">
+                  <span className={`cc-sidebar-dot cc-sidebar-dot--${state}`}>
+                    {state === 'done' && <CheckCircle2 size={12} />}
+                  </span>
+                  {number < STEP_LABELS.length && (
+                    <span className={`cc-sidebar-line ${number < step ? 'cc-sidebar-line--done' : ''}`} />
+                  )}
+                </span>
+                <span className="cc-sidebar-step-text">
+                  <span className={`cc-sidebar-step-title cc-sidebar-step-title--${state}`}>{label}</span>
+                  <span className={`cc-sidebar-step-caption cc-sidebar-step-caption--${state}`}>{caption}</span>
+                </span>
+              </button>
+            );
+          })}
+        </div>
+      </div>
+
+      {/* Profile chip at bottom */}
+      <div className="cc-sidebar-profile">
+        <button onClick={() => setMenuOpen((v) => !v)} className="flex w-full items-center gap-2.5 rounded-lg px-2 py-2">
+          <div
+            className="flex h-8 w-8 items-center justify-center overflow-hidden rounded-full text-xs font-semibold text-white"
+            style={{ background: primary }}
+          >
+            {avatarUrl ? <img src={avatarUrl} alt="" className="h-full w-full object-cover" /> : initials}
+          </div>
+          <div className="flex-1 text-left">
+            <div className="text-xs font-medium leading-tight" style={{ color: 'var(--ink)' }}>{user?.full_name}</div>
+            <div className="text-[11px] capitalize leading-tight" style={{ color: '#A39DB8' }}>{user?.role}</div>
+          </div>
+          <ChevronDown size={14} style={{ color: '#A39DB8' }} />
+        </button>
+        {menuOpen && (
+          <div className="absolute bottom-full left-0 mb-2 w-full rounded-lg border py-1 shadow-lg" style={{ background: '#fff', borderColor: 'var(--line)' }}>
+            <Link to="/profile" className="flex items-center gap-2 px-3 py-2 text-xs" style={{ color: 'var(--ink)' }} onClick={() => setMenuOpen(false)}>
+              <Settings size={13} /> Edit profile
+            </Link>
+            {role === 'business' && (
+              <Link to="/settings" className="flex items-center gap-2 px-3 py-2 text-xs" style={{ color: 'var(--ink)' }} onClick={() => setMenuOpen(false)}>
+                <Settings size={13} /> Settings
+              </Link>
+            )}
+            <button
+              onClick={() => { setMenuOpen(false); logout(); navigate('/login'); }}
+              className="flex w-full items-center gap-2 px-3 py-2 text-left text-xs"
+              style={{ color: 'var(--ink)' }}
+            >
+              <LogOut size={13} /> Log out
+            </button>
+          </div>
+        )}
+      </div>
+    </aside>
+  );
+}
+
 export function CampaignForm({ mode }: { mode: 'create' | 'edit' }) {
   const navigate = useNavigate();
   const { user } = useAuth();
@@ -266,6 +422,12 @@ export function CampaignForm({ mode }: { mode: 'create' | 'edit' }) {
 
   const [saving, setSaving] = useState<'draft' | 'publish' | null>(null);
   const [error, setError] = useState('');
+
+  // Which of the 5 numbered steps is currently visible. Starts at 1
+  // always — even in edit mode — since every step but Basics is
+  // optional and the dots let someone jump straight to whichever one
+  // they actually want to change.
+  const [step, setStep] = useState(1);
 
   // ------------------------------------------------------------
   // Brand-level defaults panel (create mode only). Loaded from and
@@ -464,9 +626,18 @@ export function CampaignForm({ mode }: { mode: 'create' | 'edit' }) {
     return null;
   };
 
+  // Gates the "Next" button on step 1 only — every later step is
+  // optional content, so Next is always enabled once you're past Basics.
+  const canContinueStep1 =
+    title.trim().length >= 3 && !!category && description.trim().length >= 10;
+
   const handleSubmit = async (action: 'draft' | 'publish') => {
     const validationError = validate();
     if (validationError) {
+      // Every current validation rule concerns a step-1 field (title/
+      // category/description) — if someone jumped straight to a later
+      // step via the dots, they can't see what's wrong without this.
+      setStep(1);
       setError(validationError);
       return;
     }
@@ -532,377 +703,508 @@ export function CampaignForm({ mode }: { mode: 'create' | 'edit' }) {
   return (
     <div className="cc">
       <style>{`
-        .cc {
-          --violet: ${VIOLET};
-          --violet-dark: ${VIOLET_DARK};
-          --ink: #111217;
-          --ink-soft: #6c6d73;
-          --line: #e6e6ea;
-          font-family: 'Poppins', -apple-system, Helvetica, Arial, sans-serif;
-          min-height: 100vh;
-          background: #fbfaff;
-          color: var(--ink);
-        }
-        .cc * { box-sizing: border-box; }
+  .cc {
+    --violet: ${VIOLET};
+    --violet-dark: ${VIOLET_DARK};
+    --ink: #111217;
+    --ink-soft: #6c6d73;
+    --line: #e6e6ea;
+    font-family: 'Poppins', -apple-system, Helvetica, Arial, sans-serif;
+    min-height: 100vh;
+    background: #F5F4FA;
+    color: var(--ink);
+  }
+  .cc * { box-sizing: border-box; }
 
-        .cc-topbar {
-          display: flex;
-          align-items: center;
-          gap: 24px;
-          padding: 16px 32px;
-          border-bottom: 1px solid var(--line);
-          background: #fff;
-        }
-        .cc-logo { font-weight: 700; font-size: 17px; }
+  .cc-topbar {
+    display: flex;
+    align-items: center;
+    gap: 24px;
+    padding: 16px 32px;
+    border-bottom: 1px solid var(--line);
+    background: #fff;
+  }
+  .cc-logo { display: inline-flex; align-items: center; gap: 8px; font-weight: 700; font-size: 17px; }
 
-        .cc-body { max-width: 720px; margin: 0 auto; padding: 32px 24px 80px; }
+  /* --- Two-pane shell: persistent sidebar + scrolling main --- */
+  .cc-shell { display: flex; min-height: 100vh; align-items: flex-start; }
 
-        .cc-back {
-          display: inline-flex;
-          align-items: center;
-          gap: 6px;
-          font-size: 13.5px;
-          font-weight: 500;
-          color: var(--ink-soft);
-          background: none;
-          border: none;
-          cursor: pointer;
-          padding: 6px 0;
-          margin-bottom: 16px;
-        }
-        .cc-back:hover { color: var(--ink); }
+  /* 🔥 FIX: Sidebar stays fixed while right side scrolls */
+  .cc-sidebar {
+    width: 300px;
+    flex-shrink: 0;
+    padding: 32px 26px;
+    background: #FFFFFF;
+    border-right: 1px solid #EAE7F2;
+    display: flex;
+    flex-direction: column;
+    position: sticky;
+    top: 0;
+    height: 100vh;
+    overflow-y: auto;
+  }
+  @media (max-width: 860px) {
+    .cc-sidebar {
+      position: static;
+      height: auto;
+      width: 100%;
+      border-right: none;
+      border-bottom: 1px solid #EAE7F2;
+    }
+    .cc-shell { align-items: stretch; }
+  }
 
-        .cc-title { font-size: 24px; font-weight: 700; margin: 0 0 4px; }
-        .cc-sub { font-size: 13.5px; color: var(--ink-soft); margin: 0 0 28px; }
+  .cc-sidebar-profile { 
+    position: relative; 
+    margin-top: auto; 
+    padding-top: 20px;
+    border-top: 1px solid #EAE7F2;
+  }
 
-        .cc-card {
-          background: #fff;
-          border: 1px solid var(--line);
-          border-radius: 16px;
-          padding: 28px;
-        }
+  .cc-sidebar-brand { display: inline-flex; align-items: center; gap: 8px; font-weight: 700; font-size: 16px; }
+  .cc-sidebar-tagline { font-size: 12px; color: var(--ink-soft); margin: 4px 0 0 28px; }
+  .cc-sidebar-divider { border: none; border-top: 1px solid rgba(108,93,211,0.16); margin: 22px 0; }
 
-        .cc-field { margin-bottom: 18px; }
-        .cc-label { display: block; font-size: 13px; font-weight: 600; margin-bottom: 7px; }
-        .cc-input, .cc-textarea, .cc-select {
-          width: 100%;
-          border: 1px solid var(--line);
-          border-radius: 10px;
-          padding: 11px 13px;
-          font-size: 14px;
-          font-family: inherit;
-          color: var(--ink);
-          background: #fff;
-        }
-        .cc-textarea { min-height: 100px; resize: vertical; }
-        .cc-input:focus, .cc-textarea:focus, .cc-select:focus {
-          outline: none;
-          border-color: var(--violet);
-        }
-        .cc-hint { font-size: 12px; color: var(--ink-soft); margin-top: 5px; display: flex; align-items: flex-start; gap: 5px; }
+  .cc-sidebar-eyebrow { font-size: 15px; font-weight: 700; letter-spacing: 0.05em; text-transform: uppercase; color: var(--violet-dark); margin-bottom: 4px; }
+  .cc-sidebar-meta { font-size: 13px; color: var(--ink-soft); margin-bottom: 20px; }
 
-        .cc-hero {
-          width: 100%;
-          height: 160px;
-          border-radius: 12px;
-          border: 1.5px dashed var(--line);
-          background: #fafafd;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          overflow: hidden;
-          position: relative;
-          margin-bottom: 10px;
-        }
-        .cc-hero img { width: 100%; height: 100%; object-fit: cover; }
-        .cc-hero-placeholder {
-          display: flex;
-          flex-direction: column;
-          align-items: center;
-          gap: 6px;
-          color: var(--ink-soft);
-          font-size: 12.5px;
-        }
-        .cc-hero-btn {
-          display: inline-flex;
-          align-items: center;
-          gap: 7px;
-          font-size: 13px;
-          font-weight: 600;
-          color: var(--violet-dark);
-          background: #f2f0fc;
-          border: 1px solid #ded8f7;
-          border-radius: 8px;
-          padding: 9px 16px;
-          cursor: pointer;
-        }
-        .cc-hero-remove {
-          position: absolute;
-          top: 10px;
-          right: 10px;
-          width: 26px;
-          height: 26px;
-          border-radius: 50%;
-          background: rgba(17,18,23,0.55);
-          color: #fff;
-          border: none;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          cursor: pointer;
-        }
+  .cc-sidebar-steps { display: flex; flex-direction: column; }
+  .cc-sidebar-step {
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+    background: none;
+    border: none;
+    text-align: left;
+    cursor: pointer;
+    padding: 0 0 4px;
+    width: 100%;
+  }
+  .cc-sidebar-dotcol { display: flex; flex-direction: column; align-items: center; flex-shrink: 0; padding-top: 2px; }
+  .cc-sidebar-dot {
+    width: 18px; height: 18px; border-radius: 50%; flex-shrink: 0;
+    display: flex; align-items: center; justify-content: center;
+    color: #fff;
+  }
+  .cc-sidebar-dot--upcoming { background: #fff; border: 1.5px solid var(--line); }
+  .cc-sidebar-dot--active { background: var(--violet); box-shadow: 0 0 0 4px rgba(108,93,211,0.18); }
+  .cc-sidebar-dot--done { background: #16a34a; }
+  .cc-sidebar-line { width: 1.5px; flex: 1; min-height: 26px; background: var(--line); margin: 3px 0; }
+  .cc-sidebar-line--done { background: #16a34a; }
 
-        .cc-row { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
-        @media (max-width: 540px) { .cc-row { grid-template-columns: 1fr; } }
+  .cc-sidebar-step-text { display: flex; flex-direction: column; padding-bottom: 18px; }
+  .cc-sidebar-step-title { font-size: 13.5px; font-weight: 600; color: var(--ink-soft); }
+  .cc-sidebar-step-title--active, .cc-sidebar-step-title--done { color: var(--ink); }
+  .cc-sidebar-step-caption { font-size: 11.5px; color: var(--ink-soft); margin-top: 2px; }
+  .cc-sidebar-step-caption--active { color: var(--violet-dark); font-weight: 600; }
+  .cc-sidebar-step-caption--done { color: #16a34a; font-weight: 600; }
 
-        .cc-type-toggle { display: flex; gap: 10px; }
-        .cc-type-btn {
-          flex: 1;
-          padding: 12px;
-          border-radius: 10px;
-          border: 1px solid var(--line);
-          background: #fff;
-          font-size: 13.5px;
-          font-weight: 600;
-          color: var(--ink-soft);
-          cursor: pointer;
-          text-align: center;
-        }
-        .cc-type-btn--active { border-color: var(--violet); color: var(--violet-dark); background: #f2f0fc; }
+  .cc-main { 
+    flex: 1; 
+    max-width: 100%; 
+    padding: 40px 48px 80px; 
+  }
+  @media (max-width: 560px) { 
+    .cc-main { padding: 28px 20px 60px; } 
+  }
 
-        .cc-error {
-          font-size: 13px;
-          color: #d64545;
-          background: #fdecec;
-          border-radius: 10px;
-          padding: 10px 14px;
-          margin-bottom: 18px;
-        }
+  .cc-eyebrow { font-size: 14px; font-weight: 700; letter-spacing: 0.02em; text-transform: uppercase; color: var(--violet-dark); margin-bottom: 10px; }
+  .cc-h1-serif {
+    font-family: 'Poppins', -apple-system, Helvetica, Arial, sans-serif;
+    font-size: 28px;
+    font-weight: 600;
+    line-height: 1.3;
+    margin: 0 0 8px;
+    color: var(--ink);
+  }
+  @media (max-width: 560px) { .cc-h1-serif { font-size: 24px; } }
 
-        .cc-actions { display: flex; gap: 10px; margin-top: 8px; }
-        .cc-btn-draft, .cc-btn-publish {
-          flex: 1;
-          padding: 13px;
-          border-radius: 10px;
-          font-size: 14px;
-          font-weight: 600;
-          cursor: pointer;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          gap: 7px;
-        }
-        .cc-btn-draft { border: 1px solid var(--line); background: #fff; color: var(--ink); }
-        .cc-btn-publish { border: none; background: var(--violet); color: #fff; }
-        .cc-btn-draft:disabled, .cc-btn-publish:disabled { opacity: 0.6; cursor: not-allowed; }
-        .cc-spin { animation: cc-spin 0.8s linear infinite; }
-        @keyframes cc-spin { to { transform: rotate(360deg); } }
+  .cc-back {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 13.5px;
+    font-weight: 500;
+    color: var(--ink-soft);
+    background: none;
+    border: none;
+    cursor: pointer;
+    padding: 6px 0;
+    margin-bottom: 16px;
+  }
+  .cc-back:hover { color: var(--ink); }
 
-        .cc-section-divider {
-          border: none;
-          border-top: 1px solid var(--line);
-          margin: 8px 0 24px;
-        }
-        .cc-section-heading { font-size: 15px; font-weight: 700; margin: 0 0 4px; }
-        .cc-section-sub { font-size: 12.5px; color: var(--ink-soft); margin: 0 0 16px; }
+  .cc-title { font-size: 24px; font-weight: 700; margin: 0 0 4px; }
+  .cc-sub { font-size: 13.5px; color: var(--ink-soft); margin: 0 0 28px; }
+  .cc-h2 { font-size: 19px; font-weight: 700; margin: 0 0 5px; }
 
-        .cc-taglist-input-row { display: flex; gap: 8px; }
-        .cc-taglist-input-row .cc-input { flex: 1; }
-        .cc-taglist-add {
-          flex-shrink: 0;
-          width: 42px;
-          border-radius: 10px;
-          border: 1px solid var(--line);
-          background: #fff;
-          color: var(--violet-dark);
-          cursor: pointer;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-        }
-        .cc-taglist-add:hover { background: #f2f0fc; border-color: var(--violet); }
-        .cc-taglist-chips { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
-        .cc-chip {
-          display: inline-flex;
-          align-items: center;
-          gap: 6px;
-          font-size: 12.5px;
-          font-weight: 500;
-          background: #f2f0fc;
-          color: var(--violet-dark);
-          border-radius: 999px;
-          padding: 6px 8px 6px 12px;
-        }
-        .cc-chip-remove {
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          background: none;
-          border: none;
-          color: var(--violet-dark);
-          cursor: pointer;
-          padding: 2px;
-          opacity: 0.7;
-        }
-        .cc-chip-remove:hover { opacity: 1; }
+  .cc-footer { display: flex; align-items: center; justify-content: space-between; margin-top: 4px; flex-wrap: wrap; gap: 12px; }
+  .cc-footer-right { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+  .cc-back-step { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; font-weight: 600; color: var(--ink-soft); background: none; border: none; cursor: pointer; padding: 8px 4px; }
+  .cc-back-step:hover { color: var(--ink); }
+  .cc-next-step { display: inline-flex; align-items: center; gap: 8px; font-size: 14px; font-weight: 600; color: #fff; background: var(--violet); border: none; padding: 12px 24px; border-radius: 8px; cursor: pointer; }
+  .cc-next-step:disabled { background: #cabbf5; cursor: not-allowed; }
+  .cc-next-step--secondary { background: #fff; color: var(--violet-dark); border: 1px solid #ded8f7; padding: 11px 20px; }
+  .cc-next-step--secondary:disabled { background: #fafafd; color: var(--ink-soft); border-color: var(--line); }
 
-        .cc-spec-card {
-          border: 1px solid var(--line);
-          border-radius: 12px;
-          padding: 16px;
-          margin-bottom: 12px;
-          position: relative;
-        }
-        .cc-spec-card-remove {
-          position: absolute;
-          top: 12px;
-          right: 12px;
-          background: none;
-          border: none;
-          color: var(--ink-soft);
-          cursor: pointer;
-        }
-        .cc-spec-card-remove:hover { color: #d64545; }
-        .cc-spec-row-inputs { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 10px; }
-        @media (max-width: 540px) { .cc-spec-row-inputs { grid-template-columns: 1fr; } }
-        .cc-spec-checks { display: flex; gap: 18px; }
-        .cc-spec-check { display: flex; align-items: center; gap: 7px; font-size: 13px; color: var(--ink); }
-        .cc-add-spec-btn {
-          display: inline-flex;
-          align-items: center;
-          gap: 6px;
-          font-size: 13px;
-          font-weight: 600;
-          color: var(--violet-dark);
-          background: #f2f0fc;
-          border: 1px dashed var(--violet);
-          border-radius: 10px;
-          padding: 10px 16px;
-          cursor: pointer;
-          width: 100%;
-          justify-content: center;
-        }
+  .cc-card {
+    background: #fff;
+    border: 1px solid var(--line);
+    border-radius: 16px;
+    padding: 32px 40px;
+  }
 
-        .cc-defaults-box {
-          border: 1px solid var(--line);
-          border-radius: 12px;
-          margin-bottom: 18px;
-          overflow: hidden;
-          background: #fafafd;
-        }
-        .cc-defaults-toggle {
-          width: 100%;
-          display: flex;
-          align-items: center;
-          gap: 8px;
-          font-size: 13px;
-          font-weight: 600;
-          color: var(--violet-dark);
-          background: none;
-          border: none;
-          cursor: pointer;
-          padding: 13px 16px;
-          text-align: left;
-        }
-        .cc-defaults-panel { padding: 4px 16px 18px; border-top: 1px solid var(--line); }
-        .cc-defaults-save {
-          font-size: 13px;
-          font-weight: 600;
-          color: #fff;
-          background: var(--violet);
-          border: none;
-          border-radius: 8px;
-          padding: 9px 16px;
-          cursor: pointer;
-        }
-        .cc-defaults-save:disabled { opacity: 0.6; cursor: not-allowed; }
+  .cc-field { margin-bottom: 18px; }
+  .cc-label { display: block; font-size: 13px; font-weight: 600; margin-bottom: 7px; }
+  .cc-input, .cc-textarea, .cc-select {
+    width: 100%;
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    padding: 11px 13px;
+    font-size: 14px;
+    font-family: inherit;
+    color: var(--ink);
+    background: #fff;
+  }
+  .cc-textarea { min-height: 100px; resize: vertical; }
+  .cc-input:focus, .cc-textarea:focus, .cc-select:focus {
+    outline: none;
+    border-color: var(--violet);
+  }
+  .cc-hint { font-size: 12px; color: var(--ink-soft); margin-top: 5px; display: flex; align-items: flex-start; gap: 5px; }
 
-        .cc-suggest-box {
-          border: 1px dashed #ded8f7;
-          background: #f8f7fd;
-          border-radius: 12px;
-          padding: 14px 16px;
-          margin: -6px 0 18px;
-        }
-        .cc-suggest-title {
-          display: flex;
-          align-items: center;
-          gap: 6px;
-          font-size: 12.5px;
-          font-weight: 700;
-          color: var(--violet-dark);
-          margin-bottom: 10px;
-        }
-        .cc-suggest-group { margin-bottom: 8px; }
-        .cc-suggest-group:last-child { margin-bottom: 0; }
-        .cc-suggest-group-label { font-size: 11px; font-weight: 600; color: var(--ink-soft); margin-bottom: 6px; text-transform: uppercase; letter-spacing: 0.02em; }
-        .cc-suggest-list { display: flex; flex-wrap: wrap; gap: 6px; }
-        .cc-suggest-chip, .cc-preset-chip {
-          font-size: 12px;
-          font-weight: 500;
-          border: 1px solid #ded8f7;
-          background: #fff;
-          color: var(--violet-dark);
-          border-radius: 999px;
-          padding: 5px 11px;
-          cursor: pointer;
-        }
-        .cc-suggest-chip:hover, .cc-preset-chip:hover { background: #f2f0fc; }
-        .cc-suggest-chip:disabled, .cc-preset-chip:disabled {
-          opacity: 0.55;
-          cursor: default;
-          background: #f2f0fc;
-        }
-        .cc-preset-row { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; }
-      `}</style>
+  .cc-hero {
+    width: 100%;
+    height: 160px;
+    border-radius: 12px;
+    border: 1.5px dashed var(--line);
+    background: #fafafd;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    overflow: hidden;
+    position: relative;
+    margin-bottom: 10px;
+  }
+  .cc-hero img { width: 100%; height: 100%; object-fit: cover; }
+  .cc-hero-placeholder {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 6px;
+    color: var(--ink-soft);
+    font-size: 12.5px;
+  }
+  .cc-hero-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--violet-dark);
+    background: #f2f0fc;
+    border: 1px solid #ded8f7;
+    border-radius: 8px;
+    padding: 9px 16px;
+    cursor: pointer;
+  }
+  .cc-hero-remove {
+    position: absolute;
+    top: 10px;
+    right: 10px;
+    width: 26px;
+    height: 26px;
+    border-radius: 50%;
+    background: rgba(17,18,23,0.55);
+    color: #fff;
+    border: none;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+  }
 
-      <div className="cc-topbar">
-        <span className="cc-logo">CreatorKhoj</span>
-      </div>
+  .cc-row { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+  @media (max-width: 540px) { .cc-row { grid-template-columns: 1fr; } }
 
-      <div className="cc-body">
-        <button className="cc-back" onClick={() => navigate(-1)}>
-          <ArrowLeft size={15} /> Back
-        </button>
+  .cc-type-toggle { display: flex; gap: 10px; }
+  .cc-type-btn {
+    flex: 1;
+    padding: 12px;
+    border-radius: 10px;
+    border: 1px solid var(--line);
+    background: #fff;
+    font-size: 13.5px;
+    font-weight: 600;
+    color: var(--ink-soft);
+    cursor: pointer;
+    text-align: center;
+  }
+  .cc-type-btn--active { border-color: var(--violet); color: var(--violet-dark); background: #f2f0fc; }
 
-        {mode === 'edit' && loadingExisting && (
-          <div className="cc-card" style={{ textAlign: 'center', padding: '48px 20px', color: 'var(--ink-soft)' }}>
-            Loading campaign…
-          </div>
-        )}
+  .cc-error {
+    font-size: 13px;
+    color: #d64545;
+    background: #fdecec;
+    border-radius: 10px;
+    padding: 10px 14px;
+    margin-bottom: 18px;
+  }
 
-        {mode === 'edit' && !loadingExisting && notFound && (
-          <div className="cc-card" style={{ textAlign: 'center', padding: '48px 20px', color: 'var(--ink-soft)' }}>
-            This campaign couldn't be found.
-          </div>
-        )}
+  .cc-actions { display: flex; gap: 10px; margin-top: 8px; }
+  .cc-btn-draft, .cc-btn-publish {
+    flex: 1;
+    padding: 13px;
+    border-radius: 10px;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 7px;
+  }
+  .cc-btn-draft { border: 1px solid var(--line); background: #fff; color: var(--ink); }
+  .cc-btn-publish { border: none; background: var(--violet); color: #fff; }
+  .cc-btn-draft:disabled, .cc-btn-publish:disabled { opacity: 0.6; cursor: not-allowed; }
+  .cc-spin { animation: cc-spin 0.8s linear infinite; }
+  @keyframes cc-spin { to { transform: rotate(360deg); } }
 
-        {mode === 'edit' && !loadingExisting && accessDenied && (
-          <div className="cc-card" style={{ textAlign: 'center', padding: '48px 20px', color: 'var(--ink-soft)' }}>
-            You don't have access to edit this campaign.
-          </div>
-        )}
+  .cc-section-divider {
+    border: none;
+    border-top: 1px solid var(--line);
+    margin: 8px 0 24px;
+  }
+  .cc-section-heading { font-size: 15px; font-weight: 700; margin: 0 0 4px; }
+  .cc-section-sub { font-size: 12.5px; color: var(--ink-soft); margin: 0 0 16px; }
 
-        {(mode === 'create' || (!loadingExisting && !notFound && !accessDenied)) && (
-          <>
-            <h1 className="cc-title">{mode === 'edit' ? 'Edit Campaign' : 'Create a Campaign'}</h1>
-            <p className="cc-sub">
-              {mode === 'edit'
-                ? 'Update any field below — changes save when you click one of the buttons at the bottom.'
-                : 'Fill in the basics now — you can add requirements, checklists, and video specs after.'}
-            </p>
+  .cc-taglist-input-row { display: flex; gap: 8px; }
+  .cc-taglist-input-row .cc-input { flex: 1; }
+  .cc-taglist-add {
+    flex-shrink: 0;
+    width: 42px;
+    border-radius: 10px;
+    border: 1px solid var(--line);
+    background: #fff;
+    color: var(--violet-dark);
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  .cc-taglist-add:hover { background: #f2f0fc; border-color: var(--violet); }
+  .cc-taglist-chips { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
+  .cc-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 12.5px;
+    font-weight: 500;
+    background: #f2f0fc;
+    color: var(--violet-dark);
+    border-radius: 999px;
+    padding: 6px 8px 6px 12px;
+  }
+  .cc-chip-remove {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: none;
+    border: none;
+    color: var(--violet-dark);
+    cursor: pointer;
+    padding: 2px;
+    opacity: 0.7;
+  }
+  .cc-chip-remove:hover { opacity: 1; }
 
-            {mode === 'create' && (
+  .cc-spec-card {
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    padding: 16px;
+    margin-bottom: 12px;
+    position: relative;
+  }
+  .cc-spec-card-remove {
+    position: absolute;
+    top: 12px;
+    right: 12px;
+    background: none;
+    border: none;
+    color: var(--ink-soft);
+    cursor: pointer;
+  }
+  .cc-spec-card-remove:hover { color: #d64545; }
+  .cc-spec-row-inputs { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 10px; }
+  @media (max-width: 540px) { .cc-spec-row-inputs { grid-template-columns: 1fr; } }
+  .cc-spec-checks { display: flex; gap: 18px; }
+  .cc-spec-check { display: flex; align-items: center; gap: 7px; font-size: 13px; color: var(--ink); }
+  .cc-add-spec-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--violet-dark);
+    background: #f2f0fc;
+    border: 1px dashed var(--violet);
+    border-radius: 10px;
+    padding: 10px 16px;
+    cursor: pointer;
+    width: 100%;
+    justify-content: center;
+  }
+
+  .cc-defaults-box {
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    margin-bottom: 18px;
+    overflow: hidden;
+    background: #fafafd;
+  }
+  .cc-defaults-toggle {
+    width: 100%;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--violet-dark);
+    background: none;
+    border: none;
+    cursor: pointer;
+    padding: 13px 16px;
+    text-align: left;
+  }
+  .cc-defaults-panel { padding: 4px 16px 18px; border-top: 1px solid var(--line); }
+  .cc-defaults-save {
+    font-size: 13px;
+    font-weight: 600;
+    color: #fff;
+    background: var(--violet);
+    border: none;
+    border-radius: 8px;
+    padding: 9px 16px;
+    cursor: pointer;
+  }
+  .cc-defaults-save:disabled { opacity: 0.6; cursor: not-allowed; }
+
+  .cc-suggest-box {
+    border: 1px dashed #ded8f7;
+    background: #f8f7fd;
+    border-radius: 12px;
+    padding: 14px 16px;
+    margin: -6px 0 18px;
+  }
+  .cc-suggest-title {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 12.5px;
+    font-weight: 700;
+    color: var(--violet-dark);
+    margin-bottom: 10px;
+  }
+  .cc-suggest-group { margin-bottom: 8px; }
+  .cc-suggest-group:last-child { margin-bottom: 0; }
+  .cc-suggest-group-label { font-size: 11px; font-weight: 600; color: var(--ink-soft); margin-bottom: 6px; text-transform: uppercase; letter-spacing: 0.02em; }
+  .cc-suggest-list { display: flex; flex-wrap: wrap; gap: 6px; }
+  .cc-suggest-chip, .cc-preset-chip {
+    font-size: 12px;
+    font-weight: 500;
+    border: 1px solid #ded8f7;
+    background: #fff;
+    color: var(--violet-dark);
+    border-radius: 999px;
+    padding: 5px 11px;
+    cursor: pointer;
+  }
+  .cc-suggest-chip:hover, .cc-preset-chip:hover { background: #f2f0fc; }
+  .cc-suggest-chip:disabled, .cc-preset-chip:disabled {
+    opacity: 0.55;
+    cursor: default;
+    background: #f2f0fc;
+  }
+  .cc-preset-row { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; }
+
+  /* 🔥 FIX: Profile chip at bottom of sidebar */
+  .cc-sidebar-profile { 
+    margin-top: auto; 
+    padding-top: 16px;
+    border-top: 1px solid #EAE7F2;
+    position: relative;
+  }
+
+  .flex { display: flex; }
+  .w-full { width: 100%; }
+  .items-center { align-items: center; }
+  .gap-2\.5 { gap: 10px; }
+  .rounded-lg { border-radius: 8px; }
+  .px-2 { padding-left: 8px; padding-right: 8px; }
+  .py-2 { padding-top: 8px; padding-bottom: 8px; }
+  .h-8 { height: 32px; }
+  .w-8 { width: 32px; }
+  .text-xs { font-size: 12px; }
+  .font-semibold { font-weight: 600; }
+  .text-white { color: #fff; }
+  .overflow-hidden { overflow: hidden; }
+  .rounded-full { border-radius: 9999px; }
+  .h-full { height: 100%; }
+  .w-full { width: 100%; }
+  .object-cover { object-fit: cover; }
+  .flex-1 { flex: 1; }
+  .text-left { text-align: left; }
+  .font-medium { font-weight: 500; }
+  .leading-tight { line-height: 1.25; }
+  .capitalize { text-transform: capitalize; }
+  .absolute { position: absolute; }
+  .bottom-full { bottom: 100%; }
+  .left-0 { left: 0; }
+  .mb-2 { margin-bottom: 8px; }
+  .border { border-width: 1px; }
+  .py-1 { padding-top: 4px; padding-bottom: 4px; }
+  .shadow-lg { box-shadow: 0 10px 15px -3px rgba(0,0,0,0.1); }
+`}</style>
+
+      <div className="cc-shell">
+        <StepSidebar step={step} onStepClick={(n) => { setError(''); setStep(n); }} mode={mode} />
+
+        <main className="cc-main">
+          <button className="cc-back" onClick={() => navigate(-1)}>
+            <ArrowLeft size={15} /> Back
+          </button>
+
+          {mode === 'edit' && loadingExisting && (
+            <div className="cc-card" style={{ textAlign: 'center', padding: '48px 20px', color: 'var(--ink-soft)' }}>
+              Loading campaign…
+            </div>
+          )}
+
+          {mode === 'edit' && !loadingExisting && notFound && (
+            <div className="cc-card" style={{ textAlign: 'center', padding: '48px 20px', color: 'var(--ink-soft)' }}>
+              This campaign couldn't be found.
+            </div>
+          )}
+
+          {mode === 'edit' && !loadingExisting && accessDenied && (
+            <div className="cc-card" style={{ textAlign: 'center', padding: '48px 20px', color: 'var(--ink-soft)' }}>
+              You don't have access to edit this campaign.
+            </div>
+          )}
+
+          {(mode === 'create' || (!loadingExisting && !notFound && !accessDenied)) && (
+            <>
+              <div className="cc-eyebrow">
+                Step {step} of {STEP_LABELS.length} · {STEP_LABELS[step - 1]}
+              </div>
+              <h1 className="cc-h1-serif">{STEP_QUESTIONS[step - 1]}</h1>
+              <p className="cc-sub" style={{ marginBottom: 20 }}>
+                {STEP_SUBTITLES[step - 1]}
+              </p>
+
+              {mode === 'create' && step === 1 && (
               <div className="cc-defaults-box">
-                <button
-                  type="button"
-                  className="cc-defaults-toggle"
-                  onClick={() => setDefaultsOpen((o) => !o)}
-                >
-                  <Settings size={14} />
-                  Manage my campaign defaults
-                  <span style={{ marginLeft: 'auto', color: 'var(--ink-soft)' }}>{defaultsOpen ? '▲' : '▼'}</span>
-                </button>
+                
                 {defaultsOpen && (
                   <div className="cc-defaults-panel">
                     <div className="cc-hint" style={{ marginBottom: 12 }}>
@@ -983,7 +1285,9 @@ export function CampaignForm({ mode }: { mode: 'create' | 'edit' }) {
             <div className="cc-card">
               {error && <div className="cc-error">{error}</div>}
 
-              <div className="cc-field">
+              {step === 1 && (
+                <>
+                  <div className="cc-field">
                 <label className="cc-label">Cover Image</label>
                 <div className="cc-hero">
                   {heroImage ? (
@@ -1182,14 +1486,16 @@ export function CampaignForm({ mode }: { mode: 'create' | 'edit' }) {
                     className={`cc-type-btn ${campaignType === 'gifted' ? 'cc-type-btn--active' : ''}`}
                     onClick={() => setCampaignType('gifted')}
                   >
-                    🎁 Gifted
+                    <Gift size={14} style={{ verticalAlign: -2, marginRight: 6 }} />
+                    Gifted
                   </button>
                   <button
                     type="button"
                     className={`cc-type-btn ${campaignType === 'paid' ? 'cc-type-btn--active' : ''}`}
                     onClick={() => setCampaignType('paid')}
                   >
-                    $ Paid
+                    <DollarSign size={14} style={{ verticalAlign: -2, marginRight: 4 }} />
+                    Paid
                   </button>
                 </div>
               </div>
@@ -1238,11 +1544,11 @@ export function CampaignForm({ mode }: { mode: 'create' | 'edit' }) {
                   onChange={(e) => setDeadline(e.target.value)}
                 />
               </div>
+                </>
+              )}
 
-              <hr className="cc-section-divider" />
-              <div className="cc-section-heading">Requirements &amp; Deliverables</div>
-              <div className="cc-section-sub">What creators need to bring, and what they owe you.</div>
-
+              {step === 2 && (
+                <>
               <div className="cc-field">
                 <label className="cc-label">Requirements</label>
                 <textarea
@@ -1356,11 +1662,11 @@ export function CampaignForm({ mode }: { mode: 'create' | 'edit' }) {
                 onChange={setRequiredScenes}
                 hint="Shown as a numbered shot list, in the order you add them."
               />
+                </>
+              )}
 
-              <hr className="cc-section-divider" />
-              <div className="cc-section-heading">Do's &amp; Don'ts</div>
-              <div className="cc-section-sub">Set the creative guardrails up front.</div>
-
+              {step === 3 && (
+                <>
               <TagListField
                 label="Do"
                 placeholder="e.g. Use natural lighting if possible"
@@ -1373,11 +1679,11 @@ export function CampaignForm({ mode }: { mode: 'create' | 'edit' }) {
                 items={donts}
                 onChange={setDonts}
               />
+                </>
+              )}
 
-              <hr className="cc-section-divider" />
-              <div className="cc-section-heading">Caption &amp; Tags</div>
-              <div className="cc-section-sub">Give creators a starting point they can tweak.</div>
-
+              {step === 4 && (
+                <>
               <div className="cc-field">
                 <label className="cc-label">Suggested Caption</label>
                 <textarea
@@ -1394,11 +1700,11 @@ export function CampaignForm({ mode }: { mode: 'create' | 'edit' }) {
                 items={hashtags}
                 onChange={setHashtags}
               />
+                </>
+              )}
 
-              <hr className="cc-section-divider" />
-              <div className="cc-section-heading">Video Specs</div>
-              <div className="cc-section-sub">One card per platform (e.g. TikTok, Instagram Reel).</div>
-
+              {step === 5 && (
+                <>
               {videoSpecs.map((spec, i) => (
                 <div className="cc-spec-card" key={i}>
                   <button type="button" className="cc-spec-card-remove" onClick={() => removeVideoSpec(i)}>
@@ -1463,32 +1769,58 @@ export function CampaignForm({ mode }: { mode: 'create' | 'edit' }) {
               <button type="button" className="cc-add-spec-btn" onClick={addVideoSpec}>
                 <Plus size={15} /> Add a platform
               </button>
+                </>
+              )}
 
               <hr className="cc-section-divider" style={{ marginTop: 24 }} />
 
-              <div className="cc-actions">
-                <button
-                  className="cc-btn-draft"
-                  onClick={() => handleSubmit('draft')}
-                  disabled={saving !== null}
-                >
-                  {saving === 'draft' && <Loader2 size={15} className="cc-spin" />}
-                  {mode === 'edit' ? 'Save Changes' : 'Save as Draft'}
-                </button>
-                {(mode === 'create' || originalStatus === 'draft') && (
+              <div className="cc-footer">
+                {step > 1 ? (
+                  <button type="button" className="cc-back-step" onClick={() => { setError(''); setStep(step - 1); }}>
+                    <ArrowLeft size={14} /> Previous
+                  </button>
+                ) : <span />}
+
+                <div className="cc-footer-right">
+                  {step < 5 && (
+                    <button
+                      type="button"
+                      className="cc-next-step cc-next-step--secondary"
+                      disabled={step === 1 && !canContinueStep1}
+                      onClick={() => { setError(''); setStep(step + 1); }}
+                    >
+                      Next <ArrowRight size={15} />
+                    </button>
+                  )}
                   <button
-                    className="cc-btn-publish"
-                    onClick={() => handleSubmit('publish')}
+                    className="cc-btn-draft"
+                    onClick={() => handleSubmit('draft')}
                     disabled={saving !== null}
                   >
-                    {saving === 'publish' && <Loader2 size={15} className="cc-spin" />}
-                    Publish Campaign
+                    {saving === 'draft' && <Loader2 size={15} className="cc-spin" />}
+                    {mode === 'edit' ? 'Save Changes' : 'Save as Draft'}
                   </button>
-                )}
+                  {(mode === 'create' || originalStatus === 'draft') && (
+                    <button
+                      className="cc-btn-publish"
+                      onClick={() => handleSubmit('publish')}
+                      disabled={saving !== null}
+                    >
+                      {saving === 'publish' && <Loader2 size={15} className="cc-spin" />}
+                      Publish Campaign
+                    </button>
+                  )}
+                </div>
+              </div>
+              <div className="cc-hint" style={{ marginTop: 10, justifyContent: 'center' }}>
+                <Info size={13} style={{ marginTop: 1, flexShrink: 0 }} />
+                You don't need to fill in every step — save or publish whenever you're ready, and come back to add
+                more later.
               </div>
             </div>
           </>
         )}
+        </main>
       </div>
     </div>
   );

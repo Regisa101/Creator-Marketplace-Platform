@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Link, useParams, useNavigate } from 'react-router-dom';
-import { ArrowLeft, MapPin, Building2, DollarSign, Calendar, CheckCircle2, Target, ListChecks, Film, X, Hash, Quote, ClipboardList, Music2, Smartphone, Volume2, Captions, Loader2, Bookmark, BookmarkCheck, Copy, Rocket, Trash2 } from 'lucide-react';
+import { ArrowLeft, MapPin, Building2, DollarSign, Calendar, CheckCircle2, Target, ListChecks, Film, X, Hash, Quote, ClipboardList, Music2, Smartphone, Volume2, Captions, Loader2, Bookmark, BookmarkCheck, Copy, Rocket, Trash2, Gift, Sparkles } from 'lucide-react';
 import {
   getCampaign,
   getCampaigns,
@@ -16,6 +16,7 @@ import {
   type Application,
 } from '../api/client';
 import { useAuth } from '../context/AuthContext';
+import { LogoMark, BRAND_NAME, PAGE_GRADIENT_BG } from '../components/Brand';
 
 const CORAL = '#FF8A5B';
 const CORAL_DARK = '#E86B3E';
@@ -229,7 +230,7 @@ export function CampaignDetail() {
           --surface: #fbfaff;
           font-family: 'Poppins', -apple-system, Helvetica, Arial, sans-serif;
           min-height: 100vh;
-          background: var(--surface);
+          background: ${PAGE_GRADIENT_BG};
           color: var(--ink);
         }
         .cd * { box-sizing: border-box; }
@@ -242,7 +243,7 @@ export function CampaignDetail() {
           border-bottom: 1px solid var(--line);
           background: #fff;
         }
-        .cd-logo { font-weight: 700; font-size: 17px; color: var(--ink); }
+        .cd-logo { display: inline-flex; align-items: center; gap: 8px; font-weight: 700; font-size: 17px; color: var(--ink); }
         .cd-nav-link { font-size: 13.5px; color: var(--ink-soft); text-decoration: none; }
         .cd-nav-link:hover { color: var(--ink); }
 
@@ -328,6 +329,9 @@ export function CampaignDetail() {
 
         .cd-tags { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 20px; }
         .cd-tag {
+          display: inline-flex;
+          align-items: center;
+          gap: 4px;
           font-size: 12.5px;
           font-weight: 600;
           padding: 6px 14px;
@@ -685,7 +689,7 @@ export function CampaignDetail() {
       `}</style>
 
       <div className="cd-topbar">
-        <span className="cd-logo">CreatorKhoj</span>
+        <span className="cd-logo"><LogoMark size={20} /> {BRAND_NAME}</span>
         <Link to="/campaigns" className="cd-nav-link">Browse Campaigns</Link>
       </div>
 
@@ -723,7 +727,7 @@ export function CampaignDetail() {
                 <ArrowLeft size={15} /> Back
               </button>
 
-              <div className="cd-badge">✦ Featured Campaign</div>
+              <div className="cd-badge"><Sparkles size={12} /> Featured Campaign</div>
 
               <h1 className="cd-title">{campaign.title}</h1>
 
@@ -747,7 +751,11 @@ export function CampaignDetail() {
 
               <div className="cd-tags">
                 <span className={`cd-tag cd-tag--type-${campaign.campaign_type}`}>
-                  {campaign.campaign_type === 'paid' ? '$ paid' : '🎁 gifted'}
+                  {campaign.campaign_type === 'paid' ? (
+                    <><DollarSign size={12} style={{ verticalAlign: -2 }} /> paid</>
+                  ) : (
+                    <><Gift size={12} style={{ verticalAlign: -2 }} /> gifted</>
+                  )}
                 </span>
                 {campaign.sub_category && <span className="cd-tag">{campaign.sub_category}</span>}
               </div>
