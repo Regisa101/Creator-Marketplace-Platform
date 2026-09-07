@@ -1,7 +1,11 @@
 // frontend/src/App.tsx
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider, useAuth } from './context/AuthContext';
-import { AuthCard } from './pages/Authcard';
+import { RoleSelect } from './pages/auth/RoleSelect';
+import { LoginCreator } from './pages/auth/LoginCreator';
+import { LoginBusiness } from './pages/auth/LoginBusiness';
+import { RegisterCreator } from './pages/auth/RegisterCreator';
+import { RegisterBusiness } from './pages/auth/RegisterBusiness';
 import { Dashboard } from './pages/Dashboard';
 import { Landing } from './pages/Landing';
 import { ProtectedRoute } from './components/ProtectedRoute';
@@ -32,8 +36,12 @@ function App() {
         <Routes>
           {/* Public Routes */}
           <Route path="/" element={<Landing />} />
-          <Route path="/login" element={<AuthCard />} />
-          <Route path="/register" element={<AuthCard />} />
+          <Route path="/login" element={<RoleSelect />} />
+<Route path="/register" element={<RoleSelect />} />
+<Route path="/login/creator" element={<LoginCreator />} />
+<Route path="/login/business" element={<LoginBusiness />} />
+<Route path="/register/creator" element={<RegisterCreator />} />
+<Route path="/register/business" element={<RegisterBusiness />} />
           
           {/* Onboarding Routes */}
           <Route

@@ -1,6 +1,7 @@
 // frontend/src/pages/Dashboard.tsx
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import { LogoMark } from '../components/Logo';
 import {
   LayoutDashboard, Megaphone, Compass, Inbox, Briefcase, Search, Bell,
   ChevronDown, ChevronRight, LogOut, Settings, Plus, ArrowRight, Send, Eye,
@@ -25,6 +26,11 @@ import { getApplications, getCampaigns, type Application, type Campaign } from '
  * or `npm install @fontsource/league-spartan` and import the 500/600 weights.
  */
 
+// Brand palette — matches Landing.tsx / CreatorOnboarding.tsx / AuthLayout.tsx
+// (navy #1E2A78 + coral #FF6B5A). Keeping the keys named `violet`/`coral`
+// rather than renaming them, since they're referenced ~20+ times below —
+// only the hex values changed, to bring this page onto the same theme as
+// the rest of the site.
 const C = {
   sidebar: '#FFFFFF',
   sidebarBorder: '#EAE7F2',
@@ -34,10 +40,10 @@ const C = {
   inkSoft: '#6B6478',
   inkFaint: '#A39DB8',
   line: '#EAE7F2',
-  violet: '#6C5DD3',       // business primary — from the logo mark
-  violetSoft: '#EDEAFB',
-  coral: '#FF8A5B',        // creator primary — from the logo mark
-  coralSoft: '#FFEEE5',
+  violet: '#1E2A78',       // business primary — brand navy
+  violetSoft: '#F2F4FC',
+  coral: '#FF6B5A',        // creator primary — brand coral
+  coralSoft: '#FFF4F2',
   mint: '#22C55E',
   sky: '#38BDF8',
   amber: '#F59E0B',
@@ -327,10 +333,7 @@ export const Dashboard = () => {
         style={{ background: C.sidebar, borderColor: C.sidebarBorder }}
       >
         <div className="flex items-center gap-2.5 px-2">
-          <svg width="28" height="28" viewBox="0 0 26 26" className="shrink-0" aria-hidden="true">
-            <circle cx="10" cy="13" r="8" fill={C.violet} />
-            <circle cx="17" cy="9" r="6" fill="#FF8A5B" fillOpacity="0.9" />
-          </svg>
+          <LogoMark size={28} />
           <span
             style={{
               fontFamily: "'League Spartan', sans-serif",
@@ -428,7 +431,7 @@ export const Dashboard = () => {
             nudge is enough to make the feature discoverable without
             nagging indefinitely. */}
         {role === 'business' && !defaultsHintDismissed && (
-          <div className="mt-4 rounded-xl p-4" style={{ background: C.violetSoft, border: `1px solid #ded8f7` }}>
+          <div className="mt-4 rounded-xl p-4" style={{ background: C.violetSoft, border: `1px solid #d7ddf5` }}>
             <div className="flex items-start justify-between gap-2">
               <div className="text-xs font-semibold" style={{ color: C.violet }}>Save time on your next campaign</div>
               <button
@@ -446,7 +449,7 @@ export const Dashboard = () => {
             <Link
               to="/settings"
               className="mt-2 flex items-center justify-center gap-1.5 rounded-lg py-2 text-xs font-semibold"
-              style={{ background: '#fff', color: C.violet, border: `1px solid #ded8f7` }}
+              style={{ background: '#fff', color: C.violet, border: `1px solid #d7ddf5` }}
             >
               Set up Campaign Defaults <ArrowRight size={12} />
             </Link>

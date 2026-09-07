@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router-dom';
 import {
   ArrowRight,
   ArrowLeft,
@@ -22,8 +22,11 @@ import { useAuth } from '../../context/AuthContext';
 // CONSTANTS
 // ============================================================
 
-const VIOLET = '#6C5DD3';
-const VIOLET_DARK = '#4A3BA8';
+// Navy accent — matches the business/brand color used across the rest
+// of the site (auth panels, role picker) instead of the old one-off violet.
+const NAVY = '#2B2F6B';
+const NAVY_DARK = '#20244F';
+const CORAL = '#FF6B5A';
 
 const BUSINESS_TYPES = [
   'Retail', 'E-commerce', 'Agency', 'SaaS', 'Food & Beverage',
@@ -75,6 +78,25 @@ function resolveBusinessStep(profile: Record<string, any> | null | undefined): n
   if (!step3Done) return 3;
 
   return 4;
+}
+
+// ============================================================
+// LOGO
+// ============================================================
+
+// Universal brand mark — same navy + coral circles used on the
+// login/register pages, the role picker, and Creator onboarding, so
+// the logo itself always reads as "creatorhub" regardless of which
+// role's page it's sitting on. This page's own NAVY accent (buttons,
+// step dots, focus rings) is unaffected and still styles everything
+// else below.
+function LogoMark({ size = 26 }: { size?: number }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 26 26" aria-hidden="true" style={{ flexShrink: 0 }}>
+      <circle cx="10" cy="13" r="8" fill="#1E2A78" />
+      <circle cx="17" cy="9" r="6" fill="#FF6B5A" fillOpacity={0.9} />
+    </svg>
+  );
 }
 
 // ============================================================
@@ -374,10 +396,10 @@ export function BusinessOnboarding() {
           --ink-soft: #6c6d73;
           --line: #e6e6ea;
           --surface: #f7f7f9;
-          --accent: ${VIOLET};
-          --accent-hover: ${VIOLET_DARK};
-          --accent-soft: #EDEAFB;
-          --coral: #FF8A5B;
+          --accent: ${NAVY};
+          --accent-hover: ${NAVY_DARK};
+          --accent-soft: #EAEBF5;
+          --coral: #FF6B5A;
           --good: #16a34a;
 
           font-family: Inter, Poppins, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
@@ -390,8 +412,12 @@ export function BusinessOnboarding() {
 
         .co * { box-sizing: border-box; }
         .co button { font-family: inherit; cursor: pointer; }
+        .co a { text-decoration: none; color: inherit; }
 
         .co-shell { max-width: 620px; margin: 0 auto; }
+
+        .co-wordmark { display: flex; align-items: center; justify-content: center; gap: 10px; margin-bottom: 22px; }
+        .co-wordmark span { font-family: 'League Spartan', sans-serif; font-weight: 700; font-size: 24px; color: var(--ink); }
 
         .co-header {
           display: flex;
@@ -465,7 +491,6 @@ export function BusinessOnboarding() {
           border: 1px solid var(--line);
           border-radius: 18px;
           padding: 36px 40px 40px;
-          box-shadow: 0 30px 60px -24px rgba(108,93,211,0.16), 0 4px 14px rgba(17,18,23,0.04);
         }
 
         .co-h2 { font-size: 22px; font-weight: 700; margin: 0 0 5px; }
@@ -515,7 +540,7 @@ export function BusinessOnboarding() {
         .co-footer { display: flex; align-items: center; justify-content: space-between; margin-top: 30px; padding-top: 22px; border-top: 1px solid var(--line); }
         .co-back { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; font-weight: 600; color: var(--ink-soft); background: none; border: none; padding: 8px 4px; }
         .co-continue { display: inline-flex; align-items: center; gap: 8px; font-size: 14px; font-weight: 600; color: #fff; background: var(--accent); border: none; padding: 12px 24px; border-radius: 8px; }
-        .co-continue:disabled { background: #cabbf5; cursor: not-allowed; }
+        .co-continue:disabled { background: #b9bcdd; cursor: not-allowed; }
 
         .co-done { text-align: center; padding: 20px 0 10px; }
         .co-done-icon { width: 64px; height: 64px; border-radius: 50%; background: #E1F6EA; color: #16A34A; display: flex; align-items: center; justify-content: center; margin: 0 auto 20px; }
@@ -534,6 +559,11 @@ export function BusinessOnboarding() {
       `}</style>
 
       <div className="co-shell">
+
+        <Link to="/" className="co-wordmark">
+          <LogoMark size={34} />
+          <span>creatorhub</span>
+        </Link>
 
         {/* ==================================================
             HEADER — Back to Dashboard / Save Draft

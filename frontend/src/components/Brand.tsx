@@ -8,10 +8,10 @@
 // Same two circles + colors as the nav logo in Landing.tsx, so every
 // page matches the actual marketing site instead of using placeholder
 // text.
-export const VIOLET = '#6C5DD3';
-export const VIOLET_DARK = '#4A3BA8';
-export const CORAL = '#FF8A5B';
-export const CORAL_DARK = '#E86B3E';
+export const VIOLET = '#2B2F6B';
+export const VIOLET_DARK = '#20244F';
+export const CORAL = '#FF6B5A';
+export const CORAL_DARK = '#F0523F';
 
 export const BRAND_NAME = 'creatorhub';
 

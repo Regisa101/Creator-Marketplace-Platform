@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router-dom';
 import {
   ArrowRight,
   ArrowLeft,
@@ -22,6 +22,7 @@ import {
 } from '../../api/client';
 import type { CreatorOnboardingData } from '../../api/client';
 import { useAuth } from '../../context/AuthContext';
+import { LogoMark } from '../../components/Logo';
 
 // ============================================================
 // TYPES
@@ -46,9 +47,12 @@ interface PortfolioItem {
 // CONSTANTS
 // ============================================================
 
-const VIOLET = '#6C5DD3';
-const CORAL = '#FF8A5B';
-const CORAL_DARK = '#E86B3E';
+// Soft-coral accent — matches the creator color used across the rest
+// of the site (auth panels, role picker) instead of the old one-off
+// #FF8A5B shade, so buttons, chips, and focus states all read as the
+// same "creator" coral everywhere.
+const CORAL = '#FF6B5A';
+const CORAL_DARK = '#F0523F';
 
 const LANGUAGES = ['English', 'Nepali', 'Hindi', 'Newari', 'Maithili'];
 
@@ -121,19 +125,6 @@ function resolveCreatorStep(
   if (!step3Done) return 3;
 
   return 4;
-}
-
-// ============================================================
-// LOGO
-// ============================================================
-
-function LogoMark({ size = 22 }: { size?: number }) {
-  return (
-    <svg width={size} height={size} viewBox="0 0 26 26" aria-hidden="true" style={{ flexShrink: 0 }}>
-      <circle cx="10" cy="13" r="8" fill={VIOLET} />
-      <circle cx="17" cy="9" r="6" fill={CORAL} fillOpacity={0.9} />
-    </svg>
-  );
 }
 
 // ============================================================
@@ -570,7 +561,7 @@ export function CreatorOnboarding() {
           --surface: #f7f7f9;
           --accent: ${CORAL};
           --accent-hover: ${CORAL_DARK};
-          --accent-soft: #FFEEE5;
+          --accent-soft: #FFEDEA;
           --coral: #FF8A5B;
           --good: #16a34a;
 
@@ -584,8 +575,12 @@ export function CreatorOnboarding() {
 
         .co * { box-sizing: border-box; }
         .co button { font-family: inherit; cursor: pointer; }
+        .co a { text-decoration: none; color: inherit; }
 
         .co-shell { max-width: 620px; margin: 0 auto; }
+
+        .co-wordmark { display: flex; align-items: center; justify-content: center; gap: 10px; margin-bottom: 22px; }
+        .co-wordmark span { font-family: 'League Spartan', sans-serif; font-weight: 700; font-size: 24px; color: var(--ink); }
 
         .co-header {
           display: flex;
@@ -659,7 +654,7 @@ export function CreatorOnboarding() {
           border: 1px solid var(--line);
           border-radius: 18px;
           padding: 36px 40px 40px;
-          box-shadow: 0 30px 60px -24px rgba(232,108,62,0.16), 0 4px 14px rgba(17,18,23,0.04);
+          box-shadow: 0 30px 60px -24px rgba(240,82,63,0.16), 0 4px 14px rgba(17,18,23,0.04);
         }
 
         .co-h2 { font-size: 22px; font-weight: 700; margin: 0 0 5px; }
@@ -752,6 +747,11 @@ export function CreatorOnboarding() {
       `}</style>
 
       <div className="co-shell">
+
+        <Link to="/" className="co-wordmark">
+          <LogoMark size={34} />
+          <span>creatorhub</span>
+        </Link>
 
         {/* ==================================================
             HEADER — Back to Dashboard / Save Draft
