@@ -709,8 +709,15 @@ export function CampaignForm({ mode }: { mode: 'create' | 'edit' }) {
         suggested_caption: suggestedCaption.trim() || undefined,
         hashtags: hashtags.length > 0 ? hashtags : undefined,
         guidelines_note: guidelinesNote.trim() || undefined,
-        hero_image: heroImage || undefined,
-        extra_photos: extraPhotos.length > 0 ? extraPhotos : undefined,
+        // NOTE: these two must send `null` (not `undefined`) when cleared.
+        // The backend's PUT /campaigns/{id} uses model_dump(exclude_unset=True),
+        // which only updates fields that are actually present in the JSON body.
+        // `undefined` values get dropped by JSON.stringify before the request
+        // is even sent, so the backend sees "field not provided" and leaves the
+        // old image in place instead of clearing it. `null` is a real value and
+        // gets included, so it correctly clears the column.
+        hero_image: heroImage || null,
+        extra_photos: extraPhotos.length > 0 ? extraPhotos : null,
       };
 
       let campaignId: number;

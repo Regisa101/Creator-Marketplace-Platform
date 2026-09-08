@@ -1,5 +1,6 @@
 from fastapi import APIRouter, Depends, HTTPException, status, Query
 from sqlalchemy.orm import Session
+from sqlalchemy.exc import IntegrityError
 from typing import Optional
 
 from app.database import get_db
@@ -280,6 +281,17 @@ async def delete_campaign(
     if campaign.status == "in_progress":
         raise HTTPException(status_code=400, detail="Cannot delete active campaign")
     
-    db.delete(campaign)
-    db.commit()
+    try:
+        db.delete(campaign)
+        db.commit()
+    except IntegrityError:
+        # Belt-and-suspenders: the saved_by/applications cascades above should
+        # already prevent this, but if some other table ever adds a
+        # campaign_id FK without a cascade, fail with a clear message instead
+        # of a bare 500.
+        db.rollback()
+        raise HTTPException(
+            status_code=400,
+            detail="Could not delete this campaign because other records still reference it."
+        )
     return {"message": "Campaign deleted successfully"}

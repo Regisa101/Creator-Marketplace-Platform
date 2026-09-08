@@ -386,7 +386,8 @@ export interface CampaignCreateData {
   hashtags?: string[];
   guidelines_note?: string;
   deadline?: string;
-  hero_image?: string;
+  hero_image?: string | null;
+  extra_photos?: string[] | null;
 }
 
 // POST /api/campaigns - business-only (backend enforces via

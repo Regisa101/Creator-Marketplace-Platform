@@ -1,418 +1,743 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Search, MapPin, Building2, Plus, ChevronLeft, ChevronRight, DollarSign, Gift } from 'lucide-react';
-import { getCampaigns, type Campaign, type CampaignListParams } from '../api/client';
+import {
+  CheckCircle2,
+  Clock3,
+  Image as ImageIcon,
+  Megaphone,
+  PauseCircle,
+  Radio,
+} from 'lucide-react';
+import { getCampaigns, type Campaign } from '../api/client';
 import { useAuth } from '../context/AuthContext';
-import { LogoMark, BRAND_NAME, PAGE_GRADIENT_BG } from '../components/Brand';
+import { AppLayout } from '../components/AppLayout';
 
-const CORAL = '#FF6B5A';
-const CORAL_DARK = '#F0523F';
-const VIOLET = '#1E2A78';
+const C = {
+  surface: '#F5F4FA',
+  card: '#FFFFFF',
+  ink: '#1A1625',
+  inkSoft: '#6B6478',
+  inkFaint: '#A39DB8',
+  line: '#EAE7F2',
+  navy: '#1E2A78',
+  navySoft: '#EEF1FF',
+  coral: '#FF6B5A',
+  green: '#22C55E',
+  greenSoft: '#EAFBF1',
+  amberSoft: '#FFF6E5',
+  blue: '#38BDF8',
+  blueSoft: '#EAF8FE',
+};
 
-// Same list as CampaignCreate.tsx — kept local per-file for now rather
-// than shared, same reasoning noted there.
 const CATEGORIES = [
-  'Beauty', 'Fashion', 'Lifestyle', 'Food', 'Tech', 'Fitness', 'Travel',
-  'Gaming', 'Education', 'Finance', 'Wellness', 'Skincare', 'Home Decor',
-  'Parenting', 'Entertainment',
+  'Beauty',
+  'Fashion',
+  'Lifestyle',
+  'Food',
+  'Tech',
+  'Fitness',
+  'Travel',
+  'Gaming',
+  'Education',
+  'Finance',
+  'Wellness',
+  'Skincare',
+  'Home Decor',
+  'Parenting',
+  'Entertainment',
 ];
 
-const BUSINESS_STATUSES = ['draft', 'published', 'in_progress', 'completed', 'cancelled', 'closed'];
+const TAB_ORDER = ['all', 'active', 'draft', 'review', 'completed'] as const;
+type CampaignTab = (typeof TAB_ORDER)[number];
+
+function tabMatches(campaign: Campaign, tab: CampaignTab) {
+  const status = String(campaign.status || '').toLowerCase();
+
+  if (tab === 'all') return true;
+  if (tab === 'active') return status === 'published' || status === 'in_progress';
+  if (tab === 'draft') return status === 'draft';
+  if (tab === 'review') return status === 'in_review' || status === 'review';
+  return status === 'completed';
+}
+
+function statusMeta(status: string) {
+  switch (String(status || '').toLowerCase()) {
+    case 'published':
+    case 'in_progress':
+      return {
+        label: 'Active',
+        color: C.green,
+        bg: C.greenSoft,
+        Icon: Radio,
+      };
+
+    case 'in_review':
+    case 'review':
+      return {
+        label: 'Review',
+        color: C.blue,
+        bg: C.blueSoft,
+        Icon: Clock3,
+      };
+
+    case 'draft':
+      return {
+        label: 'Draft',
+        color: C.inkSoft,
+        bg: '#F0EFF4',
+        Icon: Clock3,
+      };
+
+    case 'completed':
+      return {
+        label: 'Completed',
+        color: C.navy,
+        bg: C.navySoft,
+        Icon: CheckCircle2,
+      };
+
+    case 'cancelled':
+    case 'closed':
+      return {
+        label: 'Paused',
+        color: '#A16207',
+        bg: C.amberSoft,
+        Icon: PauseCircle,
+      };
+
+    default:
+      return {
+        label: status || 'Active',
+        color: C.inkSoft,
+        bg: '#F0EFF4',
+        Icon: Clock3,
+      };
+  }
+}
+
+function getDeliverableTotal(campaign: Campaign) {
+  return campaign.deliverables?.length || campaign.checklist?.length || 0;
+}
+
+function formatDate(date?: string | null) {
+  if (!date) return '';
+
+  const parsed = new Date(date);
+  if (Number.isNaN(parsed.getTime())) return '';
+
+  return parsed.toLocaleDateString('en-US', {
+    month: 'short',
+    day: 'numeric',
+  });
+}
+
+function formatBudget(campaign: Campaign) {
+  if (campaign.compensation_description) {
+    return campaign.compensation_description;
+  }
+
+  if (campaign.budget != null) {
+    return `Rs. ${Number(campaign.budget).toLocaleString()}`;
+  }
+
+  return 'Budget not set';
+}
+
+function CampaignCard({
+  campaign,
+  isBusiness,
+}: {
+  campaign: Campaign;
+  isBusiness: boolean;
+}) {
+  const meta = statusMeta(campaign.status);
+  const totalDeliverables = getDeliverableTotal(campaign);
+  const description =
+    campaign.description?.trim() ||
+    campaign.tagline?.trim() ||
+    'No campaign description yet.';
+
+  const StatusIcon = meta.Icon;
+
+  return (
+    <Link to={`/campaigns/${campaign.id}`} className="mc-card">
+      <div className="mc-card-head">
+        <div className="mc-card-icon">
+          {campaign.hero_image ? (
+            <img src={campaign.hero_image} alt="" />
+          ) : campaign.campaign_type === 'paid' ? (
+            <Radio size={18} />
+          ) : (
+            <ImageIcon size={18} />
+          )}
+        </div>
+
+        <span
+          className="mc-status"
+          style={{
+            background: meta.bg,
+            color: meta.color,
+          }}
+        >
+          <StatusIcon size={10} />
+          {meta.label}
+        </span>
+      </div>
+
+      <h3 className="mc-card-title">{campaign.title}</h3>
+
+      <p className="mc-card-description">{description}</p>
+
+      <div className="mc-card-stats">
+        <span>
+          Applications: <strong>{campaign.application_count ?? 0}</strong>
+        </span>
+
+        <span>
+          Deliverables:{' '}
+          <strong>
+            {totalDeliverables ? `0/${totalDeliverables}` : '—'}
+          </strong>
+        </span>
+      </div>
+
+      <div className="mc-progress-track" aria-hidden="true">
+        <div className="mc-progress-fill" />
+      </div>
+
+      <div className="mc-card-footer">
+        <span>{formatBudget(campaign)}</span>
+        <span>
+          {campaign.deadline
+            ? `Due ${formatDate(campaign.deadline)}`
+            : campaign.category || 'Campaign'}
+        </span>
+      </div>
+
+      <div className="mc-view-btn">
+        {isBusiness ? 'View Details' : 'View Campaign'}
+      </div>
+    </Link>
+  );
+}
 
 export function CampaignBrowse() {
   const { user } = useAuth();
   const isBusiness = user?.role === 'business';
 
   const [campaigns, setCampaigns] = useState<Campaign[]>([]);
-  const [total, setTotal] = useState(0);
-  const [pages, setPages] = useState(1);
-  const [page, setPage] = useState(1);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
-
   const [search, setSearch] = useState('');
-  const [searchInput, setSearchInput] = useState('');
+  const [activeTab, setActiveTab] = useState<CampaignTab>('all');
   const [category, setCategory] = useState('');
-  const [status, setStatus] = useState('');
+  const [sort, setSort] = useState<'newest' | 'oldest'>('newest');
 
   useEffect(() => {
     let cancelled = false;
 
-    (async () => {
-      setLoading(true);
-      setError('');
-      try {
-        const params: CampaignListParams = { page, limit: 12 };
-        if (search) params.search = search;
-        if (category) params.category = category;
-        if (status) params.status = status;
+    setLoading(true);
+    setError('');
 
-        const data = await getCampaigns(params);
+    const timer = window.setTimeout(async () => {
+      try {
+        const data = await getCampaigns({
+  search: search.trim() || undefined,
+  category: category || undefined,
+  page: 1,
+  limit: 50,
+});
+
         if (!cancelled) {
-          setCampaigns(data.campaigns);
-          setTotal(data.total);
-          setPages(data.pages);
+          setCampaigns(data.campaigns ?? []);
         }
       } catch (err) {
         console.error('Could not load campaigns:', err);
-        if (!cancelled) setError('Could not load campaigns. Please try again.');
+
+        if (!cancelled) {
+          setError('Could not load campaigns. Please try again.');
+        }
       } finally {
-        if (!cancelled) setLoading(false);
+        if (!cancelled) {
+          setLoading(false);
+        }
       }
-    })();
+    }, 250);
 
     return () => {
       cancelled = true;
+      window.clearTimeout(timer);
     };
-  }, [page, search, category, status]);
+  }, [search, category]);
 
-  const handleSearchSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    setPage(1);
-    setSearch(searchInput.trim());
-  };
+  const visibleCampaigns = useMemo(() => {
+    return [...campaigns]
+      .filter((campaign) => tabMatches(campaign, activeTab))
+      .sort((a, b) => {
+        const aTime = new Date(a.created_at).getTime();
+        const bTime = new Date(b.created_at).getTime();
+
+        return sort === 'newest'
+          ? bTime - aTime
+          : aTime - bTime;
+      });
+  }, [campaigns, activeTab, sort]);
+
+  const counts = useMemo(
+    () => ({
+      all: campaigns.length,
+      active: campaigns.filter((campaign) =>
+        tabMatches(campaign, 'active')
+      ).length,
+      draft: campaigns.filter((campaign) =>
+        tabMatches(campaign, 'draft')
+      ).length,
+      review: campaigns.filter((campaign) =>
+        tabMatches(campaign, 'review')
+      ).length,
+      completed: campaigns.filter((campaign) =>
+        tabMatches(campaign, 'completed')
+      ).length,
+    }),
+    [campaigns]
+  );
 
   return (
-    <div className="cb">
+    <AppLayout
+      title={isBusiness ? 'My Campaigns' : 'Discover Collabs'}
+      subtitle={
+        isBusiness
+          ? "Here's all your campaigns."
+          : 'Browse open campaigns from businesses looking for creators.'
+      }
+      searchValue={search}
+      onSearchChange={(value) => {
+        setSearch(value);
+        setActiveTab('all');
+      }}
+      searchPlaceholder={
+        isBusiness
+          ? 'Search campaigns, creators…'
+          : 'Search campaigns…'
+      }
+      actionLabel={isBusiness ? 'New Campaign' : undefined}
+      actionTo={isBusiness ? '/campaigns/new' : undefined}
+    >
       <style>{`
-        .cb {
-          --coral: ${CORAL};
-          --coral-dark: ${CORAL_DARK};
-          --violet: ${VIOLET};
-          --ink: #111217;
-          --ink-soft: #6c6d73;
-          --line: #e6e6ea;
-          font-family: 'Poppins', -apple-system, Helvetica, Arial, sans-serif;
-          min-height: 100vh;
-          background: ${PAGE_GRADIENT_BG};
-          color: var(--ink);
+        .campaign-page {
+          min-height: calc(100vh - 68px);
+          background: ${C.surface};
+          color: ${C.ink};
+          font-family: Poppins, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
         }
-        .cb * { box-sizing: border-box; }
 
-        .cb-topbar {
-          display: flex;
-          align-items: center;
-          gap: 24px;
-          padding: 16px 32px;
-          border-bottom: 1px solid var(--line);
-          background: #fff;
+        .campaign-page * {
+          box-sizing: border-box;
         }
-        .cb-logo { display: inline-flex; align-items: center; gap: 8px; font-weight: 700; font-size: 17px; }
 
-        .cb-body { max-width: 1080px; margin: 0 auto; padding: 32px 24px 80px; }
+        .mc-content {
+          padding: 0 24px 40px;
+          max-width: 1500px;
+          margin: 0 auto;
+        }
 
-        .cb-header-row {
+        .mc-title-row {
           display: flex;
-          justify-content: space-between;
           align-items: flex-start;
+          justify-content: space-between;
           gap: 16px;
-          margin-bottom: 24px;
-          flex-wrap: wrap;
+          margin-bottom: 18px;
         }
-        .cb-title { font-size: 24px; font-weight: 700; margin: 0 0 4px; }
-        .cb-sub { font-size: 13.5px; color: var(--ink-soft); margin: 0; }
 
-        .cb-create-btn {
-          display: inline-flex;
+        .mc-title-row > div:first-child {
+          display: none;
+        }
+
+        .mc-sort {
+          display: flex;
           align-items: center;
-          gap: 7px;
-          font-size: 13.5px;
-          font-weight: 600;
-          color: #fff;
-          background: var(--violet);
-          border: none;
-          border-radius: 10px;
-          padding: 11px 18px;
-          cursor: pointer;
-          text-decoration: none;
+          gap: 6px;
+          margin-left: auto;
+          font-size: 11px;
+          color: ${C.inkSoft};
           white-space: nowrap;
         }
 
-        .cb-filters {
-          display: flex;
-          gap: 10px;
-          flex-wrap: wrap;
-          margin-bottom: 24px;
-        }
-        .cb-search-form { position: relative; flex: 1; min-width: 220px; }
-        .cb-search-icon { position: absolute; left: 13px; top: 50%; transform: translateY(-50%); color: var(--ink-soft); }
-        .cb-search-input {
-          width: 100%;
-          border: 1px solid var(--line);
-          border-radius: 10px;
-          padding: 10px 13px 10px 38px;
-          font-size: 13.5px;
-          font-family: inherit;
+        .mc-sort select {
+          border: 1px solid ${C.line};
+          border-radius: 7px;
           background: #fff;
-        }
-        .cb-search-input:focus { outline: none; border-color: var(--coral); }
-        .cb-select {
-          border: 1px solid var(--line);
-          border-radius: 10px;
-          padding: 10px 13px;
-          font-size: 13.5px;
-          font-family: inherit;
-          background: #fff;
-          color: var(--ink);
-        }
-
-        .cb-grid {
-          display: grid;
-          grid-template-columns: repeat(3, 1fr);
-          gap: 18px;
-        }
-        @media (max-width: 860px) { .cb-grid { grid-template-columns: repeat(2, 1fr); } }
-        @media (max-width: 560px) { .cb-grid { grid-template-columns: 1fr; } }
-
-        .cb-card {
-          display: block;
-          text-decoration: none;
-          color: inherit;
-          background: #fff;
-          border: 1px solid var(--line);
-          border-radius: 14px;
-          padding: 18px;
-          transition: box-shadow 0.15s, transform 0.15s;
-        }
-        .cb-card:hover { box-shadow: 0 4px 18px rgba(0,0,0,0.06); transform: translateY(-2px); }
-
-        .cb-card-top { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 10px; }
-        .cb-card-type {
-          display: inline-flex;
-          align-items: center;
-          gap: 3px;
+          color: ${C.ink};
+          padding: 7px 9px;
           font-size: 11px;
-          font-weight: 700;
-          padding: 4px 10px;
-          border-radius: 999px;
-          background: #fff1ea;
-          color: var(--coral-dark);
-          border: 1px solid #ffd9c2;
+          outline: none;
         }
-        .cb-card-status {
-          font-size: 10.5px;
-          font-weight: 700;
-          padding: 4px 10px;
-          border-radius: 999px;
-          background: #f1f0f5;
-          color: var(--ink-soft);
-          text-transform: capitalize;
-        }
-        .cb-card-title { font-size: 15.5px; font-weight: 700; line-height: 1.35; margin: 0 0 8px; }
-        .cb-card-meta {
+
+        .mc-tabs {
           display: flex;
           align-items: center;
+          gap: 7px;
+          margin-bottom: 16px;
           flex-wrap: wrap;
-          gap: 5px;
+        }
+
+        .mc-tab {
+          border: 1px solid ${C.line};
+          background: #fff;
+          color: ${C.inkSoft};
+          padding: 8px 13px;
+          border-radius: 7px;
+          font-size: 11px;
+          font-weight: 500;
+          cursor: pointer;
+        }
+
+        .mc-tab.active {
+          border-color: ${C.navy};
+          background: ${C.navy};
+          color: #fff;
+          font-weight: 600;
+        }
+
+        .mc-tab-count {
+          margin-left: 3px;
+          opacity: .75;
+        }
+
+        .mc-state {
+          padding: 70px 20px;
+          text-align: center;
+          color: ${C.inkSoft};
           font-size: 12px;
-          color: var(--ink-soft);
+        }
+
+        .mc-state-title {
+          margin: 8px 0 4px;
+          color: ${C.ink};
+          font-size: 14px;
+          font-weight: 600;
+        }
+
+        .mc-grid {
+          display: grid;
+          grid-template-columns: repeat(4, minmax(0, 1fr));
+          gap: 14px;
+        }
+
+        .mc-card {
+          min-width: 0;
+          display: flex;
+          flex-direction: column;
+          min-height: 245px;
+          padding: 13px;
+          border: 1px solid ${C.line};
+          border-radius: 12px;
+          background: ${C.card};
+          color: inherit;
+          text-decoration: none;
+          transition: transform .15s ease, box-shadow .15s ease;
+        }
+
+        .mc-card:hover {
+          transform: translateY(-2px);
+          box-shadow: 0 7px 22px rgba(35, 29, 58, .08);
+        }
+
+        .mc-card-head {
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          gap: 8px;
           margin-bottom: 10px;
         }
-        .cb-card-meta-item { display: inline-flex; align-items: center; gap: 3px; }
-        .cb-card-desc {
-          font-size: 12.5px;
-          color: #3d3d42;
-          line-height: 1.55;
-          margin: 0 0 12px;
+
+        .mc-card-icon {
+          width: 36px;
+          height: 36px;
+          flex: 0 0 36px;
+          display: grid;
+          place-items: center;
+          overflow: hidden;
+          border-radius: 8px;
+          background: ${C.navySoft};
+          color: ${C.navy};
+        }
+
+        .mc-card-icon img {
+          width: 100%;
+          height: 100%;
+          object-fit: cover;
+        }
+
+        .mc-status {
+          display: inline-flex;
+          align-items: center;
+          gap: 4px;
+          border-radius: 999px;
+          padding: 4px 8px;
+          font-size: 9px;
+          font-weight: 700;
+          white-space: nowrap;
+        }
+
+        .mc-card-title {
+          margin: 0 0 5px;
+          font-size: 12px;
+          line-height: 1.35;
+          font-weight: 700;
+          min-height: 32px;
+        }
+
+        .mc-card-description {
+          margin: 0 0 10px;
+          color: ${C.inkSoft};
+          font-size: 9.5px;
+          line-height: 1.45;
+          min-height: 28px;
           display: -webkit-box;
           -webkit-line-clamp: 2;
           -webkit-box-orient: vertical;
           overflow: hidden;
         }
-        .cb-card-footer {
+
+        .mc-card-stats {
           display: flex;
           justify-content: space-between;
-          align-items: center;
-          font-size: 11.5px;
-          color: var(--ink-soft);
-          border-top: 1px solid var(--line);
-          padding-top: 10px;
+          gap: 5px;
+          margin-top: auto;
+          color: ${C.inkSoft};
+          font-size: 8.5px;
+          white-space: nowrap;
         }
 
-        .cb-state { text-align: center; padding: 60px 20px; color: var(--ink-soft); }
-        .cb-state-title { font-size: 16px; font-weight: 600; color: var(--ink); margin-bottom: 6px; }
-
-        .cb-pagination {
-          display: flex;
-          justify-content: center;
-          align-items: center;
-          gap: 14px;
-          margin-top: 32px;
+        .mc-card-stats strong {
+          color: ${C.ink};
+          font-weight: 700;
         }
-        .cb-page-btn {
+
+        .mc-progress-track {
+          height: 3px;
+          margin: 6px 0 8px;
+          border-radius: 99px;
+          overflow: hidden;
+          background: #ECEAF1;
+        }
+
+        .mc-progress-fill {
+          width: 0%;
+          height: 100%;
+          border-radius: inherit;
+          background: ${isBusiness ? C.navy : C.coral};
+        }
+
+        .mc-card-footer {
           display: flex;
-          align-items: center;
-          justify-content: center;
-          width: 34px;
-          height: 34px;
-          border-radius: 8px;
-          border: 1px solid var(--line);
+          justify-content: space-between;
+          gap: 5px;
+          margin-bottom: 9px;
+          padding-top: 7px;
+          border-top: 1px solid #F0EEF4;
+          color: ${C.inkFaint};
+          font-size: 8.5px;
+          white-space: nowrap;
+          overflow: hidden;
+        }
+
+        .mc-card-footer span {
+          overflow: hidden;
+          text-overflow: ellipsis;
+        }
+
+        .mc-view-btn {
+          width: 100%;
+          height: 28px;
+          display: grid;
+          place-items: center;
+          border: 1px solid #8D8B94;
+          border-radius: 5px;
+          color: ${C.ink};
+          font-size: 9.5px;
+          font-weight: 500;
           background: #fff;
-          color: var(--ink);
-          cursor: pointer;
         }
-        .cb-page-btn:disabled { opacity: 0.4; cursor: not-allowed; }
-        .cb-page-label { font-size: 13px; color: var(--ink-soft); }
+
+        @media (max-width: 1050px) {
+          .mc-grid {
+            grid-template-columns: repeat(3, minmax(0, 1fr));
+          }
+        }
+
+        @media (max-width: 820px) {
+          .mc-content {
+            padding-left: 18px;
+            padding-right: 18px;
+          }
+
+          .mc-grid {
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+          }
+        }
+
+        @media (max-width: 560px) {
+          .mc-title-row {
+            flex-direction: column;
+          }
+
+          .mc-sort {
+            margin-left: 0;
+          }
+
+          .mc-grid {
+            grid-template-columns: 1fr;
+          }
+        }
       `}</style>
 
-      <div className="cb-topbar">
-        <span className="cb-logo"><LogoMark size={20} /> {BRAND_NAME}</span>
-      </div>
-
-      <div className="cb-body">
-        <div className="cb-header-row">
-          <div>
-            <h1 className="cb-title">{isBusiness ? 'My Campaigns' : 'Discover Collabs'}</h1>
-            <p className="cb-sub">
-              {isBusiness
-                ? `${total} campaign${total === 1 ? '' : 's'} you've posted`
-                : `${total} open campaign${total === 1 ? '' : 's'} looking for creators`}
-            </p>
-          </div>
-          {isBusiness && (
-            <Link to="/campaigns/new" className="cb-create-btn">
-              <Plus size={16} /> Create Campaign
-            </Link>
-          )}
-        </div>
-
-        <div className="cb-filters">
-          <form className="cb-search-form" onSubmit={handleSearchSubmit}>
-            <Search size={15} className="cb-search-icon" />
-            <input
-              className="cb-search-input"
-              value={searchInput}
-              onChange={(e) => setSearchInput(e.target.value)}
-              placeholder="Search campaigns…"
-            />
-          </form>
-
-          <select
-            className="cb-select"
-            value={category}
-            onChange={(e) => {
-              setPage(1);
-              setCategory(e.target.value);
-            }}
-          >
-            <option value="">All categories</option>
-            {CATEGORIES.map((c) => (
-              <option key={c} value={c}>
-                {c}
-              </option>
-            ))}
-          </select>
-
-          {isBusiness && (
-            <select
-              className="cb-select"
-              value={status}
-              onChange={(e) => {
-                setPage(1);
-                setStatus(e.target.value);
-              }}
-            >
-              <option value="">All statuses</option>
-              {BUSINESS_STATUSES.map((s) => (
-                <option key={s} value={s}>
-                  {s.replace('_', ' ')}
-                </option>
-              ))}
-            </select>
-          )}
-        </div>
-
-        {loading && <div className="cb-state">Loading campaigns…</div>}
-
-        {!loading && error && <div className="cb-state">{error}</div>}
-
-        {!loading && !error && campaigns.length === 0 && (
-          <div className="cb-state">
-            <div className="cb-state-title">
-              {search || category || status
-                ? 'No campaigns match those filters'
-                : isBusiness
-                ? "You haven't posted a campaign yet"
-                : 'No open campaigns right now'}
+      <main className="campaign-page">
+        <section className="mc-content">
+          <div className="mc-title-row">
+            <div>
+              <h1 className="mc-title">
+                {isBusiness ? 'My Campaigns' : 'Discover Collabs'}
+              </h1>
             </div>
-            {isBusiness && !search && !category && !status && (
-              <Link to="/campaigns/new" className="cb-create-btn" style={{ display: 'inline-flex', marginTop: 12 }}>
-                <Plus size={16} /> Create your first campaign
-              </Link>
+
+            <label className="mc-sort">
+              Sort by:
+              <select
+                value={sort}
+                onChange={(event) =>
+                  setSort(event.target.value as 'newest' | 'oldest')
+                }
+              >
+                <option value="newest">Date (Newest)</option>
+                <option value="oldest">Date (Oldest)</option>
+              </select>
+            </label>
+          </div>
+
+          <div
+            className="mc-tabs"
+            role="tablist"
+            aria-label="Campaign status"
+          >
+            {TAB_ORDER.map((tab) => {
+              const labels: Record<CampaignTab, string> = {
+                all: 'All',
+                active: 'Active',
+                draft: 'Drafts',
+                review: 'Review',
+                completed: 'Completed',
+              };
+
+              return (
+                <button
+                  key={tab}
+                  type="button"
+                  role="tab"
+                  aria-selected={activeTab === tab}
+                  className={`mc-tab ${
+                    activeTab === tab ? 'active' : ''
+                  }`}
+                  onClick={() => setActiveTab(tab)}
+                >
+                  {labels[tab]}
+                  <span className="mc-tab-count">
+                    ({counts[tab]})
+                  </span>
+                </button>
+              );
+            })}
+
+            {isBusiness && (
+              <select
+                className="mc-tab"
+                value={category}
+                onChange={(event) => {
+                  setCategory(event.target.value);
+                  setActiveTab('all');
+                }}
+                aria-label="Filter by category"
+              >
+                <option value="">All categories</option>
+
+                {CATEGORIES.map((item) => (
+                  <option key={item} value={item}>
+                    {item}
+                  </option>
+                ))}
+              </select>
             )}
           </div>
-        )}
 
-        {!loading && !error && campaigns.length > 0 && (
-          <>
-            <div className="cb-grid">
-              {campaigns.map((c) => (
-                <Link key={c.id} to={`/campaigns/${c.id}`} className="cb-card">
-                  <div className="cb-card-top">
-                    <span className="cb-card-type">
-                      {c.campaign_type === 'paid' ? (
-                        <><DollarSign size={11} style={{ verticalAlign: -2 }} /> paid</>
-                      ) : (
-                        <><Gift size={11} style={{ verticalAlign: -2 }} /> gifted</>
-                      )}
-                    </span>
-                    {isBusiness && <span className="cb-card-status">{c.status}</span>}
-                  </div>
-                  <h3 className="cb-card-title">{c.title}</h3>
-                  <div className="cb-card-meta">
-                    <span className="cb-card-meta-item">
-                      <Building2 size={12} /> {c.brand_name || 'Business'}
-                    </span>
-                    <span>·</span>
-                    <span>{c.category}</span>
-                    {c.brand_location && (
-                      <>
-                        <span>·</span>
-                        <span className="cb-card-meta-item">
-                          <MapPin size={12} /> {c.brand_location}
-                        </span>
-                      </>
-                    )}
-                  </div>
-                  <p className="cb-card-desc">{c.description}</p>
-                  <div className="cb-card-footer">
-                    <span>
-                      {c.application_count} applicant{c.application_count === 1 ? '' : 's'}
-                    </span>
-                    {c.deadline && (
-                      <span>
-                        Due {new Date(c.deadline).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
-                      </span>
-                    )}
-                  </div>
-                </Link>
-              ))}
+          {loading && (
+            <div className="mc-state">
+              Loading campaigns…
             </div>
+          )}
 
-            {pages > 1 && (
-              <div className="cb-pagination">
-                <button
-                  className="cb-page-btn"
-                  disabled={page <= 1}
-                  onClick={() => setPage((p) => Math.max(1, p - 1))}
-                >
-                  <ChevronLeft size={16} />
-                </button>
-                <span className="cb-page-label">
-                  Page {page} of {pages}
-                </span>
-                <button
-                  className="cb-page-btn"
-                  disabled={page >= pages}
-                  onClick={() => setPage((p) => Math.min(pages, p + 1))}
-                >
-                  <ChevronRight size={16} />
-                </button>
+          {!loading && error && (
+            <div className="mc-state">
+              {error}
+            </div>
+          )}
+
+          {!loading && !error && visibleCampaigns.length === 0 && (
+            <div className="mc-state">
+              <Megaphone
+                size={26}
+                color={C.inkFaint}
+              />
+
+              <div className="mc-state-title">
+                {search || category || activeTab !== 'all'
+                  ? 'No campaigns match these filters'
+                  : isBusiness
+                    ? "You haven't launched a campaign yet"
+                    : 'No open campaigns right now'}
+              </div>
+
+              <div>
+                {isBusiness
+                  ? 'Create a campaign to start receiving creator applications.'
+                  : 'Check back soon for new collaborations.'}
+              </div>
+
+              {isBusiness &&
+                !search &&
+                !category &&
+                activeTab === 'all' && (
+                  <Link
+                    className="app-action"
+                    style={{
+                      marginTop: 14,
+                      display: 'inline-flex',
+                    }}
+                    to="/campaigns/new"
+                  >
+                    Create your first campaign
+                  </Link>
+                )}
+            </div>
+          )}
+
+          {!loading &&
+            !error &&
+            visibleCampaigns.length > 0 && (
+              <div className="mc-grid">
+                {visibleCampaigns.map((campaign) => (
+                  <CampaignCard
+                    key={campaign.id}
+                    campaign={campaign}
+                    isBusiness={isBusiness}
+                  />
+                ))}
               </div>
             )}
-          </>
-        )}
-      </div>
-    </div>
+        </section>
+      </main>
+    </AppLayout>
   );
 }
+
+export default CampaignBrowse;

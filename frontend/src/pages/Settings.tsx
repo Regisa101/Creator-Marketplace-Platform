@@ -605,7 +605,11 @@ export function CampaignForm({ mode }: { mode: 'create' | 'edit' }) {
         donts: donts.length > 0 ? donts : undefined,
         suggested_caption: suggestedCaption.trim() || undefined,
         hashtags: hashtags.length > 0 ? hashtags : undefined,
-        hero_image: heroImage || undefined,
+        // Send `null` (not `undefined`) when cleared — see Campaignform.tsx
+        // for why: the backend only clears fields that are actually present
+        // in the JSON body (exclude_unset=True), and `undefined` gets
+        // dropped before the request is sent.
+        hero_image: heroImage || null,
       };
 
       let campaignId: number;

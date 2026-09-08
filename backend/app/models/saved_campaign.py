@@ -18,7 +18,7 @@ class SavedCampaign(Base):
     created_at = Column(DateTime(timezone=True), server_default=func.now())
 
     creator = relationship("User", foreign_keys=[creator_id])
-    campaign = relationship("Campaign")
+    campaign = relationship("Campaign", back_populates="saved_by")
 
     __table_args__ = (
         # One save per creator per campaign — the route also checks

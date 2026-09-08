@@ -94,3 +94,10 @@ class Campaign(Base):
     # Relationships
     business = relationship("User", foreign_keys=[business_id])
     applications = relationship("Application", back_populates="campaign", cascade="all, delete-orphan")
+    # Bookmarks a creator made on this campaign (the "Save Campaign" button).
+    # Without this, deleting a campaign that anyone has saved throws a
+    # foreign-key IntegrityError in Postgres/SQLite (saved_campaigns.campaign_id
+    # still points at the row), which the DELETE route doesn't catch — the
+    # delete just silently 500s. This makes SQLAlchemy delete those bookmark
+    # rows first, same as it already does for applications above.
+    saved_by = relationship("SavedCampaign", back_populates="campaign", cascade="all, delete-orphan")
