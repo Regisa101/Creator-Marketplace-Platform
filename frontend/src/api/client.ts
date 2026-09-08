@@ -276,6 +276,38 @@ export interface Campaign {
   application_count: number;
 }
 
+export interface PublicBusinessCampaign {
+  id: number;
+  title: string;
+  category: string;
+  sub_category?: string | null;
+  campaign_type: string;
+  status: string;
+}
+
+export interface PublicBusinessProfile {
+  id: number;
+  company_name: string;
+  business_type?: string | null;
+  industry?: string | null;
+  location?: string | null;
+  website?: string | null;
+  description?: string | null;
+  logo_url?: string | null;
+  interested_categories: string[];
+  preferred_content_types: string[];
+  team_size?: string | null;
+  year_established?: number | null;
+  is_onboarding_complete: boolean;
+  is_published: boolean;
+  campaigns: PublicBusinessCampaign[];
+}
+
+export const getPublicBusinessProfile = async (businessId: number | string): Promise<PublicBusinessProfile> => {
+  const response = await api.get<PublicBusinessProfile>(`/businesses/${businessId}/public-profile`);
+  return response.data;
+};
+
 export interface CampaignListResponse {
   campaigns: Campaign[];
   total: number;

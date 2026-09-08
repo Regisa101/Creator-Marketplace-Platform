@@ -26,6 +26,12 @@ import {
   Wallet,
   FileSignature,
   CreditCard,
+  LayoutDashboard,
+  Megaphone,
+  Settings as SettingsIcon,
+  FileText,
+  Bell,
+  Wand2,
 } from "lucide-react";
 
 // ============================================
@@ -89,6 +95,13 @@ const NAV_MENUS = {
   },
 };
 
+// ============================================
+// HERO DASHBOARD PREVIEW — alternates between the
+// Business dashboard and the Creator dashboard every
+// few seconds. Both the mock app-frame content and the
+// floating notification cards swap together so the
+// whole preview reads as "here's what each side sees."
+// ============================================
 const FIND_FEATURES = [
   {
     title: "Discover creators that fit your brand",
@@ -211,6 +224,52 @@ const NavMegaMenu = memo(function NavMegaMenu({
           );
         })}
       </div>
+    </div>
+  );
+});
+
+// ============================================
+// HERO DASHBOARD PREVIEW
+// ============================================
+
+function HeroFloatCard({ float }: { float: any }) {
+  const Icon = float.icon;
+  return (
+    <div className={`hero-float hero-float--${float.pos}`}>
+      {float.avatar && <img className="hero-float-avatar" src={float.avatar} alt="" />}
+      {float.avatars && (
+        <div className="hero-float-avatars">
+          {float.avatars.map((src: string) => (
+            <img key={src} src={src} alt="" />
+          ))}
+        </div>
+      )}
+      {Icon && (
+        <span className="hero-float-icon" style={float.iconBg ? { background: float.iconBg } : undefined}>
+          <Icon size={14} />
+        </span>
+      )}
+      <div className="hero-float-body">
+        <div className="hero-float-title-row">
+          <span className="hero-float-title">{float.title}</span>
+          {float.verified && <Check size={11} className="hero-float-verified" />}
+        </div>
+        {float.amount && <div className="hero-float-amount">{float.amount}</div>}
+        <div className="hero-float-sub">{float.sub}</div>
+      </div>
+      {float.time && <span className="hero-float-time">{float.time}</span>}
+    </div>
+  );
+}
+
+const HeroDashboardPreview = memo(function HeroDashboardPreview() {
+  return (
+    <div className="hero-product-preview" aria-label="CreatorHub business and creator dashboards">
+      <img
+        className="hero-dashboard-composite"
+        src="/creatorhub-hero-dashboard.png"
+        alt="CreatorHub business and creator dashboards"
+      />
     </div>
   );
 });
@@ -467,6 +526,18 @@ const FindCreatorsSection = memo(function FindCreatorsSection() {
 // full-bleed white wrapper, 1200px content, 48px
 // title, 24px card titles, 32px card padding,
 // pill/button colors from the spec's palette.
+//
+// Buttons are pinned to the bottom of each card via
+// `margin-top: auto` on .goals-btn (inside a flex
+// column), so "Join as a Brand" / "Join as a Creator"
+// always align on the same baseline regardless of
+// how much copy sits above them.
+//
+// The photo + its two floating cards are wrapped in
+// .goals-photo-frame, a fixed-size relatively
+// positioned box, so the floating cards anchor to the
+// image itself instead of the wider .goals-visual
+// column.
 // ============================================
 
 const GoalsSection = memo(function GoalsSection() {
@@ -521,35 +592,37 @@ const GoalsSection = memo(function GoalsSection() {
             </div>
 
             <div className="goals-visual">
-              <img
-              className="goals-photo"
-              src="/images/business-hero.png"
-              alt="Business team"
-              />
-              
-              <div className="goals-float-card goals-float-card--top">
+              <div className="goals-photo-frame">
                 <img
-                  className="goals-float-thumb"
-                  src="https://images.unsplash.com/photo-1500835556837-99ac94a94552?q=80&w=100&auto=format&fit=crop"
-                  alt=""
+                  className="goals-photo"
+                  src="/images/business-hero.png"
+                  alt="Business team"
                 />
-                <div>
-                  <div className="goals-float-title">Campaign Launch</div>
-                  <div className="goals-float-meta">Travel Brand</div>
+
+                <div className="goals-float-card goals-float-card--top">
+                  <img
+                    className="goals-float-thumb"
+                    src="https://images.unsplash.com/photo-1500835556837-99ac94a94552?q=80&w=100&auto=format&fit=crop"
+                    alt=""
+                  />
+                  <div>
+                    <div className="goals-float-title">Campaign Launch</div>
+                    <div className="goals-float-meta">Travel Brand</div>
+                  </div>
+                  <span className="goals-float-status">Active</span>
                 </div>
-                <span className="goals-float-status">Active</span>
-              </div>
-              <div className="goals-float-card goals-float-card--avatars">
-                <span className="goals-stat-label">
-                  <Users size={11} /> Top Creator Matches
-                </span>
-                <div className="goals-avatar-row">
-                  {FIND_AVATAR_PHOTOS.map((src) => (
-                    <img key={src} className="goals-avatar-chip" src={src} alt="" />
-                  ))}
-                  <Link to="/business" className="goals-view-all">
-                    View all <ArrowRight size={10} />
-                  </Link>
+                <div className="goals-float-card goals-float-card--avatars">
+                  <span className="goals-stat-label">
+                    <Users size={11} /> Top Creator Matches
+                  </span>
+                  <div className="goals-avatar-row">
+                    {FIND_AVATAR_PHOTOS.map((src) => (
+                      <img key={src} className="goals-avatar-chip" src={src} alt="" />
+                    ))}
+                    <Link to="/business" className="goals-view-all">
+                      View all <ArrowRight size={10} />
+                    </Link>
+                  </div>
                 </div>
               </div>
             </div>
@@ -587,29 +660,32 @@ const GoalsSection = memo(function GoalsSection() {
             </div>
 
             <div className="goals-visual">
-              <img
-                className="goals-photo"
-                src="/images/creator-hero.png"
-                alt="Creator working"
-              />
-              <div className="goals-float-card goals-float-card--top">
-                <span className="goals-float-icon goals-float-icon--creator">
-                  <Inbox size={12} />
-                </span>
-                <div>
-                  <div className="goals-float-title">New Campaign Match!</div>
-                  <div className="goals-float-meta">Skincare Brand</div>
-                  <div className="goals-float-meta">NPR 15,000 · 2 weeks</div>
+              <div className="goals-photo-frame">
+                <img
+                  className="goals-photo"
+                  src="/images/creator-hero.png"
+                  alt="Creator working"
+                />
+
+                <div className="goals-float-card goals-float-card--top">
+                  <span className="goals-float-icon goals-float-icon--creator">
+                    <Inbox size={12} />
+                  </span>
+                  <div>
+                    <div className="goals-float-title">New Campaign Match!</div>
+                    <div className="goals-float-meta">Skincare Brand</div>
+                    <div className="goals-float-meta">NPR 15,000 · 2 weeks</div>
+                  </div>
+                  <ArrowRight size={12} className="goals-float-arrow" />
                 </div>
-                <ArrowRight size={12} className="goals-float-arrow" />
-              </div>
-              <div className="goals-float-card goals-float-card--stat">
-                <span className="goals-stat-label">
-                  <BarChart3 size={11} /> Your Growth
-                </span>
-                <div className="goals-stat-row">
-                  <strong>+12%</strong>
-                  <span>More views this month</span>
+                <div className="goals-float-card goals-float-card--stat">
+                  <span className="goals-stat-label">
+                    <BarChart3 size={11} /> Your Growth
+                  </span>
+                  <div className="goals-stat-row">
+                    <strong>+12%</strong>
+                    <span>More views this month</span>
+                  </div>
                 </div>
               </div>
             </div>
@@ -918,21 +994,283 @@ export function Landing() {
 .ch-btn-hero-link svg { transition: transform 0.25s ease; }
 .ch-btn-hero-link:hover svg { transform: translateX(3px); }
 
-.ch-hero { position: relative; padding: 48px clamp(24px, 5vw, 72px) 0; max-width: 1320px; margin: 0 auto; }
-.ch-hero-copy { max-width: 640px; margin: 0 auto; text-align: center; }
-.ch-h1 { font-size: clamp(36px, 4.5vw, 52px); font-weight: 700; line-height: 1.15; letter-spacing: -0.02em; margin: 18px 0 0; color: var(--ink); }
-.ch-h1-accent-violet { color: var(--midnight); }
-.ch-h1-accent-coral { color: var(--orange); }
-.ch-h1-swash { display: block; margin: 0 auto; width: 60%; max-width: 200px; }
-.ch-sub { font-size: 16px; line-height: 1.65; color: var(--ink-soft); margin: 20px auto 0; font-weight: 400; max-width: 480px; }
-.ch-hero-ctas { display: flex; gap: 14px; margin-top: 30px; flex-wrap: wrap; justify-content: center; }
-.ch-btn-ghost-play {
-  display: inline-flex; align-items: center; gap: 8px;
-  font-size: 14px; font-weight: 600; color: var(--ink);
-  background: #fff; border: 1.5px solid var(--line); padding: 9px 22px; border-radius: 8px;
-  transition: border-color 0.15s ease;
+.ch-hero {
+  position: relative;
+  max-width: 1480px;
+  margin: 0 auto;
+  padding: 72px clamp(28px, 5vw, 76px) 52px;
+  overflow: hidden;
 }
-.ch-btn-ghost-play:hover { border-color: var(--midnight); }
+
+.ch-hero-copy {
+  position: relative;
+  z-index: 5;
+  max-width: 560px;
+  margin: 70px 0 0;
+  text-align: left;
+}
+
+.ch-h1 {
+  font-family: 'League Spartan', sans-serif;
+  font-size: clamp(52px, 5.5vw, 78px);
+  font-weight: 700;
+  line-height: .98;
+  letter-spacing: -0.045em;
+  margin: 18px 0 0;
+  color: var(--midnight);
+}
+
+.ch-h1-accent-violet {
+  color: var(--midnight);
+}
+
+.ch-h1-accent-coral {
+  color: var(--orange);
+}
+
+.ch-h1-swash {
+  display: block;
+  margin: 0;
+  width: 220px;
+  max-width: 100%;
+}
+
+.ch-sub {
+  font-size: 17px;
+  line-height: 1.65;
+  color: var(--ink-soft);
+  margin: 24px 0 0;
+  font-weight: 400;
+  max-width: 500px;
+}
+
+.ch-hero-ctas {
+  display: flex;
+  gap: 14px;
+  margin-top: 32px;
+  flex-wrap: wrap;
+  justify-content: flex-start;
+}
+
+.ch-btn-hero-link {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+
+  height: 44px;
+  padding: 0 22px;
+
+  background: #2E3278;
+  color: #FFFFFF !important;
+
+  border: none;
+  border-radius: 999px;
+
+  font-size: 14px;
+  font-weight: 700;
+  text-decoration: none !important;
+
+  box-shadow: 0 8px 20px rgba(46, 50, 120, 0.18);
+
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.ch-btn-hero-link:hover,
+.ch-btn-hero-link:focus,
+.ch-btn-hero-link:active {
+  color: #FFFFFF !important;
+  text-decoration: none !important;
+  background: #2E3278;
+  transform: translateY(-2px);
+  box-shadow: 0 10px 24px rgba(46, 50, 120, 0.24);
+}
+
+
+.ch-btn-hero-link:hover {
+  text-decoration: none !important;
+}
+
+.ch-btn-hero-link svg {
+  color: #FFFFFF !important;
+  stroke: #FFFFFF !important;
+}
+
+.ch-btn-ghost-play {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--midnight);
+  background: #fff;
+  border: 1.5px solid rgba(30,42,120,.35);
+  padding: 13px 22px;
+  border-radius: 9px;
+  transition: border-color .15s ease, transform .18s ease;
+}
+
+.ch-btn-ghost-play:hover {
+  border-color: var(--midnight);
+  transform: translateY(-2px);
+}
+
+/* ===== Real dashboard showcase ===== */
+.hero-product-preview {
+  position: absolute;
+  z-index: 2;
+  top: 35px;
+  right: -4%;
+  width: 78%;
+  max-width: 1100px;
+  pointer-events: none;
+}
+
+.hero-dashboard-composite {
+  display: block;
+  width: 100%;
+  height: auto;
+  object-fit: contain;
+}
+
+.hero-product-blob {
+  position: absolute;
+  border-radius: 50%;
+  pointer-events: none;
+  filter: blur(1px);
+}
+
+.hero-product-blob--blue {
+  width: 570px;
+  height: 570px;
+  left: 3%;
+  top: 45px;
+  background: radial-gradient(circle, rgba(30,42,120,.13), transparent 68%);
+}
+
+.hero-product-blob--coral {
+  width: 520px;
+  height: 520px;
+  right: 0;
+  top: 80px;
+  background: radial-gradient(circle, rgba(255,107,90,.14), transparent 68%);
+}
+
+.hero-dashboard-shot {
+  position: absolute;
+  overflow: hidden;
+  background: #fff;
+  border: 1px solid rgba(225,226,235,.95);
+  border-radius: 18px;
+  box-shadow: 0 30px 65px rgba(24,30,75,.14), 0 8px 25px rgba(24,30,75,.08);
+}
+
+.hero-dashboard-shot img {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+
+.hero-dashboard-shot--business {
+  left: 0;
+  top: 95px;
+  width: 66%;
+  transform: rotate(-1.5deg);
+  z-index: 3;
+}
+
+.hero-dashboard-shot--creator {
+  right: 0;
+  top: 150px;
+  width: 53%;
+  transform: rotate(1.2deg);
+  z-index: 2;
+  box-shadow: 0 28px 55px rgba(24,30,75,.12), 0 7px 22px rgba(24,30,75,.07);
+}
+
+.hero-product-float {
+  position: absolute;
+  z-index: 6;
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  min-width: 215px;
+  padding: 10px 13px;
+  background: rgba(255,255,255,.97);
+  border: 1px solid rgba(225,226,235,.9);
+  border-radius: 12px;
+  box-shadow: 0 18px 38px rgba(20,25,55,.12);
+  transform: rotate(-2deg);
+}
+
+.hero-product-float--top {
+  left: 8%;
+  top: 24px;
+}
+
+.hero-product-float--right {
+  right: -1%;
+  top: 72px;
+  transform: rotate(2deg);
+}
+
+.hero-product-float--bottom {
+  right: 7%;
+  bottom: 42px;
+  transform: rotate(-2deg);
+}
+
+.hero-product-float-avatar {
+  width: 31px;
+  height: 31px;
+  flex: 0 0 31px;
+  display: grid;
+  place-items: center;
+  border-radius: 9px;
+  font-size: 14px;
+  font-weight: 800;
+}
+
+.hero-product-float-avatar--blue {
+  color: var(--midnight);
+  background: var(--midnight-soft);
+}
+
+.hero-product-float-avatar--coral {
+  color: var(--orange);
+  background: var(--orange-soft);
+}
+
+.hero-product-float-avatar--green {
+  color: #18a957;
+  background: #e9f9ef;
+}
+
+.hero-product-float strong,
+.hero-product-float span {
+  display: block;
+}
+
+.hero-product-float strong {
+  color: var(--ink);
+  font-size: 10px;
+  white-space: nowrap;
+}
+
+.hero-product-float span {
+  margin-top: 2px;
+  color: var(--ink-soft);
+  font-size: 8px;
+  white-space: nowrap;
+}
+
+.hero-product-float small {
+  margin-left: auto;
+  align-self: flex-start;
+  color: #9a9eaa;
+  font-size: 7px;
+  white-space: nowrap;
+}
 
 .ch-marquee { border-top: 1px solid var(--line); border-bottom: 1px solid var(--line); overflow: hidden; padding: 22px 0; background: var(--surface); margin-top: 60px; }
 .ch-marquee-track { display: flex; width: max-content; gap: 44px; animation: ch-scroll 28s linear infinite; }
@@ -1096,7 +1434,7 @@ export function Landing() {
 
 .goals-card {
   display: grid; grid-template-columns: minmax(0, 52%) minmax(0, 48%); gap: 0; padding: 0; border-radius: 20px;
-  min-height: 460px; overflow: hidden; align-items: stretch; border: 1px solid transparent;
+  min-height: 500px; overflow: hidden; align-items: stretch; border: 1px solid transparent;
   transition: box-shadow 0.2s ease, transform 0.2s ease;
 }
 .goals-card:hover { box-shadow: 0 20px 40px -16px rgba(17,18,23,0.12); }
@@ -1104,7 +1442,6 @@ export function Landing() {
 .goals-card--brand { background: transparent; border-color: transparent; }
 
 .goals-copy { padding: 30px 26px 30px 32px; display: flex; flex-direction: column; height: 100%; justify-content: flex-start; gap: 4px; }
-.goals-copy .goals-btn { margin-top: 18px; }
 
 .goals-badge {
   display: inline-block; font-size: 12px; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase;
@@ -1122,21 +1459,16 @@ export function Landing() {
 .goals-icon-circle--creator { background: #FFE8E5; color: #FF6B5A; }
 .goals-icon-circle--brand { background: #E2E8FF; color: #2B2F6B; }
 
-.goals-title { font-family: 'Inter', 'League Spartan', sans-serif; font-size: 24px; font-weight: 700; line-height: 1.3; color: #1E2A78; margin: 0 0 8px; }
-.goals-desc { font-size: 14px; line-height: 1.6; color: #64748B; margin: 0 0 14px; max-width: 300px; }
-
-.goals-list { list-style: none; margin: 0 0 16px; padding: 0; display: flex; flex-direction: column; gap: 9px; }
-.goals-list li { display: flex; align-items: center; gap: 10px; font-size: 14px; color: #1E293B; line-height: 1.4; }
-.goals-icon-circle { width: 22px; height: 22px; border-radius: 50%; flex-shrink: 0; display: flex; align-items: center; justify-content: center; }
-.goals-icon-circle--creator { background: #FFE8E5; color: #FF6B5A; }
-.goals-icon-circle--brand { background: #E2E8FF; color: #2B2F6B; }
-
+/* Button pinned to the bottom of the flex column so both
+   "Join as a Brand" / "Join as a Creator" buttons sit on
+   the same baseline regardless of copy length above them. */
 .goals-btn {
   display: inline-flex; align-items: center; gap: 7px; font-size: 14px; font-weight: 600;
   color: #FFFFFF !important; padding: 11px 22px; border-radius: 999px;
   transition: transform 0.15s ease, box-shadow 0.15s ease, background 0.15s ease;
   border: none; cursor: pointer; align-self: flex-start; text-decoration: none !important;
   white-space: nowrap; flex-shrink: 0;
+  margin-top: auto;
 }
 .goals-btn--creator { background: #FF6B5A; box-shadow: 0 12px 20px -10px rgba(255,107,90,0.35); }
 .goals-btn--creator:hover { background: #F0523F; transform: translateY(-2px); }
@@ -1148,9 +1480,21 @@ export function Landing() {
 .goals-blob { position: absolute; width: 230px; height: 260px; background: #FFE0DA; border-radius: 58% 42% 55% 45% / 45% 48% 52% 55%; z-index: 0; }
 .goals-blob--brand { background: #DCE3FF; }
 
-.goals-photo {
-  position: relative; width: 300px; height: 300px; object-fit: contain; z-index: 3;
+/* Fixed-size frame the photo AND its floating cards live in,
+   so the floating cards anchor to the image itself instead of
+   the wider .goals-visual column. */
+.goals-photo-frame {
+  position: relative;
+  width: 280px;
+  height: 280px;
   flex-shrink: 0;
+  z-index: 3;
+}
+
+.goals-photo {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
   transition: transform 0.3s ease;
 }
 
@@ -1163,8 +1507,18 @@ export function Landing() {
 .goals-card:hover .goals-float-card--stat,
 .goals-card:hover .goals-float-card--avatars { transform: translateY(6px); }
 
-.goals-card--creator .goals-float-card--top { top: 90px; right: 12px; }
-.goals-card--brand .goals-float-card--top { top: 90px; right: 12px; }
+/* Anchored to the photo frame's own corners, so they hug the
+   image regardless of how wide .goals-visual is. */
+.goals-photo-frame .goals-float-card--top {
+  top: -40px;
+  right: 16px;
+}
+.goals-photo-frame .goals-float-card--stat,
+.goals-photo-frame .goals-float-card--avatars {
+  bottom: 16px;
+  left: -24px;
+}
+
 .goals-float-icon { width: 24px; height: 24px; border-radius: 50%; flex-shrink: 0; display: flex; align-items: center; justify-content: center; }
 .goals-float-icon--creator { background: #FFF4F2; color: #FF6B5A; }
 .goals-float-title { font-size: 12px; font-weight: 700; color: #1E293B; line-height: 1.2; }
@@ -1172,12 +1526,14 @@ export function Landing() {
 .goals-float-arrow { color: #64748B; flex-shrink: 0; }
 .goals-float-thumb { width: 28px; height: 28px; border-radius: 6px; object-fit: cover; flex-shrink: 0; }
 .goals-float-status { margin-left: auto; font-size: 9px; font-weight: 700; background: #E1F6EA; color: #16a34a; padding: 2px 8px; border-radius: 999px; }
-.goals-float-card--stat { left: 0px; bottom: 70px; flex-direction: column; align-items: flex-start; gap: 4px; padding: 8px 12px; }.goals-stat-label { display: flex; align-items: center; gap: 4px; font-size: 10px; font-weight: 700; color: #64748B; }
+.goals-stat-label { display: flex; align-items: center; gap: 4px; font-size: 10px; font-weight: 700; color: #64748B; }
 .goals-stat-row { display: flex; align-items: baseline; gap: 6px; }
 .goals-stat-row strong { font-size: 15px; color: #FF6B5A; font-weight: 800; }
 .goals-stat-row span { font-size: 10px; color: #64748B; }
 
-.goals-float-card--avatars { left: 0px; bottom: 70px; flex-direction: column; align-items: flex-start; gap: 6px; padding: 8px 12px; }.goals-avatar-row { display: flex; align-items: center; }
+.goals-float-card--stat { flex-direction: column; align-items: flex-start; gap: 4px; padding: 8px 12px; }
+.goals-float-card--avatars { flex-direction: column; align-items: flex-start; gap: 6px; padding: 8px 12px; }
+.goals-avatar-row { display: flex; align-items: center; }
 .goals-avatar-chip { width: 22px; height: 22px; border-radius: 50%; object-fit: cover; border: 2px solid #FFFFFF; margin-left: -6px; }
 .goals-avatar-chip:first-child { margin-left: 0; }
 .goals-view-all { margin-left: 8px; font-size: 10px; font-weight: 600; color: #1E2A78; display: inline-flex; align-items: center; gap: 2px; }
@@ -1333,6 +1689,11 @@ export function Landing() {
   .find-cta { margin-left: auto; margin-right: auto; }
   .faq-cols::before { display: none; }
 
+  .hero-frame { grid-template-columns: 1fr; }
+  .hero-frame-sidebar { display: none; }
+  .hero-frame-body { grid-template-columns: 1fr; }
+  .hero-float { display: none; }
+
   .goals-h2 { font-size: 36px; }
     .goals-card--brand .goals-copy { order: 2; }
   .goals-card--brand .goals-visual { order: 1; }
@@ -1343,7 +1704,8 @@ export function Landing() {
   .goals-copy .goals-btn { margin-top: 8px; }
   .goals-visual { height: 220px; }
   .goals-blob { width: 180px; height: 200px; }
-  .goals-photo { width: 150px; height: 190px; }
+  .goals-photo-frame { width: 150px; height: 190px; }
+  .goals-photo { width: 100%; height: 100%; }
   .goals-kicker-line { width: 60px; }
 }
 @media (max-width: 860px) {
@@ -1366,6 +1728,68 @@ export function Landing() {
   .goals-tagline-dash { width: 20px; }
   .goals-kicker-line { width: 30px; }
 }
+
+/* ===== Hero showcase responsive overrides ===== */
+@media (max-width: 1100px) {
+  .ch-hero { padding-top: 52px; }
+  .ch-hero-copy { margin-top: 35px; max-width: 500px; }
+  .ch-h1 { font-size: clamp(48px, 6vw, 66px); }
+  .hero-product-preview { right: -12%; width: 67%; }
+  .hero-dashboard-shot--business { top: 115px; width: 70%; }
+  .hero-dashboard-shot--creator { top: 185px; width: 56%; }
+  .hero-product-float { min-width: 185px; }
+}
+
+@media (max-width: 900px) {
+  .ch-hero {
+    padding: 48px 24px 20px;
+    min-height: 0;
+  }
+  .ch-hero-copy {
+    max-width: 700px;
+    margin: 0 auto;
+    text-align: center;
+  }
+  .ch-h1 { font-size: clamp(48px, 8vw, 64px); }
+  .ch-h1-swash { margin: 0 auto; }
+  .ch-sub { margin-left: auto; margin-right: auto; }
+  .ch-hero-ctas { justify-content: center; }
+  .hero-product-preview {
+    position: relative;
+    top: auto;
+    right: auto;
+    width: 100%;
+    height: 470px;
+    margin: 25px auto 0;
+    max-width: 760px;
+  }
+  .hero-dashboard-shot--business { left: 2%; top: 70px; width: 70%; }
+  .hero-dashboard-shot--creator { right: 2%; top: 125px; width: 56%; }
+  .hero-product-float--top { left: 7%; top: 8px; }
+  .hero-product-float--right { right: 0; top: 45px; }
+  .hero-product-float--bottom { right: 6%; bottom: 20px; }
+}
+
+@media (max-width: 560px) {
+  .ch-hero { padding: 36px 18px 10px; }
+  .ch-h1 { font-size: 43px; }
+  .ch-sub { font-size: 15px; }
+  .ch-hero-ctas { gap: 9px; }
+  .ch-btn-hero-link,
+  .ch-btn-ghost-play { padding: 11px 15px; font-size: 13px; }
+  .hero-product-preview { height: 330px; }
+  .hero-dashboard-shot--business { left: 0; top: 50px; width: 82%; }
+  .hero-dashboard-shot--creator { right: 0; top: 95px; width: 62%; }
+  .hero-product-float { min-width: 145px; padding: 7px 9px; gap: 6px; }
+  .hero-product-float-avatar { width: 25px; height: 25px; flex-basis: 25px; font-size: 11px; }
+  .hero-product-float strong { font-size: 8px; }
+  .hero-product-float span { font-size: 6.5px; }
+  .hero-product-float small { display: none; }
+  .hero-product-float--top { left: 2%; top: 8px; }
+  .hero-product-float--right { right: 0; top: 30px; }
+  .hero-product-float--bottom { right: 2%; bottom: 6px; }
+}
+
       `}</style>
 
       {/* ===== NAVBAR ===== */}
@@ -1451,24 +1875,26 @@ export function Landing() {
           <h1 className="ch-h1">
             Plan. Approve.
             <br />
-            <span className="ch-h1-accent-violet">Launch</span> <span className="ch-h1-accent-coral">campaigns.</span>
+            <span className="ch-h1-accent-violet">Launch</span>{" "}
+            <span className="ch-h1-accent-coral">campaigns.</span>
             <svg className="ch-h1-swash" viewBox="0 0 220 12" preserveAspectRatio="none" aria-hidden="true">
               <path d="M2 8 C60 2, 160 2, 218 8" stroke={ELECTRIC_ORANGE} strokeWidth="3" fill="none" strokeLinecap="round" />
             </svg>
           </h1>
           <p className="ch-sub">
-            creatorhub matches your business with creators who fit, writes the brief, tracks every deliverable, and
-            handles the payment — all from one dashboard.
+            creatorhub connects brands with creators, making collaborations simple, transparent, and rewarding for everyone.
           </p>
           <div className="ch-hero-ctas">
             <Link to="/register" className="ch-btn-hero-link">
               Start for free <ArrowRight size={16} />
             </Link>
             <a href="#demo" className="ch-btn-ghost-play">
-              <PlayCircle size={16} /> Watch demo
+              <PlayCircle size={16} /> Watch how it works
             </a>
           </div>
         </div>
+
+        <HeroDashboardPreview />
       </section>
 
       {/* ===== MARQUEE ===== */}
@@ -1622,3 +2048,4 @@ export function Landing() {
 }
 
 export default Landing;
+ 

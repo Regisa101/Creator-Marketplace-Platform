@@ -1,38 +1,83 @@
-import { useEffect, useState } from 'react';
-import { Link, useParams, useNavigate } from 'react-router-dom';
-import { ArrowLeft, MapPin, Building2, DollarSign, Calendar, CheckCircle2, Target, ListChecks, Film, X, Hash, Quote, ClipboardList, Music2, Smartphone, Volume2, Captions, Loader2, Bookmark, BookmarkCheck, Copy, Rocket, Trash2, Gift, Sparkles } from 'lucide-react';
+import { useEffect, useMemo, useState } from 'react';
+import { Link, useNavigate, useParams } from 'react-router-dom';
 import {
-  getCampaign,
-  getCampaigns,
-  getApplications,
+  ArrowLeft,
+  ArrowUpRight,
+  Bell,
+  Bookmark,
+  BookmarkCheck,
+  Calendar,
+  Check,
+  CheckCircle2,
+  ChevronRight,
+  Clipboard,
+  Copy,
+  DollarSign,
+  Film,
+  Gift,
+  Loader2,
+  MapPin,
+  MessageCircle,
+  Music2,
+  Rocket,
+  Smartphone,
+  Trash2,
+  Volume2,
+  X,
+} from 'lucide-react';
+import {
   createApplication,
-  saveCampaign,
-  unsaveCampaign,
-  getSavedCampaigns,
-  publishCampaign,
   deleteCampaign,
   duplicateCampaign,
-  type Campaign,
+  getApplications,
+  getCampaign,
+  getCampaigns,
+  getPublicBusinessProfile,
+  getSavedCampaigns,
+  publishCampaign,
+  saveCampaign,
+  unsaveCampaign,
   type Application,
+  type Campaign,
+  type PublicBusinessProfile,
 } from '../api/client';
 import { useAuth } from '../context/AuthContext';
-import { LogoMark, BRAND_NAME, PAGE_GRADIENT_BG } from '../components/Brand';
+import { LogoMark, BRAND_NAME } from '../components/Brand';
 
-const CORAL = '#FF8A5B';
-const CORAL_DARK = '#E86B3E';
-const VIOLET = '#6C5DD3';
+const CORAL = '#FF6B5A';
+const CORAL_DARK = '#F0523F';
+const VIOLET = '#1E2A78';
 
-function formatDeadline(deadline?: string | null): { label: string; closed: boolean } | null {
+const API_ORIGIN = 'http://localhost:8000';
+
+function resolveMediaUrl(url?: string | null) {
+  if (!url) return '';
+  if (/^(https?:)?\/\//i.test(url) || url.startsWith('data:') || url.startsWith('blob:')) return url;
+  if (url.startsWith('/api/')) return `${API_ORIGIN}${url}`;
+  return `${API_ORIGIN}/${url.replace(/^\/+/, '')}`;
+}
+
+function formatDeadline(deadline?: string | null) {
   if (!deadline) return null;
   const date = new Date(deadline);
   if (Number.isNaN(date.getTime())) return null;
-  const closed = date.getTime() < Date.now();
-  const formatted = date.toLocaleDateString('en-US', {
-    month: 'long',
-    day: 'numeric',
-    year: 'numeric',
-  });
-  return { label: `${formatted}${closed ? ' (Closed)' : ''}`, closed };
+  return {
+    label: date.toLocaleDateString('en-US', {
+      month: 'short',
+      day: 'numeric',
+      year: 'numeric',
+    }),
+    closed: date.getTime() < Date.now(),
+  };
+}
+
+function formatMoney(value?: number | null) {
+  if (value == null) return '';
+  return `Rs. ${Number(value).toLocaleString()}`;
+}
+
+function cleanTag(tag: string) {
+  return tag.startsWith('#') ? tag : `#${tag}`;
 }
 
 export function CampaignDetail() {
@@ -41,18 +86,13 @@ export function CampaignDetail() {
   const { user } = useAuth();
 
   const [campaign, setCampaign] = useState<Campaign | null>(null);
+  const [brandProfile, setBrandProfile] = useState<PublicBusinessProfile | null>(null);
+  const [related, setRelated] = useState<Campaign[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [navVisible, setNavVisible] = useState(true);
   const [activeSpecTab, setActiveSpecTab] = useState(0);
-  const [related, setRelated] = useState<Campaign[]>([]);
 
-  // Owner management actions (publish / delete / duplicate). Separate
-  // from `applying` etc below since these are business-only and act on
-  // the campaign itself rather than an application.
-  const [managing, setManaging] = useState<'publish' | 'delete' | 'duplicate' | null>(null);
-  const [manageError, setManageError] = useState('');
-
-  // Apply flow state
   const [myApplication, setMyApplication] = useState<Application | null>(null);
   const [showApplyForm, setShowApplyForm] = useState(false);
   const [proposal, setProposal] = useState('');
@@ -61,9 +101,24 @@ export function CampaignDetail() {
   const [applying, setApplying] = useState(false);
   const [applyError, setApplyError] = useState('');
 
-  // Save/bookmark state
   const [isSaved, setIsSaved] = useState(false);
   const [savingBookmark, setSavingBookmark] = useState(false);
+  const [copied, setCopied] = useState(false);
+
+  const [managing, setManaging] = useState<'publish' | 'delete' | 'duplicate' | null>(null);
+  const [manageError, setManageError] = useState('');
+
+  useEffect(() => {
+    let lastScrollY = window.scrollY;
+    const handleScroll = () => {
+      const current = window.scrollY;
+      if (current <= 8 || current < lastScrollY - 2) setNavVisible(true);
+      else if (current > lastScrollY + 2) setNavVisible(false);
+      lastScrollY = current;
+    };
+    window.addEventListener('scroll', handleScroll, { passive: true });
+    return () => window.removeEventListener('scroll', handleScroll);
+  }, []);
 
   useEffect(() => {
     if (!id) return;
@@ -74,39 +129,37 @@ export function CampaignDetail() {
       setError('');
       try {
         const data = await getCampaign(id);
-        if (!cancelled) setCampaign(data);
+        if (cancelled) return;
+        setCampaign(data);
 
-        // Has this creator already applied? Only relevant for
-        // creators — businesses viewing their own campaign, or a
-        // logged-out preview, skip this entirely rather than firing
-        // a call the backend would just ignore/reject.
+        try {
+          const profile = await getPublicBusinessProfile(data.business_id);
+          if (!cancelled) setBrandProfile(profile);
+        } catch (err) {
+          console.error('Could not load brand profile:', err);
+        }
+
         if (user?.role === 'creator') {
           try {
             const apps = await getApplications({ campaign_id: data.id });
             if (!cancelled) setMyApplication(apps[0] ?? null);
-          } catch (appErr) {
-            console.error('Could not check application status:', appErr);
+          } catch (err) {
+            console.error('Could not check application status:', err);
           }
 
           try {
             const saved = await getSavedCampaigns();
-            if (!cancelled) setIsSaved(saved.some((s) => s.campaign_id === data.id));
-          } catch (savedErr) {
-            console.error('Could not check saved status:', savedErr);
+            if (!cancelled) setIsSaved(saved.some((item) => item.campaign_id === data.id));
+          } catch (err) {
+            console.error('Could not check saved status:', err);
           }
         }
 
-        // Related campaigns: same category, published, excluding this one.
-        // Best-effort — a failure here shouldn't block the page from
-        // showing the campaign itself, so it's swallowed rather than
-        // setting the page-level `error` state.
         try {
-          const list = await getCampaigns({ category: data.category, status: 'published', limit: 4 });
-          if (!cancelled) {
-            setRelated(list.campaigns.filter((c) => c.id !== data.id).slice(0, 3));
-          }
-        } catch (relErr) {
-          console.error('Could not load related campaigns:', relErr);
+          const list = await getCampaigns({ category: data.category, status: 'published', limit: 6 });
+          if (!cancelled) setRelated(list.campaigns.filter((item) => item.id !== data.id).slice(0, 3));
+        } catch (err) {
+          console.error('Could not load related campaigns:', err);
         }
       } catch (err) {
         console.error('Could not load campaign:', err);
@@ -121,20 +174,21 @@ export function CampaignDetail() {
     };
   }, [id, user?.role]);
 
+  const deadline = useMemo(() => formatDeadline(campaign?.deadline), [campaign?.deadline]);
+  const brandName = brandProfile?.company_name || campaign?.brand_name || 'Business';
+  const brandLocation = brandProfile?.location || campaign?.brand_location || '';
+  const brandIndustry = brandProfile?.industry || campaign?.category || '';
+  const heroImage = resolveMediaUrl(campaign?.hero_image);
+  const brandLogo = resolveMediaUrl(brandProfile?.logo_url);
+
   const handleToggleSave = async () => {
     if (!campaign || savingBookmark) return;
-    setSavingBookmark(true);
-    // Optimistic — flip immediately, roll back on failure. A save/unsave
-    // toggle should feel instant; the network round-trip isn't worth
-    // making the person wait to see their own click register.
     const previous = isSaved;
+    setSavingBookmark(true);
     setIsSaved(!previous);
     try {
-      if (previous) {
-        await unsaveCampaign(campaign.id);
-      } else {
-        await saveCampaign(campaign.id);
-      }
+      if (previous) await unsaveCampaign(campaign.id);
+      else await saveCampaign(campaign.id);
     } catch (err) {
       console.error('Could not update saved status:', err);
       setIsSaved(previous);
@@ -146,7 +200,7 @@ export function CampaignDetail() {
   const handleApplySubmit = async () => {
     if (!campaign) return;
     if (!proposal.trim()) {
-      setApplyError('Tell them why you\'re a good fit before submitting.');
+      setApplyError("Tell them why you're a good fit before submitting.");
       return;
     }
     setApplying(true);
@@ -161,12 +215,20 @@ export function CampaignDetail() {
       setMyApplication(created);
       setShowApplyForm(false);
     } catch (err: any) {
-      console.error('Application failed:', err);
-      setApplyError(
-        err?.response?.data?.detail || 'Could not submit your application. Please try again.'
-      );
+      setApplyError(err?.response?.data?.detail || 'Could not submit your application. Please try again.');
     } finally {
       setApplying(false);
+    }
+  };
+
+  const handleCopyCaption = async () => {
+    if (!campaign?.suggested_caption) return;
+    try {
+      await navigator.clipboard.writeText(campaign.suggested_caption);
+      setCopied(true);
+      window.setTimeout(() => setCopied(false), 1600);
+    } catch (err) {
+      console.error('Could not copy caption:', err);
     }
   };
 
@@ -175,10 +237,8 @@ export function CampaignDetail() {
     setManaging('publish');
     setManageError('');
     try {
-      const updated = await publishCampaign(campaign.id);
-      setCampaign(updated);
+      setCampaign(await publishCampaign(campaign.id));
     } catch (err: any) {
-      console.error('Could not publish campaign:', err);
       setManageError(err?.response?.data?.detail || 'Could not publish. Please try again.');
     } finally {
       setManaging(null);
@@ -194,7 +254,6 @@ export function CampaignDetail() {
       await deleteCampaign(campaign.id);
       navigate('/campaigns');
     } catch (err: any) {
-      console.error('Could not delete campaign:', err);
       setManageError(err?.response?.data?.detail || 'Could not delete. Please try again.');
       setManaging(null);
     }
@@ -206,1036 +265,546 @@ export function CampaignDetail() {
     setManageError('');
     try {
       const copy = await duplicateCampaign(campaign.id);
-      // Land the business straight in the editor for the new draft —
-      // that's almost always the next thing they want to do with a
-      // "Title - Copy" campaign, rather than re-navigating from the list.
       navigate(`/campaigns/${copy.id}/edit`);
     } catch (err: any) {
-      console.error('Could not duplicate campaign:', err);
       setManageError(err?.response?.data?.detail || 'Could not duplicate. Please try again.');
       setManaging(null);
     }
   };
 
+  const renderApplicationAction = () => {
+    if (!campaign) return null;
+
+    if (myApplication) {
+      const label =
+        myApplication.status === 'pending'
+          ? 'Application pending'
+          : myApplication.status === 'accepted'
+          ? 'Application accepted'
+          : myApplication.status === 'rejected'
+          ? 'Application rejected'
+          : 'Application withdrawn';
+      return (
+        <div className={`cd-application-status cd-application-status--${myApplication.status}`}>
+          <CheckCircle2 size={17} /> {label}
+        </div>
+      );
+    }
+
+    if (!user || user.role !== 'creator') {
+      return <button className="cd-apply-button cd-apply-button--disabled" disabled>{user ? 'Apply unavailable' : 'Sign in to apply'}</button>;
+    }
+
+    if (deadline?.closed || campaign.status !== 'published') {
+      return <button className="cd-apply-button cd-apply-button--disabled" disabled>Applications closed</button>;
+    }
+
+    if (!showApplyForm) {
+      return <button className="cd-apply-button" onClick={() => setShowApplyForm(true)}>Apply to this campaign <ChevronRight size={17} /></button>;
+    }
+
+    return (
+      <div className="cd-apply-form">
+        {applyError && <div className="cd-error">{applyError}</div>}
+        <label>Why are you a good fit? *</label>
+        <textarea value={proposal} onChange={(e) => setProposal(e.target.value)} placeholder="Tell the brand about your content style, audience and why this campaign fits you…" />
+        <label>Your rate <span>(optional)</span></label>
+        <input type="number" min="0" value={rate} onChange={(e) => setRate(e.target.value)} placeholder="Rs. 0" />
+        <label>Message <span>(optional)</span></label>
+        <textarea value={message} onChange={(e) => setMessage(e.target.value)} placeholder="Anything else the brand should know?" />
+        <div className="cd-form-actions">
+          <button className="cd-secondary-button" onClick={() => { setShowApplyForm(false); setApplyError(''); }} disabled={applying}>Cancel</button>
+          <button className="cd-apply-button" onClick={handleApplySubmit} disabled={applying}>
+            {applying && <Loader2 size={15} className="cd-spin" />}
+            {applying ? 'Sending…' : 'Send application'}
+          </button>
+        </div>
+      </div>
+    );
+  };
+
   return (
-    <div className="cd">
+    <div className="cd-page">
       <style>{`
-        .cd {
+        .cd-page {
           --coral: ${CORAL};
           --coral-dark: ${CORAL_DARK};
           --violet: ${VIOLET};
-          --ink: #111217;
-          --ink-soft: #6c6d73;
-          --line: #e6e6ea;
-          --surface: #fbfaff;
-          font-family: 'Poppins', -apple-system, Helvetica, Arial, sans-serif;
+          --ink: #12131a;
+          --muted: #70717a;
+          --soft: #f7f7fa;
+          --line: #e7e7eb;
           min-height: 100vh;
-          background: ${PAGE_GRADIENT_BG};
+          background: #f7f7f8;
           color: var(--ink);
+          font-family: 'Poppins', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
         }
-        .cd * { box-sizing: border-box; }
-
+        .cd-page *, .cd-page *::before, .cd-page *::after { box-sizing: border-box; }
         .cd-topbar {
-          display: flex;
-          align-items: center;
-          gap: 24px;
-          padding: 16px 32px;
-          border-bottom: 1px solid var(--line);
-          background: #fff;
+          position: sticky; top: 0; z-index: 50; height: 72px; background: rgba(255,255,255,.96);
+          backdrop-filter: blur(12px); border-bottom: 1px solid var(--line); transition: transform .22s ease;
         }
-        .cd-logo { display: inline-flex; align-items: center; gap: 8px; font-weight: 700; font-size: 17px; color: var(--ink); }
-        .cd-nav-link { font-size: 13.5px; color: var(--ink-soft); text-decoration: none; }
-        .cd-nav-link:hover { color: var(--ink); }
+        .cd-topbar--hidden { transform: translateY(-100%); }
+        .cd-topbar-inner { max-width: 1240px; height: 100%; margin: 0 auto; padding: 0 28px; display: flex; align-items: center; justify-content: space-between; gap: 24px; }
+        .cd-nav-left { display: flex; align-items: center; gap: 34px; min-width: 0; }
+        .cd-logo { display: inline-flex; align-items: center; gap: 9px; color: var(--ink); text-decoration: none; font-size: 18px; font-weight: 700; flex: 0 0 auto; }
+        .cd-breadcrumb { min-width: 0; display: flex; align-items: center; gap: 9px; color: #8b8c93; font-size: 12px; overflow: hidden; }
+        .cd-breadcrumb a { color: #5f6068; font-weight: 600; text-decoration: none; }
+        .cd-breadcrumb span:last-child { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .cd-nav-actions { display: flex; align-items: center; gap: 4px; }
+        .cd-nav-icon { width: 34px; height: 34px; display: inline-flex; align-items: center; justify-content: center; color: #676870; text-decoration: none; border-radius: 9px; position: relative; }
+        .cd-nav-icon:hover { background: #f5f5f7; color: var(--ink); }
+        .cd-nav-dot { position: absolute; width: 6px; height: 6px; top: 6px; right: 6px; border-radius: 50%; background: var(--coral); border: 1px solid #fff; }
+        .cd-profile-avatar { width: 32px; height: 32px; margin-left: 6px; overflow: hidden; border-radius: 50%; display: flex; align-items: center; justify-content: center; background: var(--violet); color: #fff; font-size: 11px; font-weight: 700; }
+        .cd-profile-avatar img { width: 100%; height: 100%; object-fit: cover; }
 
-        .cd-crumb {
-          max-width: 1080px;
-          margin: 0 auto;
-          padding: 20px 24px 0;
-          font-size: 13px;
-          color: var(--ink-soft);
-        }
-        .cd-crumb a { color: var(--ink-soft); text-decoration: none; }
-        .cd-crumb a:hover { color: var(--ink); }
-
-        .cd-body {
-          max-width: 1080px;
-          margin: 0 auto;
-          padding: 16px 24px 64px;
-          display: grid;
-          grid-template-columns: 1fr 320px;
-          gap: 32px;
-          align-items: start;
-        }
-        @media (max-width: 860px) {
-          .cd-body { grid-template-columns: 1fr; }
-        }
-
-        .cd-back {
-          display: inline-flex;
-          align-items: center;
-          gap: 6px;
-          font-size: 13.5px;
-          font-weight: 500;
-          color: var(--ink-soft);
-          background: none;
-          border: none;
-          cursor: pointer;
-          padding: 6px 0;
-          margin-bottom: 8px;
-        }
+        .cd-shell { max-width: 1160px; margin: 0 auto; padding: 28px 24px 80px; }
+        .cd-back { border: 0; background: transparent; padding: 6px 0; display: inline-flex; align-items: center; gap: 7px; color: #6d6e76; font-size: 13px; font-weight: 600; cursor: pointer; margin-bottom: 18px; }
         .cd-back:hover { color: var(--ink); }
+        .cd-layout { display: grid; grid-template-columns: minmax(0, 1fr) 310px; gap: 34px; align-items: start; }
+        .cd-main { min-width: 0; }
 
-        .cd-hero-banner {
-          width: 100%;
-          max-width: 1080px;
-          margin: 0 auto;
-          padding: 20px 24px 0;
-        }
-        .cd-hero-banner img {
-          width: 100%;
-          max-height: 320px;
-          object-fit: cover;
-          border-radius: 16px;
-          display: block;
-        }
+        .cd-hero { background: #fff; border: 1px solid var(--line); border-radius: 24px; padding: 28px; box-shadow: 0 8px 30px rgba(18,19,26,.035); }
+        .cd-brandline { display: flex; align-items: center; gap: 12px; margin-bottom: 20px; }
+        .cd-brand-logo { width: 46px; height: 46px; border-radius: 14px; overflow: hidden; flex: 0 0 auto; display: flex; align-items: center; justify-content: center; background: var(--coral); color: #fff; font-weight: 800; }
+        .cd-brand-logo img { width: 100%; height: 100%; object-fit: cover; display: block; }
+        .cd-brandline-name { font-size: 14px; font-weight: 700; }
+        .cd-brandline-meta { margin-top: 2px; color: var(--muted); font-size: 12.5px; }
+        .cd-kicker { display: inline-flex; align-items: center; gap: 6px; color: var(--coral-dark); font-size: 12px; font-weight: 700; letter-spacing: .02em; margin-bottom: 9px; }
+        .cd-title { font-size: clamp(30px, 4vw, 44px); line-height: 1.1; letter-spacing: -.9px; max-width: 800px; margin: 0 0 11px; font-weight: 750; }
+        .cd-tagline { max-width: 760px; margin: 0; color: #666771; font-size: 15px; line-height: 1.75; }
+        .cd-meta-row { display: flex; flex-wrap: wrap; gap: 9px 16px; margin-top: 21px; padding-top: 18px; border-top: 1px solid var(--line); }
+        .cd-meta-item { display: inline-flex; align-items: center; gap: 6px; color: #55565e; font-size: 12.5px; font-weight: 600; }
+        .cd-meta-item svg { color: var(--coral-dark); }
+        .cd-tags { display: flex; flex-wrap: wrap; gap: 7px; margin-top: 13px; }
+        .cd-tag { padding: 5px 10px; border-radius: 999px; background: #f6f6f8; border: 1px solid #e7e7eb; color: #666771; font-size: 11.5px; font-weight: 600; }
+        .cd-tag--accent { color: var(--coral-dark); background: #fff2ed; border-color: #ffd8cc; }
 
-        .cd-badge {
-          display: inline-flex;
-          align-items: center;
-          gap: 6px;
-          font-size: 12px;
-          font-weight: 600;
-          color: var(--ink-soft);
-          background: #f1f0f5;
-          border-radius: 999px;
-          padding: 5px 12px;
-          margin-bottom: 14px;
-        }
+        .cd-visual { margin-top: 18px; overflow: hidden; border-radius: 22px; border: 1px solid var(--line); background: linear-gradient(145deg, #fff, #f3f3f7); min-height: 260px; }
+        .cd-visual img { width: 100%; max-height: 560px; display: block; object-fit: cover; }
+        .cd-visual-placeholder { min-height: 270px; display: flex; align-items: center; justify-content: center; padding: 42px; position: relative; overflow: hidden; }
+        .cd-visual-placeholder::before, .cd-visual-placeholder::after { content: ''; position: absolute; border-radius: 50%; filter: blur(2px); opacity: .8; }
+        .cd-visual-placeholder::before { width: 220px; height: 220px; right: 7%; top: -80px; background: #fff0eb; }
+        .cd-visual-placeholder::after { width: 190px; height: 190px; left: 8%; bottom: -95px; background: #eceefd; }
+        .cd-visual-placeholder-inner { position: relative; z-index: 1; max-width: 520px; text-align: center; }
+        .cd-visual-label { color: var(--coral-dark); font-size: 11px; font-weight: 800; letter-spacing: .1em; text-transform: uppercase; margin-bottom: 8px; }
+        .cd-visual-title { font-size: 24px; line-height: 1.25; font-weight: 750; }
 
-        .cd-title { font-size: 28px; font-weight: 700; line-height: 1.25; margin: 0 0 10px; }
+        .cd-section { margin-top: 42px; }
+        .cd-section-header { display: flex; align-items: flex-end; justify-content: space-between; gap: 16px; margin-bottom: 15px; }
+        .cd-section-title { margin: 0; font-size: 21px; letter-spacing: -.25px; font-weight: 750; }
+        .cd-section-intro { margin: 5px 0 0; color: var(--muted); font-size: 13px; line-height: 1.6; }
+        .cd-prose { color: #3f4047; font-size: 14.5px; line-height: 1.8; white-space: pre-wrap; margin: 0; }
 
-        .cd-meta {
-          display: flex;
-          align-items: center;
-          flex-wrap: wrap;
-          gap: 6px;
-          font-size: 13.5px;
-          color: var(--ink-soft);
-          margin-bottom: 16px;
-        }
-        .cd-meta b { color: var(--ink); font-weight: 600; }
-        .cd-meta-sep { opacity: 0.5; }
-        .cd-meta-item { display: inline-flex; align-items: center; gap: 4px; }
+        .cd-opportunity { display: grid; grid-template-columns: repeat(3, 1fr); gap: 11px; }
+        .cd-opportunity-card { background: #fff; border: 1px solid var(--line); border-radius: 16px; padding: 17px; min-height: 100px; }
+        .cd-opportunity-label { color: #888991; font-size: 11.5px; font-weight: 600; margin-bottom: 8px; }
+        .cd-opportunity-value { font-size: 15px; line-height: 1.45; font-weight: 700; }
+        .cd-opportunity-value--open { color: #1a8a4a; }
+        .cd-opportunity-icon { color: var(--coral-dark); margin-bottom: 12px; }
 
-        .cd-tags { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 20px; }
-        .cd-tag {
-          display: inline-flex;
-          align-items: center;
-          gap: 4px;
-          font-size: 12.5px;
-          font-weight: 600;
-          padding: 6px 14px;
-          border-radius: 999px;
-          border: 1px solid var(--line);
-          color: var(--ink-soft);
-          background: #fff;
-        }
-        .cd-tag--type-paid { color: var(--coral-dark); background: #fff1ea; border-color: #ffd9c2; }
-        .cd-tag--type-gifted { color: var(--coral-dark); background: #fff1ea; border-color: #ffd9c2; }
+        .cd-brief { background: #fff; border: 1px solid var(--line); border-radius: 18px; padding: 22px; }
+        .cd-brief-label { color: var(--coral-dark); font-size: 11px; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; margin-bottom: 8px; }
 
-        .cd-hr { border: none; border-top: 1px solid var(--line); margin: 20px 0; }
+        .cd-deliverables { display: grid; gap: 0; border-top: 1px solid var(--line); }
+        .cd-deliverable { display: grid; grid-template-columns: 40px minmax(0,1fr); gap: 14px; padding: 18px 0; border-bottom: 1px solid var(--line); }
+        .cd-number { width: 34px; height: 34px; border-radius: 11px; background: #fff0eb; color: var(--coral-dark); display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 800; }
+        .cd-deliverable-title { font-size: 14.5px; font-weight: 700; margin-bottom: 3px; }
+        .cd-deliverable-copy { color: var(--muted); font-size: 13px; line-height: 1.65; }
 
-        .cd-section-title { font-size: 17px; font-weight: 700; margin: 0 0 12px; }
-        .cd-prose { font-size: 14.5px; line-height: 1.7; color: #3d3d42; white-space: pre-wrap; }
+        .cd-requirements { padding: 0; }
+        .cd-requirement-list { margin: 0; padding: 0; list-style: none; }
+        .cd-requirement-list li { display: flex; align-items: flex-start; gap: 10px; padding: 11px 0; color: #3f4047; font-size: 14px; line-height: 1.65; border-bottom: 1px solid #ededf0; }
+        .cd-requirement-list li:last-child { border-bottom: 0; }
+        .cd-check { width: 20px; height: 20px; border-radius: 50%; background: #fff0eb; color: var(--coral-dark); display: inline-flex; align-items: center; justify-content: center; flex: 0 0 auto; margin-top: 1px; }
+        .cd-requirements-copy { white-space: pre-wrap; }
 
-        .cd-card {
-          background: #fff;
-          border: 1px solid var(--line);
-          border-radius: 14px;
-          padding: 20px;
-        }
-        .cd-sidebar { display: flex; flex-direction: column; gap: 16px; }
-        .cd-sidebar-title { font-size: 15px; font-weight: 700; text-align: center; margin: 0 0 4px; }
-        .cd-sidebar-sub { font-size: 13px; color: var(--ink-soft); text-align: center; margin: 0 0 16px; }
-        .cd-cta {
-          display: block;
-          width: 100%;
-          text-align: center;
-          padding: 12px;
-          border-radius: 10px;
-          border: none;
-          background: var(--coral);
-          color: #fff;
-          font-weight: 600;
-          font-size: 14px;
-          cursor: pointer;
-          margin-bottom: 10px;
-        }
-        .cd-save {
-          display: block;
-          width: 100%;
-          text-align: center;
-          padding: 12px;
-          border-radius: 10px;
-          border: 1px solid var(--line);
-          background: #fff;
-          color: var(--ink);
-          font-weight: 600;
-          font-size: 14px;
-          cursor: pointer;
-        }
-        .cd-save:disabled { opacity: 0.6; cursor: not-allowed; }
+        .cd-checklist { display: grid; grid-template-columns: 1fr 1fr; gap: 9px; }
+        .cd-checklist-item { min-height: 52px; display: flex; align-items: center; gap: 10px; background: #fff; border: 1px solid var(--line); border-radius: 13px; padding: 11px 13px; font-size: 13px; color: #3f4047; }
+        .cd-checklist-item .cd-check { background: #edf8f1; color: #21894c; }
 
-        .cd-brand-row { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; }
-        .cd-brand-avatar {
-          width: 36px; height: 36px; border-radius: 10px;
-          background: var(--coral); color: #fff;
-          display: flex; align-items: center; justify-content: center;
-          font-weight: 700; font-size: 15px; flex-shrink: 0;
-        }
-        .cd-brand-name { font-size: 14px; font-weight: 600; }
-        .cd-brand-cat { font-size: 12.5px; color: var(--ink-soft); }
-        .cd-brand-desc { font-size: 13px; color: var(--ink-soft); line-height: 1.6; }
-
-        .cd-state { max-width: 1080px; margin: 60px auto; padding: 0 24px; text-align: center; color: var(--ink-soft); }
-
-        .cd-info-grid {
-          display: grid;
-          grid-template-columns: 1fr 1fr;
-          gap: 14px;
-          margin: 20px 0;
-        }
-        .cd-info-card {
-          background: #fff;
-          border: 1px solid var(--line);
-          border-radius: 12px;
-          padding: 16px 18px;
-        }
-        .cd-info-card--full { grid-column: 1 / -1; }
-        .cd-info-label {
-          display: flex;
-          align-items: center;
-          gap: 7px;
-          font-size: 13.5px;
-          font-weight: 600;
-          margin-bottom: 6px;
-        }
-        .cd-info-value { font-size: 13.5px; color: #3d3d42; line-height: 1.6; }
-        .cd-info-value--deadline-closed { color: #d64545; font-weight: 500; }
-        .cd-info-value--deadline-open { color: #1a8a4a; font-weight: 500; }
-
-        .cd-list { margin: 0; padding-left: 20px; }
-        .cd-list li { font-size: 14.5px; line-height: 1.9; color: #3d3d42; }
-
-        .cd-checklist-grid {
-          display: grid;
-          grid-template-columns: 1fr 1fr;
-          gap: 12px;
-        }
-        @media (max-width: 560px) {
-          .cd-checklist-grid { grid-template-columns: 1fr; }
-        }
-        .cd-checklist-item {
-          display: flex;
-          align-items: center;
-          gap: 10px;
-          border: 1px solid #ffd9c2;
-          background: #fff7f2;
-          border-radius: 10px;
-          padding: 12px 14px;
-          font-size: 13.5px;
-          font-weight: 500;
-        }
-        .cd-checklist-dot {
-          width: 20px;
-          height: 20px;
-          border-radius: 50%;
-          background: var(--coral-dark);
-          color: #fff;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          flex-shrink: 0;
-        }
-
-        .cd-scenes { position: relative; padding-left: 4px; }
-        .cd-scene {
-          position: relative;
-          display: flex;
-          gap: 16px;
-          padding-bottom: 16px;
-        }
+        .cd-scenes { position: relative; padding-left: 3px; }
+        .cd-scene { position: relative; display: grid; grid-template-columns: 44px minmax(0,1fr); gap: 13px; padding-bottom: 23px; }
         .cd-scene:last-child { padding-bottom: 0; }
-        .cd-scene-num {
-          width: 30px;
-          height: 30px;
-          border-radius: 50%;
-          background: var(--coral-dark);
-          color: #fff;
-          font-size: 13px;
-          font-weight: 700;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          flex-shrink: 0;
-          z-index: 1;
-        }
-        .cd-scene-line {
-          position: absolute;
-          left: 15px;
-          top: 30px;
-          bottom: -16px;
-          width: 2px;
-          background: #ffd9c2;
-        }
+        .cd-scene-line { position: absolute; left: 16px; top: 35px; bottom: 0; width: 1px; background: #ffd5ca; }
         .cd-scene:last-child .cd-scene-line { display: none; }
-        .cd-scene-card {
-          flex: 1;
-          background: #fff;
-          border: 1px solid var(--line);
-          border-radius: 12px;
-          padding: 12px 16px;
-        }
-        .cd-scene-title { font-size: 14px; font-weight: 600; margin-bottom: 3px; }
-        .cd-scene-text { font-size: 13.5px; color: var(--ink-soft); line-height: 1.5; }
+        .cd-scene-num { width: 34px; height: 34px; border-radius: 50%; background: #fff; border: 2px solid #ffd0c6; color: var(--coral-dark); display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 800; position: relative; z-index: 1; }
+        .cd-scene-content { padding-top: 5px; }
+        .cd-scene-title { font-size: 14.5px; font-weight: 700; margin-bottom: 3px; }
+        .cd-scene-copy { color: var(--muted); font-size: 13px; line-height: 1.65; }
 
-        .cd-dosdonts { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
-        @media (max-width: 560px) {
-          .cd-dosdonts { grid-template-columns: 1fr; }
-        }
-        .cd-dosdonts-card { border-radius: 12px; padding: 16px 18px; }
-        .cd-dosdonts-card--do { border: 1px solid #bfe8cd; background: #f2fbf5; }
-        .cd-dosdonts-card--dont { border: 1px solid #f6c8c8; background: #fdf3f3; }
-        .cd-dosdonts-heading {
-          display: flex;
-          align-items: center;
-          gap: 6px;
-          font-size: 14px;
-          font-weight: 700;
-          margin-bottom: 10px;
-        }
-        .cd-dosdonts-heading--do { color: #1a8a4a; }
-        .cd-dosdonts-heading--dont { color: #d64545; }
-        .cd-dosdonts-row {
-          display: flex;
-          align-items: flex-start;
-          gap: 8px;
-          font-size: 13.5px;
-          color: #3d3d42;
-          line-height: 1.7;
-        }
+        .cd-dosdonts { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+        .cd-do, .cd-dont { border-radius: 17px; padding: 19px; }
+        .cd-do { background: #f3fbf6; border: 1px solid #ccebd7; }
+        .cd-dont { background: #fff6f5; border: 1px solid #f2ceca; }
+        .cd-rule-heading { display: flex; align-items: center; gap: 7px; font-size: 13px; font-weight: 750; margin-bottom: 10px; }
+        .cd-rule-heading--do { color: #21894c; }
+        .cd-rule-heading--dont { color: #cf4944; }
+        .cd-rule { display: flex; align-items: flex-start; gap: 8px; padding: 7px 0; color: #45464d; font-size: 13px; line-height: 1.6; }
 
-        .cd-caption-box {
-          background: #f7f7fa;
-          border: 1px solid var(--line);
-          border-radius: 12px;
-          padding: 16px 18px;
-          font-size: 14px;
-          line-height: 1.7;
-          color: #3d3d42;
-          white-space: pre-wrap;
-          margin-bottom: 16px;
-        }
-        .cd-hashtag-row { display: flex; flex-wrap: wrap; gap: 8px; }
-        .cd-hashtag {
-          font-size: 12.5px;
-          font-weight: 500;
-          color: var(--coral-dark);
-          background: #fff1ea;
-          border: 1px solid #ffd9c2;
-          border-radius: 999px;
-          padding: 5px 12px;
-        }
-        .cd-subheading {
-          font-size: 13px;
-          font-weight: 600;
-          color: var(--ink-soft);
-          margin: 0 0 10px;
-        }
+        .cd-caption { border: 1px solid var(--line); background: #fff; border-radius: 17px; overflow: hidden; }
+        .cd-caption-top { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 13px 16px; border-bottom: 1px solid var(--line); }
+        .cd-caption-label { color: #85868e; font-size: 11.5px; font-weight: 700; text-transform: uppercase; letter-spacing: .06em; }
+        .cd-copy-button { border: 1px solid #e1e1e7; background: #fff; color: #4f5058; border-radius: 9px; padding: 7px 10px; display: inline-flex; align-items: center; gap: 6px; font-size: 11.5px; font-weight: 700; cursor: pointer; }
+        .cd-copy-button:hover { border-color: #c9c9d1; color: var(--ink); }
+        .cd-caption-text { padding: 17px; white-space: pre-wrap; color: #3f4047; font-size: 14px; line-height: 1.75; }
+        .cd-hashtags { display: flex; flex-wrap: wrap; gap: 7px; padding: 0 17px 17px; }
+        .cd-hashtag { color: var(--coral-dark); background: #fff2ed; border: 1px solid #ffd8cc; border-radius: 999px; padding: 5px 10px; font-size: 11.5px; font-weight: 650; }
 
-        .cd-guidelines-card {
-          background: #fff;
-          border: 1px solid var(--line);
-          border-radius: 12px;
-          padding: 18px 20px;
-          margin-bottom: 16px;
-        }
-        .cd-guidelines-label { font-size: 13.5px; font-weight: 700; margin-bottom: 6px; }
-        .cd-guidelines-text { font-size: 13.5px; color: var(--ink-soft); line-height: 1.7; }
+        .cd-spec-tabs { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 10px; }
+        .cd-spec-tab { border: 1px solid var(--line); background: #fff; border-radius: 10px; padding: 8px 11px; display: inline-flex; align-items: center; gap: 6px; color: #686971; font-size: 12px; font-weight: 650; cursor: pointer; }
+        .cd-spec-tab--active { border-color: #ffcdbf; color: var(--coral-dark); background: #fff5f1; }
+        .cd-spec-table { background: #fff; border: 1px solid var(--line); border-radius: 16px; overflow: hidden; }
+        .cd-spec-row { display: flex; align-items: center; justify-content: space-between; gap: 20px; padding: 13px 16px; border-bottom: 1px solid #ededf0; font-size: 13px; }
+        .cd-spec-row:last-child { border-bottom: 0; }
+        .cd-spec-row-label { color: var(--muted); display: inline-flex; align-items: center; gap: 6px; }
+        .cd-spec-row-value { font-weight: 700; text-align: right; }
+        .cd-spec-pill { padding: 4px 9px; border-radius: 999px; background: #fff0eb; color: var(--coral-dark); font-size: 10.5px; font-weight: 750; }
+        .cd-spec-pill--off { background: #f0f0f3; color: #73747c; }
 
-        .cd-spec-tabs { display: flex; gap: 8px; margin-bottom: 14px; }
-        .cd-spec-tab {
-          display: inline-flex;
-          align-items: center;
-          gap: 7px;
-          font-size: 13px;
-          font-weight: 600;
-          padding: 9px 16px;
-          border-radius: 10px;
-          border: 1px solid var(--line);
-          background: #fff;
-          color: var(--ink-soft);
-          cursor: pointer;
-        }
-        .cd-spec-tab--active { background: #fff7f2; border-color: #ffd9c2; color: var(--coral-dark); }
+        .cd-sidebar { position: sticky; top: 92px; display: flex; flex-direction: column; gap: 13px; }
+        .cd-side-card { background: #fff; border: 1px solid var(--line); border-radius: 19px; padding: 19px; box-shadow: 0 7px 26px rgba(18,19,26,.04); }
+        .cd-apply-card { position: relative; overflow: hidden; border-color: #ffcfc4; background: linear-gradient(180deg, #fffaf8 0%, #fff 42%); box-shadow: 0 12px 34px rgba(255,107,90,.11), 0 3px 12px rgba(30,42,120,.035); }
+        .cd-apply-accent { position: absolute; inset: 0 0 auto 0; height: 4px; background: linear-gradient(90deg, var(--coral), #ff9a88, var(--violet)); }
+        .cd-apply-topline { display: inline-flex; align-items: center; gap: 7px; color: var(--coral-dark); font-size: 10px; font-weight: 800; letter-spacing: .075em; text-transform: uppercase; margin: 2px 0 10px; }
+        .cd-apply-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--coral); box-shadow: 0 0 0 4px rgba(255,107,90,.10); }
+        .cd-apply-title { font-size: 23px; line-height: 1.18; font-weight: 800; letter-spacing: -.55px; margin: 0 0 9px; color: #20213a; }
+        .cd-apply-copy { color: var(--muted); font-size: 12.5px; line-height: 1.65; margin: 0 0 16px; }
+        .cd-apply-copy strong { color: #343541; font-weight: 750; }
+        .cd-apply-highlights { display: grid; gap: 10px; margin-bottom: 16px; }
+        .cd-apply-highlight { display: grid; grid-template-columns: 31px 1fr; gap: 9px; align-items: start; }
+        .cd-apply-highlight-icon { width: 31px; height: 31px; border-radius: 10px; display: flex; align-items: center; justify-content: center; color: var(--coral-dark); background: #fff0eb; border: 1px solid #ffd9d0; }
+        .cd-apply-highlight strong { display: block; color: #373841; font-size: 11.5px; line-height: 1.35; margin-bottom: 2px; }
+        .cd-apply-highlight span { display: block; color: #85868e; font-size: 10.5px; line-height: 1.45; }
+        .cd-apply-divider { height: 1px; background: #eee2df; margin: 0 -2px 14px; }
+        .cd-apply-note { display: flex; align-items: center; justify-content: center; gap: 5px; margin-top: 10px; color: #85868e; font-size: 10px; line-height: 1.4; }
+        .cd-apply-note svg { color: #42a66b; flex: 0 0 auto; }
+        .cd-apply-button { width: 100%; min-height: 43px; border: 1px solid var(--coral); border-radius: 11px; background: var(--coral); color: #fff; display: inline-flex; align-items: center; justify-content: center; gap: 6px; font-size: 12.5px; font-weight: 750; cursor: pointer; box-shadow: 0 7px 18px rgba(255,107,90,.18); }
+        .cd-apply-button:hover:not(:disabled) { background: var(--coral-dark); border-color: var(--coral-dark); }
+        .cd-apply-button:disabled { opacity: .72; cursor: not-allowed; box-shadow: none; }
+        .cd-apply-button--disabled { background: #f0b5a9; border-color: #f0b5a9; }
+        .cd-save-button { width: 100%; margin-top: 9px; min-height: 41px; border: 1px solid #dedee5; border-radius: 11px; background: #fff; color: #383941; display: inline-flex; align-items: center; justify-content: center; gap: 7px; font-size: 12.5px; font-weight: 700; cursor: pointer; }
+        .cd-save-button:hover { border-color: #c8c8d0; background: #fafafd; }
+        .cd-side-stat { display: flex; align-items: flex-start; gap: 10px; padding: 10px 0; border-bottom: 1px solid #ededf0; }
+        .cd-side-stat:last-child { border-bottom: 0; padding-bottom: 0; }
+        .cd-side-stat-icon { color: var(--coral-dark); margin-top: 1px; }
+        .cd-side-stat-label { color: #898a91; font-size: 10.5px; margin-bottom: 2px; }
+        .cd-side-stat-value { color: #36373e; font-size: 12.5px; font-weight: 700; line-height: 1.5; }
+        .cd-side-heading { display: flex; align-items: center; justify-content: space-between; gap: 10px; font-size: 14px; font-weight: 750; margin-bottom: 13px; }
+        .cd-brand-side { text-decoration: none; color: inherit; border-color: #f0d4cd; transition: transform .16s ease, box-shadow .16s ease, border-color .16s ease; }
+        .cd-brand-side:hover { transform: translateY(-2px); border-color: #f2a99c; box-shadow: 0 10px 28px rgba(255,107,90,.11); }
+        .cd-brand-side-row { display: flex; align-items: center; gap: 11px; }
+        .cd-brand-side-logo { width: 43px; height: 43px; border-radius: 12px; overflow: hidden; display: flex; align-items: center; justify-content: center; background: var(--coral); color: #fff; font-weight: 800; flex: 0 0 auto; }
+        .cd-brand-side-logo img { width: 100%; height: 100%; object-fit: cover; }
+        .cd-brand-side-name { font-size: 13px; font-weight: 750; }
+        .cd-brand-side-meta { color: var(--muted); font-size: 11.5px; margin-top: 2px; }
+        .cd-brand-side-link { margin-top: 13px; color: var(--coral-dark); font-size: 11.5px; font-weight: 750; display: flex; align-items: center; justify-content: space-between; }
+        .cd-related { border-color: #eadeda; }
+        .cd-related-item { display: block; text-decoration: none; color: inherit; padding: 11px 0; border-bottom: 1px solid #ededf0; }
+        .cd-related-item:last-child { border-bottom: 0; padding-bottom: 0; }
+        .cd-related-title { font-size: 12.5px; font-weight: 700; line-height: 1.45; margin-bottom: 3px; }
+        .cd-related-meta { color: var(--muted); font-size: 10.5px; }
 
-        .cd-spec-table { border: 1px solid var(--line); border-radius: 12px; overflow: hidden; background: #fff; }
-        .cd-spec-row {
-          display: flex;
-          justify-content: space-between;
-          align-items: center;
-          padding: 13px 18px;
-          font-size: 13.5px;
-          border-bottom: 1px solid var(--line);
-        }
-        .cd-spec-row:last-child { border-bottom: none; }
-        .cd-spec-row-label { color: var(--ink-soft); }
-        .cd-spec-row-value { font-weight: 500; }
-        .cd-spec-pill {
-          font-size: 11.5px;
-          font-weight: 700;
-          padding: 4px 10px;
-          border-radius: 999px;
-          background: var(--coral);
-          color: #fff;
-        }
-        .cd-spec-pill--off { background: #ececef; color: var(--ink-soft); }
+        .cd-apply-form label { display: block; color: #55565e; font-size: 11px; font-weight: 700; margin: 11px 0 5px; }
+        .cd-apply-form label span { color: #999aa1; font-weight: 500; }
+        .cd-apply-form textarea, .cd-apply-form input { width: 100%; border: 1px solid #dedee4; border-radius: 9px; padding: 9px 10px; color: var(--ink); background: #fff; font: inherit; font-size: 12px; outline: none; }
+        .cd-apply-form textarea { min-height: 74px; resize: vertical; }
+        .cd-apply-form textarea:focus, .cd-apply-form input:focus { border-color: var(--coral); box-shadow: 0 0 0 3px rgba(255,107,90,.08); }
+        .cd-form-actions { display: grid; grid-template-columns: 1fr 1.6fr; gap: 8px; margin-top: 12px; }
+        .cd-secondary-button { min-height: 41px; border: 1px solid #dedee4; border-radius: 10px; background: #fff; color: #42434a; font-size: 12px; font-weight: 700; cursor: pointer; }
+        .cd-error { color: #c84642; background: #fff0ef; border: 1px solid #f2cfcc; padding: 9px 10px; border-radius: 9px; font-size: 11.5px; line-height: 1.5; }
+        .cd-application-status { min-height: 43px; display: flex; align-items: center; justify-content: center; gap: 7px; border-radius: 11px; font-size: 12.5px; font-weight: 750; text-transform: capitalize; }
+        .cd-application-status--pending { color: #956b00; background: #fff5df; }
+        .cd-application-status--accepted { color: #21894c; background: #edf8f1; }
+        .cd-application-status--rejected { color: #c84642; background: #fff0ef; }
 
-        .cd-related-item {
-          display: block;
-          text-decoration: none;
-          color: inherit;
-          padding: 10px 0;
-          border-bottom: 1px solid var(--line);
-        }
-        .cd-related-item:last-child { border-bottom: none; }
-        .cd-related-title { font-size: 13.5px; font-weight: 600; margin-bottom: 3px; }
-        .cd-related-meta { font-size: 12px; color: var(--ink-soft); }
+        .cd-owner { border-color: #dddde5; }
+        .cd-owner-actions { display: grid; gap: 7px; }
+        .cd-owner-button { min-height: 38px; border: 1px solid #dedee5; border-radius: 9px; background: #fff; display: flex; align-items: center; justify-content: center; gap: 6px; color: #41424a; font-size: 11.5px; font-weight: 700; cursor: pointer; text-decoration: none; }
+        .cd-owner-button:hover { background: #fafafd; }
+        .cd-owner-button--danger { color: #c84642; border-color: #f0cdca; }
 
-        .cd-sidebar-heading { font-size: 13px; color: var(--ink-soft); margin-bottom: 10px; }
-
-        .cd-cta--disabled { background: #f4a98a; cursor: not-allowed; }
-        .cd-status-pill {
-          display: inline-flex;
-          align-items: center;
-          gap: 6px;
-          width: 100%;
-          justify-content: center;
-          padding: 12px;
-          border-radius: 10px;
-          font-weight: 600;
-          font-size: 14px;
-          margin-bottom: 10px;
-        }
-        .cd-status-pill--pending { background: #fff4de; color: #9a6b00; }
-        .cd-status-pill--accepted { background: #e6f7ec; color: #1a8a4a; }
-        .cd-status-pill--rejected { background: #fdecec; color: #d64545; }
-
-        .cd-form-field { margin-bottom: 12px; }
-        .cd-form-label { display: block; font-size: 12.5px; font-weight: 600; color: var(--ink-soft); margin-bottom: 6px; }
-        .cd-form-input, .cd-form-textarea {
-          width: 100%;
-          border: 1px solid var(--line);
-          border-radius: 8px;
-          padding: 9px 11px;
-          font-size: 13.5px;
-          font-family: inherit;
-          color: var(--ink);
-          resize: vertical;
-        }
-        .cd-form-textarea { min-height: 76px; }
-        .cd-form-input:focus, .cd-form-textarea:focus {
-          outline: none;
-          border-color: var(--coral);
-        }
-        .cd-apply-error {
-          font-size: 12.5px;
-          color: #d64545;
-          background: #fdecec;
-          border-radius: 8px;
-          padding: 8px 10px;
-          margin-bottom: 10px;
-        }
-        .cd-form-actions { display: flex; gap: 8px; }
-        .cd-form-cancel {
-          flex: 1;
-          padding: 10px;
-          border-radius: 10px;
-          border: 1px solid var(--line);
-          background: #fff;
-          color: var(--ink);
-          font-weight: 600;
-          font-size: 13.5px;
-          cursor: pointer;
-        }
-        .cd-form-submit {
-          flex: 2;
-          padding: 10px;
-          border-radius: 10px;
-          border: none;
-          background: var(--coral);
-          color: #fff;
-          font-weight: 600;
-          font-size: 13.5px;
-          cursor: pointer;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          gap: 6px;
-        }
-        .cd-form-submit:disabled { opacity: 0.6; cursor: not-allowed; }
-        .cd-spin { animation: cd-spin 0.8s linear infinite; }
+        .cd-empty { max-width: 600px; margin: 80px auto; text-align: center; padding: 0 24px; color: var(--muted); }
+        .cd-empty button { margin-top: 12px; }
+        .cd-spin { animation: cd-spin .8s linear infinite; }
         @keyframes cd-spin { to { transform: rotate(360deg); } }
+
+        @media (max-width: 920px) {
+          .cd-layout { grid-template-columns: 1fr; }
+          .cd-sidebar { position: static; display: grid; grid-template-columns: 1fr 1fr; align-items: start; }
+          .cd-apply-card { grid-column: 1 / -1; }
+        }
+        @media (max-width: 650px) {
+          .cd-topbar-inner { padding: 0 16px; }
+          .cd-nav-left { gap: 12px; }
+          .cd-breadcrumb { display: none; }
+          .cd-shell { padding: 18px 14px 56px; }
+          .cd-hero { padding: 20px; border-radius: 19px; }
+          .cd-title { font-size: 30px; }
+          .cd-visual { border-radius: 17px; }
+          .cd-opportunity, .cd-checklist, .cd-dosdonts, .cd-sidebar { grid-template-columns: 1fr; }
+          .cd-section { margin-top: 34px; }
+        }
       `}</style>
 
-      <div className="cd-topbar">
-        <span className="cd-logo"><LogoMark size={20} /> {BRAND_NAME}</span>
-        <Link to="/campaigns" className="cd-nav-link">Browse Campaigns</Link>
-      </div>
+      <header className={`cd-topbar${navVisible ? '' : ' cd-topbar--hidden'}`}>
+        <div className="cd-topbar-inner">
+          <div className="cd-nav-left">
+            <Link to="/campaigns" className="cd-logo"><LogoMark size={24} /><span>{BRAND_NAME}</span></Link>
+            {campaign && <div className="cd-breadcrumb"><Link to="/campaigns">Campaigns</Link><span>/</span><span>{campaign.title}</span></div>}
+          </div>
+          <div className="cd-nav-actions">
+            <Link to="/messages" className="cd-nav-icon" aria-label="Messages"><MessageCircle size={17} /></Link>
+            <Link to="/notifications" className="cd-nav-icon" aria-label="Notifications"><Bell size={17} /><span className="cd-nav-dot" /></Link>
+            <Link to="/profile" aria-label="Profile">
+              <span className="cd-profile-avatar">
+                {user?.profile?.profile_image || user?.profile?.logo_url ? <img src={user.profile.profile_image || user.profile.logo_url || ''} alt="" /> : (user?.full_name?.[0] || '?').toUpperCase()}
+              </span>
+            </Link>
+          </div>
+        </div>
+      </header>
 
-      {loading && (
-        <div className="cd-state">Loading campaign…</div>
-      )}
+      {loading && <div className="cd-empty">Loading campaign…</div>}
 
       {!loading && error && (
-        <div className="cd-state">
-          {error}
-          <div style={{ marginTop: 12 }}>
-            <button className="cd-back" onClick={() => navigate(-1)}>
-              <ArrowLeft size={15} /> Go back
-            </button>
-          </div>
+        <div className="cd-empty">
+          <div>{error}</div>
+          <button className="cd-back" onClick={() => navigate(-1)}><ArrowLeft size={15} /> Go back</button>
         </div>
       )}
 
       {!loading && !error && campaign && (
-        <>
-          <div className="cd-crumb">
-            <Link to="/campaigns">Campaigns</Link> / {campaign.title}
-          </div>
+        <main className="cd-shell">
+          <button className="cd-back" onClick={() => navigate(-1)}><ArrowLeft size={15} /> Back to campaigns</button>
 
-          {campaign.hero_image && (
-            <div className="cd-hero-banner">
-              <img src={campaign.hero_image} alt={campaign.title} />
-            </div>
-          )}
-
-          <div className="cd-body">
-            {/* MAIN COLUMN */}
-            <div>
-              <button className="cd-back" onClick={() => navigate(-1)}>
-                <ArrowLeft size={15} /> Back
-              </button>
-
-              <div className="cd-badge"><Sparkles size={12} /> Featured Campaign</div>
-
-              <h1 className="cd-title">{campaign.title}</h1>
-
-              <div className="cd-meta">
-                <span className="cd-meta-item">
-                  <Building2 size={14} />
-                  <b>{campaign.brand_name || 'Business'}</b>
-                </span>
-                <span className="cd-meta-sep">·</span>
-                <span>{campaign.category}</span>
-                {campaign.brand_location && (
-                  <>
-                    <span className="cd-meta-sep">·</span>
-                    <span className="cd-meta-item">
-                      <MapPin size={14} />
-                      {campaign.brand_location}
-                    </span>
-                  </>
-                )}
-              </div>
-
-              <div className="cd-tags">
-                <span className={`cd-tag cd-tag--type-${campaign.campaign_type}`}>
-                  {campaign.campaign_type === 'paid' ? (
-                    <><DollarSign size={12} style={{ verticalAlign: -2 }} /> paid</>
-                  ) : (
-                    <><Gift size={12} style={{ verticalAlign: -2 }} /> gifted</>
-                  )}
-                </span>
-                {campaign.sub_category && <span className="cd-tag">{campaign.sub_category}</span>}
-              </div>
-
-              <hr className="cd-hr" />
-
-              <h2 className="cd-section-title">About This Campaign</h2>
-              <p className="cd-prose">{campaign.description}</p>
-
-              <div className="cd-info-grid">
-                <div className="cd-info-card">
-                  <div className="cd-info-label">
-                    <DollarSign size={15} color={CORAL_DARK} /> Compensation
+          <div className="cd-layout">
+            <article className="cd-main">
+              <section className="cd-hero">
+                <div className="cd-brandline">
+                  <div className="cd-brand-logo">
+                    {brandLogo ? <img src={brandLogo} alt={`${brandName} logo`} /> : brandName[0].toUpperCase()}
                   </div>
-                  <div className="cd-info-value">
-                    {campaign.compensation_description ||
-                      (campaign.budget ? `Rs. ${campaign.budget.toLocaleString()}` : 'Not specified')}
+                  <div>
+                    <div className="cd-brandline-name">{brandName}</div>
+                    <div className="cd-brandline-meta">{brandIndustry}{brandLocation ? ` · ${brandLocation}` : ''}</div>
                   </div>
                 </div>
 
-                <div className="cd-info-card">
-                  <div className="cd-info-label">
-                    <Calendar size={15} color={CORAL_DARK} /> Deadline
-                  </div>
-                  {(() => {
-                    const dl = formatDeadline(campaign.deadline);
-                    if (!dl) return <div className="cd-info-value">No deadline set</div>;
-                    return (
-                      <div
-                        className={`cd-info-value ${
-                          dl.closed ? 'cd-info-value--deadline-closed' : 'cd-info-value--deadline-open'
-                        }`}
-                      >
-                        {dl.label}
-                      </div>
-                    );
-                  })()}
+                <div className="cd-kicker">CREATOR OPPORTUNITY</div>
+                <h1 className="cd-title">{campaign.title}</h1>
+                {campaign.tagline && <p className="cd-tagline">{campaign.tagline}</p>}
+
+                <div className="cd-meta-row">
+                  {brandLocation && <span className="cd-meta-item"><MapPin size={14} /> {brandLocation}</span>}
+                  <span className="cd-meta-item"><Film size={14} /> {campaign.sub_category || campaign.category}</span>
+                  <span className="cd-meta-item">{campaign.campaign_type === 'paid' ? <DollarSign size={14} /> : <Gift size={14} />} {campaign.campaign_type === 'paid' ? 'Paid collaboration' : 'Gifted collaboration'}</span>
+                  {campaign.application_count > 0 && <span className="cd-meta-item"><CheckCircle2 size={14} /> {campaign.application_count} creator{campaign.application_count === 1 ? '' : 's'} applied</span>}
                 </div>
 
-                {campaign.brand_location && (
-                  <div className="cd-info-card cd-info-card--full">
-                    <div className="cd-info-label">
-                      <MapPin size={15} color={CORAL_DARK} /> Location
+                <div className="cd-tags">
+                  {campaign.category && <span className="cd-tag cd-tag--accent">{campaign.category}</span>}
+                  {campaign.sub_category && <span className="cd-tag">{campaign.sub_category}</span>}
+                </div>
+              </section>
+
+              <div className="cd-visual">
+                {heroImage ? (
+                  <img src={heroImage} alt={`${campaign.title} campaign`} onError={(e) => { e.currentTarget.style.display = 'none'; }} />
+                ) : (
+                  <div className="cd-visual-placeholder">
+                    <div className="cd-visual-placeholder-inner">
+                      <div className="cd-visual-label">{brandName}</div>
+                      <div className="cd-visual-title">{campaign.title}</div>
                     </div>
-                    <div className="cd-info-value">{campaign.brand_location}</div>
                   </div>
                 )}
               </div>
 
-              {campaign.requirements && (
-                <>
-                  <h2 className="cd-section-title">
-                    <CheckCircle2 size={17} color={CORAL_DARK} style={{ verticalAlign: -3, marginRight: 6 }} />
-                    Requirements
-                  </h2>
-                  <p className="cd-prose">{campaign.requirements}</p>
-                </>
+              <section className="cd-section">
+                <div className="cd-section-header"><div><h2 className="cd-section-title">The opportunity</h2><p className="cd-section-intro">Everything you need to know before you apply.</p></div></div>
+                <div className="cd-opportunity">
+                  <div className="cd-opportunity-card"><DollarSign size={17} className="cd-opportunity-icon" /><div className="cd-opportunity-label">Compensation</div><div className="cd-opportunity-value">{campaign.compensation_description || formatMoney(campaign.budget) || 'Discuss with brand'}</div></div>
+                  <div className="cd-opportunity-card"><Calendar size={17} className="cd-opportunity-icon" /><div className="cd-opportunity-label">Application deadline</div><div className={`cd-opportunity-value ${deadline && !deadline.closed ? 'cd-opportunity-value--open' : ''}`}>{deadline ? deadline.label : 'Open until filled'}</div></div>
+                  <div className="cd-opportunity-card"><MapPin size={17} className="cd-opportunity-icon" /><div className="cd-opportunity-label">Location</div><div className="cd-opportunity-value">{brandLocation || 'Remote / flexible'}</div></div>
+                </div>
+              </section>
+
+              {(campaign.description || campaign.brief) && (
+                <section className="cd-section">
+                  <div className="cd-section-header"><div><h2 className="cd-section-title">About this campaign</h2><p className="cd-section-intro">The story the brand wants creators to bring to life.</p></div></div>
+                  <div className="cd-brief">
+                    {campaign.brief && <div className="cd-brief-label">Campaign brief</div>}
+                    <p className="cd-prose">{campaign.description}</p>
+                    {campaign.brief && campaign.brief !== campaign.description && <p className="cd-prose" style={{ marginTop: 14 }}>{campaign.brief}</p>}
+                  </div>
+                </section>
               )}
 
               {campaign.deliverables && campaign.deliverables.length > 0 && (
-                <>
-                  <h2 className="cd-section-title">
-                    <Target size={17} color={CORAL_DARK} style={{ verticalAlign: -3, marginRight: 6 }} />
-                    Deliverables
-                  </h2>
-                  <ul className="cd-list">
-                    {campaign.deliverables.map((item, i) => (
-                      <li key={i}>{item}</li>
+                <section className="cd-section">
+                  <div className="cd-section-header"><div><h2 className="cd-section-title">What you'll create</h2><p className="cd-section-intro">A simple creative direction for your content.</p></div></div>
+                  <div className="cd-deliverables">
+                    {campaign.deliverables.map((item, index) => (
+                      <div className="cd-deliverable" key={`${item}-${index}`}>
+                        <div className="cd-number">{String(index + 1).padStart(2, '0')}</div>
+                        <div><div className="cd-deliverable-title">{item}</div><div className="cd-deliverable-copy">Create this naturally in your own style while staying aligned with the campaign brief.</div></div>
+                      </div>
+                    ))}
+                  </div>
+                </section>
+              )}
+
+              {campaign.requirements && (
+                <section className="cd-section cd-requirements">
+                  <div className="cd-section-header"><div><h2 className="cd-section-title">What we're looking for</h2><p className="cd-section-intro">Make sure you meet these creator requirements before applying.</p></div></div>
+                  <ul className="cd-requirement-list">
+                    {campaign.requirements.split(/\r?\n|•/).map((item) => item.trim()).filter(Boolean).map((item, index) => (
+                      <li key={`${item}-${index}`}><span className="cd-check"><Check size={12} strokeWidth={3} /></span><span>{item}</span></li>
                     ))}
                   </ul>
-                </>
+                </section>
               )}
 
               {campaign.checklist && campaign.checklist.length > 0 && (
-                <>
-                  <h2 className="cd-section-title">
-                    <ListChecks size={17} color={CORAL_DARK} style={{ verticalAlign: -3, marginRight: 6 }} />
-                    Quick Checklist
-                  </h2>
-                  <div className="cd-checklist-grid">
-                    {campaign.checklist.map((item, i) => (
-                      <div className="cd-checklist-item" key={i}>
-                        <span className="cd-checklist-dot">
-                          <CheckCircle2 size={12} />
-                        </span>
-                        {item.text}
-                      </div>
-                    ))}
+                <section className="cd-section">
+                  <div className="cd-section-header"><div><h2 className="cd-section-title">Creator checklist</h2><p className="cd-section-intro">A quick check before you hit submit.</p></div></div>
+                  <div className="cd-checklist">
+                    {campaign.checklist.map((item, index) => <div className="cd-checklist-item" key={`${item.text}-${index}`}><span className="cd-check"><Check size={12} strokeWidth={3} /></span>{item.text}</div>)}
                   </div>
-                </>
+                </section>
               )}
 
               {campaign.required_scenes && campaign.required_scenes.length > 0 && (
-                <>
-                  <h2 className="cd-section-title">
-                    <Film size={17} color={CORAL_DARK} style={{ verticalAlign: -3, marginRight: 6 }} />
-                    Required Scenes
-                  </h2>
+                <section className="cd-section">
+                  <div className="cd-section-header"><div><h2 className="cd-section-title">Your content flow</h2><p className="cd-section-intro">Use these scenes as a guide, not a script.</p></div></div>
                   <div className="cd-scenes">
-                    {campaign.required_scenes.map((scene, i) => (
-                      <div className="cd-scene" key={i}>
-                        <div className="cd-scene-num">{i + 1}</div>
-                        <div className="cd-scene-line" />
-                        <div className="cd-scene-card">
-                          <div className="cd-scene-text">{scene}</div>
-                        </div>
-                      </div>
-                    ))}
+                    {campaign.required_scenes.map((scene, index) => {
+                      const parts = scene.split(/\n|:/);
+                      const title = parts[0]?.trim() || scene;
+                      const copy = parts.slice(1).join(':').trim();
+                      return <div className="cd-scene" key={`${scene}-${index}`}><div className="cd-scene-num">{String(index + 1).padStart(2, '0')}</div><div className="cd-scene-line" /><div className="cd-scene-content"><div className="cd-scene-title">{title}</div>{copy && <div className="cd-scene-copy">{copy}</div>}</div></div>;
+                    })}
                   </div>
-                </>
+                </section>
               )}
 
-              {((campaign.dos && campaign.dos.length > 0) || (campaign.donts && campaign.donts.length > 0)) && (
-                <>
-                  <h2 className="cd-section-title">Do's &amp; Don'ts</h2>
+              {((campaign.dos?.length || 0) > 0 || (campaign.donts?.length || 0) > 0) && (
+                <section className="cd-section">
+                  <div className="cd-section-header"><div><h2 className="cd-section-title">Do's &amp; don'ts</h2><p className="cd-section-intro">Creative guardrails from the brand.</p></div></div>
                   <div className="cd-dosdonts">
-                    {campaign.dos && campaign.dos.length > 0 && (
-                      <div className="cd-dosdonts-card cd-dosdonts-card--do">
-                        <div className="cd-dosdonts-heading cd-dosdonts-heading--do">
-                          <CheckCircle2 size={15} /> Do
-                        </div>
-                        {campaign.dos.map((item, i) => (
-                          <div className="cd-dosdonts-row" key={i}>
-                            <CheckCircle2 size={14} color="#1a8a4a" style={{ marginTop: 2, flexShrink: 0 }} />
-                            {item}
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                    {campaign.donts && campaign.donts.length > 0 && (
-                      <div className="cd-dosdonts-card cd-dosdonts-card--dont">
-                        <div className="cd-dosdonts-heading cd-dosdonts-heading--dont">
-                          <X size={15} /> Don't
-                        </div>
-                        {campaign.donts.map((item, i) => (
-                          <div className="cd-dosdonts-row" key={i}>
-                            <X size={14} color="#d64545" style={{ marginTop: 2, flexShrink: 0 }} />
-                            {item}
-                          </div>
-                        ))}
-                      </div>
-                    )}
+                    {campaign.dos && campaign.dos.length > 0 && <div className="cd-do"><div className="cd-rule-heading cd-rule-heading--do"><CheckCircle2 size={16} /> Do</div>{campaign.dos.map((item, index) => <div className="cd-rule" key={`${item}-${index}`}><Check size={13} color="#21894c" />{item}</div>)}</div>}
+                    {campaign.donts && campaign.donts.length > 0 && <div className="cd-dont"><div className="cd-rule-heading cd-rule-heading--dont"><X size={16} /> Don't</div>{campaign.donts.map((item, index) => <div className="cd-rule" key={`${item}-${index}`}><X size={13} color="#cf4944" />{item}</div>)}</div>}
                   </div>
-                </>
+                </section>
               )}
 
-              {(campaign.suggested_caption || (campaign.hashtags && campaign.hashtags.length > 0)) && (
-                <>
-                  <h2 className="cd-section-title">
-                    <Hash size={17} color={CORAL_DARK} style={{ verticalAlign: -3, marginRight: 6 }} />
-                    Caption &amp; Tags
-                  </h2>
-                  {campaign.suggested_caption && (
-                    <>
-                      <div className="cd-subheading">
-                        <Quote size={13} style={{ verticalAlign: -1, marginRight: 4 }} />
-                        Suggested Caption
-                      </div>
-                      <div className="cd-caption-box">{campaign.suggested_caption}</div>
-                    </>
-                  )}
-                  {campaign.hashtags && campaign.hashtags.length > 0 && (
-                    <>
-                      <div className="cd-subheading">Hashtags</div>
-                      <div className="cd-hashtag-row">
-                        {campaign.hashtags.map((tag, i) => (
-                          <span className="cd-hashtag" key={i}>
-                            {tag.startsWith('#') ? tag : `#${tag}`}
-                          </span>
-                        ))}
-                      </div>
-                    </>
-                  )}
-                </>
+              {(campaign.suggested_caption || campaign.hashtags?.length) && (
+                <section className="cd-section">
+                  <div className="cd-section-header"><div><h2 className="cd-section-title">Caption &amp; tags</h2><p className="cd-section-intro">Optional copy to help you get started faster.</p></div></div>
+                  <div className="cd-caption">
+                    {campaign.suggested_caption && <><div className="cd-caption-top"><span className="cd-caption-label">Suggested caption</span><button className="cd-copy-button" onClick={handleCopyCaption}>{copied ? <Check size={13} /> : <Copy size={13} />}{copied ? 'Copied' : 'Copy'}</button></div><div className="cd-caption-text">{campaign.suggested_caption}</div></>}
+                    {campaign.hashtags && campaign.hashtags.length > 0 && <div className="cd-hashtags">{campaign.hashtags.map((tag, index) => <span className="cd-hashtag" key={`${tag}-${index}`}>{cleanTag(tag)}</span>)}</div>}
+                  </div>
+                </section>
               )}
 
               {(campaign.brief || (campaign.video_specs && campaign.video_specs.length > 0)) && (
-                <>
-                  <h2 className="cd-section-title">
-                    <ClipboardList size={17} color={CORAL_DARK} style={{ verticalAlign: -3, marginRight: 6 }} />
-                    Campaign Guidelines
-                  </h2>
-
-                  {campaign.brief && (
-                    <div className="cd-guidelines-card">
-                      <div className="cd-guidelines-label">Overview</div>
-                      <div className="cd-guidelines-text">{campaign.brief}</div>
-                    </div>
-                  )}
-
+                <section className="cd-section">
+                  <div className="cd-section-header"><div><h2 className="cd-section-title">Campaign guidelines</h2><p className="cd-section-intro">Technical details for getting the final content right.</p></div></div>
                   {campaign.video_specs && campaign.video_specs.length > 0 && (
                     <>
-                      <h2 className="cd-section-title" style={{ fontSize: 15, marginTop: 20 }}>
-                        <Film size={16} color={CORAL_DARK} style={{ verticalAlign: -3, marginRight: 6 }} />
-                        Video Specs
-                      </h2>
                       <div className="cd-spec-tabs">
-                        {campaign.video_specs.map((spec, i) => {
-                          const isTikTok = spec.platform.toLowerCase().includes('tiktok');
-                          const Icon = isTikTok ? Music2 : Smartphone;
-                          return (
-                            <button
-                              key={i}
-                              className={`cd-spec-tab ${activeSpecTab === i ? 'cd-spec-tab--active' : ''}`}
-                              onClick={() => setActiveSpecTab(i)}
-                            >
-                              <Icon size={14} /> {spec.platform}
-                            </button>
-                          );
+                        {campaign.video_specs.map((spec, index) => {
+                          const Icon = spec.platform.toLowerCase().includes('tiktok') ? Music2 : Smartphone;
+                          return <button key={`${spec.platform}-${index}`} className={`cd-spec-tab ${activeSpecTab === index ? 'cd-spec-tab--active' : ''}`} onClick={() => setActiveSpecTab(index)}><Icon size={14} /> {spec.platform}</button>;
                         })}
                       </div>
-                      {campaign.video_specs[activeSpecTab] && (
-                        <div className="cd-spec-table">
-                          <div className="cd-spec-row">
-                            <span className="cd-spec-row-label">Video Length</span>
-                            <span className="cd-spec-row-value">
-                              {campaign.video_specs[activeSpecTab].duration || '—'}
-                            </span>
-                          </div>
-                          <div className="cd-spec-row">
-                            <span className="cd-spec-row-label">Aspect Ratio</span>
-                            <span className="cd-spec-row-value">
-                              {campaign.video_specs[activeSpecTab].aspect_ratio || '—'}
-                            </span>
-                          </div>
-                          <div className="cd-spec-row">
-                            <span className="cd-spec-row-label">
-                              <Volume2 size={13} style={{ verticalAlign: -2, marginRight: 4 }} />
-                              Voiceover
-                            </span>
-                            <span
-                              className={`cd-spec-pill ${
-                                !campaign.video_specs[activeSpecTab].voiceover_required ? 'cd-spec-pill--off' : ''
-                              }`}
-                            >
-                              {campaign.video_specs[activeSpecTab].voiceover_required ? 'Required' : 'Optional'}
-                            </span>
-                          </div>
-                          <div className="cd-spec-row">
-                            <span className="cd-spec-row-label">
-                              <Captions size={13} style={{ verticalAlign: -2, marginRight: 4 }} />
-                              Subtitles
-                            </span>
-                            <span
-                              className={`cd-spec-pill ${
-                                !campaign.video_specs[activeSpecTab].subtitles_required ? 'cd-spec-pill--off' : ''
-                              }`}
-                            >
-                              {campaign.video_specs[activeSpecTab].subtitles_required ? 'Required' : 'Optional'}
-                            </span>
-                          </div>
-                        </div>
-                      )}
+                      {campaign.video_specs[activeSpecTab] && <div className="cd-spec-table">
+                        <div className="cd-spec-row"><span className="cd-spec-row-label"><Film size={14} /> Video length</span><span className="cd-spec-row-value">{campaign.video_specs[activeSpecTab].duration || '—'}</span></div>
+                        <div className="cd-spec-row"><span className="cd-spec-row-label">Aspect ratio</span><span className="cd-spec-row-value">{campaign.video_specs[activeSpecTab].aspect_ratio || '—'}</span></div>
+                        <div className="cd-spec-row"><span className="cd-spec-row-label"><Volume2 size={14} /> Voiceover</span><span className={`cd-spec-pill ${!campaign.video_specs[activeSpecTab].voiceover_required ? 'cd-spec-pill--off' : ''}`}>{campaign.video_specs[activeSpecTab].voiceover_required ? 'Required' : 'Optional'}</span></div>
+                        <div className="cd-spec-row"><span className="cd-spec-row-label"><Clipboard size={14} /> Subtitles</span><span className={`cd-spec-pill ${!campaign.video_specs[activeSpecTab].subtitles_required ? 'cd-spec-pill--off' : ''}`}>{campaign.video_specs[activeSpecTab].subtitles_required ? 'Required' : 'Optional'}</span></div>
+                      </div>}
                     </>
                   )}
-                </>
+                </section>
               )}
-            </div>
+            </article>
 
-            {/* SIDEBAR */}
-            <div className="cd-sidebar">
+            <aside className="cd-sidebar">
               {user?.role === 'business' && campaign.business_id === user.id && (
-                <div className="cd-card">
-                  <div style={{ fontSize: 13, color: 'var(--ink-soft)', marginBottom: 10 }}>
-                    Manage
+                <div className="cd-side-card cd-owner">
+                  <div className="cd-side-heading">Manage campaign</div>
+                  {manageError && <div className="cd-error" style={{ marginBottom: 9 }}>{manageError}</div>}
+                  <div className="cd-owner-actions">
+                    <Link className="cd-owner-button" to={`/campaigns/${campaign.id}/edit`}>Edit campaign</Link>
+                    {campaign.status === 'draft' && <button className="cd-owner-button" onClick={handlePublish} disabled={managing !== null}>{managing === 'publish' ? <Loader2 size={14} className="cd-spin" /> : <Rocket size={14} />}{managing === 'publish' ? 'Publishing…' : 'Publish campaign'}</button>}
+                    <button className="cd-owner-button" onClick={handleDuplicate} disabled={managing !== null}>{managing === 'duplicate' ? <Loader2 size={14} className="cd-spin" /> : <Copy size={14} />}{managing === 'duplicate' ? 'Duplicating…' : 'Duplicate campaign'}</button>
+                    <button className="cd-owner-button cd-owner-button--danger" onClick={handleDelete} disabled={managing !== null}>{managing === 'delete' ? <Loader2 size={14} className="cd-spin" /> : <Trash2 size={14} />}{managing === 'delete' ? 'Deleting…' : 'Delete campaign'}</button>
                   </div>
-
-                  {manageError && <div className="cd-apply-error">{manageError}</div>}
-
-                  <Link
-                    to={`/campaigns/${campaign.id}/edit`}
-                    className="cd-cta"
-                    style={{ display: 'block', textAlign: 'center', textDecoration: 'none' }}
-                  >
-                    Edit Campaign
-                  </Link>
-
-                  {campaign.status === 'draft' && (
-                    <button
-                      className="cd-save"
-                      style={{ marginTop: 8, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}
-                      onClick={handlePublish}
-                      disabled={managing !== null}
-                    >
-                      {managing === 'publish' ? <Loader2 size={14} className="cd-spin" /> : <Rocket size={14} />}
-                      {managing === 'publish' ? 'Publishing…' : 'Publish Campaign'}
-                    </button>
-                  )}
-
-                  <button
-                    className="cd-save"
-                    style={{ marginTop: 8, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}
-                    onClick={handleDuplicate}
-                    disabled={managing !== null}
-                  >
-                    {managing === 'duplicate' ? <Loader2 size={14} className="cd-spin" /> : <Copy size={14} />}
-                    {managing === 'duplicate' ? 'Duplicating…' : 'Duplicate Campaign'}
-                  </button>
-
-                  <button
-                    className="cd-save"
-                    style={{
-                      marginTop: 8,
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      gap: 6,
-                      color: '#d64545',
-                      borderColor: '#f3caca',
-                    }}
-                    onClick={handleDelete}
-                    disabled={managing !== null}
-                  >
-                    {managing === 'delete' ? <Loader2 size={14} className="cd-spin" /> : <Trash2 size={14} />}
-                    {managing === 'delete' ? 'Deleting…' : 'Delete Campaign'}
-                  </button>
-
-                  {campaign.status === 'draft' && (
-                    <div style={{ marginTop: 8, textAlign: 'center', fontSize: 12, color: 'var(--ink-soft)' }}>
-                      This campaign is a draft — only you can see it.
-                    </div>
-                  )}
                 </div>
               )}
 
-              <div className="cd-card">
-                <div className="cd-sidebar-title">Interested?</div>
-                <div className="cd-sidebar-sub">
-                  Apply to collaborate with {campaign.brand_name || 'this brand'}
+              <div className="cd-side-card cd-apply-card">
+                <div className="cd-apply-accent" />
+                <div className="cd-apply-topline">
+                  <span className="cd-apply-dot" />
+                  <span>Creator opportunity</span>
                 </div>
+                <h2 className="cd-apply-title">Ready to create something great?</h2>
+                <p className="cd-apply-copy">
+                  Pitch your creative idea to <strong>{brandName}</strong> and show the brand what makes your content a great fit for this campaign.
+                </p>
 
-                {(() => {
-                  const dl = formatDeadline(campaign.deadline);
-                  const deadlinePassed = dl?.closed || campaign.status !== 'published';
-
-                  // Already applied — show status instead of a button.
-                  if (myApplication) {
-                    const statusLabel =
-                      myApplication.status === 'pending'
-                        ? 'Application Pending'
-                        : myApplication.status === 'accepted'
-                        ? 'Application Accepted'
-                        : myApplication.status === 'rejected'
-                        ? 'Application Rejected'
-                        : 'Application Withdrawn';
-                    return (
-                      <div className={`cd-status-pill cd-status-pill--${myApplication.status}`}>
-                        <CheckCircle2 size={15} /> {statusLabel}
-                      </div>
-                    );
-                  }
-
-                  // Not logged in as a creator — businesses previewing
-                  // their own listing, or a logged-out visitor, get a
-                  // disabled state rather than a broken submit.
-                  if (!user || user.role !== 'creator') {
-                    return (
-                      <button className="cd-cta cd-cta--disabled" disabled>
-                        {user ? 'Only creators can apply' : 'Log in to apply'}
-                      </button>
-                    );
-                  }
-
-                  if (deadlinePassed) {
-                    return (
-                      <button className="cd-cta cd-cta--disabled" disabled>
-                        Deadline Passed
-                      </button>
-                    );
-                  }
-
-                  if (showApplyForm) {
-                    return (
-                      <div>
-                        {applyError && <div className="cd-apply-error">{applyError}</div>}
-                        <div className="cd-form-field">
-                          <label className="cd-form-label">Why are you a fit? *</label>
-                          <textarea
-                            className="cd-form-textarea"
-                            value={proposal}
-                            onChange={(e) => setProposal(e.target.value)}
-                            placeholder="Tell them about your content style and why this campaign fits your audience…"
-                          />
-                        </div>
-                        <div className="cd-form-field">
-                          <label className="cd-form-label">Your rate (optional)</label>
-                          <input
-                            className="cd-form-input"
-                            type="number"
-                            min="0"
-                            value={rate}
-                            onChange={(e) => setRate(e.target.value)}
-                            placeholder="Rs. 0"
-                          />
-                        </div>
-                        <div className="cd-form-field">
-                          <label className="cd-form-label">Message (optional)</label>
-                          <textarea
-                            className="cd-form-textarea"
-                            value={message}
-                            onChange={(e) => setMessage(e.target.value)}
-                            placeholder="Anything else they should know?"
-                          />
-                        </div>
-                        <div className="cd-form-actions">
-                          <button
-                            className="cd-form-cancel"
-                            onClick={() => {
-                              setShowApplyForm(false);
-                              setApplyError('');
-                            }}
-                            disabled={applying}
-                          >
-                            Cancel
-                          </button>
-                          <button className="cd-form-submit" onClick={handleApplySubmit} disabled={applying}>
-                            {applying && <Loader2 size={14} className="cd-spin" />}
-                            {applying ? 'Submitting…' : 'Submit'}
-                          </button>
-                        </div>
-                      </div>
-                    );
-                  }
-
-                  return (
-                    <button className="cd-cta" onClick={() => setShowApplyForm(true)}>
-                      Apply Now
-                    </button>
-                  );
-                })()}
-
-                {!myApplication && !showApplyForm && user?.role === 'creator' && (
-                  <button className="cd-save" onClick={handleToggleSave} disabled={savingBookmark}>
-                    {isSaved ? (
-                      <>
-                        <BookmarkCheck size={15} style={{ verticalAlign: -3, marginRight: 6 }} />
-                        Saved
-                      </>
-                    ) : (
-                      <>
-                        <Bookmark size={15} style={{ verticalAlign: -3, marginRight: 6 }} />
-                        Save Campaign
-                      </>
-                    )}
-                  </button>
-                )}
-              </div>
-
-              <div className="cd-card">
-                <div style={{ fontSize: 13, color: 'var(--ink-soft)', marginBottom: 10 }}>
-                  About the Brand
-                </div>
-                <div className="cd-brand-row">
-                  <div className="cd-brand-avatar">
-                    {(campaign.brand_name || 'B')[0].toUpperCase()}
+                <div className="cd-apply-highlights">
+                  <div className="cd-apply-highlight">
+                    <div className="cd-apply-highlight-icon"><MessageCircle size={15} /></div>
+                    <div><strong>Share your idea</strong><span>Tell the brand how you would bring the campaign to life.</span></div>
                   </div>
-                  <div>
-                    <div className="cd-brand-name">{campaign.brand_name || 'Business'}</div>
-                    <div className="cd-brand-cat">{campaign.category}</div>
+                  <div className="cd-apply-highlight">
+                    <div className="cd-apply-highlight-icon"><Film size={15} /></div>
+                    <div><strong>Show your style</strong><span>Highlight the kind of content and storytelling you create.</span></div>
+                  </div>
+                  <div className="cd-apply-highlight">
+                    <div className="cd-apply-highlight-icon"><Rocket size={15} /></div>
+                    <div><strong>Send your pitch</strong><span>Keep it clear, personal and relevant to this brief.</span></div>
                   </div>
                 </div>
+
+                <div className="cd-apply-divider" />
+                {renderApplicationAction()}
+                {!myApplication && !showApplyForm && user?.role === 'creator' && <button className="cd-save-button" onClick={handleToggleSave} disabled={savingBookmark}>{isSaved ? <BookmarkCheck size={15} /> : <Bookmark size={15} />}{isSaved ? 'Saved to your campaigns' : 'Save for later'}</button>}
+                <div className="cd-apply-note"><Check size={13} /> Your pitch is sent directly to the brand.</div>
               </div>
 
-              {related.length > 0 && (
-                <div className="cd-card">
-                  <div className="cd-sidebar-heading">Related Campaigns</div>
-                  {related.map((c) => (
-                    <Link key={c.id} to={`/campaigns/${c.id}`} className="cd-related-item">
-                      <div className="cd-related-title">{c.title}</div>
-                      <div className="cd-related-meta">
-                        {c.brand_name || 'Business'} · {c.category}
-                      </div>
-                    </Link>
-                  ))}
+              <div className="cd-side-card">
+                <div className="cd-side-heading">Campaign snapshot</div>
+                <div className="cd-side-stat"><DollarSign size={15} className="cd-side-stat-icon" /><div><div className="cd-side-stat-label">Compensation</div><div className="cd-side-stat-value">{campaign.compensation_description || formatMoney(campaign.budget) || 'Discuss with brand'}</div></div></div>
+                <div className="cd-side-stat"><Calendar size={15} className="cd-side-stat-icon" /><div><div className="cd-side-stat-label">Deadline</div><div className="cd-side-stat-value">{deadline ? deadline.label : 'Open until filled'}</div></div></div>
+                <div className="cd-side-stat"><MapPin size={15} className="cd-side-stat-icon" /><div><div className="cd-side-stat-label">Location</div><div className="cd-side-stat-value">{brandLocation || 'Remote / flexible'}</div></div></div>
+                <div className="cd-side-stat"><Film size={15} className="cd-side-stat-icon" /><div><div className="cd-side-stat-label">Content</div><div className="cd-side-stat-value">{campaign.sub_category || campaign.category}</div></div></div>
+              </div>
+
+              <Link to={`/brands/${campaign.business_id}`} className="cd-side-card cd-brand-side">
+                <div className="cd-side-heading"><span>About the brand</span><ArrowUpRight size={15} color={CORAL_DARK} /></div>
+                <div className="cd-brand-side-row">
+                  <div className="cd-brand-side-logo">{brandLogo ? <img src={brandLogo} alt={`${brandName} logo`} /> : brandName[0].toUpperCase()}</div>
+                  <div><div className="cd-brand-side-name">{brandName}</div><div className="cd-brand-side-meta">{brandIndustry}{brandLocation ? ` · ${brandLocation}` : ''}</div></div>
                 </div>
-              )}
-            </div>
+                <div className="cd-brand-side-link">View brand profile <ArrowUpRight size={13} /></div>
+              </Link>
+
+              {related.length > 0 && <div className="cd-side-card cd-related">
+                <div className="cd-side-heading">More campaigns</div>
+                {related.map((item) => <Link key={item.id} to={`/campaigns/${item.id}`} className="cd-related-item"><div className="cd-related-title">{item.title}</div><div className="cd-related-meta">{item.brand_name || 'Business'} · {item.category}</div></Link>)}
+              </div>}
+            </aside>
           </div>
-        </>
+        </main>
       )}
     </div>
   );
 }
+
+export default CampaignDetail;

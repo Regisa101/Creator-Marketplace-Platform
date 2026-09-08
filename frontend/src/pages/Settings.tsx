@@ -18,8 +18,8 @@ import {
 import { useAuth } from '../context/AuthContext';
 import { LogoMark, BRAND_NAME, PAGE_GRADIENT_BG } from '../components/Brand';
 
-const VIOLET = '#6C5DD3';
-const VIOLET_DARK = '#4A3BA8';
+const VIOLET = '#1E2A78';
+const VIOLET_DARK = '#182262';
 
 // Same category list as CreatorProfile/BusinessOnboarding's
 // "interested categories" so campaign categories line up with what
@@ -671,17 +671,17 @@ export function CampaignForm({ mode }: { mode: 'create' | 'edit' }) {
           flex-shrink: 0;
           padding: 32px 26px;
           background: rgba(255,255,255,0.55);
-          border-right: 1px solid rgba(108,93,211,0.14);
+          border-right: 1px solid rgba(30,42,120,0.14);
           backdrop-filter: blur(6px);
         }
         @media (max-width: 860px) {
           .cc-shell { flex-direction: column; }
-          .cc-sidebar { width: 100%; border-right: none; border-bottom: 1px solid rgba(108,93,211,0.14); }
+          .cc-sidebar { width: 100%; border-right: none; border-bottom: 1px solid rgba(30,42,120,0.14); }
         }
 
         .cc-sidebar-brand { display: inline-flex; align-items: center; gap: 8px; font-weight: 700; font-size: 16px; }
         .cc-sidebar-tagline { font-size: 12px; color: var(--ink-soft); margin: 4px 0 0 28px; }
-        .cc-sidebar-divider { border: none; border-top: 1px solid rgba(108,93,211,0.16); margin: 22px 0; }
+        .cc-sidebar-divider { border: none; border-top: 1px solid rgba(30,42,120,0.16); margin: 22px 0; }
 
         .cc-sidebar-eyebrow { font-size: 11px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; color: var(--violet-dark); margin-bottom: 4px; }
         .cc-sidebar-meta { font-size: 12px; color: var(--ink-soft); margin-bottom: 20px; }
@@ -705,7 +705,7 @@ export function CampaignForm({ mode }: { mode: 'create' | 'edit' }) {
           color: #fff;
         }
         .cc-sidebar-dot--upcoming { background: #fff; border: 1.5px solid var(--line); }
-        .cc-sidebar-dot--active { background: var(--violet); box-shadow: 0 0 0 4px rgba(108,93,211,0.18); }
+        .cc-sidebar-dot--active { background: var(--violet); box-shadow: 0 0 0 4px rgba(30,42,120,0.18); }
         .cc-sidebar-dot--done { background: #16a34a; }
         .cc-sidebar-line { width: 1.5px; flex: 1; min-height: 26px; background: var(--line); margin: 3px 0; }
         .cc-sidebar-line--done { background: #16a34a; }
@@ -780,7 +780,7 @@ export function CampaignForm({ mode }: { mode: 'create' | 'edit' }) {
         .cc-back-step:hover { color: var(--ink); }
         .cc-next-step { display: inline-flex; align-items: center; gap: 8px; font-size: 14px; font-weight: 600; color: #fff; background: var(--violet); border: none; padding: 12px 24px; border-radius: 8px; cursor: pointer; }
         .cc-next-step:disabled { background: #cabbf5; cursor: not-allowed; }
-        .cc-next-step--secondary { background: #fff; color: var(--violet-dark); border: 1px solid #ded8f7; padding: 11px 20px; }
+        .cc-next-step--secondary { background: #fff; color: var(--violet-dark); border: 1px solid #D6DCF5; padding: 11px 20px; }
         .cc-next-step--secondary:disabled { background: #fafafd; color: var(--ink-soft); border-color: var(--line); }
 
         .cc-card {
@@ -838,8 +838,8 @@ export function CampaignForm({ mode }: { mode: 'create' | 'edit' }) {
           font-size: 13px;
           font-weight: 600;
           color: var(--violet-dark);
-          background: #f2f0fc;
-          border: 1px solid #ded8f7;
+          background: #F2F4FC;
+          border: 1px solid #D6DCF5;
           border-radius: 8px;
           padding: 9px 16px;
           cursor: pointer;
@@ -876,7 +876,7 @@ export function CampaignForm({ mode }: { mode: 'create' | 'edit' }) {
           cursor: pointer;
           text-align: center;
         }
-        .cc-type-btn--active { border-color: var(--violet); color: var(--violet-dark); background: #f2f0fc; }
+        .cc-type-btn--active { border-color: var(--violet); color: var(--violet-dark); background: #F2F4FC; }
 
         .cc-error {
           font-size: 13px;
@@ -928,7 +928,7 @@ export function CampaignForm({ mode }: { mode: 'create' | 'edit' }) {
           align-items: center;
           justify-content: center;
         }
-        .cc-taglist-add:hover { background: #f2f0fc; border-color: var(--violet); }
+        .cc-taglist-add:hover { background: #F2F4FC; border-color: var(--violet); }
         .cc-taglist-chips { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
         .cc-chip {
           display: inline-flex;
@@ -936,7 +936,7 @@ export function CampaignForm({ mode }: { mode: 'create' | 'edit' }) {
           gap: 6px;
           font-size: 12.5px;
           font-weight: 500;
-          background: #f2f0fc;
+          background: #F2F4FC;
           color: var(--violet-dark);
           border-radius: 999px;
           padding: 6px 8px 6px 12px;
@@ -982,7 +982,7 @@ export function CampaignForm({ mode }: { mode: 'create' | 'edit' }) {
           font-size: 13px;
           font-weight: 600;
           color: var(--violet-dark);
-          background: #f2f0fc;
+          background: #F2F4FC;
           border: 1px dashed var(--violet);
           border-radius: 10px;
           padding: 10px 16px;
@@ -1026,7 +1026,7 @@ export function CampaignForm({ mode }: { mode: 'create' | 'edit' }) {
         .cc-defaults-save:disabled { opacity: 0.6; cursor: not-allowed; }
 
         .cc-suggest-box {
-          border: 1px dashed #ded8f7;
+          border: 1px dashed #D6DCF5;
           background: #f8f7fd;
           border-radius: 12px;
           padding: 14px 16px;
@@ -1048,18 +1048,18 @@ export function CampaignForm({ mode }: { mode: 'create' | 'edit' }) {
         .cc-suggest-chip, .cc-preset-chip {
           font-size: 12px;
           font-weight: 500;
-          border: 1px solid #ded8f7;
+          border: 1px solid #D6DCF5;
           background: #fff;
           color: var(--violet-dark);
           border-radius: 999px;
           padding: 5px 11px;
           cursor: pointer;
         }
-        .cc-suggest-chip:hover, .cc-preset-chip:hover { background: #f2f0fc; }
+        .cc-suggest-chip:hover, .cc-preset-chip:hover { background: #F2F4FC; }
         .cc-suggest-chip:disabled, .cc-preset-chip:disabled {
           opacity: 0.55;
           cursor: default;
-          background: #f2f0fc;
+          background: #F2F4FC;
         }
         .cc-preset-row { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; }
       `}</style>

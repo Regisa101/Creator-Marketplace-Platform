@@ -36,9 +36,9 @@ export const ROLE_THEME: Record<Role, RoleTheme> = {
   business: {
     role: 'business',
     label: 'Brand',
-    accent: '#2B2F6B',
-    accentHover: '#20244F',
-    accentSoft: '#EAEBF5',
+    accent: '#1E2A78',
+    accentHover: '#182262',
+    accentSoft: '#F2F4FC',
     // Same light, airy treatment as the creator panel — a soft navy
     // tint fading to near-white, instead of a solid dark-navy block
     // that overpowered the panel.

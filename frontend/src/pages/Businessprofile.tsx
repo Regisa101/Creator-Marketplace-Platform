@@ -16,9 +16,9 @@ import {
 import { useAuth } from '../context/AuthContext';
 import { getBusinessProgress } from '../api/client';
 
-const CORAL = '#FF8A5B';
-const VIOLET = '#6C5DD3';
-const VIOLET_DARK = '#4A3BA8';
+const CORAL = '#FF6B5A';
+const VIOLET = '#1E2A78';
+const VIOLET_DARK = '#182262';
 
 export function BusinessProfile() {
   const { user } = useAuth();
@@ -166,7 +166,7 @@ export function BusinessProfile() {
         }
         .bp-badge-pending { background: #F1EEFC; color: #6c6d73; }
         .bp-badge-verified { background: #E1F6EA; color: #16a34a; display: inline-flex; align-items: center; gap: 4px; }
-        .bp-badge-tag { background: #EDEAFB; color: var(--violet-dark); }
+        .bp-badge-tag { background: #F2F4FC; color: var(--violet-dark); }
 
         .bp-section { padding: 24px 32px; border-top: 1px solid var(--line); }
         .bp-section-title {
@@ -191,8 +191,8 @@ export function BusinessProfile() {
           font-weight: 600;
           padding: 6px 13px;
           border-radius: 100px;
-          background: #FFEEE5;
-          color: #E86B3E;
+          background: #FFF4F2;
+          color: #F0523F;
         }
 
         .bp-info-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 12px; }
@@ -208,7 +208,7 @@ export function BusinessProfile() {
           width: 36px;
           height: 36px;
           border-radius: 9px;
-          background: #EDEAFB;
+          background: #F2F4FC;
           color: var(--violet-dark);
           display: flex;
           align-items: center;

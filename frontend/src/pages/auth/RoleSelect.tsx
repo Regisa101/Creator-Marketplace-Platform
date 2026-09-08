@@ -20,7 +20,7 @@ export function RoleSelect() {
         }
         .rs-page * { box-sizing: border-box; }
         .rs-page a { text-decoration: none; color: inherit; }
-        .rs-font-logo { font-family: 'League Spartan', sans-serif; font-weight: 700; letter-spacing: 0.02em; }
+        .rs-font-logo { font-family: 'League Spartan', sans-serif; font-weight: 600; letter-spacing: 0.02em; }
 
         .rs-logo-row { display: flex; align-items: center; justify-content: center; gap: 9px; margin-bottom: 16px; }
         .rs-logo-text { font-size: 26px; color: #111217; }
@@ -45,7 +45,7 @@ export function RoleSelect() {
         }
         .rs-tile:hover { transform: translateY(-2px); box-shadow: 0 16px 30px -14px rgba(17,18,23,0.18); }
         .rs-tile--creator:hover { border-color: #FF6B5A; }
-        .rs-tile--business:hover { border-color: #2B2F6B; }
+        .rs-tile--business:hover { border-color: #1E2A78; }
 
         .rs-thumb { height: 140px; }
         .rs-thumb img { width: 100%; height: 100%; object-fit: cover; display: block; }
@@ -53,14 +53,14 @@ export function RoleSelect() {
         .rs-body { padding: 16px 18px 20px; }
         .rs-name { font-size: 14.5px; font-weight: 700; }
         .rs-tile--creator .rs-name { color: #FF6B5A; }
-        .rs-tile--business .rs-name { color: #2B2F6B; }
+        .rs-tile--business .rs-name { color: #1E2A78; }
         .rs-desc { font-size: 12.5px; color: #6c6d73; margin-top: 6px; line-height: 1.5; }
         .rs-go { display: inline-flex; align-items: center; gap: 5px; font-size: 12.5px; font-weight: 600; margin-top: 12px; }
         .rs-tile--creator .rs-go { color: #FF6B5A; }
-        .rs-tile--business .rs-go { color: #2B2F6B; }
+        .rs-tile--business .rs-go { color: #1E2A78; }
 
         .rs-switch { text-align: center; margin-top: 26px; font-size: 12.5px; color: #6c6d73; }
-        .rs-switch a { font-weight: 600; color: #2B2F6B; }
+        .rs-switch a { font-weight: 600; color: #1E2A78; }
 
         @media (max-width: 560px) {
           .rs-grid { grid-template-columns: 1fr; }

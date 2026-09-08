@@ -11,10 +11,10 @@ const C = {
   inkSoft: '#6B6478',
   inkFaint: '#A39DB8',
   line: '#EAE7F2',
-  violet: '#6C5DD3',
-  violetSoft: '#EDEAFB',
-  coral: '#FF8A5B',
-  coralSoft: '#FFEEE5',
+  violet: '#1E2A78',
+  violetSoft: '#F2F4FC',
+  coral: '#FF6B5A',
+  coralSoft: '#FFF4F2',
 };
 
 // Same list CampaignCreate.tsx uses, so the filter options line up

@@ -5,9 +5,9 @@ import { getCampaigns, type Campaign, type CampaignListParams } from '../api/cli
 import { useAuth } from '../context/AuthContext';
 import { LogoMark, BRAND_NAME, PAGE_GRADIENT_BG } from '../components/Brand';
 
-const CORAL = '#FF8A5B';
-const CORAL_DARK = '#E86B3E';
-const VIOLET = '#6C5DD3';
+const CORAL = '#FF6B5A';
+const CORAL_DARK = '#F0523F';
+const VIOLET = '#1E2A78';
 
 // Same list as CampaignCreate.tsx — kept local per-file for now rather
 // than shared, same reasoning noted there.

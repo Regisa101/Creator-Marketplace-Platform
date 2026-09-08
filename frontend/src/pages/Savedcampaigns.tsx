@@ -4,8 +4,8 @@ import { ArrowLeft, MapPin, Building2, BookmarkX, DollarSign, Gift } from 'lucid
 import { getSavedCampaigns, unsaveCampaign, type SavedCampaignEntry } from '../api/client';
 import { LogoMark, BRAND_NAME, PAGE_GRADIENT_BG } from '../components/Brand';
 
-const CORAL = '#FF8A5B';
-const CORAL_DARK = '#E86B3E';
+const CORAL = '#FF6B5A';
+const CORAL_DARK = '#F0523F';
 
 export function SavedCampaigns() {
   const [saved, setSaved] = useState<SavedCampaignEntry[]>([]);

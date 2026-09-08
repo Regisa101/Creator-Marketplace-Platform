@@ -24,8 +24,8 @@ import { useAuth } from '../../context/AuthContext';
 
 // Navy accent — matches the business/brand color used across the rest
 // of the site (auth panels, role picker) instead of the old one-off violet.
-const NAVY = '#2B2F6B';
-const NAVY_DARK = '#20244F';
+const NAVY = '#1E2A78';
+const NAVY_DARK = '#182262';
 const CORAL = '#FF6B5A';
 
 const BUSINESS_TYPES = [

@@ -5,8 +5,8 @@ import { getApplications, updateApplicationStatus, type Application, type Applic
 import { useAuth } from '../context/AuthContext';
 import { LogoMark, BRAND_NAME, PAGE_GRADIENT_BG } from '../components/Brand';
 
-const VIOLET = '#6C5DD3';
-const VIOLET_DARK = '#4A3BA8';
+const VIOLET = '#1E2A78';
+const VIOLET_DARK = '#182262';
 
 const TABS: { key: ApplicationStatus | 'all'; label: string }[] = [
   { key: 'all', label: 'All' },

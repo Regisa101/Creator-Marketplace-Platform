@@ -6,18 +6,30 @@ import {
   LayoutDashboard, Megaphone, Compass, Inbox, Briefcase, Search, Bell,
   ChevronDown, ChevronRight, LogOut, Settings, Plus, ArrowRight, Send, Eye,
   Wallet, FileText, Users, CircleDashed, CheckCircle2, MessageSquare,
-  Calendar, PackageCheck, Bookmark,
+  Calendar, PackageCheck, Bookmark, HelpCircle, ExternalLink,
 } from 'lucide-react';
 import { useState, useEffect } from 'react';
 import { getApplications, getCampaigns, type Application, type Campaign } from '../api/client';
 
 /**
- * /dashboard — increment 1, single file on purpose.
- * White sidebar + light content, role-aware (creator vs business).
+ * /dashboard — restyled to match the reference layout: tinted stat
+ * cards, a light "campaign spotlight" card (falls back to the dark
+ * getting-started prompt when there's nothing to show yet), a two-up
+ * "My Campaigns / My Applications" + "Recent Activity" row, and a
+ * right rail with a real Application Status donut, a "Quick Tasks"
+ * list, and a discovery promo card.
  *
- * IMPORTANT: this renders REAL zero-state, not sample data. Swap the
- * `stats` / `spotlight` / `checklist` blocks for real API data once
- * GET /api/dashboard exists — the shapes are already set up for that.
+ * IMPORTANT: still renders REAL zero-state, not sample data. Numbers
+ * and list items come from the same `applications` / `ownCampaigns`
+ * fetches as before — nothing here is hardcoded to match the
+ * reference screenshot's sample numbers. Two small honesty notes vs.
+ * the reference image:
+ *   - the reference shows deltas like "↑ 1 this month" on stat cards;
+ *     there's no history/analytics endpoint backing that yet, so
+ *     those are short status captions instead of fabricated deltas.
+ *   - the reference's Application Status donut has a "Draft" segment;
+ *     the Application type only has accepted/pending/rejected, so
+ *     that segment is labeled "Rejected" here instead of invented.
  *
  * FONT: the logo uses League Spartan. Add it once, globally, e.g. in
  * index.html:
@@ -45,8 +57,11 @@ const C = {
   coral: '#FF6B5A',        // creator primary — brand coral
   coralSoft: '#FFF4F2',
   mint: '#22C55E',
+  mintSoft: '#EAFBF1',
   sky: '#38BDF8',
+  skySoft: '#EAF8FE',
   amber: '#F59E0B',
+  amberSoft: '#FEF6E7',
 };
 
 const WORKSPACE_CHILDREN = [
@@ -165,11 +180,31 @@ const Donut = ({ segments }: { segments: { value: number; color: string; label: 
     <div className="relative flex h-32 w-32 items-center justify-center rounded-full" style={{ background: `conic-gradient(${stops})` }}>
       <div className="flex h-[72px] w-[72px] flex-col items-center justify-center rounded-full" style={{ background: C.card }}>
         <span className="text-lg font-bold" style={{ color: C.ink }}>{total}</span>
-        <span className="text-[10px]" style={{ color: C.inkFaint }}>total</span>
+        <span className="text-[10px]" style={{ color: C.inkFaint }}>Total</span>
       </div>
     </div>
   );
 };
+
+// Small helper — status string -> display label + color, used by
+// both the campaign spotlight and the "My Campaigns" list so the two
+// stay visually consistent.
+function statusMeta(status: string | undefined) {
+  switch (status) {
+    case 'published':
+    case 'in_progress':
+      return { label: 'In progress', color: C.mint, bg: C.mintSoft };
+    case 'in_review':
+    case 'review':
+      return { label: 'In review', color: C.sky, bg: C.skySoft };
+    case 'draft':
+      return { label: 'Draft', color: C.inkFaint, bg: C.line };
+    case 'completed':
+      return { label: 'Completed', color: C.violet, bg: C.violetSoft };
+    default:
+      return { label: status || 'Active', color: C.inkSoft, bg: C.line };
+  }
+}
 
 export const Dashboard = () => {
   const { user, logout } = useAuth();
@@ -201,15 +236,16 @@ export const Dashboard = () => {
   const firstName = user?.full_name?.split(' ')[0] ?? 'there';
   const initials = user?.full_name?.[0]?.toUpperCase() ?? '?';
 
-  // Backs the top stat cards below. GET /api/applications is already
+  // Backs the top stat cards, the campaign spotlight, and the "My
+  // Campaigns" list below. GET /api/applications is already
   // role-scoped server-side (creators get their own, businesses get
   // applicants to their campaigns), so no extra filtering needed here.
   // GET /api/campaigns is the same for the business "Active Campaigns"
-  // count. There's deliberately no "Profile Views" / "Earnings" /
-  // "Deliverables Due" / "Spend" fetch — those have no backing model
+  // count and list. There's deliberately no "Profile Views" / "Earnings"
+  // / "Deliverables Due" / "Spend" fetch — those have no backing model
   // anywhere in the API yet (no analytics, payments, or deliverable
-  // tracking), so those four cards stay at their zero-state below
-  // rather than being wired to numbers that don't exist.
+  // tracking), so those cards stay at their zero-state below rather
+  // than being wired to numbers that don't exist.
   const [applications, setApplications] = useState<Application[]>([]);
   const [ownCampaigns, setOwnCampaigns] = useState<Campaign[]>([]);
 
@@ -239,10 +275,15 @@ export const Dashboard = () => {
     };
   }, [role]);
 
-  const activeCollabsCount = applications.filter((a) => a.status === 'accepted').length;
-  const activeCampaignsCount = ownCampaigns.filter(
+  const acceptedApplications = applications.filter((a) => a.status === 'accepted');
+  const pendingApplications = applications.filter((a) => a.status === 'pending');
+  const rejectedApplications = applications.filter((a) => a.status === 'rejected');
+
+  const activeCollabsCount = acceptedApplications.length;
+  const activeCampaigns = ownCampaigns.filter(
     (c) => c.status === 'published' || c.status === 'in_progress'
-  ).length;
+  );
+  const activeCampaignsCount = activeCampaigns.length;
 
   const hour = new Date().getHours();
   const greeting = hour < 12 ? 'Good morning' : hour < 17 ? 'Good afternoon' : 'Good evening';
@@ -277,21 +318,32 @@ export const Dashboard = () => {
         { label: 'Workspace', icon: Briefcase, to: '/workspace', children: WORKSPACE_CHILDREN },
       ];
 
+  // Stat cards now carry a tinted background (not just a tinted icon
+  // square) plus a short status caption instead of a fabricated
+  // period-over-period delta — see file header note.
   const STATS = role === 'creator'
     ? [
-        { label: 'Active Collabs', value: activeCollabsCount, icon: Briefcase, color: primary },
-        { label: 'Applications Sent', value: applications.length, icon: Send, color: C.mint },
-        { label: 'Profile Views', value: 0, icon: Eye, color: C.sky },
-        { label: 'Earnings this month', value: 'Rs. 0', icon: Wallet, color: C.amber },
+        { label: 'Active Collabs', value: activeCollabsCount, icon: Briefcase, color: primary, soft: primarySoft, caption: activeCollabsCount > 0 ? 'In progress' : 'None yet' },
+        { label: 'Applications Sent', value: applications.length, icon: Send, color: C.mint, soft: C.mintSoft, caption: pendingApplications.length > 0 ? `${pendingApplications.length} pending` : 'All reviewed' },
+        { label: 'Profile Views', value: 0, icon: Eye, color: C.sky, soft: C.skySoft, caption: 'No views yet' },
+        { label: 'Earnings this month', value: 'Rs. 0', icon: Wallet, color: C.amber, soft: C.amberSoft, caption: 'No payouts yet' },
       ]
     : [
-        { label: 'Active Campaigns', value: activeCampaignsCount, icon: Megaphone, color: primary },
-        { label: 'Applications Received', value: applications.length, icon: Inbox, color: C.mint },
-        { label: 'Deliverables Due', value: 0, icon: FileText, color: C.sky },
-        { label: 'Spend this month', value: 'Rs. 0', icon: Wallet, color: C.amber },
+        { label: 'Active Campaigns', value: activeCampaignsCount, icon: Megaphone, color: primary, soft: primarySoft, caption: activeCampaignsCount > 0 ? 'Live now' : 'None yet' },
+        { label: 'Applications Received', value: applications.length, icon: Inbox, color: C.mint, soft: C.mintSoft, caption: pendingApplications.length > 0 ? `${pendingApplications.length} to review` : 'All reviewed' },
+        { label: 'Deliverables Due', value: 0, icon: FileText, color: C.sky, soft: C.skySoft, caption: 'All caught up' },
+        { label: 'Spent this month', value: 'Rs. 0', icon: Wallet, color: C.amber, soft: C.amberSoft, caption: 'No expenses yet' },
       ];
 
-  const spotlight = role === 'creator'
+  // Campaign spotlight — when there's something real to show (a
+  // published campaign for business, an accepted collab for creator)
+  // render the light "in progress" card from the reference. Otherwise
+  // fall back to the original dark getting-started prompt.
+  const spotlightCampaign = role === 'business' ? activeCampaigns[0] : undefined;
+  const spotlightCollab = role === 'creator' ? acceptedApplications[0] : undefined;
+  const hasSpotlightContent = role === 'business' ? Boolean(spotlightCampaign) : Boolean(spotlightCollab);
+
+  const emptySpotlight = role === 'creator'
     ? { title: "You don't have an active collab yet", sub: 'Apply to a campaign to get your first one started.', cta: 'Browse Campaigns', ctaTo: '/campaigns' }
     : { title: "You haven't launched a campaign yet", sub: 'Create your first campaign to start receiving applications.', cta: 'Create Campaign', ctaTo: '/campaigns/new' };
 
@@ -307,23 +359,33 @@ export const Dashboard = () => {
         { label: 'Review Applications', icon: Inbox, to: '/applications', color: C.amber },
       ];
 
-  const checklist = role === 'creator'
+  // "Quick Tasks" — same underlying checklist as before, restyled as
+  // a tappable list (chevron -> route) instead of a static checklist,
+  // matching the reference. Each task links somewhere real.
+  const quickTasks = role === 'creator'
     ? [
-        { label: 'Complete your profile', done: profileCompletion >= 100 },
-        { label: 'Apply to your first campaign', done: false },
-        { label: 'Get your first application approved', done: false },
+        { label: 'Complete your profile', sub: profileCompletion >= 100 ? 'Profile complete' : `${profileCompletion}% done`, done: profileCompletion >= 100, to: profileEditRoute },
+        { label: 'Apply to your first campaign', sub: applications.length > 0 ? `${applications.length} application${applications.length > 1 ? 's' : ''} sent` : 'Browse open campaigns', done: applications.length > 0, to: '/campaigns' },
+        { label: 'Get your first application approved', sub: activeCollabsCount > 0 ? `${activeCollabsCount} accepted` : 'Waiting on a response', done: activeCollabsCount > 0, to: '/applications' },
       ]
     : [
-        { label: 'Complete your business profile', done: profileCompletion >= 100 },
-        { label: 'Publish your first campaign', done: false },
-        { label: 'Review your first application', done: false },
+        { label: 'Review applications', sub: pendingApplications.length > 0 ? `${pendingApplications.length} new application${pendingApplications.length > 1 ? 's' : ''}` : 'All caught up', done: applications.length > 0 && pendingApplications.length === 0, to: '/applications' },
+        { label: 'Publish your first campaign', sub: activeCampaignsCount > 0 ? `${activeCampaignsCount} live` : 'Get started with your brand', done: activeCampaignsCount > 0, to: '/campaigns/new' },
+        { label: 'Update your profile', sub: profileCompletion >= 100 ? 'Profile complete' : 'Complete your brand profile', done: profileCompletion >= 100, to: profileEditRoute },
       ];
 
+  // Application Status donut — real counts. The reference screenshot's
+  // "Draft" segment doesn't map to anything the Application type has
+  // (accepted / pending / rejected), so that slot is "Rejected" here.
   const statusSegments = [
-    { value: 0, color: C.mint, label: 'Approved' },
-    { value: 0, color: C.amber, label: 'In review' },
-    { value: 0, color: C.inkFaint, label: 'Draft' },
+    { value: acceptedApplications.length, color: C.mint, label: 'Approved' },
+    { value: pendingApplications.length, color: C.amber, label: 'In review' },
+    { value: rejectedApplications.length, color: C.inkFaint, label: 'Rejected' },
   ];
+
+  const discoveryPromo = role === 'creator'
+    ? { title: 'Get discovered by the right brands.', sub: 'Complete your portfolio and browse open campaigns that match your niche.', cta: 'Browse campaigns', to: '/campaigns' }
+    : { title: 'Get better results with the right creators.', sub: 'Explore our creator database and find perfect matches for your brand.', cta: 'Discover creators', to: '/creators' };
 
   return (
     <div className="flex min-h-screen" style={{ background: C.surface }}>
@@ -398,99 +460,103 @@ export const Dashboard = () => {
           })}
         </nav>
 
-        {/* Profile completion promo — percentage/bar reflect the real
-            profile data and animate as it changes (see profileCompletion
-            above). Hidden once the profile is fully filled in. */}
-        {profileCompletion < 100 && (
-          <div className="mt-8 rounded-xl p-4" style={{ background: '#1F1A2E' }}>
-            <div className="text-sm font-semibold text-white">Complete your profile</div>
-            <p className="mt-1 text-xs" style={{ color: '#9992AD' }}>
-              {role === 'creator' ? 'A complete profile gets seen by more brands.' : 'A complete profile builds trust with creators.'}
-            </p>
-            <div className="mt-3 h-1.5 w-full rounded-full" style={{ background: '#332C48' }}>
-              <div
-                className="h-1.5 rounded-full transition-all duration-700 ease-out"
-                style={{ width: `${profileCompletion}%`, background: primary }}
-              />
-            </div>
-            <div className="mt-1 text-right text-[11px]" style={{ color: '#9992AD' }}>{profileCompletion}%</div>
-            <Link
-              to={profileEditRoute}
-              className="mt-2 flex items-center justify-center gap-1.5 rounded-lg py-2 text-xs font-semibold text-white"
-              style={{ background: primary }}
-            >
-              Complete Profile <ArrowRight size={12} />
-            </Link>
-          </div>
-        )}
+        {/* Push the rest of the rail to the bottom, like the reference */}
+        <div className="mt-6 flex flex-1 flex-col justify-end gap-4">
 
-        {/* Campaign Defaults nudge — points business users at the new
-            Settings page. Dismissible (localStorage) rather than tied
-            to whether defaults are actually set, since that would
-            need an extra profile fetch just for this hint; a one-time
-            nudge is enough to make the feature discoverable without
-            nagging indefinitely. */}
-        {role === 'business' && !defaultsHintDismissed && (
-          <div className="mt-4 rounded-xl p-4" style={{ background: C.violetSoft, border: `1px solid #d7ddf5` }}>
-            <div className="flex items-start justify-between gap-2">
-              <div className="text-xs font-semibold" style={{ color: C.violet }}>Save time on your next campaign</div>
-              <button
-                onClick={() => dismissDefaultsHint()}
-                className="text-[11px] leading-none"
-                style={{ color: '#9992AD' }}
-                aria-label="Dismiss"
+          {/* Profile completion promo — percentage/bar reflect the real
+              profile data and animate as it changes (see profileCompletion
+              above). Hidden once the profile is fully filled in. */}
+          {profileCompletion < 100 && (
+            <div className="rounded-xl p-4" style={{ background: '#1F1A2E' }}>
+              <div className="text-sm font-semibold text-white">Complete your profile</div>
+              <p className="mt-1 text-xs" style={{ color: '#9992AD' }}>
+                {role === 'creator' ? 'A complete profile gets seen by more brands.' : 'A complete profile builds trust with creators.'}
+              </p>
+              <div className="mt-3 h-1.5 w-full rounded-full" style={{ background: '#332C48' }}>
+                <div
+                  className="h-1.5 rounded-full transition-all duration-700 ease-out"
+                  style={{ width: `${profileCompletion}%`, background: primary }}
+                />
+              </div>
+              <div className="mt-1 text-right text-[11px]" style={{ color: '#9992AD' }}>{profileCompletion}%</div>
+              <Link
+                to={profileEditRoute}
+                className="mt-2 flex items-center justify-center gap-1.5 rounded-lg py-2 text-xs font-semibold text-white"
+                style={{ background: primary }}
               >
-                ✕
-              </button>
-            </div>
-            <p className="mt-1 text-xs" style={{ color: C.inkSoft }}>
-              Set your usual Do's, Don'ts &amp; video specs once — they'll auto-fill every new campaign.
-            </p>
-            <Link
-              to="/settings"
-              className="mt-2 flex items-center justify-center gap-1.5 rounded-lg py-2 text-xs font-semibold"
-              style={{ background: '#fff', color: C.violet, border: `1px solid #d7ddf5` }}
-            >
-              Set up Campaign Defaults <ArrowRight size={12} />
-            </Link>
-          </div>
-        )}
-
-        {/* User chip */}
-        <div className="relative mt-4">
-          <button onClick={() => setMenuOpen((v) => !v)} className="flex w-full items-center gap-2.5 rounded-lg px-2 py-2">
-            <div className="flex h-8 w-8 items-center justify-center overflow-hidden rounded-full text-xs font-semibold text-white" style={{ background: primary }}>
-              {avatarUrl ? (
-                <img src={avatarUrl} alt="" className="h-full w-full object-cover" />
-              ) : (
-                initials
-              )}
-            </div>
-            <div className="flex-1 text-left">
-              <div className="text-xs font-medium leading-tight" style={{ color: C.ink }}>{user?.full_name}</div>
-              <div className="text-[11px] capitalize leading-tight" style={{ color: C.inkFaint }}>{user?.role}</div>
-            </div>
-            <ChevronDown size={14} style={{ color: C.inkFaint }} />
-          </button>
-          {menuOpen && (
-            <div className="absolute bottom-full left-0 mb-2 w-full rounded-lg border py-1 shadow-lg" style={{ background: C.card, borderColor: C.line }}>
-              <Link to={profileViewRoute} className="flex items-center gap-2 px-3 py-2 text-xs" style={{ color: C.ink }} onClick={() => setMenuOpen(false)}>
-                <Settings size={13} /> Edit profile
+                Complete Profile <ArrowRight size={12} />
               </Link>
-              {role === 'business' && (
-                <Link to="/settings" className="flex items-center gap-2 px-3 py-2 text-xs" style={{ color: C.ink }} onClick={() => setMenuOpen(false)}>
-                  <Settings size={13} /> Settings
-                </Link>
-              )}
-              <button
-                onClick={() => { setMenuOpen(false); logout(); navigate('/login'); }}
-                className="flex w-full items-center gap-2 px-3 py-2 text-left text-xs"
-                style={{ color: C.ink }}
-              >
-                <LogOut size={13} /> Log out
-              </button>
             </div>
           )}
+
+          {/* Campaign Defaults nudge — points business users at the new
+              Settings page. Dismissible (localStorage) rather than tied
+              to whether defaults are actually set, since that would
+              need an extra profile fetch just for this hint; a one-time
+              nudge is enough to make the feature discoverable without
+              nagging indefinitely. */}
+          {role === 'business' && !defaultsHintDismissed && (
+            <div className="rounded-xl p-4" style={{ background: C.violetSoft, border: `1px solid #d7ddf5` }}>
+              <div className="flex items-start justify-between gap-2">
+                <div className="text-xs font-semibold" style={{ color: C.violet }}>Save time on your next campaign</div>
+                <button
+                  onClick={() => dismissDefaultsHint()}
+                  className="text-[11px] leading-none"
+                  style={{ color: '#9992AD' }}
+                  aria-label="Dismiss"
+                >
+                  ✕
+                </button>
+              </div>
+              <p className="mt-1 text-xs" style={{ color: C.inkSoft }}>
+                Set your usual Do's, Don'ts &amp; video specs once — they'll auto-fill every new campaign.
+              </p>
+              <Link
+                to="/settings"
+                className="mt-2 flex items-center justify-center gap-1.5 rounded-lg py-2 text-xs font-semibold"
+                style={{ background: '#fff', color: C.violet, border: `1px solid #d7ddf5` }}
+              >
+                Set up Campaign Defaults <ArrowRight size={12} />
+              </Link>
+            </div>
+          )}
+
+          {/* User chip */}
+          <div className="relative">
+            <button onClick={() => setMenuOpen((v) => !v)} className="flex w-full items-center gap-2.5 rounded-lg px-2 py-2">
+              <div className="flex h-8 w-8 items-center justify-center overflow-hidden rounded-full text-xs font-semibold text-white" style={{ background: primary }}>
+                {avatarUrl ? (
+                  <img src={avatarUrl} alt="" className="h-full w-full object-cover" />
+                ) : (
+                  initials
+                )}
+              </div>
+              <div className="flex-1 text-left">
+                <div className="text-xs font-medium leading-tight" style={{ color: C.ink }}>{user?.full_name}</div>
+                <div className="text-[11px] capitalize leading-tight" style={{ color: C.inkFaint }}>{user?.role}</div>
+              </div>
+              <ChevronDown size={14} style={{ color: C.inkFaint }} />
+            </button>
+            {menuOpen && (
+              <div className="absolute bottom-full left-0 mb-2 w-full rounded-lg border py-1 shadow-lg" style={{ background: C.card, borderColor: C.line }}>
+                <Link to={profileViewRoute} className="flex items-center gap-2 px-3 py-2 text-xs" style={{ color: C.ink }} onClick={() => setMenuOpen(false)}>
+                  <Settings size={13} /> Edit profile
+                </Link>
+                {role === 'business' && (
+                  <Link to="/settings" className="flex items-center gap-2 px-3 py-2 text-xs" style={{ color: C.ink }} onClick={() => setMenuOpen(false)}>
+                    <Settings size={13} /> Settings
+                  </Link>
+                )}
+                <button
+                  onClick={() => { setMenuOpen(false); logout(); navigate('/login'); }}
+                  className="flex w-full items-center gap-2 px-3 py-2 text-left text-xs"
+                  style={{ color: C.ink }}
+                >
+                  <LogOut size={13} /> Log out
+                </button>
+              </div>
+            )}
+          </div>
         </div>
       </aside>
 
@@ -503,12 +569,12 @@ export const Dashboard = () => {
               {greeting}, {firstName} 👋
             </h1>
             <p className="mt-0.5 text-sm" style={{ color: C.inkSoft }}>
-              {role === 'creator' ? "Let's get your first collab started." : "Let's get your first campaign launched."}
+              {role === 'creator' ? "Here's what's happening with your collabs today." : "Here's what's happening with your campaigns today."}
             </p>
           </div>
           <div className="flex items-center gap-4">
             <div className="hidden items-center gap-2 rounded-lg border px-3 py-2 text-sm sm:flex" style={{ borderColor: C.line, background: C.card, color: C.inkFaint }}>
-              <Search size={14} /> Search anything…
+              <Search size={14} /> {role === 'creator' ? 'Search campaigns…' : 'Search campaigns, creators…'}
             </div>
             <button aria-label="Notifications" style={{ color: C.inkSoft }}>
               <Bell size={19} />
@@ -516,7 +582,7 @@ export const Dashboard = () => {
             <Link
               to={role === 'creator' ? '/campaigns' : '/campaigns/new'}
               className="flex items-center gap-1.5 rounded-lg px-3.5 py-2 text-sm font-semibold text-white"
-              style={{ background: primary }}
+              style={{ background: '#15111F' }}
             >
               <Plus size={15} /> {role === 'creator' ? 'Apply' : 'New Campaign'}
             </Link>
@@ -525,63 +591,173 @@ export const Dashboard = () => {
 
         <main className="grid grid-cols-1 gap-5 px-6 pb-10 lg:grid-cols-[1fr_320px]">
           <div>
-            {/* Stat cards */}
+            {/* Stat cards — tinted background per card, short status
+                caption instead of a fabricated delta */}
             <div className="grid grid-cols-2 gap-4 xl:grid-cols-4">
-              {STATS.map((s) => {
-                const Icon = s.icon;
-                return (
-                  <div key={s.label} className="rounded-xl border p-4" style={{ borderColor: C.line, background: C.card }}>
-                    <div className="flex h-9 w-9 items-center justify-center rounded-lg" style={{ background: `${s.color}1A`, color: s.color }}>
-                      <Icon size={17} />
-                    </div>
-                    <div className="mt-3 text-xl font-bold" style={{ color: C.ink }}>{s.value}</div>
-                    <div className="text-xs" style={{ color: C.inkSoft }}>{s.label}</div>
+              {STATS.map((s) => (
+                <div key={s.label} className="rounded-xl p-4" style={{ background: s.soft }}>
+                  <div className="text-xs font-medium" style={{ color: C.inkSoft }}>{s.label}</div>
+                  <div className="mt-2 text-xl font-bold" style={{ color: C.ink }}>{s.value}</div>
+                  <div className="mt-1.5 text-[11px] font-medium" style={{ color: s.color }}>{s.caption}</div>
+                </div>
+              ))}
+            </div>
+
+            {/* Campaign / collab spotlight — light "in progress" card
+                when there's something real to show, dark
+                getting-started prompt otherwise. */}
+            {hasSpotlightContent && role === 'business' && spotlightCampaign ? (
+              <div className="relative mt-5 overflow-hidden rounded-2xl border p-6 sm:flex sm:items-center sm:justify-between sm:gap-6" style={{ borderColor: C.line, background: '#FBFAFF' }}>
+                <div className="max-w-md">
+                  <div className="flex items-center gap-1.5 text-xs font-semibold" style={{ color: C.mint }}>
+                    <span className="h-1.5 w-1.5 rounded-full" style={{ background: C.mint }} />
+                    {statusMeta(spotlightCampaign.status).label === 'In progress' ? 'Campaign in progress' : statusMeta(spotlightCampaign.status).label}
                   </div>
-                );
-              })}
-            </div>
-
-            {/* Onboarding spotlight */}
-            <div className="relative mt-5 overflow-hidden rounded-2xl p-6" style={{ background: 'linear-gradient(120deg, #15111F 40%, #241D38 100%)' }}>
-              <div
-                className="pointer-events-none absolute -right-10 -top-10 h-56 w-56 rounded-full opacity-50"
-                style={{ background: `radial-gradient(circle at 30% 30%, ${primary}, transparent 70%)`, filter: 'blur(10px)' }}
-              />
-              <div className="relative flex items-center gap-1.5 text-xs font-semibold" style={{ color: '#B8AEE8' }}>
-                <CircleDashed size={13} /> Getting started
+                  <h2 className="mt-1 text-xl font-bold" style={{ color: C.ink }}>{spotlightCampaign.title}</h2>
+                  {spotlightCampaign.description && (
+                    <p className="mt-1 text-sm" style={{ color: C.inkSoft }}>{spotlightCampaign.description}</p>
+                  )}
+                  <Link
+                    to={`/campaigns/${spotlightCampaign.id}`}
+                    className="mt-5 inline-flex items-center gap-1.5 rounded-lg px-4 py-2.5 text-sm font-semibold text-white"
+                    style={{ background: '#15111F' }}
+                  >
+                    View campaign <ArrowRight size={14} />
+                  </Link>
+                </div>
+                {(spotlightCampaign as any).image_url && (
+                  <img
+                    src={(spotlightCampaign as any).image_url}
+                    alt=""
+                    className="mt-5 h-40 w-full rounded-xl object-cover sm:mt-0 sm:h-32 sm:w-56"
+                  />
+                )}
               </div>
-              <h2 className="relative mt-1 text-xl font-bold text-white">{spotlight.title}</h2>
-              <p className="relative mt-1 text-sm" style={{ color: '#B7B0C9' }}>{spotlight.sub}</p>
-              <Link
-                to={spotlight.ctaTo}
-                className="relative mt-5 inline-flex items-center gap-1.5 rounded-lg px-4 py-2 text-sm font-semibold text-white"
-                style={{ background: primary }}
-              >
-                {spotlight.cta} <ArrowRight size={14} />
-              </Link>
-            </div>
+            ) : hasSpotlightContent && role === 'creator' && spotlightCollab ? (
+              <div className="relative mt-5 overflow-hidden rounded-2xl border p-6" style={{ borderColor: C.line, background: '#FBFAFF' }}>
+                <div className="flex items-center gap-1.5 text-xs font-semibold" style={{ color: C.mint }}>
+                  <span className="h-1.5 w-1.5 rounded-full" style={{ background: C.mint }} />
+                  Active collab
+                </div>
+                <h2 className="mt-1 text-xl font-bold" style={{ color: C.ink }}>{(spotlightCollab as any).campaign_title ?? 'Your accepted campaign'}</h2>
+                <p className="mt-1 text-sm" style={{ color: C.inkSoft }}>You're in! Head to your workspace to see deliverables and message the brand.</p>
+                <Link
+                  to="/workspace/active"
+                  className="mt-5 inline-flex items-center gap-1.5 rounded-lg px-4 py-2.5 text-sm font-semibold text-white"
+                  style={{ background: '#15111F' }}
+                >
+                  Go to workspace <ArrowRight size={14} />
+                </Link>
+              </div>
+            ) : (
+              <div className="relative mt-5 overflow-hidden rounded-2xl p-6" style={{ background: 'linear-gradient(120deg, #15111F 40%, #241D38 100%)' }}>
+                <div
+                  className="pointer-events-none absolute -right-10 -top-10 h-56 w-56 rounded-full opacity-50"
+                  style={{ background: `radial-gradient(circle at 30% 30%, ${primary}, transparent 70%)`, filter: 'blur(10px)' }}
+                />
+                <div className="relative flex items-center gap-1.5 text-xs font-semibold" style={{ color: '#B8AEE8' }}>
+                  <CircleDashed size={13} /> Getting started
+                </div>
+                <h2 className="relative mt-1 text-xl font-bold text-white">{emptySpotlight.title}</h2>
+                <p className="relative mt-1 text-sm" style={{ color: '#B7B0C9' }}>{emptySpotlight.sub}</p>
+                <Link
+                  to={emptySpotlight.ctaTo}
+                  className="relative mt-5 inline-flex items-center gap-1.5 rounded-lg px-4 py-2 text-sm font-semibold text-white"
+                  style={{ background: primary }}
+                >
+                  {emptySpotlight.cta} <ArrowRight size={14} />
+                </Link>
+              </div>
+            )}
 
-            {/* Quick actions + recent activity */}
-            <div className="mt-5 grid grid-cols-1 gap-5 sm:grid-cols-[220px_1fr]">
+            {/* My Campaigns / My Applications + Recent Activity */}
+            <div className="mt-5 grid grid-cols-1 gap-5 lg:grid-cols-2">
               <div className="rounded-xl border p-4" style={{ borderColor: C.line, background: C.card }}>
-                <h3 className="text-sm font-semibold" style={{ color: C.ink }}>Quick Actions</h3>
+                <div className="flex items-center justify-between">
+                  <h3 className="text-sm font-semibold" style={{ color: C.ink }}>
+                    {role === 'creator' ? 'My Applications' : 'My Campaigns'}
+                  </h3>
+                  <Link to={role === 'creator' ? '/applications' : '/campaigns'} className="flex items-center gap-1 text-xs font-medium" style={{ color: primary }}>
+                    View all <ArrowRight size={12} />
+                  </Link>
+                </div>
+
                 <div className="mt-3 flex flex-col gap-2">
-                  {quickActions.map((a) => {
-                    const Icon = a.icon;
-                    return (
-                      <Link key={a.label} to={a.to} className="flex items-center gap-2.5 rounded-lg border p-2.5 text-xs font-medium" style={{ borderColor: C.line, color: C.ink }}>
-                        <div className="flex h-7 w-7 items-center justify-center rounded-md" style={{ background: `${a.color}1A`, color: a.color }}>
-                          <Icon size={14} />
+                  {role === 'business' ? (
+                    ownCampaigns.length === 0 ? (
+                      <div className="flex flex-col items-center justify-center py-8 text-center">
+                        <div className="flex h-9 w-9 items-center justify-center rounded-full" style={{ background: primarySoft, color: primary }}>
+                          <Megaphone size={16} />
                         </div>
-                        {a.label}
-                      </Link>
-                    );
-                  })}
+                        <p className="mt-2.5 text-xs font-medium" style={{ color: C.ink }}>No campaigns yet</p>
+                        <p className="mt-1 max-w-[200px] text-[11px]" style={{ color: C.inkFaint }}>Create your first campaign to start receiving applications.</p>
+                      </div>
+                    ) : (
+                      ownCampaigns.slice(0, 3).map((c) => {
+                        const meta = statusMeta(c.status);
+                        return (
+                          <Link
+                            key={c.id}
+                            to={`/campaigns/${c.id}`}
+                            className="flex items-center gap-3 rounded-lg border p-2.5"
+                            style={{ borderColor: C.line }}
+                          >
+                            <div className="flex h-11 w-11 shrink-0 items-center justify-center overflow-hidden rounded-lg" style={{ background: primarySoft, color: primary }}>
+                              {(c as any).image_url ? (
+                                <img src={(c as any).image_url} alt="" className="h-full w-full object-cover" />
+                              ) : (
+                                <Megaphone size={16} />
+                              )}
+                            </div>
+                            <div className="min-w-0 flex-1">
+                              <div className="truncate text-xs font-semibold" style={{ color: C.ink }}>{c.title}</div>
+                              <div className="mt-0.5 truncate text-[11px]" style={{ color: C.inkFaint }}>
+                                {(c as any).creator_count !== undefined ? `${(c as any).creator_count} creators` : meta.label}
+                              </div>
+                            </div>
+                            <span className="shrink-0 rounded-full px-2 py-1 text-[10px] font-semibold" style={{ background: meta.bg, color: meta.color }}>
+                              {meta.label}
+                            </span>
+                            <ChevronRight size={14} style={{ color: C.inkFaint }} />
+                          </Link>
+                        );
+                      })
+                    )
+                  ) : applications.length === 0 ? (
+                    <div className="flex flex-col items-center justify-center py-8 text-center">
+                      <div className="flex h-9 w-9 items-center justify-center rounded-full" style={{ background: primarySoft, color: primary }}>
+                        <Inbox size={16} />
+                      </div>
+                      <p className="mt-2.5 text-xs font-medium" style={{ color: C.ink }}>No applications yet</p>
+                      <p className="mt-1 max-w-[200px] text-[11px]" style={{ color: C.inkFaint }}>Browse campaigns and apply to get your first collab.</p>
+                    </div>
+                  ) : (
+                    applications.slice(0, 3).map((a, i) => {
+                      const meta = statusMeta(a.status === 'accepted' ? 'in_progress' : a.status === 'rejected' ? 'draft' : 'in_review');
+                      return (
+                        <div key={(a as any).id ?? i} className="flex items-center gap-3 rounded-lg border p-2.5" style={{ borderColor: C.line }}>
+                          <div className="flex h-11 w-11 shrink-0 items-center justify-center overflow-hidden rounded-lg" style={{ background: primarySoft, color: primary }}>
+                            <Send size={16} />
+                          </div>
+                          <div className="min-w-0 flex-1">
+                            <div className="truncate text-xs font-semibold" style={{ color: C.ink }}>{(a as any).campaign_title ?? 'Campaign application'}</div>
+                            <div className="mt-0.5 truncate text-[11px]" style={{ color: C.inkFaint }}>{a.status}</div>
+                          </div>
+                          <span className="shrink-0 rounded-full px-2 py-1 text-[10px] font-semibold" style={{ background: meta.bg, color: meta.color }}>
+                            {meta.label}
+                          </span>
+                        </div>
+                      );
+                    })
+                  )}
                 </div>
               </div>
 
               <div className="rounded-xl border p-4" style={{ borderColor: C.line, background: C.card }}>
                 <h3 className="text-sm font-semibold" style={{ color: C.ink }}>Recent Activity</h3>
+                {/* No activity/events endpoint exists yet (see comment
+                    above the `applications` fetch), so this stays a
+                    real empty state rather than sample rows. */}
                 <div className="mt-6 flex flex-col items-center justify-center py-6 text-center">
                   <div className="flex h-10 w-10 items-center justify-center rounded-full" style={{ background: primarySoft, color: primary }}>
                     <CircleDashed size={18} />
@@ -593,6 +769,24 @@ export const Dashboard = () => {
                       : 'New applications and deliverable updates will show up here.'}
                   </p>
                 </div>
+              </div>
+            </div>
+
+            {/* Quick actions */}
+            <div className="mt-5 rounded-xl border p-4" style={{ borderColor: C.line, background: C.card }}>
+              <h3 className="text-sm font-semibold" style={{ color: C.ink }}>Quick Actions</h3>
+              <div className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-3">
+                {quickActions.map((a) => {
+                  const Icon = a.icon;
+                  return (
+                    <Link key={a.label} to={a.to} className="flex items-center gap-2.5 rounded-lg border p-2.5 text-xs font-medium" style={{ borderColor: C.line, color: C.ink }}>
+                      <div className="flex h-7 w-7 items-center justify-center rounded-md" style={{ background: `${a.color}1A`, color: a.color }}>
+                        <Icon size={14} />
+                      </div>
+                      {a.label}
+                    </Link>
+                  );
+                })}
               </div>
             </div>
           </div>
@@ -621,19 +815,33 @@ export const Dashboard = () => {
             </div>
 
             <div className="rounded-xl border p-5" style={{ borderColor: C.line, background: C.card }}>
-              <h3 className="text-sm font-semibold" style={{ color: C.ink }}>Getting Started</h3>
-              <div className="mt-3 flex flex-col gap-3">
-                {checklist.map((item) => (
-                  <div key={item.label} className="flex items-center gap-2.5 text-xs">
+              <h3 className="text-sm font-semibold" style={{ color: C.ink }}>Quick Tasks</h3>
+              <div className="mt-3 flex flex-col gap-1">
+                {quickTasks.map((item) => (
+                  <Link
+                    key={item.label}
+                    to={item.to}
+                    className="flex items-center gap-2.5 rounded-lg px-2 py-2 -mx-2"
+                  >
                     {item.done
-                      ? <CheckCircle2 size={16} style={{ color: C.mint }} />
-                      : <CircleDashed size={16} style={{ color: C.inkFaint }} />}
-                    <span style={{ color: item.done ? C.ink : C.inkSoft, textDecoration: item.done ? 'line-through' : 'none' }}>
-                      {item.label}
+                      ? <CheckCircle2 size={16} style={{ color: C.mint }} className="shrink-0" />
+                      : <CircleDashed size={16} style={{ color: C.inkFaint }} className="shrink-0" />}
+                    <span className="min-w-0 flex-1">
+                      <div className="text-xs font-medium" style={{ color: C.ink }}>{item.label}</div>
+                      <div className="truncate text-[11px]" style={{ color: C.inkFaint }}>{item.sub}</div>
                     </span>
-                  </div>
+                    <ChevronRight size={14} style={{ color: C.inkFaint }} className="shrink-0" />
+                  </Link>
                 ))}
               </div>
+            </div>
+
+            <div className="rounded-xl p-5" style={{ background: primarySoft }}>
+              <h3 className="text-sm font-semibold" style={{ color: C.ink }}>{discoveryPromo.title}</h3>
+              <p className="mt-1.5 text-xs leading-relaxed" style={{ color: C.inkSoft }}>{discoveryPromo.sub}</p>
+              <Link to={discoveryPromo.to} className="mt-2.5 inline-flex items-center gap-1 text-xs font-semibold" style={{ color: primary }}>
+                {discoveryPromo.cta} <ArrowRight size={12} />
+              </Link>
             </div>
           </aside>
         </main>

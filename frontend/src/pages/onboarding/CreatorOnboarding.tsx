@@ -562,7 +562,7 @@ export function CreatorOnboarding() {
           --accent: ${CORAL};
           --accent-hover: ${CORAL_DARK};
           --accent-soft: #FFEDEA;
-          --coral: #FF8A5B;
+          --coral: #FF6B5A;
           --good: #16a34a;
 
           font-family: Inter, Poppins, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;

@@ -48,7 +48,7 @@ export function AuthLayout({ role, mode, title, children }: AuthLayoutProps) {
         .az-page * { box-sizing: border-box; }
         .az-page a { text-decoration: none; }
         .az-page button { font-family: inherit; cursor: pointer; }
-        .az-font-logo { font-family: 'League Spartan', sans-serif; font-weight: 700; letter-spacing: 0.01em; }
+        .az-font-logo { font-family: 'League Spartan', sans-serif; font-weight: 600; letter-spacing: 0.01em; }
 
         .az-wordmark { display: flex; align-items: center; justify-content: center; gap: 9px; margin-top: -14px; margin-bottom: 20px; }
         .az-wordmark .az-font-logo { font-size: 28px; color: var(--ink); }

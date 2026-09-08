@@ -16,8 +16,9 @@ import {
 } from '../api/client';
 import { useAuth } from '../context/AuthContext';
 
-const VIOLET = '#6C5DD3';
-const VIOLET_DARK = '#4A3BA8';
+const VIOLET = '#1E2A78';
+const VIOLET_DARK = '#182262';
+const CORAL = '#FF6B5A';
 
 // Same category list as CreatorProfile/BusinessOnboarding's
 // "interested categories" so campaign categories line up with what
@@ -257,6 +258,19 @@ const STEP_QUESTIONS = [
   'Any platform-specific video rules?',
 ];
 
+// The word in each STEP_QUESTIONS heading that gets the coral
+// highlight (matches the reference design). Must match a whole word
+// in the corresponding question, case-insensitive.
+const STEP_HIGHLIGHT_WORDS = ['campaign', 'deliver', 'guardrails', 'caption', 'rules'];
+
+// Splits a heading into [before, highlighted, after] around one word,
+// so it can be rendered with the middle word in a different color.
+function splitHeading(text: string, word: string): [string, string, string] {
+  const idx = text.toLowerCase().indexOf(word.toLowerCase());
+  if (idx === -1) return [text, '', ''];
+  return [text.slice(0, idx), text.slice(idx, idx + word.length), text.slice(idx + word.length)];
+}
+
 const STEP_SUBTITLES = [
   'The essentials creators see first — title, category, and what you\'re offering.',
   'Tell creators what to bring, and what they owe you.',
@@ -270,6 +284,12 @@ const STEP_SUBTITLES = [
 // past Basics is optional) but laid out as a vertical "qualification
 // gates" list: title + a one-line description that swaps for a live
 // status once you're on or past that step.
+//
+// Color logic: a step you're ACTIVELY filling in shows navy (matches
+// the brand's primary color while work is in progress); a step only
+// turns coral once it's genuinely DONE. Upcoming steps stay outlined
+// navy. This mirrors the reference screenshots where "Basics" stayed
+// navy while being filled, rather than turning coral immediately.
 //
 // Logo mark and the profile chip at the bottom are the exact same
 // markup/behavior as Dashboard.tsx's sidebar (same SVG circles,
@@ -290,9 +310,12 @@ function StepSidebar({
   const [menuOpen, setMenuOpen] = useState(false);
 
   const role = user?.role === 'creator' ? 'creator' : 'business';
-  const primary = role === 'creator' ? '#FF8A5B' : VIOLET;
+  const primary = role === 'creator' ? CORAL : VIOLET;
   const initials = user?.full_name?.[0]?.toUpperCase() ?? '?';
   const avatarUrl: string | null = user?.profile?.profile_image || user?.profile?.logo_url || null;
+
+  const total = STEP_LABELS.length;
+  const percent = Math.round((step / total) * 100);
 
   return (
     <aside className="cc-sidebar">
@@ -300,7 +323,7 @@ function StepSidebar({
         <div className="cc-sidebar-brand">
           <svg width="28" height="28" viewBox="0 0 26 26" aria-hidden="true">
             <circle cx="10" cy="13" r="8" fill={VIOLET} />
-            <circle cx="17" cy="9" r="6" fill="#FF8A5B" fillOpacity="0.9" />
+            <circle cx="17" cy="9" r="6" fill={CORAL} fillOpacity="0.9" />
           </svg>
           <span
             style={{
@@ -315,8 +338,18 @@ function StepSidebar({
           </span>
         </div>
 
-        <div className="cc-sidebar-eyebrow">Campaign Step's</div>
-        <div className="cc-sidebar-meta">5 sections- only Basics is required</div>
+        <div className="cc-sidebar-eyebrow">{mode === 'create' ? 'Create Campaign' : 'Edit Campaign'}</div>
+
+        <div className="cc-sidebar-progress-wrap">
+          <div className="cc-sidebar-progress-label">
+            <span>{step} of {total} steps</span>
+            <span>{percent}%</span>
+          </div>
+          <div className="cc-sidebar-progress-track">
+            <div className="cc-sidebar-progress-fill" style={{ width: `${percent}%` }} />
+          </div>
+        </div>
+
         <hr className="cc-sidebar-divider" />
 
         <div className="cc-sidebar-steps">
@@ -329,15 +362,15 @@ function StepSidebar({
             return (
               <button
                 type="button"
-                className="cc-sidebar-step"
+                className={`cc-sidebar-step ${state === 'active' ? 'cc-sidebar-step--active' : ''}`}
                 key={label}
                 onClick={() => onStepClick(number)}
               >
                 <span className="cc-sidebar-dotcol">
-                  <span className={`cc-sidebar-dot cc-sidebar-dot--${state}`}>
-                    {state === 'done' && <CheckCircle2 size={12} />}
+                  <span className={`cc-sidebar-num cc-sidebar-num--${state}`}>
+                    {state === 'done' ? <CheckCircle2 size={12} /> : number}
                   </span>
-                  {number < STEP_LABELS.length && (
+                  {number < total && (
                     <span className={`cc-sidebar-line ${number < step ? 'cc-sidebar-line--done' : ''}`} />
                   )}
                 </span>
@@ -706,6 +739,7 @@ export function CampaignForm({ mode }: { mode: 'create' | 'edit' }) {
   .cc {
     --violet: ${VIOLET};
     --violet-dark: ${VIOLET_DARK};
+    --coral: ${CORAL};
     --ink: #111217;
     --ink-soft: #6c6d73;
     --line: #e6e6ea;
@@ -729,11 +763,11 @@ export function CampaignForm({ mode }: { mode: 'create' | 'edit' }) {
   /* --- Two-pane shell: persistent sidebar + scrolling main --- */
   .cc-shell { display: flex; min-height: 100vh; align-items: flex-start; }
 
-  /* 🔥 FIX: Sidebar stays fixed while right side scrolls */
+  /* Sidebar stays fixed while right side scrolls */
   .cc-sidebar {
-    width: 300px;
+    width: 260px;
     flex-shrink: 0;
-    padding: 32px 26px;
+    padding: 24px 20px;
     background: #FFFFFF;
     border-right: 1px solid #EAE7F2;
     display: flex;
@@ -754,69 +788,100 @@ export function CampaignForm({ mode }: { mode: 'create' | 'edit' }) {
     .cc-shell { align-items: stretch; }
   }
 
-  .cc-sidebar-profile { 
-    position: relative; 
-    margin-top: auto; 
-    padding-top: 20px;
-    border-top: 1px solid #EAE7F2;
-  }
-
   .cc-sidebar-brand { display: inline-flex; align-items: center; gap: 8px; font-weight: 700; font-size: 16px; }
   .cc-sidebar-tagline { font-size: 12px; color: var(--ink-soft); margin: 4px 0 0 28px; }
-  .cc-sidebar-divider { border: none; border-top: 1px solid rgba(108,93,211,0.16); margin: 22px 0; }
+  .cc-sidebar-divider { border: none; border-top: 1px solid #EDEBF5; margin: 14px 0; }
 
-  .cc-sidebar-eyebrow { font-size: 15px; font-weight: 700; letter-spacing: 0.05em; text-transform: uppercase; color: var(--violet-dark); margin-bottom: 4px; }
-  .cc-sidebar-meta { font-size: 13px; color: var(--ink-soft); margin-bottom: 20px; }
+  .cc-sidebar-eyebrow { font-size: 12px; font-weight: 700; letter-spacing: 0.05em; text-transform: uppercase; color: var(--violet-dark); margin-bottom: 10px; }
+
+  .cc-sidebar-progress-wrap { margin-bottom: 14px; }
+  .cc-sidebar-progress-label {
+    display: flex; justify-content: space-between;
+    font-size: 11.5px; font-weight: 600; color: var(--ink-soft);
+    margin-bottom: 6px;
+  }
+  .cc-sidebar-progress-track {
+    height: 4px; background: #EDEBF5; border-radius: 999px; overflow: hidden;
+  }
+  .cc-sidebar-progress-fill {
+    height: 100%; border-radius: 999px;
+    background: var(--coral);
+    transition: width 0.3s ease;
+  }
 
   .cc-sidebar-steps { display: flex; flex-direction: column; }
   .cc-sidebar-step {
     display: flex;
     align-items: flex-start;
-    gap: 12px;
+    gap: 10px;
     background: none;
     border: none;
     text-align: left;
     cursor: pointer;
-    padding: 0 0 4px;
-    width: 100%;
+    padding: 6px 8px;
+    margin: 0 -8px;
+    width: calc(100% + 16px);
+    border-radius: 10px;
+    transition: background 0.15s ease;
   }
-  .cc-sidebar-dotcol { display: flex; flex-direction: column; align-items: center; flex-shrink: 0; padding-top: 2px; }
-  .cc-sidebar-dot {
-    width: 18px; height: 18px; border-radius: 50%; flex-shrink: 0;
+  .cc-sidebar-step--active {
+    background: #F2F4FC;
+  }
+
+  .cc-sidebar-dotcol { display: flex; flex-direction: column; align-items: center; flex-shrink: 0; }
+  .cc-sidebar-num {
+    width: 22px; height: 22px; border-radius: 50%; flex-shrink: 0;
     display: flex; align-items: center; justify-content: center;
-    color: #fff;
+    font-size: 11px; font-weight: 700;
   }
-  .cc-sidebar-dot--upcoming { background: #fff; border: 1.5px solid var(--line); }
-  .cc-sidebar-dot--active { background: var(--violet); box-shadow: 0 0 0 4px rgba(108,93,211,0.18); }
-  .cc-sidebar-dot--done { background: #16a34a; }
-  .cc-sidebar-line { width: 1.5px; flex: 1; min-height: 26px; background: var(--line); margin: 3px 0; }
-  .cc-sidebar-line--done { background: #16a34a; }
+  /* Upcoming: outlined navy */
+  .cc-sidebar-num--upcoming { background: #fff; border: 1.5px solid var(--violet); color: var(--violet); }
+  /* Currently filling: solid navy */
+  .cc-sidebar-num--active {
+    background: var(--violet); color: #fff;
+    box-shadow: 0 0 0 3px rgba(30,42,120,0.15);
+  }
+  /* Completed: solid coral */
+  .cc-sidebar-num--done { background: var(--coral); color: #fff; }
 
-  .cc-sidebar-step-text { display: flex; flex-direction: column; padding-bottom: 18px; }
-  .cc-sidebar-step-title { font-size: 13.5px; font-weight: 600; color: var(--ink-soft); }
-  .cc-sidebar-step-title--active, .cc-sidebar-step-title--done { color: var(--ink); }
-  .cc-sidebar-step-caption { font-size: 11.5px; color: var(--ink-soft); margin-top: 2px; }
+  .cc-sidebar-line { width: 1.5px; flex: 1; min-height: 14px; background: var(--line); margin: 2px 0; }
+  .cc-sidebar-line--done { background: var(--coral); }
+
+  .cc-sidebar-step-text { display: flex; flex-direction: column; padding: 1px 0 6px; }
+  .cc-sidebar-step-title { font-size: 13px; font-weight: 600; color: var(--ink-soft); }
+  .cc-sidebar-step-title--active { color: var(--violet-dark); }
+  .cc-sidebar-step-title--done { color: var(--ink); }
+  .cc-sidebar-step-caption { font-size: 11px; color: var(--ink-soft); margin-top: 1px; }
   .cc-sidebar-step-caption--active { color: var(--violet-dark); font-weight: 600; }
-  .cc-sidebar-step-caption--done { color: #16a34a; font-weight: 600; }
+  .cc-sidebar-step-caption--done { color: var(--coral); font-weight: 600; }
 
-  .cc-main { 
-    flex: 1; 
-    max-width: 100%; 
-    padding: 40px 48px 80px; 
-  }
-  @media (max-width: 560px) { 
-    .cc-main { padding: 28px 20px 60px; } 
+  .cc-sidebar-profile {
+    position: relative;
+    margin-top: auto;
+    padding-top: 16px;
+    border-top: 1px solid #EAE7F2;
   }
 
-  .cc-eyebrow { font-size: 14px; font-weight: 700; letter-spacing: 0.02em; text-transform: uppercase; color: var(--violet-dark); margin-bottom: 10px; }
+  .cc-main {
+    flex: 1;
+    max-width: 100%;
+    padding: 40px 48px 80px;
+  }
+  @media (max-width: 560px) {
+    .cc-main { padding: 28px 20px 60px; }
+  }
+
+  .cc-eyebrow { font-size: 12px; font-weight: 700; letter-spacing: 0.05em; text-transform: uppercase; color: var(--violet-dark); margin-bottom: 10px; }
+  .cc-eyebrow-num { color: var(--coral); }
   .cc-h1-serif {
     font-family: 'Poppins', -apple-system, Helvetica, Arial, sans-serif;
     font-size: 28px;
     font-weight: 600;
     line-height: 1.3;
     margin: 0 0 8px;
-    color: var(--ink);
+    color: var(--violet-dark);
   }
+  .cc-h1-highlight { color: var(--coral); }
   @media (max-width: 560px) { .cc-h1-serif { font-size: 24px; } }
 
   .cc-back {
@@ -844,7 +909,7 @@ export function CampaignForm({ mode }: { mode: 'create' | 'edit' }) {
   .cc-back-step:hover { color: var(--ink); }
   .cc-next-step { display: inline-flex; align-items: center; gap: 8px; font-size: 14px; font-weight: 600; color: #fff; background: var(--violet); border: none; padding: 12px 24px; border-radius: 8px; cursor: pointer; }
   .cc-next-step:disabled { background: #cabbf5; cursor: not-allowed; }
-  .cc-next-step--secondary { background: #fff; color: var(--violet-dark); border: 1px solid #ded8f7; padding: 11px 20px; }
+  .cc-next-step--secondary { background: #fff; color: var(--violet-dark); border: 1px solid #D6DCF5; padding: 11px 20px; }
   .cc-next-step--secondary:disabled { background: #fafafd; color: var(--ink-soft); border-color: var(--line); }
 
   .cc-card {
@@ -902,8 +967,8 @@ export function CampaignForm({ mode }: { mode: 'create' | 'edit' }) {
     font-size: 13px;
     font-weight: 600;
     color: var(--violet-dark);
-    background: #f2f0fc;
-    border: 1px solid #ded8f7;
+    background: #F2F4FC;
+    border: 1px solid #D6DCF5;
     border-radius: 8px;
     padding: 9px 16px;
     cursor: pointer;
@@ -940,7 +1005,7 @@ export function CampaignForm({ mode }: { mode: 'create' | 'edit' }) {
     cursor: pointer;
     text-align: center;
   }
-  .cc-type-btn--active { border-color: var(--violet); color: var(--violet-dark); background: #f2f0fc; }
+  .cc-type-btn--active { border-color: var(--violet); color: var(--violet-dark); background: #F2F4FC; }
 
   .cc-error {
     font-size: 13px;
@@ -953,13 +1018,14 @@ export function CampaignForm({ mode }: { mode: 'create' | 'edit' }) {
 
   .cc-actions { display: flex; gap: 10px; margin-top: 8px; }
   .cc-btn-draft, .cc-btn-publish {
-    flex: 1;
-    padding: 13px;
-    border-radius: 10px;
+    flex: none;
+    white-space: nowrap;
+    padding: 12px 22px;
+    border-radius: 8px;
     font-size: 14px;
     font-weight: 600;
     cursor: pointer;
-    display: flex;
+    display: inline-flex;
     align-items: center;
     justify-content: center;
     gap: 7px;
@@ -992,7 +1058,7 @@ export function CampaignForm({ mode }: { mode: 'create' | 'edit' }) {
     align-items: center;
     justify-content: center;
   }
-  .cc-taglist-add:hover { background: #f2f0fc; border-color: var(--violet); }
+  .cc-taglist-add:hover { background: #F2F4FC; border-color: var(--violet); }
   .cc-taglist-chips { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
   .cc-chip {
     display: inline-flex;
@@ -1000,7 +1066,7 @@ export function CampaignForm({ mode }: { mode: 'create' | 'edit' }) {
     gap: 6px;
     font-size: 12.5px;
     font-weight: 500;
-    background: #f2f0fc;
+    background: #F2F4FC;
     color: var(--violet-dark);
     border-radius: 999px;
     padding: 6px 8px 6px 12px;
@@ -1046,7 +1112,7 @@ export function CampaignForm({ mode }: { mode: 'create' | 'edit' }) {
     font-size: 13px;
     font-weight: 600;
     color: var(--violet-dark);
-    background: #f2f0fc;
+    background: #F2F4FC;
     border: 1px dashed var(--violet);
     border-radius: 10px;
     padding: 10px 16px;
@@ -1090,7 +1156,7 @@ export function CampaignForm({ mode }: { mode: 'create' | 'edit' }) {
   .cc-defaults-save:disabled { opacity: 0.6; cursor: not-allowed; }
 
   .cc-suggest-box {
-    border: 1px dashed #ded8f7;
+    border: 1px dashed #D6DCF5;
     background: #f8f7fd;
     border-radius: 12px;
     padding: 14px 16px;
@@ -1112,28 +1178,20 @@ export function CampaignForm({ mode }: { mode: 'create' | 'edit' }) {
   .cc-suggest-chip, .cc-preset-chip {
     font-size: 12px;
     font-weight: 500;
-    border: 1px solid #ded8f7;
+    border: 1px solid #D6DCF5;
     background: #fff;
     color: var(--violet-dark);
     border-radius: 999px;
     padding: 5px 11px;
     cursor: pointer;
   }
-  .cc-suggest-chip:hover, .cc-preset-chip:hover { background: #f2f0fc; }
+  .cc-suggest-chip:hover, .cc-preset-chip:hover { background: #F2F4FC; }
   .cc-suggest-chip:disabled, .cc-preset-chip:disabled {
     opacity: 0.55;
     cursor: default;
-    background: #f2f0fc;
+    background: #F2F4FC;
   }
   .cc-preset-row { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; }
-
-  /* 🔥 FIX: Profile chip at bottom of sidebar */
-  .cc-sidebar-profile { 
-    margin-top: auto; 
-    padding-top: 16px;
-    border-top: 1px solid #EAE7F2;
-    position: relative;
-  }
 
   .flex { display: flex; }
   .w-full { width: 100%; }
@@ -1195,16 +1253,29 @@ export function CampaignForm({ mode }: { mode: 'create' | 'edit' }) {
           {(mode === 'create' || (!loadingExisting && !notFound && !accessDenied)) && (
             <>
               <div className="cc-eyebrow">
-                Step {step} of {STEP_LABELS.length} · {STEP_LABELS[step - 1]}
+                <span>STEP </span>
+                <span className="cc-eyebrow-num">{step}</span>
+                <span> OF {STEP_LABELS.length} · {STEP_LABELS[step - 1].toUpperCase()}</span>
               </div>
-              <h1 className="cc-h1-serif">{STEP_QUESTIONS[step - 1]}</h1>
+              <h1 className="cc-h1-serif">
+                {(() => {
+                  const [before, highlight, after] = splitHeading(STEP_QUESTIONS[step - 1], STEP_HIGHLIGHT_WORDS[step - 1]);
+                  return (
+                    <>
+                      {before}
+                      <span className="cc-h1-highlight">{highlight}</span>
+                      {after}
+                    </>
+                  );
+                })()}
+              </h1>
               <p className="cc-sub" style={{ marginBottom: 20 }}>
                 {STEP_SUBTITLES[step - 1]}
               </p>
 
               {mode === 'create' && step === 1 && (
               <div className="cc-defaults-box">
-                
+
                 {defaultsOpen && (
                   <div className="cc-defaults-panel">
                     <div className="cc-hint" style={{ marginBottom: 12 }}>

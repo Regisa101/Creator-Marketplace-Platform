@@ -19,6 +19,7 @@ import { CampaignCreate, CampaignEdit } from './pages/Campaignform';
 import { CampaignBrowse } from './pages/Campaignbrowse';
 import { ApplicationsInbox } from './pages/Applicationsinbox';
 import { SavedCampaigns } from './pages/Savedcampaigns';
+import { BrandProfile } from './pages/Brandprofile';
 
 // /profile renders the right page for whoever's logged in, so both
 // roles share one URL (Dashboard.tsx's "Edit profile" link just points
@@ -42,6 +43,7 @@ function App() {
 <Route path="/login/business" element={<LoginBusiness />} />
 <Route path="/register/creator" element={<RegisterCreator />} />
 <Route path="/register/business" element={<RegisterBusiness />} />
+          <Route path="/brands/:businessId" element={<BrandProfile />} />
           
           {/* Onboarding Routes */}
           <Route

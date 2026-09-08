@@ -8,8 +8,8 @@
 // Same two circles + colors as the nav logo in Landing.tsx, so every
 // page matches the actual marketing site instead of using placeholder
 // text.
-export const VIOLET = '#2B2F6B';
-export const VIOLET_DARK = '#20244F';
+export const VIOLET = '#1E2A78';
+export const VIOLET_DARK = '#182262';
 export const CORAL = '#FF6B5A';
 export const CORAL_DARK = '#F0523F';
 
@@ -33,7 +33,7 @@ export const LogoMark = ({ size = 22 }: { size?: number }) => (
 // page can do `background: ${PAGE_GRADIENT_BG}` instead of a flat
 // color and match the marketing site's look.
 export const PAGE_GRADIENT_BG = `
-  radial-gradient(ellipse 1000px 640px at 20% 0%, rgba(108,93,211,0.13), transparent 65%),
-  radial-gradient(ellipse 1000px 640px at 85% 5%, rgba(255,138,91,0.11), transparent 65%),
+  radial-gradient(ellipse 1000px 640px at 20% 0%, rgba(30,42,120,0.13), transparent 65%),
+  radial-gradient(ellipse 1000px 640px at 85% 5%, rgba(255,107,90,0.11), transparent 65%),
   #fbfaff
 `;

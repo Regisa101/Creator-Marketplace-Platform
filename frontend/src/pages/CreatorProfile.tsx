@@ -57,9 +57,9 @@ function TwitterIcon({ size = 16 }: { size?: number }) {
 import { useAuth } from '../context/AuthContext';
 import { getCreatorProgress } from '../api/client';
 
-const CORAL = '#FF8A5B';
-const CORAL_DARK = '#E86B3E';
-const VIOLET = '#6C5DD3';
+const CORAL = '#FF6B5A';
+const CORAL_DARK = '#F0523F';
+const VIOLET = '#1E2A78';
 
 const PLATFORM_ICON: Record<string, any> = {
   instagram: InstagramIcon,
@@ -214,7 +214,7 @@ export function CreatorProfile() {
         }
         .cp-badge-pending { background: #F1EEFC; color: #6c6d73; }
         .cp-badge-verified { background: #E1F6EA; color: #16a34a; display: inline-flex; align-items: center; gap: 4px; }
-        .cp-badge-tag { background: #FFEEE5; color: var(--coral-dark); }
+        .cp-badge-tag { background: #FFF4F2; color: var(--coral-dark); }
 
         .cp-section { padding: 24px 32px; border-top: 1px solid var(--line); }
         .cp-section-title {
@@ -262,7 +262,7 @@ export function CreatorProfile() {
           width: 36px;
           height: 36px;
           border-radius: 9px;
-          background: #FFEEE5;
+          background: #FFF4F2;
           color: var(--coral-dark);
           display: flex;
           align-items: center;
