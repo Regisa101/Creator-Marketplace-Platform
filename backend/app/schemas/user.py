@@ -26,6 +26,12 @@ class UserCreate(UserBase):
 class UserLogin(BaseModel):
     email: EmailStr
     password: str
+    # Which login page the request came from ("creator" or "business").
+    # Optional so existing/other callers don't break, but when present
+    # the backend enforces it matches the account's actual role — see
+    # routes/auth.py::login. This is what stops a business account from
+    # signing in on the creator login page and vice versa.
+    role: Optional[str] = None
 
 class UserResponse(UserBase):
     id: int
@@ -44,3 +50,8 @@ class TokenResponse(BaseModel):
     access_token: str
     token_type: str = "bearer"
     user: UserResponse
+
+class AccountDeleteRequest(BaseModel):
+    # Current password, required as confirmation before permanently
+    # deleting the account — see routes/auth.py::delete_account.
+    password: str

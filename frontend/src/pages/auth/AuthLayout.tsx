@@ -42,7 +42,10 @@ export function AuthLayout({ role, mode, title, children }: AuthLayoutProps) {
           color: var(--ink);
           min-height: 100vh; display: flex; flex-direction: column; align-items: center; justify-content: center;
           padding: 56px 24px 40px;
-          background: #faf9f6;
+          background:
+            radial-gradient(ellipse 1000px 640px at 20% 0%, rgba(10,17,40,0.08), transparent 65%),
+            radial-gradient(ellipse 1000px 640px at 85% 5%, rgba(255,109,0,0.10), transparent 65%),
+            #F8F9FA;
           -webkit-font-smoothing: antialiased;
         }
         .az-page * { box-sizing: border-box; }

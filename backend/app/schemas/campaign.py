@@ -52,8 +52,9 @@ class CampaignBase(BaseModel):
     donts: Optional[List[str]] = None
     suggested_caption: Optional[str] = None
     hashtags: Optional[List[str]] = None
-    deadline: Optional[datetime] = None
+    deadline: Optional[datetime] = None 
     hero_image: Optional[str] = None
+    extra_photos: Optional[List[str]] = None
 
 # ===== CREATE =====
 class CampaignCreate(CampaignBase):
@@ -84,6 +85,7 @@ class CampaignUpdate(BaseModel):
     deadline: Optional[datetime] = None
     status: Optional[CampaignStatus] = None
     hero_image: Optional[str] = None
+    extra_photos: Optional[List[str]] = None
     is_active: Optional[bool] = None
 
 # ===== RESPONSE =====

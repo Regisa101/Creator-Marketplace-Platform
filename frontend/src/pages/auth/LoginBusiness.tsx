@@ -18,7 +18,7 @@ export function LoginBusiness() {
     setError('');
     setLoading(true);
     try {
-      await loginUser(data);
+      await loginUser({ ...data, role: 'business' });
       navigate('/dashboard');
     } catch (err: any) {
       setError(err.response?.data?.detail || 'Login failed. Please try again.');

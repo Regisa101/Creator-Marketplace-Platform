@@ -11,6 +11,8 @@ import {
   ExternalLink,
   Building2,
   Users,
+  Trash2,
+  X,
 } from 'lucide-react';
 
 import { useAuth } from '../context/AuthContext';
@@ -21,12 +23,31 @@ const VIOLET = '#1E2A78';
 const VIOLET_DARK = '#182262';
 
 export function BusinessProfile() {
-  const { user } = useAuth();
+  const { user, deleteAccount } = useAuth();
   const navigate = useNavigate();
 
   const [profile, setProfile] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [deletePassword, setDeletePassword] = useState('');
+  const [deleteError, setDeleteError] = useState('');
+  const [deleting, setDeleting] = useState(false);
+
+  const handleDeleteAccount = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setDeleteError('');
+    setDeleting(true);
+    try {
+      await deleteAccount(deletePassword);
+      navigate('/');
+    } catch (err: any) {
+      setDeleteError(err.response?.data?.detail || 'Could not delete your account. Please try again.');
+    } finally {
+      setDeleting(false);
+    }
+  };
 
   useEffect(() => {
     let cancelled = false;
@@ -222,6 +243,61 @@ export function BusinessProfile() {
 
         .bp-empty { font-size: 13.5px; color: var(--ink-soft); }
         .bp-loading, .bp-error { text-align: center; padding: 80px 20px; color: var(--ink-soft); font-size: 14px; }
+
+        .bp-danger-zone {
+          border: 1px solid #f3caca;
+          background: #fff8f8;
+          border-radius: 12px;
+          padding: 16px 18px;
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          gap: 16px;
+          flex-wrap: wrap;
+        }
+        .bp-danger-title { font-size: 13.5px; font-weight: 700; color: #b3261e; margin: 0; }
+        .bp-danger-desc { font-size: 12.5px; color: var(--ink-soft); margin: 3px 0 0; max-width: 480px; }
+        .bp-danger-btn {
+          display: inline-flex; align-items: center; gap: 6px;
+          font-size: 13px; font-weight: 600; color: #b3261e;
+          background: #fff; border: 1.5px solid #f0b4b4; border-radius: 9px;
+          padding: 9px 16px; cursor: pointer; white-space: nowrap;
+          transition: background 0.15s ease, border-color 0.15s ease;
+        }
+        .bp-danger-btn:hover { background: #fdecec; border-color: #e69696; }
+
+        .bp-modal-overlay {
+          position: fixed; inset: 0; background: rgba(17,18,23,0.45);
+          display: flex; align-items: center; justify-content: center;
+          padding: 20px; z-index: 100;
+        }
+        .bp-modal {
+          background: #fff; border-radius: 16px; width: 100%; max-width: 400px;
+          padding: 24px; position: relative;
+        }
+        .bp-modal-close {
+          position: absolute; top: 14px; right: 14px; background: none; border: none;
+          color: var(--ink-soft); cursor: pointer; padding: 4px; display: flex;
+        }
+        .bp-modal-close:hover { color: var(--ink); }
+        .bp-modal-title { font-size: 17px; font-weight: 700; margin: 0 0 8px; }
+        .bp-modal-desc { font-size: 13px; color: var(--ink-soft); line-height: 1.55; margin: 0 0 16px; }
+        .bp-modal-input {
+          width: 100%; border: 1.5px solid var(--line); border-radius: 9px; padding: 11px 13px;
+          font-size: 14px; outline: none; margin-bottom: 6px;
+        }
+        .bp-modal-input:focus { border-color: #b3261e; }
+        .bp-modal-error { font-size: 12px; color: #b3261e; margin: 4px 0 10px; }
+        .bp-modal-actions { display: flex; gap: 10px; margin-top: 16px; }
+        .bp-modal-cancel {
+          flex: 1; padding: 10px; border-radius: 9px; border: 1.5px solid var(--line);
+          background: #fff; font-size: 13.5px; font-weight: 600; color: var(--ink); cursor: pointer;
+        }
+        .bp-modal-confirm {
+          flex: 1; padding: 10px; border-radius: 9px; border: none;
+          background: #b3261e; color: #fff; font-size: 13.5px; font-weight: 600; cursor: pointer;
+        }
+        .bp-modal-confirm:disabled { opacity: 0.6; cursor: default; }
       `}</style>
 
       <div className="bp-topbar">
@@ -348,9 +424,77 @@ export function BusinessProfile() {
                 )}
               </div>
             </div>
+
+            <div className="bp-section">
+              <p className="bp-section-title">Danger Zone</p>
+              <div className="bp-danger-zone">
+                <div>
+                  <p className="bp-danger-title">Delete account</p>
+                  <p className="bp-danger-desc">
+                    Permanently deletes your business profile and every campaign you've created, along with their applications. This can't be undone.
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  className="bp-danger-btn"
+                  onClick={() => {
+                    setDeletePassword('');
+                    setDeleteError('');
+                    setShowDeleteModal(true);
+                  }}
+                >
+                  <Trash2 size={14} /> Delete Account
+                </button>
+              </div>
+            </div>
           </div>
         )}
       </div>
+
+      {showDeleteModal && (
+        <div className="bp-modal-overlay" onClick={() => !deleting && setShowDeleteModal(false)}>
+          <div className="bp-modal" onClick={(e) => e.stopPropagation()}>
+            <button
+              type="button"
+              className="bp-modal-close"
+              onClick={() => setShowDeleteModal(false)}
+              aria-label="Close"
+              disabled={deleting}
+            >
+              <X size={18} />
+            </button>
+            <h2 className="bp-modal-title">Delete your account?</h2>
+            <p className="bp-modal-desc">
+              This permanently deletes your account and everything tied to it — profile, campaigns, and applications. Enter your password to confirm.
+            </p>
+            <form onSubmit={handleDeleteAccount}>
+              <input
+                type="password"
+                className="bp-modal-input"
+                placeholder="Current password"
+                value={deletePassword}
+                onChange={(e) => setDeletePassword(e.target.value)}
+                required
+                autoFocus
+              />
+              {deleteError && <div className="bp-modal-error">{deleteError}</div>}
+              <div className="bp-modal-actions">
+                <button
+                  type="button"
+                  className="bp-modal-cancel"
+                  onClick={() => setShowDeleteModal(false)}
+                  disabled={deleting}
+                >
+                  Cancel
+                </button>
+                <button type="submit" className="bp-modal-confirm" disabled={deleting || !deletePassword}>
+                  {deleting ? 'Deleting…' : 'Delete Account'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

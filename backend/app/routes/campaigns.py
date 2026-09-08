@@ -40,6 +40,7 @@ async def create_campaign(
         guidelines_note=data.guidelines_note,
         deadline=data.deadline,
         hero_image=data.hero_image,
+        extra_photos=data.extra_photos,
         tagline=data.tagline
     )
     db.add(campaign)
@@ -99,6 +100,7 @@ async def duplicate_campaign(
         hashtags=original.hashtags,
         guidelines_note=original.guidelines_note,
         hero_image=original.hero_image,
+        extra_photos=original.extra_photos,
         status="draft",
     )
     db.add(duplicate)
@@ -171,6 +173,7 @@ async def get_campaigns(
             "guidelines_note": campaign.guidelines_note,
             "deadline": campaign.deadline,
             "hero_image": campaign.hero_image,
+            "extra_photos": campaign.extra_photos,
             "status": campaign.status,
             "is_active": campaign.is_active,
             "created_at": campaign.created_at,

@@ -3,7 +3,8 @@ from app.schemas.user import (
     UserCreate,
     UserLogin,
     UserResponse,
-    TokenResponse
+    TokenResponse,
+    AccountDeleteRequest
 )
 
 from app.schemas.creator import (

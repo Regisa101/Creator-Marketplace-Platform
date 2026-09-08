@@ -79,8 +79,13 @@ class Campaign(Base):
     status = Column(Enum(CampaignStatus), default=CampaignStatus.DRAFT)
     is_active = Column(Boolean, default=True)
     
-    # Hero Image
+        # Hero Image
     hero_image = Column(String(255), nullable=True)
+
+    # Extra product photos shown as a gallery on the campaign page,
+    # alongside the single hero_image. First item is treated as the
+    # "main" product image in the gallery UI.
+    extra_photos = Column(JSON, nullable=True)  # ["https://.../photo1.jpg", ...]
     
     # Timestamps
     created_at = Column(DateTime(timezone=True), server_default=func.now())

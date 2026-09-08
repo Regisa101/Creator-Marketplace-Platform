@@ -12,6 +12,8 @@ import {
   Image as ImageIcon,
   Video,
   ExternalLink,
+  Trash2,
+  X,
 } from 'lucide-react';
 
 // lucide-react dropped its brand/trademark icons (Instagram, YouTube,
@@ -70,13 +72,32 @@ const PLATFORM_ICON: Record<string, any> = {
 };
 
 export function CreatorProfile() {
-  const { user } = useAuth();
+  const { user, deleteAccount } = useAuth();
   const navigate = useNavigate();
 
   const [profile, setProfile] = useState<any>(null);
   const [socials, setSocials] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [deletePassword, setDeletePassword] = useState('');
+  const [deleteError, setDeleteError] = useState('');
+  const [deleting, setDeleting] = useState(false);
+
+  const handleDeleteAccount = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setDeleteError('');
+    setDeleting(true);
+    try {
+      await deleteAccount(deletePassword);
+      navigate('/');
+    } catch (err: any) {
+      setDeleteError(err.response?.data?.detail || 'Could not delete your account. Please try again.');
+    } finally {
+      setDeleting(false);
+    }
+  };
 
   useEffect(() => {
     let cancelled = false;
@@ -294,6 +315,61 @@ export function CreatorProfile() {
 
         .cp-empty { font-size: 13.5px; color: var(--ink-soft); }
         .cp-loading, .cp-error { text-align: center; padding: 80px 20px; color: var(--ink-soft); font-size: 14px; }
+
+        .cp-danger-zone {
+          border: 1px solid #f3caca;
+          background: #fff8f8;
+          border-radius: 12px;
+          padding: 16px 18px;
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          gap: 16px;
+          flex-wrap: wrap;
+        }
+        .cp-danger-title { font-size: 13.5px; font-weight: 700; color: #b3261e; margin: 0; }
+        .cp-danger-desc { font-size: 12.5px; color: var(--ink-soft); margin: 3px 0 0; max-width: 480px; }
+        .cp-danger-btn {
+          display: inline-flex; align-items: center; gap: 6px;
+          font-size: 13px; font-weight: 600; color: #b3261e;
+          background: #fff; border: 1.5px solid #f0b4b4; border-radius: 9px;
+          padding: 9px 16px; cursor: pointer; white-space: nowrap;
+          transition: background 0.15s ease, border-color 0.15s ease;
+        }
+        .cp-danger-btn:hover { background: #fdecec; border-color: #e69696; }
+
+        .cp-modal-overlay {
+          position: fixed; inset: 0; background: rgba(17,18,23,0.45);
+          display: flex; align-items: center; justify-content: center;
+          padding: 20px; z-index: 100;
+        }
+        .cp-modal {
+          background: #fff; border-radius: 16px; width: 100%; max-width: 400px;
+          padding: 24px; position: relative;
+        }
+        .cp-modal-close {
+          position: absolute; top: 14px; right: 14px; background: none; border: none;
+          color: var(--ink-soft); cursor: pointer; padding: 4px; display: flex;
+        }
+        .cp-modal-close:hover { color: var(--ink); }
+        .cp-modal-title { font-size: 17px; font-weight: 700; margin: 0 0 8px; }
+        .cp-modal-desc { font-size: 13px; color: var(--ink-soft); line-height: 1.55; margin: 0 0 16px; }
+        .cp-modal-input {
+          width: 100%; border: 1.5px solid var(--line); border-radius: 9px; padding: 11px 13px;
+          font-size: 14px; outline: none; margin-bottom: 6px;
+        }
+        .cp-modal-input:focus { border-color: #b3261e; }
+        .cp-modal-error { font-size: 12px; color: #b3261e; margin: 4px 0 10px; }
+        .cp-modal-actions { display: flex; gap: 10px; margin-top: 16px; }
+        .cp-modal-cancel {
+          flex: 1; padding: 10px; border-radius: 9px; border: 1.5px solid var(--line);
+          background: #fff; font-size: 13.5px; font-weight: 600; color: var(--ink); cursor: pointer;
+        }
+        .cp-modal-confirm {
+          flex: 1; padding: 10px; border-radius: 9px; border: none;
+          background: #b3261e; color: #fff; font-size: 13.5px; font-weight: 600; cursor: pointer;
+        }
+        .cp-modal-confirm:disabled { opacity: 0.6; cursor: default; }
       `}</style>
 
       <div className="cp-topbar">
@@ -453,9 +529,76 @@ export function CreatorProfile() {
                 </div>
               )}
             </div>
+            <div className="cp-section">
+              <p className="cp-section-title">Danger Zone</p>
+              <div className="cp-danger-zone">
+                <div>
+                  <p className="cp-danger-title">Delete account</p>
+                  <p className="cp-danger-desc">
+                    Permanently deletes your creator profile, portfolio, social links, and campaign applications. This can't be undone.
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  className="cp-danger-btn"
+                  onClick={() => {
+                    setDeletePassword('');
+                    setDeleteError('');
+                    setShowDeleteModal(true);
+                  }}
+                >
+                  <Trash2 size={14} /> Delete Account
+                </button>
+              </div>
+            </div>
           </div>
         )}
       </div>
+
+      {showDeleteModal && (
+        <div className="cp-modal-overlay" onClick={() => !deleting && setShowDeleteModal(false)}>
+          <div className="cp-modal" onClick={(e) => e.stopPropagation()}>
+            <button
+              type="button"
+              className="cp-modal-close"
+              onClick={() => setShowDeleteModal(false)}
+              aria-label="Close"
+              disabled={deleting}
+            >
+              <X size={18} />
+            </button>
+            <h2 className="cp-modal-title">Delete your account?</h2>
+            <p className="cp-modal-desc">
+              This permanently deletes your account and everything tied to it — profile, portfolio, and applications. Enter your password to confirm.
+            </p>
+            <form onSubmit={handleDeleteAccount}>
+              <input
+                type="password"
+                className="cp-modal-input"
+                placeholder="Current password"
+                value={deletePassword}
+                onChange={(e) => setDeletePassword(e.target.value)}
+                required
+                autoFocus
+              />
+              {deleteError && <div className="cp-modal-error">{deleteError}</div>}
+              <div className="cp-modal-actions">
+                <button
+                  type="button"
+                  className="cp-modal-cancel"
+                  onClick={() => setShowDeleteModal(false)}
+                  disabled={deleting}
+                >
+                  Cancel
+                </button>
+                <button type="submit" className="cp-modal-confirm" disabled={deleting || !deletePassword}>
+                  {deleting ? 'Deleting…' : 'Delete Account'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

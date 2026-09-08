@@ -9,6 +9,7 @@ import {
   login,
   register,
   getCurrentUser,
+  deleteAccount as deleteAccountRequest,
 } from '../api/client';
 
 import type {
@@ -32,6 +33,13 @@ interface AuthContextType {
   }>;
 
   logout: () => void;
+
+  // Permanently deletes the account on the server (profile, campaigns,
+  // applications, saved campaigns — everything), then clears local
+  // session state the same way logout() does. Throws (with the
+  // backend's error message, e.g. wrong password) if the delete fails,
+  // so the caller's try/catch can show it without touching local state.
+  deleteAccount: (password: string) => Promise<void>;
 
   // Merges partial profile data (e.g. one onboarding step's worth)
   // into user.profile — both in context state and localStorage —
@@ -217,6 +225,17 @@ export const AuthProvider: React.FC<{
   };
 
   // ============================================
+  // DELETE ACCOUNT
+  // ============================================
+
+  const deleteAccount = async (password: string): Promise<void> => {
+    await deleteAccountRequest(password);
+    // Account no longer exists server-side — clear local session state
+    // the same way logout() does.
+    logout();
+  };
+
+  // ============================================
   // CONTEXT VALUE
   // ============================================
 
@@ -227,6 +246,7 @@ export const AuthProvider: React.FC<{
     loginUser,
     registerUser,
     logout,
+    deleteAccount,
     updateProfile,
     isAuthenticated: !!user && !!token,
   };

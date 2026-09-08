@@ -42,6 +42,11 @@ export interface RegisterData {
 export interface LoginData {
   email: string;
   password: string;
+  // Which login page this came from ('creator' or 'business'). The
+  // backend rejects the login with a 403 if it doesn't match the
+  // account's actual role, so a business account can't sign in on the
+  // creator login page and vice versa.
+  role?: 'creator' | 'business';
 }
 
 export interface User {
@@ -144,6 +149,15 @@ export const login = async (data: LoginData): Promise<AuthResponse> => {
 export const getCurrentUser = async (): Promise<User> => {
   const response = await api.get<User>('/auth/me');
   return response.data;
+};
+
+// DELETE /api/auth/account - permanently deletes the logged-in user's
+// account (creator or business) and everything tied to it — profile,
+// campaigns/applications/saved-campaigns, all server-side. Requires
+// the current password as confirmation. Caller is responsible for
+// clearing local session state (AuthContext.logout()) afterwards.
+export const deleteAccount = async (password: string): Promise<void> => {
+  await api.delete('/auth/account', { data: { password } });
 };
 
 // ============================================

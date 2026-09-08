@@ -3,8 +3,8 @@ from sqlalchemy.orm import Session
 from datetime import datetime
 
 from app.database import get_db
-from app.models import User, CreatorProfile, BusinessProfile
-from app.schemas import UserCreate, UserLogin, TokenResponse, UserResponse
+from app.models import User, CreatorProfile, BusinessProfile, Campaign, Application, SavedCampaign
+from app.schemas import UserCreate, UserLogin, TokenResponse, UserResponse, AccountDeleteRequest
 from app.auth import hash_password, verify_password, create_access_token
 from app.dependencies.auth import get_current_user
 
@@ -85,6 +85,20 @@ async def login(user_data: UserLogin, db: Session = Depends(get_db)):
             detail="Invalid email or password"
         )
 
+    # Enforce that a creator account can only log in via the creator
+    # login page/form, and a business account only via the business one.
+    # `role` is the page the request came from (set by LoginCreator /
+    # LoginBusiness on the frontend). Checked here, not just in the UI,
+    # so this can't be bypassed by calling the API directly.
+    if user_data.role and user_data.role != user.role:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail=(
+                f"This email is registered as a {user.role} account. "
+                f"Please log in from the {user.role} login page."
+            )
+        )
+
     user.last_login = datetime.utcnow()
     db.commit()
 
@@ -104,3 +118,71 @@ async def login(user_data: UserLogin, db: Session = Depends(get_db)):
 @router.get("/me", response_model=UserResponse)
 async def get_current_user_info(current_user: User = Depends(get_current_user)):
     return current_user
+
+@router.delete("/account", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_account(
+    payload: AccountDeleteRequest,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Permanently deletes the logged-in user's account and every row
+    that references it, for both creator and business accounts.
+
+    Password confirmation is required so a hijacked/left-open session
+    can't nuke an account with a single click.
+
+    CreatorProfile / BusinessProfile (and CreatorSocial, via
+    CreatorProfile) are already covered by the `cascade="all,
+    delete-orphan"` relationships on User, so deleting `current_user`
+    below removes those automatically. Campaigns, Applications, and
+    SavedCampaigns are plain foreign keys with no ORM relationship
+    declared on User, so they're NOT covered by that cascade and have
+    to be deleted explicitly here first, in an order that respects
+    their own foreign keys (saved campaigns/applications before the
+    campaigns they point to).
+    """
+    if not verify_password(payload.password, current_user.password):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Incorrect password",
+        )
+
+    if current_user.role == "creator":
+        # This creator's own bookmarks and campaign applications.
+        db.query(SavedCampaign).filter(
+            SavedCampaign.creator_id == current_user.id
+        ).delete(synchronize_session=False)
+
+        db.query(Application).filter(
+            Application.creator_id == current_user.id
+        ).delete(synchronize_session=False)
+
+    elif current_user.role == "business":
+        campaign_ids = [
+            row[0]
+            for row in db.query(Campaign.id)
+            .filter(Campaign.business_id == current_user.id)
+            .all()
+        ]
+
+        if campaign_ids:
+            # Other creators may have saved or applied to this
+            # business's campaigns — those rows have to go before the
+            # campaigns themselves, or the FK constraint blocks it.
+            db.query(SavedCampaign).filter(
+                SavedCampaign.campaign_id.in_(campaign_ids)
+            ).delete(synchronize_session=False)
+
+            db.query(Application).filter(
+                Application.campaign_id.in_(campaign_ids)
+            ).delete(synchronize_session=False)
+
+            db.query(Campaign).filter(
+                Campaign.business_id == current_user.id
+            ).delete(synchronize_session=False)
+
+    # Cascades to creator_profile/business_profile (and creator_socials).
+    db.delete(current_user)
+    db.commit()
+
+    return None

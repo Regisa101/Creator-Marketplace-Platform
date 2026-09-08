@@ -16,7 +16,11 @@ export function RoleSelect() {
         .rs-page {
           font-family: 'Poppins', -apple-system, Helvetica, Arial, sans-serif;
           min-height: 100vh; display: flex; align-items: center; justify-content: center;
-          padding: 24px; background: #fbfaff;
+          padding: 24px;
+          background:
+            radial-gradient(ellipse 1000px 640px at 20% 0%, rgba(10,17,40,0.08), transparent 65%),
+            radial-gradient(ellipse 1000px 640px at 85% 5%, rgba(255,109,0,0.10), transparent 65%),
+            #F8F9FA;
         }
         .rs-page * { box-sizing: border-box; }
         .rs-page a { text-decoration: none; color: inherit; }
