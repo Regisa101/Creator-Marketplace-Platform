@@ -92,6 +92,7 @@ export function CampaignDetail() {
   const [error, setError] = useState('');
   const [navVisible, setNavVisible] = useState(true);
   const [activeSpecTab, setActiveSpecTab] = useState(0);
+  const [activeProductImage, setActiveProductImage] = useState(0);
 
   const [myApplication, setMyApplication] = useState<Application | null>(null);
   const [showApplyForm, setShowApplyForm] = useState(false);
@@ -180,6 +181,12 @@ export function CampaignDetail() {
   const brandIndustry = brandProfile?.industry || campaign?.category || '';
   const heroImage = resolveMediaUrl(campaign?.hero_image);
   const brandLogo = resolveMediaUrl(brandProfile?.logo_url);
+  const productImages = useMemo(() => {
+    const extraPhotos = Array.isArray((campaign as (Campaign & { extra_photos?: string[] }) | null)?.extra_photos)
+      ? ((campaign as (Campaign & { extra_photos?: string[] }) | null)?.extra_photos || [])
+      : [];
+    return Array.from(new Set([campaign?.hero_image || '', ...extraPhotos].filter(Boolean))).map(resolveMediaUrl);
+  }, [campaign]);
 
   const handleToggleSave = async () => {
     if (!campaign || savingBookmark) return;
@@ -371,14 +378,20 @@ export function CampaignDetail() {
         .cd-brandline-name { font-size: 14px; font-weight: 700; }
         .cd-brandline-meta { margin-top: 2px; color: var(--muted); font-size: 12.5px; }
         .cd-kicker { display: inline-flex; align-items: center; gap: 6px; color: var(--coral-dark); font-size: 12px; font-weight: 700; letter-spacing: .02em; margin-bottom: 9px; }
+        .cd-kicker svg { color: var(--coral-dark); }
         .cd-title { font-size: clamp(30px, 4vw, 44px); line-height: 1.1; letter-spacing: -.9px; max-width: 800px; margin: 0 0 11px; font-weight: 750; }
         .cd-tagline { max-width: 760px; margin: 0; color: #666771; font-size: 15px; line-height: 1.75; }
-        .cd-meta-row { display: flex; flex-wrap: wrap; gap: 9px 16px; margin-top: 21px; padding-top: 18px; border-top: 1px solid var(--line); }
+        .cd-pill-row { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 18px; }
+        .cd-pill { display: inline-flex; align-items: center; gap: 6px; padding: 7px 13px; border-radius: 999px; background: #fff5f2; border: 1px solid #ffdccf; color: #55565e; font-size: 12.5px; font-weight: 650; }
+        .cd-pill svg { color: var(--coral-dark); flex: 0 0 auto; }
+        .cd-meta-row { display: flex; flex-wrap: wrap; gap: 9px 16px; margin-top: 14px; }
         .cd-meta-item { display: inline-flex; align-items: center; gap: 6px; color: #55565e; font-size: 12.5px; font-weight: 600; }
         .cd-meta-item svg { color: var(--coral-dark); }
-        .cd-tags { display: flex; flex-wrap: wrap; gap: 7px; margin-top: 13px; }
+        .cd-tags { display: flex; flex-wrap: wrap; gap: 7px; margin-top: 13px; padding-top: 15px; border-top: 1px solid var(--line); }
         .cd-tag { padding: 5px 10px; border-radius: 999px; background: #f6f6f8; border: 1px solid #e7e7eb; color: #666771; font-size: 11.5px; font-weight: 600; }
         .cd-tag--accent { color: var(--coral-dark); background: #fff2ed; border-color: #ffd8cc; }
+        .cd-hero-hashtags { display: flex; flex-wrap: wrap; gap: 5px 12px; margin-top: 10px; }
+        .cd-hero-hashtag { color: var(--coral-dark); font-size: 12px; font-weight: 650; }
 
         .cd-visual { margin-top: 18px; overflow: hidden; border-radius: 22px; border: 1px solid var(--line); background: linear-gradient(145deg, #fff, #f3f3f7); min-height: 260px; }
         .cd-visual img { width: 100%; max-height: 560px; display: block; object-fit: cover; }
@@ -396,7 +409,8 @@ export function CampaignDetail() {
         .cd-section-intro { margin: 5px 0 0; color: var(--muted); font-size: 13px; line-height: 1.6; }
         .cd-prose { color: #3f4047; font-size: 14.5px; line-height: 1.8; white-space: pre-wrap; margin: 0; }
 
-        .cd-opportunity { display: grid; grid-template-columns: repeat(3, 1fr); gap: 11px; }
+        .cd-opportunity { display: grid; grid-template-columns: repeat(var(--cd-opportunity-cols, 3), 1fr); gap: 11px; }
+        @media (max-width: 720px) { .cd-opportunity { grid-template-columns: repeat(2, 1fr); } }
         .cd-opportunity-card { background: #fff; border: 1px solid var(--line); border-radius: 16px; padding: 17px; min-height: 100px; }
         .cd-opportunity-label { color: #888991; font-size: 11.5px; font-weight: 600; margin-bottom: 8px; }
         .cd-opportunity-value { font-size: 15px; line-height: 1.45; font-weight: 700; }
@@ -462,6 +476,11 @@ export function CampaignDetail() {
         .cd-spec-pill { padding: 4px 9px; border-radius: 999px; background: #fff0eb; color: var(--coral-dark); font-size: 10.5px; font-weight: 750; }
         .cd-spec-pill--off { background: #f0f0f3; color: #73747c; }
 
+        .cd-guidelines-note { display: flex; gap: 13px; align-items: flex-start; background: #fff8f2; border: 1px solid #ffe1d2; border-radius: 18px; padding: 20px 22px; }
+        .cd-guidelines-note-icon { width: 34px; height: 34px; border-radius: 11px; background: #fff0eb; color: var(--coral-dark); display: flex; align-items: center; justify-content: center; flex: 0 0 auto; }
+        .cd-guidelines-note-title { font-size: 14.5px; font-weight: 750; margin-bottom: 5px; }
+        .cd-guidelines-note-copy { margin: 0; color: #5c5d66; font-size: 13.5px; line-height: 1.7; }
+
         .cd-sidebar { position: sticky; top: 92px; display: flex; flex-direction: column; gap: 13px; }
         .cd-side-card { background: #fff; border: 1px solid var(--line); border-radius: 19px; padding: 19px; box-shadow: 0 7px 26px rgba(18,19,26,.04); }
         .cd-apply-card { position: relative; overflow: hidden; border-color: #ffcfc4; background: linear-gradient(180deg, #fffaf8 0%, #fff 42%); box-shadow: 0 12px 34px rgba(255,107,90,.11), 0 3px 12px rgba(30,42,120,.035); }
@@ -499,6 +518,14 @@ export function CampaignDetail() {
         .cd-brand-side-name { font-size: 13px; font-weight: 750; }
         .cd-brand-side-meta { color: var(--muted); font-size: 11.5px; margin-top: 2px; }
         .cd-brand-side-link { margin-top: 13px; color: var(--coral-dark); font-size: 11.5px; font-weight: 750; display: flex; align-items: center; justify-content: space-between; }
+        .cd-sidebar > .cd-brand-side { order: 2; }
+        .cd-sidebar > .cd-apply-card { order: 3; }
+        .cd-sidebar > .cd-side-card:not(.cd-owner):not(.cd-brand-side):not(.cd-apply-card):not(.cd-related) { order: 4; }
+        .cd-sidebar > .cd-related { order: 5; }
+        .cd-brand-side { padding: 16px 18px; }
+        .cd-brand-side .cd-side-heading { margin-bottom: 10px; }
+        .cd-brand-side-link { margin-top: 10px; }
+
         .cd-related { border-color: #eadeda; }
         .cd-related-item { display: block; text-decoration: none; color: inherit; padding: 11px 0; border-bottom: 1px solid #ededf0; }
         .cd-related-item:last-child { border-bottom: 0; padding-bottom: 0; }
@@ -519,6 +546,7 @@ export function CampaignDetail() {
         .cd-application-status--rejected { color: #c84642; background: #fff0ef; }
 
         .cd-owner { border-color: #dddde5; }
+        .cd-sidebar > .cd-owner { order: 1; }
         .cd-owner-actions { display: grid; gap: 7px; }
         .cd-owner-button { min-height: 38px; border: 1px solid #dedee5; border-radius: 9px; background: #fff; display: flex; align-items: center; justify-content: center; gap: 6px; color: #41424a; font-size: 11.5px; font-weight: 700; cursor: pointer; text-decoration: none; }
         .cd-owner-button:hover { background: #fafafd; }
@@ -529,8 +557,119 @@ export function CampaignDetail() {
         .cd-spin { animation: cd-spin .8s linear infinite; }
         @keyframes cd-spin { to { transform: rotate(360deg); } }
 
+        /* Reference-style campaign layout */
+        .cd-page { background: #fbfbfc; }
+        .cd-shell { max-width: 1240px; padding: 24px 28px 90px; }
+        .cd-layout { grid-template-columns: minmax(0, 1fr) 306px; gap: 28px; }
+        .cd-main { min-width: 0; }
+        .cd-hero-reference {
+          display: grid;
+          grid-template-columns: minmax(0, 1.02fr) minmax(330px, .98fr);
+          gap: 30px;
+          align-items: center;
+          padding: 30px;
+          border: 0;
+          border-radius: 22px;
+          background: #fff;
+          box-shadow: 0 10px 34px rgba(30,42,120,.055);
+        }
+        .cd-hero-copy { min-width: 0; }
+        .cd-hero-media {
+          min-width: 0;
+          overflow: hidden;
+          border-radius: 18px;
+          background: #f5f6fa;
+          border: 1px solid #ececf2;
+          box-shadow: 0 10px 30px rgba(18,19,26,.06);
+        }
+        .cd-hero-media img {
+          width: 100%;
+          aspect-ratio: 1.12 / 1;
+          object-fit: cover;
+          display: block;
+        }
+        .cd-product-gallery-main { position: relative; background: #f5f6fa; }
+        .cd-product-gallery-main img {
+          width: 100%;
+          aspect-ratio: 1.12 / 1;
+          object-fit: cover;
+          display: block;
+        }
+        .cd-product-gallery-count {
+          position: absolute;
+          right: 12px;
+          bottom: 12px;
+          padding: 5px 8px;
+          border-radius: 999px;
+          background: rgba(18,19,26,.68);
+          color: #fff;
+          font-size: 10px;
+          font-weight: 700;
+          letter-spacing: .02em;
+          backdrop-filter: blur(5px);
+        }
+        .cd-product-gallery-footer {
+          padding: 12px 13px 13px;
+          background: #fff;
+          border-top: 1px solid #ececf2;
+        }
+        .cd-product-gallery-label {
+          color: #55565e;
+          font-size: 10.5px;
+          font-weight: 750;
+          text-transform: uppercase;
+          letter-spacing: .06em;
+          margin-bottom: 8px;
+        }
+        .cd-product-thumbs {
+          display: flex;
+          gap: 7px;
+          overflow-x: auto;
+          padding-bottom: 1px;
+        }
+        .cd-product-thumb {
+          width: 52px;
+          height: 52px;
+          padding: 0;
+          border: 1px solid #e6e6eb;
+          border-radius: 9px;
+          overflow: hidden;
+          background: #f7f7fa;
+          cursor: pointer;
+          flex: 0 0 auto;
+          opacity: .72;
+          transition: opacity .15s ease, border-color .15s ease, transform .15s ease;
+        }
+        .cd-product-thumb:hover { opacity: 1; transform: translateY(-1px); }
+        .cd-product-thumb--active { opacity: 1; border: 2px solid var(--coral); }
+        .cd-product-thumb img { width: 100%; height: 100%; object-fit: cover; display: block; }
+        .cd-hero-media .cd-visual-placeholder { min-height: 360px; }
+        .cd-section { margin-top: 34px; }
+        .cd-section-header { margin-bottom: 13px; }
+        .cd-section-title { font-size: 20px; color: #183b72; }
+        .cd-section-intro { font-size: 12.5px; }
+        .cd-opportunity { gap: 10px; }
+        .cd-opportunity-card { border: 0; background: #fff; box-shadow: 0 5px 20px rgba(18,19,26,.035); min-height: 105px; }
+        .cd-brief, .cd-caption, .cd-spec-table, .cd-checklist-item { box-shadow: 0 5px 20px rgba(18,19,26,.03); }
+        .cd-brief { border: 0; }
+        .cd-deliverables { background: #fff; border: 0; border-radius: 16px; padding: 0 18px; box-shadow: 0 5px 20px rgba(18,19,26,.03); }
+        .cd-deliverable { padding: 17px 0; }
+        .cd-checklist { gap: 10px; }
+        .cd-sidebar { top: 88px; }
+        .cd-side-card { border: 0; box-shadow: 0 6px 24px rgba(18,19,26,.045); }
+        .cd-apply-card { border: 1px solid #ffd6ce; }
+        .cd-back { margin-bottom: 13px; }
+        .cd-title { color: #123b78; font-size: clamp(32px, 4vw, 46px); }
+        .cd-kicker { color: #f0523f; }
+        .cd-pill { background: #f8f9fc; border-color: #e9eaf0; }
+        .cd-tag { background: #f5f6fa; border-color: #e7e8ee; }
+        .cd-tag--accent { background: #fff1ed; border-color: #ffd7ce; }
+        .cd-hero-hashtag { color: #1e2a78; }
+
         @media (max-width: 920px) {
           .cd-layout { grid-template-columns: 1fr; }
+          .cd-hero-reference { grid-template-columns: 1fr; }
+          .cd-hero-media { order: -1; }
           .cd-sidebar { position: static; display: grid; grid-template-columns: 1fr 1fr; align-items: start; }
           .cd-apply-card { grid-column: 1 / -1; }
         }
@@ -542,6 +681,7 @@ export function CampaignDetail() {
           .cd-hero { padding: 20px; border-radius: 19px; }
           .cd-title { font-size: 30px; }
           .cd-visual { border-radius: 17px; }
+          .cd-product-thumb { width: 48px; height: 48px; }
           .cd-opportunity, .cd-checklist, .cd-dosdonts, .cd-sidebar { grid-template-columns: 1fr; }
           .cd-section { margin-top: 34px; }
         }
@@ -580,53 +720,97 @@ export function CampaignDetail() {
 
           <div className="cd-layout">
             <article className="cd-main">
-              <section className="cd-hero">
-                <div className="cd-brandline">
-                  <div className="cd-brand-logo">
-                    {brandLogo ? <img src={brandLogo} alt={`${brandName} logo`} /> : brandName[0].toUpperCase()}
+              <section className="cd-hero cd-hero-reference">
+                <div className="cd-hero-copy">
+                  <div className="cd-brandline">
+                    <div className="cd-brand-logo">
+                      {brandLogo ? <img src={brandLogo} alt={`${brandName} logo`} /> : brandName[0].toUpperCase()}
+                    </div>
+                    <div>
+                      <div className="cd-brandline-name">{brandName}</div>
+                      <div className="cd-brandline-meta">{brandIndustry}{brandLocation ? ` · ${brandLocation}` : ''}</div>
+                    </div>
                   </div>
-                  <div>
-                    <div className="cd-brandline-name">{brandName}</div>
-                    <div className="cd-brandline-meta">{brandIndustry}{brandLocation ? ` · ${brandLocation}` : ''}</div>
+
+                  <h1 className="cd-title">{campaign.title}</h1>
+                  {campaign.tagline && <p className="cd-tagline">{campaign.tagline}</p>}
+
+                  <div className="cd-pill-row">
+                    {brandLocation && <span className="cd-pill"><MapPin size={13} /> {brandLocation}</span>}
+                    <span className="cd-pill"><Film size={13} /> {campaign.sub_category || campaign.category}</span>
+                    <span className="cd-pill">{campaign.campaign_type === 'paid' ? <DollarSign size={13} /> : <Gift size={13} />} {campaign.campaign_type === 'paid' ? 'Paid Campaign' : 'Gifted Campaign'}</span>
+                    {deadline && <span className="cd-pill"><Calendar size={13} /> Apply by {deadline.label}</span>}
                   </div>
+
+                  {campaign.application_count > 0 && (
+                    <div className="cd-meta-row">
+                      <span className="cd-meta-item"><CheckCircle2 size={14} /> {campaign.application_count} creator{campaign.application_count === 1 ? '' : 's'} applied</span>
+                    </div>
+                  )}
+
+                  <div className="cd-tags">
+                    {campaign.category && <span className="cd-tag cd-tag--accent">{campaign.category}</span>}
+                    {campaign.sub_category && <span className="cd-tag">{campaign.sub_category}</span>}
+                  </div>
+
+                  {campaign.hashtags && campaign.hashtags.length > 0 && (
+                    <div className="cd-hero-hashtags">
+                      {campaign.hashtags.map((tag, index) => <span className="cd-hero-hashtag" key={`${tag}-${index}`}>{cleanTag(tag)}</span>)}
+                    </div>
+                  )}
                 </div>
 
-                <div className="cd-kicker">CREATOR OPPORTUNITY</div>
-                <h1 className="cd-title">{campaign.title}</h1>
-                {campaign.tagline && <p className="cd-tagline">{campaign.tagline}</p>}
-
-                <div className="cd-meta-row">
-                  {brandLocation && <span className="cd-meta-item"><MapPin size={14} /> {brandLocation}</span>}
-                  <span className="cd-meta-item"><Film size={14} /> {campaign.sub_category || campaign.category}</span>
-                  <span className="cd-meta-item">{campaign.campaign_type === 'paid' ? <DollarSign size={14} /> : <Gift size={14} />} {campaign.campaign_type === 'paid' ? 'Paid collaboration' : 'Gifted collaboration'}</span>
-                  {campaign.application_count > 0 && <span className="cd-meta-item"><CheckCircle2 size={14} /> {campaign.application_count} creator{campaign.application_count === 1 ? '' : 's'} applied</span>}
-                </div>
-
-                <div className="cd-tags">
-                  {campaign.category && <span className="cd-tag cd-tag--accent">{campaign.category}</span>}
-                  {campaign.sub_category && <span className="cd-tag">{campaign.sub_category}</span>}
+                <div className="cd-hero-media">
+                  {productImages.length > 0 ? (
+                    <>
+                      <div className="cd-product-gallery-main">
+                        <img
+                          src={productImages[Math.min(activeProductImage, productImages.length - 1)]}
+                          alt={`${brandName} product ${Math.min(activeProductImage, productImages.length - 1) + 1}`}
+                        />
+                        {productImages.length > 1 && (
+                          <div className="cd-product-gallery-count">
+                            {Math.min(activeProductImage, productImages.length - 1) + 1} / {productImages.length}
+                          </div>
+                        )}
+                      </div>
+                      {productImages.length > 1 && (
+                        <div className="cd-product-gallery-footer">
+                          <div className="cd-product-gallery-label">Products</div>
+                          <div className="cd-product-thumbs" aria-label="Product gallery">
+                            {productImages.map((image, index) => (
+                              <button
+                                type="button"
+                                key={`${image}-${index}`}
+                                className={`cd-product-thumb ${activeProductImage === index ? 'cd-product-thumb--active' : ''}`}
+                                onClick={() => setActiveProductImage(index)}
+                                aria-label={`View product ${index + 1}`}
+                              >
+                                <img src={image} alt="" />
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                    </>
+                  ) : (
+                    <div className="cd-visual-placeholder">
+                      <div className="cd-visual-placeholder-inner">
+                        <div className="cd-visual-label">{brandName}</div>
+                        <div className="cd-visual-title">Product photos coming soon</div>
+                      </div>
+                    </div>
+                  )}
                 </div>
               </section>
 
-              <div className="cd-visual">
-                {heroImage ? (
-                  <img src={heroImage} alt={`${campaign.title} campaign`} onError={(e) => { e.currentTarget.style.display = 'none'; }} />
-                ) : (
-                  <div className="cd-visual-placeholder">
-                    <div className="cd-visual-placeholder-inner">
-                      <div className="cd-visual-label">{brandName}</div>
-                      <div className="cd-visual-title">{campaign.title}</div>
-                    </div>
-                  </div>
-                )}
-              </div>
-
               <section className="cd-section">
                 <div className="cd-section-header"><div><h2 className="cd-section-title">The opportunity</h2><p className="cd-section-intro">Everything you need to know before you apply.</p></div></div>
-                <div className="cd-opportunity">
+                <div className="cd-opportunity" style={{ ['--cd-opportunity-cols' as any]: 4 }}>
                   <div className="cd-opportunity-card"><DollarSign size={17} className="cd-opportunity-icon" /><div className="cd-opportunity-label">Compensation</div><div className="cd-opportunity-value">{campaign.compensation_description || formatMoney(campaign.budget) || 'Discuss with brand'}</div></div>
-                  <div className="cd-opportunity-card"><Calendar size={17} className="cd-opportunity-icon" /><div className="cd-opportunity-label">Application deadline</div><div className={`cd-opportunity-value ${deadline && !deadline.closed ? 'cd-opportunity-value--open' : ''}`}>{deadline ? deadline.label : 'Open until filled'}</div></div>
+                  <div className="cd-opportunity-card"><Calendar size={17} className="cd-opportunity-icon" /><div className="cd-opportunity-label">Apply by</div><div className={`cd-opportunity-value ${deadline && !deadline.closed ? 'cd-opportunity-value--open' : ''}`}>{deadline ? deadline.label : 'Open until filled'}</div></div>
                   <div className="cd-opportunity-card"><MapPin size={17} className="cd-opportunity-icon" /><div className="cd-opportunity-label">Location</div><div className="cd-opportunity-value">{brandLocation || 'Remote / flexible'}</div></div>
+                  <div className="cd-opportunity-card"><Film size={17} className="cd-opportunity-icon" /><div className="cd-opportunity-label">Content type</div><div className="cd-opportunity-value">{campaign.sub_category || campaign.category}</div></div>
                 </div>
               </section>
 
@@ -660,6 +844,17 @@ export function CampaignDetail() {
                   <div className="cd-section-header"><div><h2 className="cd-section-title">What we're looking for</h2><p className="cd-section-intro">Make sure you meet these creator requirements before applying.</p></div></div>
                   <ul className="cd-requirement-list">
                     {campaign.requirements.split(/\r?\n|•/).map((item) => item.trim()).filter(Boolean).map((item, index) => (
+                      <li key={`${item}-${index}`}><span className="cd-check"><Check size={12} strokeWidth={3} /></span><span>{item}</span></li>
+                    ))}
+                  </ul>
+                </section>
+              )}
+
+              {campaign.before_you_apply && campaign.before_you_apply.length > 0 && (
+                <section className="cd-section cd-requirements">
+                  <div className="cd-section-header"><div><h2 className="cd-section-title">Before you apply</h2><p className="cd-section-intro">Confirm these before you send your pitch.</p></div></div>
+                  <ul className="cd-requirement-list">
+                    {campaign.before_you_apply.map((item, index) => (
                       <li key={`${item}-${index}`}><span className="cd-check"><Check size={12} strokeWidth={3} /></span><span>{item}</span></li>
                     ))}
                   </ul>
@@ -709,25 +904,37 @@ export function CampaignDetail() {
                 </section>
               )}
 
-              {(campaign.brief || (campaign.video_specs && campaign.video_specs.length > 0)) && (
+              {campaign.video_specs && campaign.video_specs.length > 0 && (
                 <section className="cd-section">
-                  <div className="cd-section-header"><div><h2 className="cd-section-title">Campaign guidelines</h2><p className="cd-section-intro">Technical details for getting the final content right.</p></div></div>
-                  {campaign.video_specs && campaign.video_specs.length > 0 && (
-                    <>
-                      <div className="cd-spec-tabs">
-                        {campaign.video_specs.map((spec, index) => {
-                          const Icon = spec.platform.toLowerCase().includes('tiktok') ? Music2 : Smartphone;
-                          return <button key={`${spec.platform}-${index}`} className={`cd-spec-tab ${activeSpecTab === index ? 'cd-spec-tab--active' : ''}`} onClick={() => setActiveSpecTab(index)}><Icon size={14} /> {spec.platform}</button>;
-                        })}
-                      </div>
-                      {campaign.video_specs[activeSpecTab] && <div className="cd-spec-table">
-                        <div className="cd-spec-row"><span className="cd-spec-row-label"><Film size={14} /> Video length</span><span className="cd-spec-row-value">{campaign.video_specs[activeSpecTab].duration || '—'}</span></div>
-                        <div className="cd-spec-row"><span className="cd-spec-row-label">Aspect ratio</span><span className="cd-spec-row-value">{campaign.video_specs[activeSpecTab].aspect_ratio || '—'}</span></div>
-                        <div className="cd-spec-row"><span className="cd-spec-row-label"><Volume2 size={14} /> Voiceover</span><span className={`cd-spec-pill ${!campaign.video_specs[activeSpecTab].voiceover_required ? 'cd-spec-pill--off' : ''}`}>{campaign.video_specs[activeSpecTab].voiceover_required ? 'Required' : 'Optional'}</span></div>
-                        <div className="cd-spec-row"><span className="cd-spec-row-label"><Clipboard size={14} /> Subtitles</span><span className={`cd-spec-pill ${!campaign.video_specs[activeSpecTab].subtitles_required ? 'cd-spec-pill--off' : ''}`}>{campaign.video_specs[activeSpecTab].subtitles_required ? 'Required' : 'Optional'}</span></div>
-                      </div>}
-                    </>
-                  )}
+                  <div className="cd-section-header"><div><h2 className="cd-section-title">Content specifications</h2><p className="cd-section-intro">Technical details for getting the final content right.</p></div></div>
+                  <div className="cd-spec-tabs">
+                    {campaign.video_specs.map((spec, index) => {
+                      const Icon = spec.platform.toLowerCase().includes('tiktok') ? Music2 : Smartphone;
+                      return <button key={`${spec.platform}-${index}`} className={`cd-spec-tab ${activeSpecTab === index ? 'cd-spec-tab--active' : ''}`} onClick={() => setActiveSpecTab(index)}><Icon size={14} /> {spec.platform}</button>;
+                    })}
+                  </div>
+                  {campaign.video_specs[activeSpecTab] && <div className="cd-spec-table">
+                    <div className="cd-spec-row"><span className="cd-spec-row-label"><Film size={14} /> Format</span><span className="cd-spec-row-value">{campaign.video_specs[activeSpecTab].aspect_ratio || '—'}</span></div>
+                    <div className="cd-spec-row"><span className="cd-spec-row-label">Resolution</span><span className="cd-spec-row-value">{campaign.video_specs[activeSpecTab].resolution || '—'}</span></div>
+                    <div className="cd-spec-row"><span className="cd-spec-row-label">Duration</span><span className="cd-spec-row-value">{campaign.video_specs[activeSpecTab].duration || '—'}</span></div>
+                    <div className="cd-spec-row"><span className="cd-spec-row-label">Frame rate</span><span className="cd-spec-row-value">{campaign.video_specs[activeSpecTab].frame_rate || '—'}</span></div>
+                    <div className="cd-spec-row"><span className="cd-spec-row-label">Platform</span><span className="cd-spec-row-value">{campaign.video_specs[activeSpecTab].platform || '—'}</span></div>
+                    <div className="cd-spec-row"><span className="cd-spec-row-label">File type</span><span className="cd-spec-row-value">{campaign.video_specs[activeSpecTab].file_type || '—'}</span></div>
+                    <div className="cd-spec-row"><span className="cd-spec-row-label"><Volume2 size={14} /> Voiceover</span><span className={`cd-spec-pill ${!campaign.video_specs[activeSpecTab].voiceover_required ? 'cd-spec-pill--off' : ''}`}>{campaign.video_specs[activeSpecTab].voiceover_required ? 'Required' : 'Optional'}</span></div>
+                    <div className="cd-spec-row"><span className="cd-spec-row-label"><Clipboard size={14} /> Subtitles</span><span className={`cd-spec-pill ${!campaign.video_specs[activeSpecTab].subtitles_required ? 'cd-spec-pill--off' : ''}`}>{campaign.video_specs[activeSpecTab].subtitles_required ? 'Required' : 'Optional'}</span></div>
+                  </div>}
+                </section>
+              )}
+
+              {campaign.guidelines_note && (
+                <section className="cd-section">
+                  <div className="cd-guidelines-note">
+                    <div className="cd-guidelines-note-icon"><CheckCircle2 size={17} /></div>
+                    <div>
+                      <div className="cd-guidelines-note-title">Campaign guidelines</div>
+                      <p className="cd-guidelines-note-copy">{campaign.guidelines_note}</p>
+                    </div>
+                  </div>
                 </section>
               )}
             </article>
@@ -745,6 +952,15 @@ export function CampaignDetail() {
                   </div>
                 </div>
               )}
+
+              <Link to={`/brands/${campaign.business_id}`} className="cd-side-card cd-brand-side">
+                <div className="cd-side-heading"><span>About the brand</span><ArrowUpRight size={15} color={CORAL_DARK} /></div>
+                <div className="cd-brand-side-row">
+                  <div className="cd-brand-side-logo">{brandLogo ? <img src={brandLogo} alt={`${brandName} logo`} /> : brandName[0].toUpperCase()}</div>
+                  <div><div className="cd-brand-side-name">{brandName}</div><div className="cd-brand-side-meta">{brandIndustry}{brandLocation ? ` · ${brandLocation}` : ''}</div></div>
+                </div>
+                <div className="cd-brand-side-link">View brand profile <ArrowUpRight size={13} /></div>
+              </Link>
 
               <div className="cd-side-card cd-apply-card">
                 <div className="cd-apply-accent" />
@@ -783,17 +999,8 @@ export function CampaignDetail() {
                 <div className="cd-side-stat"><DollarSign size={15} className="cd-side-stat-icon" /><div><div className="cd-side-stat-label">Compensation</div><div className="cd-side-stat-value">{campaign.compensation_description || formatMoney(campaign.budget) || 'Discuss with brand'}</div></div></div>
                 <div className="cd-side-stat"><Calendar size={15} className="cd-side-stat-icon" /><div><div className="cd-side-stat-label">Deadline</div><div className="cd-side-stat-value">{deadline ? deadline.label : 'Open until filled'}</div></div></div>
                 <div className="cd-side-stat"><MapPin size={15} className="cd-side-stat-icon" /><div><div className="cd-side-stat-label">Location</div><div className="cd-side-stat-value">{brandLocation || 'Remote / flexible'}</div></div></div>
-                <div className="cd-side-stat"><Film size={15} className="cd-side-stat-icon" /><div><div className="cd-side-stat-label">Content</div><div className="cd-side-stat-value">{campaign.sub_category || campaign.category}</div></div></div>
+                <div className="cd-side-stat"><Film size={15} className="cd-side-stat-icon" /><div><div className="cd-side-stat-label">Content type</div><div className="cd-side-stat-value">{campaign.sub_category || campaign.category}</div></div></div>
               </div>
-
-              <Link to={`/brands/${campaign.business_id}`} className="cd-side-card cd-brand-side">
-                <div className="cd-side-heading"><span>About the brand</span><ArrowUpRight size={15} color={CORAL_DARK} /></div>
-                <div className="cd-brand-side-row">
-                  <div className="cd-brand-side-logo">{brandLogo ? <img src={brandLogo} alt={`${brandName} logo`} /> : brandName[0].toUpperCase()}</div>
-                  <div><div className="cd-brand-side-name">{brandName}</div><div className="cd-brand-side-meta">{brandIndustry}{brandLocation ? ` · ${brandLocation}` : ''}</div></div>
-                </div>
-                <div className="cd-brand-side-link">View brand profile <ArrowUpRight size={13} /></div>
-              </Link>
 
               {related.length > 0 && <div className="cd-side-card cd-related">
                 <div className="cd-side-heading">More campaigns</div>

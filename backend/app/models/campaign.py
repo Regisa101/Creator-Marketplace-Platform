@@ -44,6 +44,11 @@ class Campaign(Base):
     # Requirements
     requirements = Column(Text, nullable=True)  # "Creators should have clean, aesthetic..."
     deliverables = Column(JSON, nullable=True)  # ["Instagram Reel", "Instagram Story"]
+
+    # Creator self-check list shown as "Before you apply" — separate from
+    # `requirements` (brand's creator requirements). These are short
+    # first-person confirmations, e.g. "I can complete the campaign on time".
+    before_you_apply = Column(JSON, nullable=True)  # ["I can complete the campaign on time", ...]
     
     # Checklist
     checklist = Column(JSON, nullable=True)  # [{"text": "...", "checked": true}]
@@ -61,6 +66,11 @@ class Campaign(Base):
     # Caption & Tags
     suggested_caption = Column(Text, nullable=True)
     hashtags = Column(JSON, nullable=True)  # ["#handmadepaper", "#nepalcreators"]
+
+    # Short highlighted note shown in the "Campaign guidelines" callout,
+    # e.g. "Keep your content authentic, positive and aligned with the
+    # brand's values." Distinct from `brief` (the longer campaign story).
+    guidelines_note = Column(Text, nullable=True)
     
     # Timeline
     deadline = Column(DateTime(timezone=True), nullable=True)

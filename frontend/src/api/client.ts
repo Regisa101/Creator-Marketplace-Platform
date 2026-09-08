@@ -230,6 +230,9 @@ export interface VideoSpec {
   platform: string;
   duration?: string;
   aspect_ratio?: string;
+  resolution?: string;
+  frame_rate?: string;
+  file_type?: string;
   voiceover_required: boolean;
   subtitles_required: boolean;
 }
@@ -260,6 +263,7 @@ export interface Campaign {
   compensation_description?: string | null;
   requirements?: string | null;
   deliverables?: string[] | null;
+  before_you_apply?: string[] | null;
   checklist?: ChecklistItem[] | null;
   required_scenes?: string[] | null;
   video_specs?: VideoSpec[] | null;
@@ -267,6 +271,7 @@ export interface Campaign {
   donts?: string[] | null;
   suggested_caption?: string | null;
   hashtags?: string[] | null;
+  guidelines_note?: string | null;
   deadline?: string | null;
   hero_image?: string | null;
   status: CampaignStatus;
@@ -357,6 +362,7 @@ export interface CampaignCreateData {
   compensation_description?: string;
   requirements?: string;
   deliverables?: string[];
+  before_you_apply?: string[];
   checklist?: ChecklistItem[];
   required_scenes?: string[];
   video_specs?: VideoSpec[];
@@ -364,6 +370,7 @@ export interface CampaignCreateData {
   donts?: string[];
   suggested_caption?: string;
   hashtags?: string[];
+  guidelines_note?: string;
   deadline?: string;
   hero_image?: string;
 }

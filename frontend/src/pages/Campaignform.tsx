@@ -30,6 +30,17 @@ const CATEGORIES = [
   'Parenting', 'Entertainment',
 ];
 
+const CONTENT_TYPES = [
+  'Instagram Reel', 'Instagram Story', 'Instagram Post', 'TikTok Video',
+  'YouTube Short', 'YouTube Video', 'UGC Video', 'Product Photos',
+];
+const VIDEO_PLATFORMS = ['Instagram', 'TikTok', 'YouTube', 'Facebook', 'Pinterest'];
+const VIDEO_DURATIONS = ['5-10 seconds', '10-15 seconds', '15-30 seconds', '30-60 seconds', '60-90 seconds', '90+ seconds'];
+const ASPECT_RATIOS = ['9:16', '1:1', '4:5', '16:9'];
+const RESOLUTIONS = ['720 x 1280', '1080 x 1920', '1080 x 1350', '1080 x 1080', '1920 x 1080', '4K'];
+const FRAME_RATES = ['24 FPS', '25 FPS', '30 FPS', '60 FPS'];
+const FILE_TYPES = ['MP4', 'MOV', 'WebM', 'JPG', 'PNG'];
+
 // Curated starter suggestions per category. Deliberately a plain
 // lookup table, not anything smarter — easy to extend later, and the
 // user can always ignore/edit what gets added. Nothing here is forced
@@ -235,33 +246,35 @@ export function TagListField({
   );
 }
 
-const STEP_LABELS = ['Basics', 'Requirements', 'Guidelines', 'Caption', 'Video Specs'];
+const STEP_LABELS = ['Basics', 'Creator Requirements', 'Creative Brief', 'Caption & Tags', 'Video Specs', 'Review & Publish'];
 
 // One-line descriptions shown under each step's title in the sidebar
 // while that step hasn't been reached yet — swapped for a live status
 // ("Filling in now" / "Done") once you're on it or past it.
 const STEP_DESCRIPTIONS = [
-  'Title, category & compensation',
-  'Deliverables & checklist',
-  "Do's and don'ts for creators",
-  'Suggested caption & hashtags',
+  'Campaign identity, offer & timeline',
+  'Who you want and what they deliver',
+  "Creative direction and boundaries",
+  'Caption, hashtags and messaging',
   'Format rules per platform',
+  'Check everything before publishing',
 ];
 
 // Big editorial-style heading shown above the fields for each step —
 // framed as a question, same spirit as a qualification-gate wizard.
 const STEP_QUESTIONS = [
   "What's this campaign about?",
-  'What do creators need to deliver?',
-  'What are your creative guardrails?',
+  'Who are you looking for?',
+  'What should creators know before creating?',
   'How should creators caption it?',
-  'Any platform-specific video rules?',
+  'What are the video rules?',
+  'Ready to publish your campaign?',
 ];
 
 // The word in each STEP_QUESTIONS heading that gets the coral
 // highlight (matches the reference design). Must match a whole word
 // in the corresponding question, case-insensitive.
-const STEP_HIGHLIGHT_WORDS = ['campaign', 'deliver', 'guardrails', 'caption', 'rules'];
+const STEP_HIGHLIGHT_WORDS = ['campaign', 'looking', 'creating', 'caption', 'rules', 'publish'];
 
 // Splits a heading into [before, highlighted, after] around one word,
 // so it can be rendered with the middle word in a different color.
@@ -272,11 +285,12 @@ function splitHeading(text: string, word: string): [string, string, string] {
 }
 
 const STEP_SUBTITLES = [
-  'The essentials creators see first — title, category, and what you\'re offering.',
-  'Tell creators what to bring, and what they owe you.',
-  'Set the creative guardrails up front.',
-  'Give creators a starting point they can tweak.',
-  'One card per platform (e.g. TikTok, Instagram Reel). Optional — skip if you don\'t need this yet.',
+  'The essentials creators see first — title, category, offer, compensation and deadline.',
+  'Define the creator profile, deliverables, checklist and application expectations.',
+  'Set the creative direction, required scenes, do\'s, don\'ts and campaign note.',
+  'Give creators a starting caption and the hashtags or mentions to use.',
+  'Add platform-specific duration, ratio, resolution, file and accessibility rules.',
+  'Review the campaign as a creator will see it, then save or publish.',
 ];
 
 // Persistent left-hand sidebar replacing the old horizontal dot
@@ -431,10 +445,13 @@ export function CampaignForm({ mode }: { mode: 'create' | 'edit' }) {
   const [title, setTitle] = useState('');
   const [tagline, setTagline] = useState('');
   const [heroImage, setHeroImage] = useState('');
+  const [extraPhotos, setExtraPhotos] = useState<string[]>([]);
   const [uploadingHero, setUploadingHero] = useState(false);
+  const [uploadingPhotos, setUploadingPhotos] = useState(false);
   const [heroError, setHeroError] = useState('');
   const [brandName, setBrandName] = useState('');
   const [category, setCategory] = useState('');
+  const [subCategory, setSubCategory] = useState('');
   const [campaignType, setCampaignType] = useState<CampaignType>('gifted');
   const [description, setDescription] = useState('');
   const [budget, setBudget] = useState('');
@@ -444,6 +461,7 @@ export function CampaignForm({ mode }: { mode: 'create' | 'edit' }) {
 
   const [requirements, setRequirements] = useState('');
   const [deliverables, setDeliverables] = useState<string[]>([]);
+  const [beforeYouApply, setBeforeYouApply] = useState<string[]>([]);
   const [checklist, setChecklist] = useState<ChecklistItem[]>([]);
   const [checklistDraft, setChecklistDraft] = useState('');
   const [requiredScenes, setRequiredScenes] = useState<string[]>([]);
@@ -451,12 +469,13 @@ export function CampaignForm({ mode }: { mode: 'create' | 'edit' }) {
   const [donts, setDonts] = useState<string[]>([]);
   const [suggestedCaption, setSuggestedCaption] = useState('');
   const [hashtags, setHashtags] = useState<string[]>([]);
+  const [guidelinesNote, setGuidelinesNote] = useState('');
   const [videoSpecs, setVideoSpecs] = useState<VideoSpec[]>([]);
 
   const [saving, setSaving] = useState<'draft' | 'publish' | null>(null);
   const [error, setError] = useState('');
 
-  // Which of the 5 numbered steps is currently visible. Starts at 1
+  // Which of the 6 numbered steps is currently visible. Starts at 1
   // always — even in edit mode — since every step but Basics is
   // optional and the dots let someone jump straight to whichever one
   // they actually want to change.
@@ -514,8 +533,10 @@ export function CampaignForm({ mode }: { mode: 'create' | 'edit' }) {
         setTitle(c.title);
         setTagline(c.tagline || '');
         setHeroImage(c.hero_image || '');
+        setExtraPhotos(Array.isArray((c as Campaign & { extra_photos?: string[] }).extra_photos) ? ((c as Campaign & { extra_photos?: string[] }).extra_photos || []) : []);
         setBrandName(c.brand_name || '');
         setCategory(c.category);
+        setSubCategory(c.sub_category || '');
         setCampaignType(c.campaign_type);
         setDescription(c.description);
         setBudget(c.budget != null ? String(c.budget) : '');
@@ -524,12 +545,14 @@ export function CampaignForm({ mode }: { mode: 'create' | 'edit' }) {
         setDeadline(c.deadline ? c.deadline.slice(0, 10) : '');
         setRequirements(c.requirements || '');
         setDeliverables(c.deliverables || []);
+        setBeforeYouApply(c.before_you_apply || []);
         setChecklist(c.checklist || []);
         setRequiredScenes(c.required_scenes || []);
         setDos(c.dos || []);
         setDonts(c.donts || []);
         setSuggestedCaption(c.suggested_caption || '');
         setHashtags(c.hashtags || []);
+        setGuidelinesNote(c.guidelines_note || '');
         setVideoSpecs(c.video_specs || []);
       } catch (err) {
         console.error('Could not load campaign for editing:', err);
@@ -682,6 +705,7 @@ export function CampaignForm({ mode }: { mode: 'create' | 'edit' }) {
         title: title.trim(),
         tagline: tagline.trim() || undefined,
         category,
+        sub_category: subCategory.trim() || undefined,
         campaign_type: campaignType,
         description: description.trim(),
         budget: budget ? Number(budget) : undefined,
@@ -691,6 +715,7 @@ export function CampaignForm({ mode }: { mode: 'create' | 'edit' }) {
         deadline: deadline ? new Date(deadline).toISOString() : undefined,
         requirements: requirements.trim() || undefined,
         deliverables: deliverables.length > 0 ? deliverables : undefined,
+        before_you_apply: beforeYouApply.length > 0 ? beforeYouApply : undefined,
         checklist: checklist.length > 0 ? checklist : undefined,
         required_scenes: requiredScenes.length > 0 ? requiredScenes : undefined,
         video_specs:
@@ -701,7 +726,9 @@ export function CampaignForm({ mode }: { mode: 'create' | 'edit' }) {
         donts: donts.length > 0 ? donts : undefined,
         suggested_caption: suggestedCaption.trim() || undefined,
         hashtags: hashtags.length > 0 ? hashtags : undefined,
+        guidelines_note: guidelinesNote.trim() || undefined,
         hero_image: heroImage || undefined,
+        extra_photos: extraPhotos.length > 0 ? extraPhotos : undefined,
       };
 
       let campaignId: number;
@@ -864,8 +891,8 @@ export function CampaignForm({ mode }: { mode: 'create' | 'edit' }) {
 
   .cc-main {
     flex: 1;
-    max-width: 100%;
-    padding: 40px 48px 80px;
+    max-width: 1080px;
+    padding: 40px 42px 80px;
   }
   @media (max-width: 560px) {
     .cc-main { padding: 28px 20px 60px; }
@@ -916,8 +943,25 @@ export function CampaignForm({ mode }: { mode: 'create' | 'edit' }) {
     background: #fff;
     border: 1px solid var(--line);
     border-radius: 16px;
-    padding: 32px 40px;
+    padding: 26px 28px;
   }
+
+  .cc-basics-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 0 18px; }
+  .cc-basics-full { grid-column: 1 / -1; }
+  .cc-product-gallery { border: 1px solid var(--line); border-radius: 14px; padding: 12px; background: #fff; margin-bottom: 22px; }
+  .cc-product-gallery-main { display: grid; grid-template-columns: minmax(0, 1.65fr) minmax(250px, 1fr); gap: 10px; align-items: stretch; }
+  .cc-product-main { position: relative; min-width: 0; height: 185px; border-radius: 11px; overflow: hidden; background: #f6f6f8; }
+  .cc-product-main img { width: 100%; height: 100%; object-fit: cover; display: block; }
+  .cc-product-thumbs { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; align-content: start; }
+  .cc-product-thumb, .cc-product-add { min-width: 0; height: 76px; border-radius: 9px; overflow: hidden; border: 1px solid var(--line); background: #fafafd; position: relative; cursor: pointer; }
+  .cc-product-thumb img { width: 100%; height: 100%; object-fit: cover; display: block; }
+  .cc-product-thumb--active { border: 2px solid var(--violet); }
+  .cc-product-add { border: 1px dashed #B9C1E5; color: var(--violet-dark); display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px; font-size: 10px; font-weight: 600; }
+  .cc-product-badge { position: absolute; left: 10px; top: 10px; background: #fff; color: var(--violet-dark); border-radius: 999px; padding: 6px 9px; font-size: 10px; font-weight: 700; box-shadow: 0 2px 8px rgba(0,0,0,.08); z-index: 2; }
+  .cc-product-remove { position: absolute; right: 9px; top: 9px; width: 27px; height: 27px; border: 0; border-radius: 50%; background: rgba(17,18,23,.58); color: #fff; display:flex; align-items:center; justify-content:center; cursor:pointer; z-index:3; }
+  .cc-product-actions { display:flex; gap:8px; margin-top:10px; flex-wrap:wrap; }
+  .cc-product-help { font-size:11.5px; color:var(--ink-soft); margin-top:8px; display:flex; gap:5px; line-height:1.4; }
+  @media (max-width: 760px) { .cc-basics-grid { grid-template-columns: 1fr; } .cc-basics-full { grid-column:auto; } .cc-product-gallery-main { grid-template-columns: 1fr; } .cc-product-main { height: 175px; } .cc-product-thumbs { grid-template-columns: repeat(4, 1fr); } }
 
   .cc-field { margin-bottom: 18px; }
   .cc-label { display: block; font-size: 13px; font-weight: 600; margin-bottom: 7px; }
@@ -1087,7 +1131,7 @@ export function CampaignForm({ mode }: { mode: 'create' | 'edit' }) {
   .cc-spec-card {
     border: 1px solid var(--line);
     border-radius: 12px;
-    padding: 16px;
+    padding: 14px;
     margin-bottom: 12px;
     position: relative;
   }
@@ -1192,6 +1236,79 @@ export function CampaignForm({ mode }: { mode: 'create' | 'edit' }) {
     background: #F2F4FC;
   }
   .cc-preset-row { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; }
+
+  .cc-review {
+    display: grid;
+    gap: 14px;
+  }
+  .cc-review-intro {
+    padding: 18px 20px;
+    border-radius: 12px;
+    background: #F2F4FC;
+    border: 1px solid #DDE2F6;
+  }
+  .cc-review-intro strong {
+    display: block;
+    color: var(--violet-dark);
+    font-size: 15px;
+    margin-bottom: 4px;
+  }
+  .cc-review-intro span {
+    color: var(--ink-soft);
+    font-size: 12.5px;
+    line-height: 1.55;
+  }
+  .cc-review-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+  }
+  .cc-review-item {
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    padding: 14px 15px;
+    background: #fff;
+  }
+  .cc-review-label {
+    font-size: 10.5px;
+    font-weight: 700;
+    letter-spacing: .05em;
+    text-transform: uppercase;
+    color: var(--ink-soft);
+    margin-bottom: 5px;
+  }
+  .cc-review-value {
+    font-size: 13.5px;
+    line-height: 1.45;
+    color: var(--ink);
+    word-break: break-word;
+  }
+  .cc-review-list {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+  }
+  .cc-review-pill {
+    padding: 5px 9px;
+    border-radius: 999px;
+    background: #F7F7FA;
+    border: 1px solid #E5E5EB;
+    font-size: 11.5px;
+    color: var(--ink);
+  }
+  .cc-review-empty {
+    color: #A39DB8;
+    font-size: 12px;
+  }
+  .cc-review-section-title {
+    font-size: 14px;
+    font-weight: 700;
+    color: var(--violet-dark);
+    margin: 4px 0 8px;
+  }
+  @media (max-width: 680px) {
+    .cc-review-grid { grid-template-columns: 1fr; }
+  }
 
   .flex { display: flex; }
   .w-full { width: 100%; }
@@ -1359,262 +1476,156 @@ export function CampaignForm({ mode }: { mode: 'create' | 'edit' }) {
               {step === 1 && (
                 <>
                   <div className="cc-field">
-                <label className="cc-label">Cover Image</label>
-                <div className="cc-hero">
-                  {heroImage ? (
-                    <>
-                      <img src={heroImage} alt="Campaign cover" />
-                      <button
-                        type="button"
-                        className="cc-hero-remove"
-                        onClick={() => setHeroImage('')}
-                        aria-label="Remove cover image"
-                      >
-                        <X size={14} />
-                      </button>
-                    </>
-                  ) : (
-                    <div className="cc-hero-placeholder">
-                      <Camera size={22} />
-                      No cover image yet
-                    </div>
-                  )}
-                </div>
-                <label
-                  className="cc-hero-btn"
-                  style={uploadingHero ? { opacity: 0.6, pointerEvents: 'none' } : undefined}
-                >
-                  <Camera size={14} />
-                  {uploadingHero ? 'Uploading…' : heroImage ? 'Replace image' : 'Upload image'}
-                  <input
-                    type="file"
-                    accept="image/*"
-                    style={{ display: 'none' }}
-                    disabled={uploadingHero}
-                    onChange={async (e) => {
-                      const file = e.target.files?.[0];
-                      if (!file) return;
-                      setHeroError('');
-                      setUploadingHero(true);
-                      try {
-                        const { url } = await uploadImage(file);
-                        setHeroImage(url);
-                      } catch (err: any) {
-                        console.error('Cover image upload failed:', err);
-                        setHeroError(err?.response?.data?.detail || 'Could not upload image. Please try again.');
-                      } finally {
-                        setUploadingHero(false);
-                        e.target.value = '';
-                      }
-                    }}
-                  />
-                </label>
-                <div className="cc-hint">
-                  <Info size={13} style={{ marginTop: 1, flexShrink: 0 }} />
-                  JPG, PNG or WebP — shown at the top of the campaign page.
-                </div>
-                {heroError && (
-                  <div className="cc-hint" style={{ color: '#d64545' }}>
-                    <Info size={13} style={{ marginTop: 1, flexShrink: 0 }} />
-                    {heroError}
-                  </div>
-                )}
-              </div>
-
-              <div className="cc-field">
-                <label className="cc-label">Campaign Title *</label>
-                <input
-                  className="cc-input"
-                  value={title}
-                  onChange={(e) => setTitle(e.target.value)}
-                  placeholder="e.g. Bring Paper Back to Life with Paper Made Paper"
-                />
-              </div>
-
-              <div className="cc-field">
-                <label className="cc-label">Tagline</label>
-                <input
-                  className="cc-input"
-                  value={tagline}
-                  onChange={(e) => setTagline(e.target.value)}
-                  placeholder="A short one-liner shown under the title"
-                />
-              </div>
-
-              <div className="cc-field">
-                <label className="cc-label">Brand Name</label>
-                <input
-                  className="cc-input"
-                  value={brandName}
-                  onChange={(e) => setBrandName(e.target.value)}
-                  placeholder="e.g. PaperMadePaper"
-                />
-                <div className="cc-hint">
-                  <Info size={13} style={{ marginTop: 1, flexShrink: 0 }} />
-                  Prefilled from your business profile when available — feel free to edit it.
-                </div>
-              </div>
-
-              <div className="cc-row">
-                <div className="cc-field">
-                  <label className="cc-label">Category *</label>
-                  <select className="cc-select" value={category} onChange={(e) => setCategory(e.target.value)}>
-                    <option value="">Select a category</option>
-                    {CATEGORIES.map((c) => (
-                      <option key={c} value={c}>
-                        {c}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-                <div className="cc-field">
-                  <label className="cc-label">Location</label>
-                  <input
-                    className="cc-input"
-                    value={brandLocation}
-                    onChange={(e) => setBrandLocation(e.target.value)}
-                    placeholder="e.g. Kathmandu Valley, Nepal"
-                  />
-                </div>
-              </div>
-
-              {categorySuggestions && (
-                <div className="cc-suggest-box">
-                  <div className="cc-suggest-title">
-                    <Sparkles size={13} /> Suggested for {category}
-                  </div>
-
-                  <div className="cc-suggest-group">
-                    <div className="cc-suggest-group-label">Do's</div>
-                    <div className="cc-suggest-list">
-                      {categorySuggestions.dos.map((item) => {
-                        const already = dos.some((d) => d.toLowerCase() === item.toLowerCase());
-                        return (
-                          <button
-                            type="button"
-                            key={item}
-                            className="cc-suggest-chip"
-                            disabled={already}
-                            onClick={() => setDos(addUnique(dos, [item]))}
-                          >
-                            {already ? '✓ ' : '+ '}
-                            {item}
-                          </button>
-                        );
-                      })}
+                    <label className="cc-label">Products to Promote</label>
+                    <div className="cc-product-gallery">
+                      <div className="cc-product-gallery-main">
+                        <div className="cc-product-main">
+                          {heroImage ? (
+                            <>
+                              <span className="cc-product-badge">Main product</span>
+                              <img src={heroImage} alt="Main product" />
+                              <button type="button" className="cc-product-remove" onClick={() => setHeroImage('')} aria-label="Remove main product">
+                                <X size={14} />
+                              </button>
+                            </>
+                          ) : (
+                            <div className="cc-hero-placeholder"><Camera size={22} /><span>Add your main product</span></div>
+                          )}
+                        </div>
+                        <div className="cc-product-thumbs">
+                          {extraPhotos.map((photo, i) => (
+                            <button type="button" className="cc-product-thumb" key={`${photo}-${i}`} onClick={() => { const next = [...extraPhotos]; next.splice(i, 1); setExtraPhotos([photo, ...next]); }}>
+                              <img src={photo} alt={`Product ${i + 2}`} />
+                              <span className="cc-product-badge" style={{ left: 5, top: 5, padding: '3px 6px', fontSize: 9 }}>{i + 2}</span>
+                            </button>
+                          ))}
+                          <label className="cc-product-add">
+                            <Plus size={18} />
+                            <span>{uploadingPhotos ? 'Uploading…' : 'Add more'}</span>
+                            <input
+                              type="file"
+                              accept="image/*"
+                              multiple
+                              style={{ display: 'none' }}
+                              disabled={uploadingPhotos}
+                              onChange={async (e) => {
+                                const files = Array.from(e.target.files || []);
+                                if (!files.length) return;
+                                setUploadingPhotos(true);
+                                setHeroError('');
+                                try {
+                                  const uploaded = await Promise.all(files.map((file) => uploadImage(file).then((r) => r.url)));
+                                  setExtraPhotos((prev) => [...prev, ...uploaded]);
+                                } catch (err: any) {
+                                  console.error('Product photo upload failed:', err);
+                                  setHeroError(err?.response?.data?.detail || 'Could not upload product photos. Please try again.');
+                                } finally {
+                                  setUploadingPhotos(false);
+                                  e.target.value = '';
+                                }
+                              }}
+                            />
+                          </label>
+                        </div>
+                      </div>
+                      <div className="cc-product-actions">
+                        <label className="cc-hero-btn" style={uploadingHero ? { opacity: 0.6, pointerEvents: 'none' } : undefined}>
+                          <Camera size={14} />
+                          {uploadingHero ? 'Uploading…' : heroImage ? 'Replace main image' : 'Upload main product'}
+                          <input
+                            type="file"
+                            accept="image/*"
+                            style={{ display: 'none' }}
+                            disabled={uploadingHero}
+                            onChange={async (e) => {
+                              const file = e.target.files?.[0];
+                              if (!file) return;
+                              setUploadingHero(true);
+                              setHeroError('');
+                              try { const { url } = await uploadImage(file); setHeroImage(url); }
+                              catch (err: any) { setHeroError(err?.response?.data?.detail || 'Could not upload image. Please try again.'); }
+                              finally { setUploadingHero(false); e.target.value = ''; }
+                            }}
+                          />
+                        </label>
+                        <label className="cc-hero-btn">
+                          <Plus size={14} /> Add product photos
+                          <input
+                            type="file"
+                            accept="image/*"
+                            multiple
+                            style={{ display: 'none' }}
+                            disabled={uploadingPhotos}
+                            onChange={async (e) => {
+                              const files = Array.from(e.target.files || []);
+                              if (!files.length) return;
+                              setUploadingPhotos(true);
+                              setHeroError('');
+                              try { const uploaded = await Promise.all(files.map((file) => uploadImage(file).then((r) => r.url))); setExtraPhotos((prev) => [...prev, ...uploaded]); }
+                              catch (err: any) { setHeroError(err?.response?.data?.detail || 'Could not upload product photos. Please try again.'); }
+                              finally { setUploadingPhotos(false); e.target.value = ''; }
+                            }}
+                          />
+                        </label>
+                      </div>
+                      <div className="cc-product-help"><Info size={13} /> Add the actual products creators will promote. The first image is the main product; additional photos appear as a gallery on the campaign page.</div>
+                      {heroError && <div className="cc-hint" style={{ color: '#d64545' }}>{heroError}</div>}
                     </div>
                   </div>
 
-                  <div className="cc-suggest-group">
-                    <div className="cc-suggest-group-label">Deliverables</div>
-                    <div className="cc-suggest-list">
-                      {categorySuggestions.deliverables.map((item) => {
-                        const already = deliverables.some((d) => d.toLowerCase() === item.toLowerCase());
-                        return (
-                          <button
-                            type="button"
-                            key={item}
-                            className="cc-suggest-chip"
-                            disabled={already}
-                            onClick={() => setDeliverables(addUnique(deliverables, [item]))}
-                          >
-                            {already ? '✓ ' : '+ '}
-                            {item}
-                          </button>
-                        );
-                      })}
+                  <div className="cc-basics-grid">
+                    <div className="cc-field">
+                      <label className="cc-label">Campaign Title *</label>
+                      <input className="cc-input" value={title} onChange={(e) => setTitle(e.target.value)} placeholder="e.g. Sweet Moments with CloudBakes" />
+                    </div>
+                    <div className="cc-field">
+                      <label className="cc-label">Category *</label>
+                      <select className="cc-select" value={category} onChange={(e) => setCategory(e.target.value)}>
+                        <option value="">Select a category</option>{CATEGORIES.map((c) => <option key={c} value={c}>{c}</option>)}
+                      </select>
+                    </div>
+                    <div className="cc-field">
+                      <label className="cc-label">Campaign Type *</label>
+                      <select className="cc-select" value={campaignType} onChange={(e) => setCampaignType(e.target.value as CampaignType)}>
+                        <option value="paid">Paid</option><option value="gifted">Gifted</option>
+                      </select>
+                    </div>
+                    <div className="cc-field">
+                      <label className="cc-label">Content Type</label>
+                      <select className="cc-select" value={subCategory} onChange={(e) => setSubCategory(e.target.value)}>
+                        <option value="">Select content type</option>{CONTENT_TYPES.map((c) => <option key={c} value={c}>{c}</option>)}
+                      </select>
+                    </div>
+                    <div className="cc-field">
+                      <label className="cc-label">Brand Name</label>
+                      <input className="cc-input" value={brandName} onChange={(e) => setBrandName(e.target.value)} placeholder="e.g. CloudBakes" />
+                    </div>
+                    <div className="cc-field">
+                      <label className="cc-label">Location</label>
+                      <input className="cc-input" value={brandLocation} onChange={(e) => setBrandLocation(e.target.value)} placeholder="e.g. Kathmandu, Nepal" />
+                    </div>
+                    <div className="cc-field">
+                      <label className="cc-label">Compensation</label>
+                      {campaignType === 'paid' ? (
+                        <input className="cc-input" type="number" min="0" value={budget} onChange={(e) => setBudget(e.target.value)} placeholder="e.g. 2000" />
+                      ) : (
+                        <input className="cc-input" value={compensationDescription} onChange={(e) => setCompensationDescription(e.target.value)} placeholder="e.g. Product worth Rs. 2,000" />
+                      )}
+                    </div>
+                    <div className="cc-field">
+                      <label className="cc-label">Application Deadline</label>
+                      <input className="cc-input" type="date" value={deadline} onChange={(e) => setDeadline(e.target.value)} />
+                    </div>
+                    <div className="cc-field cc-basics-full">
+                      <label className="cc-label">Tagline</label>
+                      <input className="cc-input" value={tagline} onChange={(e) => setTagline(e.target.value)} placeholder="A short one-liner shown under the title" />
+                    </div>
+                    <div className="cc-field cc-basics-full">
+                      <label className="cc-label">About This Campaign *</label>
+                      <textarea className="cc-textarea" value={description} onChange={(e) => setDescription(e.target.value)} placeholder="Tell creators what to make, why it matters, and what your brand is all about..." />
+                      <div className="cc-hint">Shown as the main description on the campaign page. Minimum 10 characters.</div>
                     </div>
                   </div>
-
-                  <div className="cc-suggest-group">
-                    <div className="cc-suggest-group-label">Hashtags</div>
-                    <div className="cc-suggest-list">
-                      {categorySuggestions.hashtags.map((item) => {
-                        const already = hashtags.some((h) => h.toLowerCase() === item.toLowerCase());
-                        return (
-                          <button
-                            type="button"
-                            key={item}
-                            className="cc-suggest-chip"
-                            disabled={already}
-                            onClick={() => setHashtags(addUnique(hashtags, [item]))}
-                          >
-                            {already ? '✓ ' : '+ '}
-                            {item}
-                          </button>
-                        );
-                      })}
-                    </div>
-                  </div>
-                </div>
-              )}
-
-              <div className="cc-field">
-                <label className="cc-label">Campaign Type *</label>
-                <div className="cc-type-toggle">
-                  <button
-                    type="button"
-                    className={`cc-type-btn ${campaignType === 'gifted' ? 'cc-type-btn--active' : ''}`}
-                    onClick={() => setCampaignType('gifted')}
-                  >
-                    <Gift size={14} style={{ verticalAlign: -2, marginRight: 6 }} />
-                    Gifted
-                  </button>
-                  <button
-                    type="button"
-                    className={`cc-type-btn ${campaignType === 'paid' ? 'cc-type-btn--active' : ''}`}
-                    onClick={() => setCampaignType('paid')}
-                  >
-                    <DollarSign size={14} style={{ verticalAlign: -2, marginRight: 4 }} />
-                    Paid
-                  </button>
-                </div>
-              </div>
-
-              <div className="cc-field">
-                <label className="cc-label">About This Campaign *</label>
-                <textarea
-                  className="cc-textarea"
-                  value={description}
-                  onChange={(e) => setDescription(e.target.value)}
-                  placeholder="What are you looking for creators to make, and why?"
-                />
-                <div className="cc-hint">Shown as the main description on the campaign page. Minimum 10 characters.</div>
-              </div>
-
-              {campaignType === 'paid' ? (
-                <div className="cc-field">
-                  <label className="cc-label">Budget (Rs.)</label>
-                  <input
-                    className="cc-input"
-                    type="number"
-                    min="0"
-                    value={budget}
-                    onChange={(e) => setBudget(e.target.value)}
-                    placeholder="e.g. 2000"
-                  />
-                </div>
-              ) : (
-                <div className="cc-field">
-                  <label className="cc-label">Compensation Details</label>
-                  <textarea
-                    className="cc-textarea"
-                    value={compensationDescription}
-                    onChange={(e) => setCompensationDescription(e.target.value)}
-                    placeholder="What are you gifting, and what's it worth?"
-                  />
-                </div>
-              )}
-
-              <div className="cc-field">
-                <label className="cc-label">Application Deadline</label>
-                <input
-                  className="cc-input"
-                  type="date"
-                  value={deadline}
-                  onChange={(e) => setDeadline(e.target.value)}
-                />
-              </div>
                 </>
               )}
 
@@ -1733,6 +1744,14 @@ export function CampaignForm({ mode }: { mode: 'create' | 'edit' }) {
                 onChange={setRequiredScenes}
                 hint="Shown as a numbered shot list, in the order you add them."
               />
+
+              <TagListField
+                label="Before You Apply"
+                placeholder="e.g. I can complete the campaign on time"
+                items={beforeYouApply}
+                onChange={setBeforeYouApply}
+                hint="Short first-person confirmations creators tick off before applying — different from your requirements above, which are the creator qualities you're looking for."
+              />
                 </>
               )}
 
@@ -1750,6 +1769,20 @@ export function CampaignForm({ mode }: { mode: 'create' | 'edit' }) {
                 items={donts}
                 onChange={setDonts}
               />
+
+              <div className="cc-field">
+                <label className="cc-label">Campaign Guidelines Note</label>
+                <textarea
+                  className="cc-textarea"
+                  value={guidelinesNote}
+                  onChange={(e) => setGuidelinesNote(e.target.value)}
+                  placeholder="A short highlighted note, e.g. Keep your content authentic, positive and aligned with the brand's values."
+                />
+                <div className="cc-hint">
+                  <Info size={13} style={{ marginTop: 1, flexShrink: 0 }} />
+                  Shown in a highlighted callout at the bottom of the campaign page.
+                </div>
+              </div>
                 </>
               )}
 
@@ -1784,55 +1817,63 @@ export function CampaignForm({ mode }: { mode: 'create' | 'edit' }) {
                   <div className="cc-spec-row-inputs">
                     <div>
                       <label className="cc-label">Platform</label>
-                      <input
-                        className="cc-input"
-                        value={spec.platform}
-                        onChange={(e) => updateVideoSpec(i, { platform: e.target.value })}
-                        placeholder="e.g. TikTok"
-                      />
+                      <select className="cc-select" value={spec.platform} onChange={(e) => updateVideoSpec(i, { platform: e.target.value })}>
+                        <option value="">Select platform</option>{VIDEO_PLATFORMS.map((v) => <option key={v} value={v}>{v}</option>)}
+                      </select>
                     </div>
                     <div>
                       <label className="cc-label">Duration</label>
-                      <input
-                        className="cc-input"
-                        value={spec.duration || ''}
-                        onChange={(e) => updateVideoSpec(i, { duration: e.target.value })}
-                        placeholder="e.g. 15-30 seconds"
-                      />
+                      <select className="cc-select" value={spec.duration || ''} onChange={(e) => updateVideoSpec(i, { duration: e.target.value })}>
+                        <option value="">Select duration</option>{VIDEO_DURATIONS.map((v) => <option key={v} value={v}>{v}</option>)}
+                      </select>
                     </div>
                   </div>
                   <div className="cc-spec-row-inputs">
                     <div>
                       <label className="cc-label">Aspect Ratio</label>
-                      <input
-                        className="cc-input"
-                        value={spec.aspect_ratio || ''}
-                        onChange={(e) => updateVideoSpec(i, { aspect_ratio: e.target.value })}
-                        placeholder="e.g. 9:16"
-                      />
+                      <select className="cc-select" value={spec.aspect_ratio || ''} onChange={(e) => updateVideoSpec(i, { aspect_ratio: e.target.value })}>
+                        <option value="">Select ratio</option>{ASPECT_RATIOS.map((v) => <option key={v} value={v}>{v}</option>)}
+                      </select>
                     </div>
                     <div>
-                      <label className="cc-label" style={{ visibility: 'hidden' }}>
-                        spacer
+                      <label className="cc-label">Resolution</label>
+                      <select className="cc-select" value={spec.resolution || ''} onChange={(e) => updateVideoSpec(i, { resolution: e.target.value })}>
+                        <option value="">Select resolution</option>{RESOLUTIONS.map((v) => <option key={v} value={v}>{v}</option>)}
+                      </select>
+                    </div>
+                  </div>
+                  <div className="cc-spec-row-inputs">
+                    <div>
+                      <label className="cc-label">Frame Rate</label>
+                      <select className="cc-select" value={spec.frame_rate || ''} onChange={(e) => updateVideoSpec(i, { frame_rate: e.target.value })}>
+                        <option value="">Select frame rate</option>{FRAME_RATES.map((v) => <option key={v} value={v}>{v}</option>)}
+                      </select>
+                    </div>
+                    <div>
+                      <label className="cc-label">File Type</label>
+                      <select className="cc-select" value={spec.file_type || ''} onChange={(e) => updateVideoSpec(i, { file_type: e.target.value })}>
+                        <option value="">Select file type</option>{FILE_TYPES.map((v) => <option key={v} value={v}>{v}</option>)}
+                      </select>
+                    </div>
+                  </div>
+                  <div className="cc-spec-row-inputs">
+                    <div className="cc-spec-checks">
+                      <label className="cc-spec-check">
+                        <input
+                          type="checkbox"
+                          checked={spec.voiceover_required}
+                          onChange={(e) => updateVideoSpec(i, { voiceover_required: e.target.checked })}
+                        />
+                        Voiceover required
                       </label>
-                      <div className="cc-spec-checks">
-                        <label className="cc-spec-check">
-                          <input
-                            type="checkbox"
-                            checked={spec.voiceover_required}
-                            onChange={(e) => updateVideoSpec(i, { voiceover_required: e.target.checked })}
-                          />
-                          Voiceover required
-                        </label>
-                        <label className="cc-spec-check">
-                          <input
-                            type="checkbox"
-                            checked={spec.subtitles_required}
-                            onChange={(e) => updateVideoSpec(i, { subtitles_required: e.target.checked })}
-                          />
-                          Subtitles required
-                        </label>
-                      </div>
+                      <label className="cc-spec-check">
+                        <input
+                          type="checkbox"
+                          checked={spec.subtitles_required}
+                          onChange={(e) => updateVideoSpec(i, { subtitles_required: e.target.checked })}
+                        />
+                        Subtitles required
+                      </label>
                     </div>
                   </div>
                 </div>
@@ -1842,6 +1883,105 @@ export function CampaignForm({ mode }: { mode: 'create' | 'edit' }) {
               </button>
                 </>
               )}
+
+              {step === 6 && (
+                <div className="cc-review">
+                  <div className="cc-review-intro">
+                    <strong>Give it a final look before you publish.</strong>
+                    <span>
+                      This is the information creators will use to decide whether the campaign is a good fit.
+                      You can jump back to any step from the sidebar and make changes.
+                    </span>
+                  </div>
+
+                  <div className="cc-review-grid">
+                    <div className="cc-review-item">
+                      <div className="cc-review-label">Campaign</div>
+                      <div className="cc-review-value">{title || 'Not added yet'}</div>
+                    </div>
+                    <div className="cc-review-item">
+                      <div className="cc-review-label">Category</div>
+                      <div className="cc-review-value">{category || 'Not selected'}</div>
+                    </div>
+                    <div className="cc-review-item">
+                      <div className="cc-review-label">Brand</div>
+                      <div className="cc-review-value">{brandName || 'Not added'}</div>
+                    </div>
+                    <div className="cc-review-item">
+                      <div className="cc-review-label">Content type</div>
+                      <div className="cc-review-value">{subCategory || 'Not specified'}</div>
+                    </div>
+                    <div className="cc-review-item">
+                      <div className="cc-review-label">Campaign type</div>
+                      <div className="cc-review-value">{campaignType === 'paid' ? 'Paid' : 'Gifted'}</div>
+                    </div>
+                    <div className="cc-review-item">
+                      <div className="cc-review-label">Compensation</div>
+                      <div className="cc-review-value">
+                        {campaignType === 'paid'
+                          ? (budget ? `Rs. ${budget}` : 'Budget not specified')
+                          : (compensationDescription || 'Compensation details not specified')}
+                      </div>
+                    </div>
+                    <div className="cc-review-item">
+                      <div className="cc-review-label">Application deadline</div>
+                      <div className="cc-review-value">{deadline || 'Not specified'}</div>
+                    </div>
+                    <div className="cc-review-item">
+                      <div className="cc-review-label">Location</div>
+                      <div className="cc-review-value">{brandLocation || 'Not specified'}</div>
+                    </div>
+                  </div>
+
+                  <div className="cc-review-item">
+                    <div className="cc-review-label">About the campaign</div>
+                    <div className="cc-review-value">{description || 'No campaign description yet.'}</div>
+                  </div>
+
+                  <div className="cc-review-item">
+                    <div className="cc-review-label">Creator requirements</div>
+                    <div className="cc-review-value">{requirements || 'No creator requirements added yet.'}</div>
+                  </div>
+
+                  <div className="cc-review-item">
+                    <div className="cc-review-section-title">Deliverables</div>
+                    {deliverables.length > 0 ? (
+                      <div className="cc-review-list">
+                        {deliverables.map((item, i) => <span className="cc-review-pill" key={i}>{item}</span>)}
+                      </div>
+                    ) : <span className="cc-review-empty">No deliverables added.</span>}
+                  </div>
+
+                  <div className="cc-review-grid">
+                    <div className="cc-review-item">
+                      <div className="cc-review-section-title">Creative direction</div>
+                      <div className="cc-review-value">
+                        {dos.length} do&apos;s · {donts.length} don&apos;ts · {requiredScenes.length} required scenes
+                      </div>
+                    </div>
+                    <div className="cc-review-item">
+                      <div className="cc-review-section-title">Caption & tags</div>
+                      <div className="cc-review-value">
+                        {suggestedCaption ? 'Caption added' : 'No suggested caption'} · {hashtags.length} hashtag{hashtags.length === 1 ? '' : 's'}
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="cc-review-item">
+                    <div className="cc-review-label">Video specifications</div>
+                    {videoSpecs.length > 0 ? (
+                      <div className="cc-review-list">
+                        {videoSpecs.filter((s) => s.platform.trim()).map((spec, i) => (
+                          <span className="cc-review-pill" key={i}>
+                            {spec.platform}{spec.duration ? ` · ${spec.duration}` : ''}{spec.aspect_ratio ? ` · ${spec.aspect_ratio}` : ''}
+                          </span>
+                        ))}
+                      </div>
+                    ) : <span className="cc-review-empty">No platform-specific rules added.</span>}
+                  </div>
+                </div>
+              )}
+
 
               <hr className="cc-section-divider" style={{ marginTop: 24 }} />
 
@@ -1853,7 +1993,7 @@ export function CampaignForm({ mode }: { mode: 'create' | 'edit' }) {
                 ) : <span />}
 
                 <div className="cc-footer-right">
-                  {step < 5 && (
+                  {step < STEP_LABELS.length && (
                     <button
                       type="button"
                       className="cc-next-step cc-next-step--secondary"
@@ -1871,7 +2011,7 @@ export function CampaignForm({ mode }: { mode: 'create' | 'edit' }) {
                     {saving === 'draft' && <Loader2 size={15} className="cc-spin" />}
                     {mode === 'edit' ? 'Save Changes' : 'Save as Draft'}
                   </button>
-                  {(mode === 'create' || originalStatus === 'draft') && (
+                  {step === STEP_LABELS.length && (mode === 'create' || originalStatus === 'draft') && (
                     <button
                       className="cc-btn-publish"
                       onClick={() => handleSubmit('publish')}
