@@ -37,6 +37,7 @@ import {
   publishCampaign,
   saveCampaign,
   unsaveCampaign,
+  withdrawApplication,
   type Application,
   type Campaign,
   type PublicBusinessProfile,
@@ -101,6 +102,7 @@ export function CampaignDetail() {
   const [message, setMessage] = useState('');
   const [applying, setApplying] = useState(false);
   const [applyError, setApplyError] = useState('');
+  const [withdrawing, setWithdrawing] = useState(false);
 
   const [isSaved, setIsSaved] = useState(false);
   const [savingBookmark, setSavingBookmark] = useState(false);
@@ -221,10 +223,35 @@ export function CampaignDetail() {
       });
       setMyApplication(created);
       setShowApplyForm(false);
+      setProposal('');
+      setRate('');
+      setMessage('');
     } catch (err: any) {
       setApplyError(err?.response?.data?.detail || 'Could not submit your application. Please try again.');
     } finally {
       setApplying(false);
+    }
+  };
+
+  // 🔥 NEW: Withdraw handler
+  const handleWithdraw = async () => {
+    if (!myApplication) return;
+    if (!confirm('Are you sure you want to withdraw your application?')) return;
+    
+    setWithdrawing(true);
+    setApplyError('');
+    try {
+      await withdrawApplication(myApplication.id);
+      // Refresh application status
+      if (id) {
+        const apps = await getApplications({ campaign_id: parseInt(id) });
+        setMyApplication(apps[0] ?? null);
+      }
+    } catch (err: any) {
+      console.error('Could not withdraw application:', err);
+      setApplyError(err?.response?.data?.detail || 'Could not withdraw application. Please try again.');
+    } finally {
+      setWithdrawing(false);
     }
   };
 
@@ -287,13 +314,26 @@ export function CampaignDetail() {
         myApplication.status === 'pending'
           ? 'Application pending'
           : myApplication.status === 'accepted'
-          ? 'Application accepted'
+          ? 'Application accepted ✓'
           : myApplication.status === 'rejected'
-          ? 'Application rejected'
+          ? 'Application rejected ✗'
           : 'Application withdrawn';
+
+      // 🔥 NEW: Show Withdraw button for pending applications
       return (
         <div className={`cd-application-status cd-application-status--${myApplication.status}`}>
-          <CheckCircle2 size={17} /> {label}
+          <CheckCircle2 size={17} /> 
+          {label}
+          {myApplication.status === 'pending' && (
+            <button
+              className="cd-withdraw-button"
+              onClick={handleWithdraw}
+              disabled={withdrawing}
+            >
+              {withdrawing ? <Loader2 size={14} className="cd-spin" /> : <Trash2 size={14} />}
+              {withdrawing ? 'Withdrawing...' : 'Withdraw'}
+            </button>
+          )}
         </div>
       );
     }
@@ -314,14 +354,38 @@ export function CampaignDetail() {
       <div className="cd-apply-form">
         {applyError && <div className="cd-error">{applyError}</div>}
         <label>Why are you a good fit? *</label>
-        <textarea value={proposal} onChange={(e) => setProposal(e.target.value)} placeholder="Tell the brand about your content style, audience and why this campaign fits you…" />
+        <textarea 
+          value={proposal} 
+          onChange={(e) => setProposal(e.target.value)} 
+          placeholder="Tell the brand about your content style, audience and why this campaign fits you…" 
+        />
         <label>Your rate <span>(optional)</span></label>
-        <input type="number" min="0" value={rate} onChange={(e) => setRate(e.target.value)} placeholder="Rs. 0" />
+        <input 
+          type="number" 
+          min="0" 
+          value={rate} 
+          onChange={(e) => setRate(e.target.value)} 
+          placeholder="Rs. 0" 
+        />
         <label>Message <span>(optional)</span></label>
-        <textarea value={message} onChange={(e) => setMessage(e.target.value)} placeholder="Anything else the brand should know?" />
+        <textarea 
+          value={message} 
+          onChange={(e) => setMessage(e.target.value)} 
+          placeholder="Anything else the brand should know?" 
+        />
         <div className="cd-form-actions">
-          <button className="cd-secondary-button" onClick={() => { setShowApplyForm(false); setApplyError(''); }} disabled={applying}>Cancel</button>
-          <button className="cd-apply-button" onClick={handleApplySubmit} disabled={applying}>
+          <button 
+            className="cd-secondary-button" 
+            onClick={() => { setShowApplyForm(false); setApplyError(''); }} 
+            disabled={applying}
+          >
+            Cancel
+          </button>
+          <button 
+            className="cd-apply-button" 
+            onClick={handleApplySubmit} 
+            disabled={applying || !proposal.trim()}
+          >
             {applying && <Loader2 size={15} className="cd-spin" />}
             {applying ? 'Sending…' : 'Send application'}
           </button>
@@ -481,6 +545,31 @@ export function CampaignDetail() {
         .cd-guidelines-note-title { font-size: 14.5px; font-weight: 750; margin-bottom: 5px; }
         .cd-guidelines-note-copy { margin: 0; color: #5c5d66; font-size: 13.5px; line-height: 1.7; }
 
+        /* Withdraw button styles */
+        .cd-withdraw-button {
+          display: inline-flex;
+          align-items: center;
+          gap: 6px;
+          font-size: 11.5px;
+          font-weight: 700;
+          padding: 6px 14px;
+          border-radius: 8px;
+          border: 1px solid #fca5a5;
+          background: #fee2e2;
+          color: #dc2626;
+          cursor: pointer;
+          margin-left: 10px;
+          transition: all 0.15s ease;
+        }
+        .cd-withdraw-button:hover {
+          background: #fca5a5;
+          border-color: #ef4444;
+        }
+        .cd-withdraw-button:disabled {
+          opacity: 0.6;
+          cursor: not-allowed;
+        }
+
         .cd-sidebar { position: sticky; top: 92px; display: flex; flex-direction: column; gap: 13px; }
         .cd-side-card { background: #fff; border: 1px solid var(--line); border-radius: 19px; padding: 19px; box-shadow: 0 7px 26px rgba(18,19,26,.04); }
         .cd-apply-card { position: relative; overflow: hidden; border-color: #ffcfc4; background: linear-gradient(180deg, #fffaf8 0%, #fff 42%); box-shadow: 0 12px 34px rgba(255,107,90,.11), 0 3px 12px rgba(30,42,120,.035); }
@@ -540,10 +629,11 @@ export function CampaignDetail() {
         .cd-form-actions { display: grid; grid-template-columns: 1fr 1.6fr; gap: 8px; margin-top: 12px; }
         .cd-secondary-button { min-height: 41px; border: 1px solid #dedee4; border-radius: 10px; background: #fff; color: #42434a; font-size: 12px; font-weight: 700; cursor: pointer; }
         .cd-error { color: #c84642; background: #fff0ef; border: 1px solid #f2cfcc; padding: 9px 10px; border-radius: 9px; font-size: 11.5px; line-height: 1.5; }
-        .cd-application-status { min-height: 43px; display: flex; align-items: center; justify-content: center; gap: 7px; border-radius: 11px; font-size: 12.5px; font-weight: 750; text-transform: capitalize; }
+        .cd-application-status { min-height: 43px; display: flex; align-items: center; justify-content: center; gap: 7px; border-radius: 11px; font-size: 12.5px; font-weight: 750; text-transform: capitalize; flex-wrap: wrap; padding: 8px 12px; }
         .cd-application-status--pending { color: #956b00; background: #fff5df; }
         .cd-application-status--accepted { color: #21894c; background: #edf8f1; }
         .cd-application-status--rejected { color: #c84642; background: #fff0ef; }
+        .cd-application-status--withdrawn { color: #6b6b72; background: #f1f0f5; }
 
         .cd-owner { border-color: #dddde5; }
         .cd-sidebar > .cd-owner { order: 1; }

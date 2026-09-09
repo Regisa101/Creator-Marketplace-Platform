@@ -24,53 +24,49 @@ class Campaign(Base):
     
     # Basic Info
     title = Column(String(255), nullable=False)
-    tagline = Column(String(255), nullable=True)  # "Bring Paper Back to Life"
+    tagline = Column(String(255), nullable=True)
     description = Column(Text, nullable=False)
     brief = Column(Text, nullable=True)
     category = Column(String(100), nullable=False)
-    sub_category = Column(String(100), nullable=True)  # "Product Lifestyle"
+    sub_category = Column(String(100), nullable=True)
     
     # Campaign Type
-    campaign_type = Column(Enum(CampaignType), default=CampaignType.GIFTED)  # paid, gifted
+    campaign_type = Column(Enum(CampaignType), default=CampaignType.GIFTED)
     
     # Brand/Company
-    brand_name = Column(String(255), nullable=True)  # "PaperMadePaper"
-    brand_location = Column(String(255), nullable=True)  # "Kathmandu Valley, Nepal"
+    brand_name = Column(String(255), nullable=True)
+    brand_location = Column(String(255), nullable=True)
     
     # Budget & Compensation
     budget = Column(DECIMAL(10,2), nullable=True)
-    compensation_description = Column(Text, nullable=True)  # "Free handmade paper products"
+    compensation_description = Column(Text, nullable=True)
     
     # Requirements
-    requirements = Column(Text, nullable=True)  # "Creators should have clean, aesthetic..."
-    deliverables = Column(JSON, nullable=True)  # ["Instagram Reel", "Instagram Story"]
-
-    # Creator self-check list shown as "Before you apply" — separate from
-    # `requirements` (brand's creator requirements). These are short
-    # first-person confirmations, e.g. "I can complete the campaign on time".
-    before_you_apply = Column(JSON, nullable=True)  # ["I can complete the campaign on time", ...]
+    requirements = Column(Text, nullable=True)
+    deliverables = Column(JSON, nullable=True)
+    before_you_apply = Column(JSON, nullable=True)  # ← ADD THIS
     
     # Checklist
-    checklist = Column(JSON, nullable=True)  # [{"text": "...", "checked": true}]
+    checklist = Column(JSON, nullable=True)
     
     # Required Scenes
-    required_scenes = Column(JSON, nullable=True)  # ["Product Introduction", "Handmade Details", ...]
+    required_scenes = Column(JSON, nullable=True)
     
     # Video Specs
-    video_specs = Column(JSON, nullable=True)  # {"platform": "TikTok", "duration": "15-30s", "ratio": "9:16"}
+    video_specs = Column(JSON, nullable=True)
     
     # Do's & Don'ts
-    dos = Column(JSON, nullable=True)  # ["Show how product can be used", ...]
-    donts = Column(JSON, nullable=True)  # ["Make it salesy", ...]
+    dos = Column(JSON, nullable=True)
+    donts = Column(JSON, nullable=True)
     
     # Caption & Tags
     suggested_caption = Column(Text, nullable=True)
-    hashtags = Column(JSON, nullable=True)  # ["#handmadepaper", "#nepalcreators"]
-
-    # Short highlighted note shown in the "Campaign guidelines" callout,
-    # e.g. "Keep your content authentic, positive and aligned with the
-    # brand's values." Distinct from `brief` (the longer campaign story).
-    guidelines_note = Column(Text, nullable=True)
+    hashtags = Column(JSON, nullable=True)
+    guidelines_note = Column(Text, nullable=True)  # ← ADD THIS
+    
+    # Images
+    hero_image = Column(String(255), nullable=True)
+    extra_photos = Column(JSON, nullable=True)  # ← ADD THIS (MOST IMPORTANT)
     
     # Timeline
     deadline = Column(DateTime(timezone=True), nullable=True)
@@ -79,14 +75,6 @@ class Campaign(Base):
     status = Column(Enum(CampaignStatus), default=CampaignStatus.DRAFT)
     is_active = Column(Boolean, default=True)
     
-        # Hero Image
-    hero_image = Column(String(255), nullable=True)
-
-    # Extra product photos shown as a gallery on the campaign page,
-    # alongside the single hero_image. First item is treated as the
-    # "main" product image in the gallery UI.
-    extra_photos = Column(JSON, nullable=True)  # ["https://.../photo1.jpg", ...]
-    
     # Timestamps
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())
@@ -94,10 +82,4 @@ class Campaign(Base):
     # Relationships
     business = relationship("User", foreign_keys=[business_id])
     applications = relationship("Application", back_populates="campaign", cascade="all, delete-orphan")
-    # Bookmarks a creator made on this campaign (the "Save Campaign" button).
-    # Without this, deleting a campaign that anyone has saved throws a
-    # foreign-key IntegrityError in Postgres/SQLite (saved_campaigns.campaign_id
-    # still points at the row), which the DELETE route doesn't catch — the
-    # delete just silently 500s. This makes SQLAlchemy delete those bookmark
-    # rows first, same as it already does for applications above.
     saved_by = relationship("SavedCampaign", back_populates="campaign", cascade="all, delete-orphan")

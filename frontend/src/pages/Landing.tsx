@@ -545,11 +545,7 @@ const GoalsSection = memo(function GoalsSection() {
     <section className="goals-section" id="goals">
       <div className="goals-container">
         <div className="goals-head">
-          <div className="goals-kicker-wrap">
-            <span className="goals-kicker-line" />
-            <span className="goals-kicker">Built For Everyone</span>
-            <span className="goals-kicker-line" />
-          </div>
+          <span className="find-dash" />
           <h2 className="goals-h2">
             Different goals. <span className="goals-h2-accent">Same platform.</span>
           </h2>
@@ -705,8 +701,8 @@ const FaqSection = memo(function FaqSection() {
 
   return (
     <section className="ch-section why-section" id="faq">
-      <div className="ch-section-head" style={{ margin: "0 auto 56px", textAlign: "center", maxWidth: 460 }}>
-        <span className="ch-kicker">Common Questions</span>
+      <div className="ch-section-head">
+        <span className="find-dash" />
         <h2 className="ch-h2 why-h2">
           Everything you need <span className="why-h2-accent">to know</span>
         </h2>
@@ -1288,7 +1284,7 @@ export function Landing() {
 .why-section {
   max-width: 100%;
   width: 100%;
-  padding: 64px clamp(24px, 5vw, 72px);
+  padding: 64px 0;
   border-top: 1px solid rgba(17,18,23,0.07);
   border-bottom: 1px solid rgba(17,18,23,0.07);
 }
@@ -1298,6 +1294,8 @@ export function Landing() {
   max-width: 1120px;
   margin-left: auto;
   margin-right: auto;
+  padding-left: clamp(24px, 5vw, 72px);
+  padding-right: clamp(24px, 5vw, 72px);
 }
 .why-section + .why-section { border-top: none; }
 .ch-section-head { max-width: 520px; margin-bottom: 56px; }
@@ -1411,14 +1409,11 @@ export function Landing() {
 .find-campaign-due { color: var(--midnight); font-weight: 600; }
 
 /* ===== Different goals. Same platform. ===== */
-.goals-section { width: 100%; background: transparent; padding: 64px 0; border-top: 1px solid rgba(17,18,23,0.07); border-bottom: 1px solid rgba(17,18,23,0.07); }.goals-container { max-width: 1120px; margin: 0 auto; padding: 0 24px; }
-.goals-head { text-align: center; margin: 0 auto 44px; max-width: 700px; }
-.goals-kicker-wrap { display: flex; align-items: center; justify-content: center; gap: 16px; margin-bottom: 12px; }
-.goals-kicker-line { width: 120px; height: 1px; background: #E5E7EB; }
-.goals-kicker { font-size: 16px; font-weight: 600; letter-spacing: 1.5px; text-transform: uppercase; color: #6B7280; margin: 0; }
+.goals-section { width: 100%; background: transparent; padding: 64px 0; border-top: 1px solid rgba(17,18,23,0.07); border-bottom: 1px solid rgba(17,18,23,0.07); }.goals-container { max-width: 1120px; margin: 0 auto; padding: 0 clamp(24px, 5vw, 72px); }
+.goals-head { text-align: left; margin: 0 0 44px; max-width: 700px; }
 .goals-h2 { font-family: 'League Spartan', sans-serif; font-size: clamp(28px, 3.6vw, 36px); font-weight: 700; line-height: 1.2; color: #1E2A78; margin: 0 0 12px; }
 .goals-h2-accent { color: #FF6B5A; }
-.goals-sub { font-size: 16px; line-height: 1.6; color: #64748B; max-width: 700px; margin: 0 auto; }
+.goals-sub { font-size: 16px; line-height: 1.6; color: #64748B; max-width: 700px; margin: 0; }
 
 
 
@@ -1673,9 +1668,7 @@ export function Landing() {
   .hiw-row { grid-template-columns: repeat(2, 1fr); row-gap: 32px; }
   .hiw-line { display: none; }
   .merge-card { grid-template-columns: 1fr; gap: 32px; }
-  .merge-copy { text-align: center; align-items: center; }
   .merge-sub { max-width: 420px; }
-  .merge-cta { align-self: center; }
   .merge-visual { min-height: 380px; }
   .icon-collage { transform: scale(0.75); }
   .compare-row { grid-template-columns: 1fr; gap: 20px; }
@@ -1684,9 +1677,7 @@ export function Landing() {
   .ch-dropdown { width: 360px; left: 0; transform: none; }
   .faq-cols { grid-template-columns: 1fr; gap: 32px; }
   .find-split { grid-template-columns: 1fr; gap: 32px; }
-  .find-copy { max-width: 100%; text-align: center; }
-  .find-dash { margin-left: auto; margin-right: auto; }
-  .find-cta { margin-left: auto; margin-right: auto; }
+  .find-copy { max-width: 100%; }
   .faq-cols::before { display: none; }
 
   .hero-frame { grid-template-columns: 1fr; }
@@ -1706,7 +1697,6 @@ export function Landing() {
   .goals-blob { width: 180px; height: 200px; }
   .goals-photo-frame { width: 150px; height: 190px; }
   .goals-photo { width: 100%; height: 100%; }
-  .goals-kicker-line { width: 60px; }
 }
 @media (max-width: 860px) {
   .ch-nav-links, .ch-nav-right .ch-btn-outline { display: none; }
@@ -1726,7 +1716,6 @@ export function Landing() {
   .goals-float-card { display: none; }
   .goals-tagline { font-size: 14px; gap: 10px; }
   .goals-tagline-dash { width: 20px; }
-  .goals-kicker-line { width: 30px; }
 }
 
 /* ===== Hero showcase responsive overrides ===== */
@@ -1747,13 +1736,8 @@ export function Landing() {
   }
   .ch-hero-copy {
     max-width: 700px;
-    margin: 0 auto;
-    text-align: center;
   }
   .ch-h1 { font-size: clamp(48px, 8vw, 64px); }
-  .ch-h1-swash { margin: 0 auto; }
-  .ch-sub { margin-left: auto; margin-right: auto; }
-  .ch-hero-ctas { justify-content: center; }
   .hero-product-preview {
     position: relative;
     top: auto;
@@ -1961,8 +1945,8 @@ export function Landing() {
 
       {/* ===== WHY WE EXIST — before / after ===== */}
       <section className="ch-section why-section" id="why-we-exist">
-        <div className="ch-section-head" style={{ textAlign: "center", margin: "0 auto 48px" }}>
-          <span className="ch-kicker">Why We Exist</span>
+        <div className="ch-section-head">
+          <span className="find-dash" />
           <h2 className="ch-h2 why-h2">
             Creator marketing in Nepal <span className="why-h2-accent">was broken</span>
           </h2>
@@ -2048,4 +2032,3 @@ export function Landing() {
 }
 
 export default Landing;
- 

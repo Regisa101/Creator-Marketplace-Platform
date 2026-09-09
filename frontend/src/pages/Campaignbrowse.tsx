@@ -376,8 +376,8 @@ export function CampaignBrowse() {
         .mc-tabs {
           display: flex;
           align-items: center;
-          gap: 7px;
-          margin-bottom: 16px;
+          gap: 10px;
+          margin-bottom: 20px;
           flex-wrap: wrap;
         }
 
@@ -385,10 +385,10 @@ export function CampaignBrowse() {
           border: 1px solid ${C.line};
           background: #fff;
           color: ${C.inkSoft};
-          padding: 8px 13px;
-          border-radius: 7px;
-          font-size: 11px;
-          font-weight: 500;
+          padding: 12px 24px;
+          border-radius: 999px;
+          font-size: 14.5px;
+          font-weight: 600;
           cursor: pointer;
         }
 
@@ -402,6 +402,17 @@ export function CampaignBrowse() {
         .mc-tab-count {
           margin-left: 3px;
           opacity: .75;
+        }
+
+        .mc-select {
+          border: 1px solid ${C.line};
+          background: #fff;
+          color: ${C.inkSoft};
+          padding: 12px 16px;
+          border-radius: 8px;
+          font-size: 13px;
+          font-weight: 500;
+          cursor: pointer;
         }
 
         .mc-state {
@@ -420,18 +431,18 @@ export function CampaignBrowse() {
 
         .mc-grid {
           display: grid;
-          grid-template-columns: repeat(4, minmax(0, 1fr));
-          gap: 14px;
+          grid-template-columns: repeat(3, minmax(0, 1fr));
+          gap: 20px;
         }
 
         .mc-card {
           min-width: 0;
           display: flex;
           flex-direction: column;
-          min-height: 245px;
-          padding: 13px;
+          min-height: 330px;
+          padding: 22px;
           border: 1px solid ${C.line};
-          border-radius: 12px;
+          border-radius: 16px;
           background: ${C.card};
           color: inherit;
           text-decoration: none;
@@ -452,13 +463,13 @@ export function CampaignBrowse() {
         }
 
         .mc-card-icon {
-          width: 36px;
-          height: 36px;
-          flex: 0 0 36px;
+          width: 52px;
+          height: 52px;
+          flex: 0 0 52px;
           display: grid;
           place-items: center;
           overflow: hidden;
-          border-radius: 8px;
+          border-radius: 10px;
           background: ${C.navySoft};
           color: ${C.navy};
         }
@@ -472,28 +483,28 @@ export function CampaignBrowse() {
         .mc-status {
           display: inline-flex;
           align-items: center;
-          gap: 4px;
+          gap: 5px;
           border-radius: 999px;
-          padding: 4px 8px;
-          font-size: 9px;
+          padding: 6px 12px;
+          font-size: 11.5px;
           font-weight: 700;
           white-space: nowrap;
         }
 
         .mc-card-title {
-          margin: 0 0 5px;
-          font-size: 12px;
+          margin: 0 0 8px;
+          font-size: 16px;
           line-height: 1.35;
           font-weight: 700;
-          min-height: 32px;
+          min-height: 42px;
         }
 
         .mc-card-description {
-          margin: 0 0 10px;
+          margin: 0 0 14px;
           color: ${C.inkSoft};
-          font-size: 9.5px;
-          line-height: 1.45;
-          min-height: 28px;
+          font-size: 12.5px;
+          line-height: 1.55;
+          min-height: 40px;
           display: -webkit-box;
           -webkit-line-clamp: 2;
           -webkit-box-orient: vertical;
@@ -503,10 +514,10 @@ export function CampaignBrowse() {
         .mc-card-stats {
           display: flex;
           justify-content: space-between;
-          gap: 5px;
+          gap: 8px;
           margin-top: auto;
           color: ${C.inkSoft};
-          font-size: 8.5px;
+          font-size: 12px;
           white-space: nowrap;
         }
 
@@ -533,12 +544,12 @@ export function CampaignBrowse() {
         .mc-card-footer {
           display: flex;
           justify-content: space-between;
-          gap: 5px;
-          margin-bottom: 9px;
-          padding-top: 7px;
+          gap: 8px;
+          margin-bottom: 14px;
+          padding-top: 12px;
           border-top: 1px solid #F0EEF4;
           color: ${C.inkFaint};
-          font-size: 8.5px;
+          font-size: 12px;
           white-space: nowrap;
           overflow: hidden;
         }
@@ -550,20 +561,20 @@ export function CampaignBrowse() {
 
         .mc-view-btn {
           width: 100%;
-          height: 28px;
+          height: 40px;
           display: grid;
           place-items: center;
           border: 1px solid #8D8B94;
-          border-radius: 5px;
+          border-radius: 8px;
           color: ${C.ink};
-          font-size: 9.5px;
-          font-weight: 500;
+          font-size: 13px;
+          font-weight: 600;
           background: #fff;
         }
 
         @media (max-width: 1050px) {
           .mc-grid {
-            grid-template-columns: repeat(3, minmax(0, 1fr));
+            grid-template-columns: repeat(2, minmax(0, 1fr));
           }
         }
 
@@ -651,7 +662,7 @@ export function CampaignBrowse() {
 
             {isBusiness && (
               <select
-                className="mc-tab"
+                className="mc-select"
                 value={category}
                 onChange={(event) => {
                   setCategory(event.target.value);

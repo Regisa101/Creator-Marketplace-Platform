@@ -481,6 +481,8 @@ export function AppLayout({
           z-index: 40;
           display: flex;
           align-items: center;
+          flex-wrap: wrap;
+          row-gap: 10px;
           justify-content: space-between;
           gap: 20px;
           padding: 16px 24px;
@@ -489,6 +491,7 @@ export function AppLayout({
 
         .app-topbar-title {
           min-width: 0;
+          flex: 1 1 220px;
         }
 
         .app-topbar-title h1 {
@@ -497,6 +500,9 @@ export function AppLayout({
           font-size: 20px;
           line-height: 1.25;
           font-weight: 700;
+          overflow: hidden;
+          text-overflow: ellipsis;
+          white-space: nowrap;
         }
 
         .app-topbar-title p {
@@ -504,6 +510,9 @@ export function AppLayout({
           color: ${C.inkSoft};
           font-size: 14px;
           line-height: 1.4;
+          overflow: hidden;
+          text-overflow: ellipsis;
+          white-space: nowrap;
         }
 
         .app-topbar-actions {

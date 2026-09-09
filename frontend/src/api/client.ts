@@ -42,10 +42,6 @@ export interface RegisterData {
 export interface LoginData {
   email: string;
   password: string;
-  // Which login page this came from ('creator' or 'business'). The
-  // backend rejects the login with a 403 if it doesn't match the
-  // account's actual role, so a business account can't sign in on the
-  // creator login page and vice versa.
   role?: 'creator' | 'business';
 }
 
@@ -57,11 +53,6 @@ export interface User {
   is_active: boolean;
   created_at: string;
   last_login: string | null;
-  // Returned by /auth/register, /auth/login, and /auth/me — see the
-  // computed `profile` property on the User model (models/user.py).
-  // This is the real, server-persisted profile; AuthContext's
-  // updateProfile() also writes here optimistically before the network
-  // round-trip finishes, so this can briefly hold client-only data too.
   profile?: Record<string, any>;
 }
 
@@ -87,7 +78,7 @@ export interface CreatorPortfolioItemData {
   description?: string;
   media_url: string;
   platform?: string;
-  type?: string; // image, video, reel, link
+  type?: string;
 }
 
 export interface CreatorOnboardingData {
@@ -104,8 +95,6 @@ export interface CreatorOnboardingData {
   audience_location: string[];
   audience_interests: string[];
   socials: CreatorSocialData[];
-  // Not collected by the onboarding UI yet — backend defaults this to
-  // an empty list, so it's safe to omit or send [].
   portfolio?: CreatorPortfolioItemData[];
   starting_price: number;
 }
@@ -124,122 +113,20 @@ export interface BusinessOnboardingData {
   typical_budget?: number;
   team_size?: string;
   year_established?: number;
-  // Brand-level campaign defaults — read/written through the same
-  // saveBusinessProgress()/getBusinessProgress() pair as the rest of
-  // this interface. See Campaignform.tsx's "Manage my campaign
-  // defaults" panel and its create-mode autofill effect.
   default_dos?: string[];
   default_donts?: string[];
   default_video_spec?: VideoSpec;
 }
-// ============================================
-// API FUNCTIONS - MUST BE EXPORTED
-// ============================================
-
-export const register = async (data: RegisterData): Promise<AuthResponse> => {
-  const response = await api.post<AuthResponse>('/auth/register', data);
-  return response.data;
-};
-
-export const login = async (data: LoginData): Promise<AuthResponse> => {
-  const response = await api.post<AuthResponse>('/auth/login', data);
-  return response.data;
-};
-
-export const getCurrentUser = async (): Promise<User> => {
-  const response = await api.get<User>('/auth/me');
-  return response.data;
-};
-
-// DELETE /api/auth/account - permanently deletes the logged-in user's
-// account (creator or business) and everything tied to it — profile,
-// campaigns/applications/saved-campaigns, all server-side. Requires
-// the current password as confirmation. Caller is responsible for
-// clearing local session state (AuthContext.logout()) afterwards.
-export const deleteAccount = async (password: string): Promise<void> => {
-  await api.delete('/auth/account', { data: { password } });
-};
 
 // ============================================
-// ONBOARDING API FUNCTIONS
+// CAMPAIGN TYPES
 // ============================================
 
-export const completeCreatorOnboarding = async (data: CreatorOnboardingData): Promise<any> => {
-  const response = await api.post('/onboarding/creator/complete', data);
-  return response.data;
-};
-
-export const completeBusinessOnboarding = async (data: BusinessOnboardingData): Promise<any> => {
-  const response = await api.post('/onboarding/business/complete', data);
-  return response.data;
-};
-
-// Partial save — fires on every step's "Continue" (and on "Skip for
-// now") so progress survives a refresh, a different browser, or a
-// cleared localStorage, instead of only living in AuthContext's
-// client-side cache. `Partial<...>` because each step only ever sends
-// the fields that step collected.
-export type CreatorOnboardingProgressData = Partial<CreatorOnboardingData>;
-
-export const saveCreatorProgress = async (
-  data: CreatorOnboardingProgressData
-): Promise<any> => {
-  const response = await api.patch('/onboarding/creator/progress', data);
-  return response.data;
-};
-
-// Fetches whatever's been saved so far (from completeCreatorOnboarding
-// or saveCreatorProgress) so the onboarding form can repopulate itself
-// and resume on the right step instead of starting over blank. No
-// profile saved yet is a normal, expected state for a brand-new
-// creator — the backend 404s for that, and this resolves to `null`
-// rather than throwing, so callers don't need their own try/catch for
-// the "nothing saved yet" case.
-export const getCreatorProgress = async (): Promise<{ profile: any; socials: any[] } | null> => {
-  try {
-    const response = await api.get('/onboarding/creator/profile');
-    return response.data;
-  } catch (error: any) {
-    if (error?.response?.status === 404) {
-      return null;
-    }
-    throw error;
-  }
-};
-
-// Same pattern as the creator progress functions above, for business.
-export type BusinessOnboardingProgressData = Partial<BusinessOnboardingData>;
-
-export const saveBusinessProgress = async (
-  data: BusinessOnboardingProgressData
-): Promise<any> => {
-  const response = await api.patch('/onboarding/business/progress', data);
-  return response.data;
-};
-
-export const getBusinessProgress = async (): Promise<{ profile: any } | null> => {
-  try {
-    const response = await api.get('/onboarding/business/profile');
-    return response.data;
-  } catch (error: any) {
-    if (error?.response?.status === 404) {
-      return null;
-    }
-    throw error;
-  }
-};
-
-// ============================================
-// CAMPAIGNS
-// ============================================
-
-// Mirrors backend/app/schemas/campaign.py::ChecklistItem
 export interface ChecklistItem {
   text: string;
   checked: boolean;
 }
 
-// Mirrors backend/app/schemas/campaign.py::VideoSpec
 export interface VideoSpec {
   platform: string;
   duration?: string;
@@ -260,7 +147,6 @@ export type CampaignStatus =
   | 'cancelled'
   | 'closed';
 
-// Mirrors backend/app/schemas/campaign.py::CampaignResponse
 export interface Campaign {
   id: number;
   business_id: number;
@@ -295,38 +181,6 @@ export interface Campaign {
   application_count: number;
 }
 
-export interface PublicBusinessCampaign {
-  id: number;
-  title: string;
-  category: string;
-  sub_category?: string | null;
-  campaign_type: string;
-  status: string;
-}
-
-export interface PublicBusinessProfile {
-  id: number;
-  company_name: string;
-  business_type?: string | null;
-  industry?: string | null;
-  location?: string | null;
-  website?: string | null;
-  description?: string | null;
-  logo_url?: string | null;
-  interested_categories: string[];
-  preferred_content_types: string[];
-  team_size?: string | null;
-  year_established?: number | null;
-  is_onboarding_complete: boolean;
-  is_published: boolean;
-  campaigns: PublicBusinessCampaign[];
-}
-
-export const getPublicBusinessProfile = async (businessId: number | string): Promise<PublicBusinessProfile> => {
-  const response = await api.get<PublicBusinessProfile>(`/businesses/${businessId}/public-profile`);
-  return response.data;
-};
-
 export interface CampaignListResponse {
   campaigns: Campaign[];
   total: number;
@@ -343,25 +197,6 @@ export interface CampaignListParams {
   limit?: number;
 }
 
-// GET /api/campaigns - list (creators see published only, businesses see their own)
-export const getCampaigns = async (
-  params?: CampaignListParams
-): Promise<CampaignListResponse> => {
-  const response = await api.get<CampaignListResponse>('/campaigns', { params });
-  return response.data;
-};
-
-// GET /api/campaigns/{id} - single campaign detail
-export const getCampaign = async (id: number | string): Promise<Campaign> => {
-  const response = await api.get<Campaign>(`/campaigns/${id}`);
-  return response.data;
-};
-
-// Payload for POST /api/campaigns. Every field here mirrors
-// CampaignCreate in backend/app/schemas/campaign.py — only `title`,
-// `description`, and `category` are actually required server-side,
-// everything else is optional and can be filled in across later form
-// slices without breaking this type.
 export interface CampaignCreateData {
   title: string;
   tagline?: string;
@@ -390,46 +225,35 @@ export interface CampaignCreateData {
   extra_photos?: string[] | null;
 }
 
-// POST /api/campaigns - business-only (backend enforces via
-// get_current_business). New campaigns always land in "draft" status
-// server-side — call publishCampaign() afterwards to make it live.
-export const createCampaign = async (data: CampaignCreateData): Promise<Campaign> => {
-  const response = await api.post<Campaign>('/campaigns', data);
-  return response.data;
-};
+export interface PublicBusinessCampaign {
+  id: number;
+  title: string;
+  category: string;
+  sub_category?: string | null;
+  campaign_type: string;
+  status: string;
+}
 
-// POST /api/campaigns/{id}/duplicate - business-only, and only for
-// campaigns you own (backend enforces both). Always returns a new
-// "draft" campaign — applications, timestamps, and id are never
-// copied. Deadline is deliberately dropped too (see backend comment).
-export const duplicateCampaign = async (id: number | string): Promise<Campaign> => {
-  const response = await api.post<Campaign>(`/campaigns/${id}/duplicate`, {});
-  return response.data;
-};
-
-export const updateCampaign = async (
-  id: number | string,
-  data: Partial<CampaignCreateData>
-): Promise<Campaign> => {
-  const response = await api.put<Campaign>(`/campaigns/${id}`, data);
-  return response.data;
-};
-
-// PUT /api/campaigns/{id}/publish - flips a draft to published.
-// Backend rejects this if the campaign isn't currently "draft".
-export const publishCampaign = async (id: number | string): Promise<Campaign> => {
-  const response = await api.put<Campaign>(`/campaigns/${id}/publish`, {});
-  return response.data;
-};
-
-// DELETE /api/campaigns/{id} - business-only, and only for campaigns
-// you own (backend enforces both).
-export const deleteCampaign = async (id: number | string): Promise<void> => {
-  await api.delete(`/campaigns/${id}`);
-};
+export interface PublicBusinessProfile {
+  id: number;
+  company_name: string;
+  business_type?: string | null;
+  industry?: string | null;
+  location?: string | null;
+  website?: string | null;
+  description?: string | null;
+  logo_url?: string | null;
+  interested_categories: string[];
+  preferred_content_types: string[];
+  team_size?: string | null;
+  year_established?: number | null;
+  is_onboarding_complete: boolean;
+  is_published: boolean;
+  campaigns: PublicBusinessCampaign[];
+}
 
 // ============================================
-// APPLICATIONS
+// APPLICATION TYPES
 // ============================================
 
 export type ApplicationStatus = 'pending' | 'accepted' | 'rejected' | 'withdrawn';
@@ -438,10 +262,6 @@ export interface Application {
   id: number;
   campaign_id: number;
   creator_id: number;
-  // Computed server-side from the applicant's profile / the parent
-  // campaign — see ApplicationResponse in
-  // backend/app/schemas/application.py. Optional because a creator
-  // with no profile filled in yet still has a valid application.
   creator_name?: string | null;
   creator_avatar?: string | null;
   campaign_title?: string | null;
@@ -460,43 +280,9 @@ export interface ApplicationCreateData {
   message?: string | null;
 }
 
-// POST /api/applications - creator applies to a campaign.
-// Backend enforces: campaign must be published, creator can't apply twice,
-// and only role="creator" accounts may call this at all.
-export const createApplication = async (data: ApplicationCreateData): Promise<Application> => {
-  const response = await api.post<Application>('/applications', data);
-  return response.data;
-};
-
-// GET /api/applications - server scopes results to the logged-in user
-// automatically (creators see their own, businesses see applicants to
-// their campaigns), so `campaign_id` here is just an extra filter, not
-// an access check.
-export const getApplications = async (params?: {
-  campaign_id?: number;
-  status?: string;
-}): Promise<Application[]> => {
-  const response = await api.get<Application[]>('/applications', { params });
-  return response.data;
-};
-
-// PUT /api/applications/{id} - business-only, accept/reject a pending
-// application. Backend rejects this if the application isn't
-// currently "pending", or if the caller doesn't own the campaign.
-export const updateApplicationStatus = async (
-  id: number,
-  status: 'accepted' | 'rejected'
-): Promise<Application> => {
-  const response = await api.put<Application>(`/applications/${id}`, { status });
-  return response.data;
-};
-
 // ============================================
-// SAVED CAMPAIGNS
+// SAVED CAMPAIGN TYPES
 // ============================================
-// Creator-only bookmarking — the "Save Campaign" button on the
-// campaign detail page. Backend enforces creator-only via
-// get_current_creator, same as applications.
 
 export interface SavedCampaignEntry {
   id: number;
@@ -506,8 +292,168 @@ export interface SavedCampaignEntry {
   campaign: Campaign;
 }
 
-// POST /api/saved-campaigns - idempotent: saving an already-saved
-// campaign just returns the existing row rather than erroring.
+// ============================================
+// API FUNCTIONS - AUTH
+// ============================================
+
+export const register = async (data: RegisterData): Promise<AuthResponse> => {
+  const response = await api.post<AuthResponse>('/auth/register', data);
+  return response.data;
+};
+
+export const login = async (data: LoginData): Promise<AuthResponse> => {
+  const response = await api.post<AuthResponse>('/auth/login', data);
+  return response.data;
+};
+
+export const getCurrentUser = async (): Promise<User> => {
+  const response = await api.get<User>('/auth/me');
+  return response.data;
+};
+
+export const deleteAccount = async (password: string): Promise<void> => {
+  await api.delete('/auth/account', { data: { password } });
+};
+
+// ============================================
+// API FUNCTIONS - ONBOARDING
+// ============================================
+
+export const completeCreatorOnboarding = async (data: CreatorOnboardingData): Promise<any> => {
+  const response = await api.post('/onboarding/creator/complete', data);
+  return response.data;
+};
+
+export const completeBusinessOnboarding = async (data: BusinessOnboardingData): Promise<any> => {
+  const response = await api.post('/onboarding/business/complete', data);
+  return response.data;
+};
+
+export type CreatorOnboardingProgressData = Partial<CreatorOnboardingData>;
+
+export const saveCreatorProgress = async (
+  data: CreatorOnboardingProgressData
+): Promise<any> => {
+  const response = await api.patch('/onboarding/creator/progress', data);
+  return response.data;
+};
+
+export const getCreatorProgress = async (): Promise<{ profile: any; socials: any[] } | null> => {
+  try {
+    const response = await api.get('/onboarding/creator/profile');
+    return response.data;
+  } catch (error: any) {
+    if (error?.response?.status === 404) {
+      return null;
+    }
+    throw error;
+  }
+};
+
+export type BusinessOnboardingProgressData = Partial<BusinessOnboardingData>;
+
+export const saveBusinessProgress = async (
+  data: BusinessOnboardingProgressData
+): Promise<any> => {
+  const response = await api.patch('/onboarding/business/progress', data);
+  return response.data;
+};
+
+export const getBusinessProgress = async (): Promise<{ profile: any } | null> => {
+  try {
+    const response = await api.get('/onboarding/business/profile');
+    return response.data;
+  } catch (error: any) {
+    if (error?.response?.status === 404) {
+      return null;
+    }
+    throw error;
+  }
+};
+
+// ============================================
+// API FUNCTIONS - CAMPAIGNS
+// ============================================
+
+export const getPublicBusinessProfile = async (businessId: number | string): Promise<PublicBusinessProfile> => {
+  const response = await api.get<PublicBusinessProfile>(`/businesses/${businessId}/public-profile`);
+  return response.data;
+};
+
+export const getCampaigns = async (
+  params?: CampaignListParams
+): Promise<CampaignListResponse> => {
+  const response = await api.get<CampaignListResponse>('/campaigns', { params });
+  return response.data;
+};
+
+export const getCampaign = async (id: number | string): Promise<Campaign> => {
+  const response = await api.get<Campaign>(`/campaigns/${id}`);
+  return response.data;
+};
+
+export const createCampaign = async (data: CampaignCreateData): Promise<Campaign> => {
+  const response = await api.post<Campaign>('/campaigns', data);
+  return response.data;
+};
+
+export const duplicateCampaign = async (id: number | string): Promise<Campaign> => {
+  const response = await api.post<Campaign>(`/campaigns/${id}/duplicate`, {});
+  return response.data;
+};
+
+export const updateCampaign = async (
+  id: number | string,
+  data: Partial<CampaignCreateData>
+): Promise<Campaign> => {
+  const response = await api.put<Campaign>(`/campaigns/${id}`, data);
+  return response.data;
+};
+
+export const publishCampaign = async (id: number | string): Promise<Campaign> => {
+  const response = await api.put<Campaign>(`/campaigns/${id}/publish`, {});
+  return response.data;
+};
+
+export const deleteCampaign = async (id: number | string): Promise<void> => {
+  await api.delete(`/campaigns/${id}`);
+};
+
+// ============================================
+// API FUNCTIONS - APPLICATIONS
+// ============================================
+
+export const createApplication = async (data: ApplicationCreateData): Promise<Application> => {
+  const response = await api.post<Application>('/applications', data);
+  return response.data;
+};
+
+export const getApplications = async (params?: {
+  campaign_id?: number;
+  status?: string;
+}): Promise<Application[]> => {
+  const response = await api.get<Application[]>('/applications', { params });
+  return response.data;
+};
+
+export const updateApplicationStatus = async (
+  id: number,
+  status: 'accepted' | 'rejected'
+): Promise<Application> => {
+  const response = await api.put<Application>(`/applications/${id}`, { status });
+  return response.data;
+};
+
+// 🔥 NEW: DELETE /api/applications/{id} - creator withdraws their pending application
+export const withdrawApplication = async (id: number): Promise<{ message: string }> => {
+  const response = await api.delete<{ message: string }>(`/applications/${id}`);
+  return response.data;
+};
+
+// ============================================
+// API FUNCTIONS - SAVED CAMPAIGNS
+// ============================================
+
 export const saveCampaign = async (campaignId: number): Promise<SavedCampaignEntry> => {
   const response = await api.post<SavedCampaignEntry>('/saved-campaigns', { campaign_id: campaignId });
   return response.data;
@@ -523,14 +469,9 @@ export const getSavedCampaigns = async (): Promise<SavedCampaignEntry[]> => {
 };
 
 // ============================================
-// FILE UPLOADS
+// API FUNCTIONS - FILE UPLOADS
 // ============================================
-// Deliberately NOT using the shared `api` axios instance here: it
-// defaults every request to 'Content-Type: application/json', and a
-// FormData body needs 'multipart/form-data' with a boundary that only
-// the browser can generate correctly — overriding the header manually
-// (rather than just omitting it) breaks that. Plain axios + a manually
-// attached bearer token sidesteps the shared instance's JSON default.
+
 export const uploadImage = async (file: File): Promise<{ url: string }> => {
   const formData = new FormData();
   formData.append('file', file);

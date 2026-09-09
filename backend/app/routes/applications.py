@@ -101,3 +101,36 @@ async def update_application_status(
         db.commit()
     
     return application
+
+@router.delete("/{application_id}")
+async def withdraw_application(
+    application_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_creator)
+):
+    """
+    Creator withdraws their application
+    Only works if application is still pending
+    """
+    # Get the application
+    application = db.query(Application).filter(Application.id == application_id).first()
+    
+    if not application:
+        raise HTTPException(status_code=404, detail="Application not found")
+    
+    # Check if the current user is the creator who applied
+    if application.creator_id != current_user.id:
+        raise HTTPException(status_code=403, detail="Not your application")
+    
+    # Check if application is still pending
+    if application.status != "pending":
+        raise HTTPException(
+            status_code=400, 
+            detail="Cannot withdraw application that is already accepted or rejected"
+        )
+    
+    # Delete the application
+    db.delete(application)
+    db.commit()
+    
+    return {"message": "Application withdrawn successfully"}

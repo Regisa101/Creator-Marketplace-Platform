@@ -1,4 +1,4 @@
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, ConfigDict
 from typing import Optional, List
 from datetime import datetime
 from enum import Enum
@@ -16,17 +16,19 @@ class CampaignStatus(str, Enum):
     CANCELLED = "cancelled"
     CLOSED = "closed"
 
-# ===== NESTED SHAPES =====
+# ===== CHECKLIST ITEM =====
 class ChecklistItem(BaseModel):
-    """One row in the 'Quick Checklist' grid, e.g. 'Format: 15 sec or longer, 9:16'."""
     text: str
-    checked: bool = True
+    checked: bool = False
 
+# ===== VIDEO SPECS =====
 class VideoSpec(BaseModel):
-    """One platform tab under 'Video Specs' (e.g. TikTok, Instagram Reel)."""
     platform: str
-    duration: Optional[str] = None        # "15-30 seconds"
-    aspect_ratio: Optional[str] = None     # "9:16"
+    duration: Optional[str] = None
+    aspect_ratio: Optional[str] = None
+    resolution: Optional[str] = None
+    frame_rate: Optional[str] = None
+    file_type: Optional[str] = None
     voiceover_required: bool = False
     subtitles_required: bool = False
 
@@ -45,6 +47,7 @@ class CampaignBase(BaseModel):
     compensation_description: Optional[str] = None
     requirements: Optional[str] = None
     deliverables: Optional[List[str]] = None
+    before_you_apply: Optional[List[str]] = None
     checklist: Optional[List[ChecklistItem]] = None
     required_scenes: Optional[List[str]] = None
     video_specs: Optional[List[VideoSpec]] = None
@@ -52,9 +55,10 @@ class CampaignBase(BaseModel):
     donts: Optional[List[str]] = None
     suggested_caption: Optional[str] = None
     hashtags: Optional[List[str]] = None
-    deadline: Optional[datetime] = None 
+    guidelines_note: Optional[str] = None
+    deadline: Optional[datetime] = None
     hero_image: Optional[str] = None
-    extra_photos: Optional[List[str]] = None
+    extra_photos: Optional[List[str]] = None  # ← ADD THIS
 
 # ===== CREATE =====
 class CampaignCreate(CampaignBase):
@@ -75,6 +79,7 @@ class CampaignUpdate(BaseModel):
     compensation_description: Optional[str] = None
     requirements: Optional[str] = None
     deliverables: Optional[List[str]] = None
+    before_you_apply: Optional[List[str]] = None
     checklist: Optional[List[ChecklistItem]] = None
     required_scenes: Optional[List[str]] = None
     video_specs: Optional[List[VideoSpec]] = None
@@ -82,10 +87,11 @@ class CampaignUpdate(BaseModel):
     donts: Optional[List[str]] = None
     suggested_caption: Optional[str] = None
     hashtags: Optional[List[str]] = None
+    guidelines_note: Optional[str] = None
     deadline: Optional[datetime] = None
     status: Optional[CampaignStatus] = None
     hero_image: Optional[str] = None
-    extra_photos: Optional[List[str]] = None
+    extra_photos: Optional[List[str]] = None  # ← ADD THIS
     is_active: Optional[bool] = None
 
 # ===== RESPONSE =====
@@ -96,8 +102,7 @@ class CampaignResponse(CampaignBase):
     is_active: bool
     created_at: datetime
     updated_at: Optional[datetime] = None
-    application_count: int = 0  # ← Changed from Optional[int] to int with default
+    application_count: int = 0
+    extra_photos: Optional[List[str]] = None  # ← ADD THIS
     
-    model_config = {
-        "from_attributes": True
-    }
+    model_config = ConfigDict(from_attributes=True)
