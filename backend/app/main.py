@@ -4,7 +4,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 
-from app.routes import auth, onboarding, campaigns, applications, uploads, saved_campaigns, businesses
+from app.routes import auth, onboarding, campaigns, applications, uploads, saved_campaigns, businesses, creators, workspace
 
 app = FastAPI()
 
@@ -30,6 +30,8 @@ app.include_router(applications.router)
 app.include_router(uploads.router)
 app.include_router(saved_campaigns.router)
 app.include_router(businesses.router)
+app.include_router(creators.router)     # ← Increment 5: Creator Discovery
+app.include_router(workspace.router)    # ← Increment 5: Workspace (collabs, messages, calendar, deliverables)
 
 # Serves whatever uploads.py writes to backend/app/static/uploads at
 # http://localhost:8000/static/uploads/<filename> — this mount was

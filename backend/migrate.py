@@ -11,7 +11,12 @@ from app.models import (
     CreatorSocial,
     Campaign,
     Application,
-    SavedCampaign
+    SavedCampaign,
+    CreatorShortlist,   # ← Increment 5
+    CreatorInvite,      # ← Increment 5
+    Message,            # ← Increment 5 (Workspace)
+    CalendarEvent,      # ← Increment 5 (Workspace)
+    Deliverable,        # ← Increment 5 (Workspace)
 )
 
 print("=" * 50)

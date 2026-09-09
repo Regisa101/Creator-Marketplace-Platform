@@ -174,6 +174,7 @@ export interface Campaign {
   guidelines_note?: string | null;
   deadline?: string | null;
   hero_image?: string | null;
+  extra_photos?: string[] | null;
   status: CampaignStatus;
   is_active: boolean;
   created_at: string;
@@ -290,6 +291,150 @@ export interface SavedCampaignEntry {
   campaign_id: number;
   created_at: string;
   campaign: Campaign;
+}
+
+// ============================================
+// CREATOR DISCOVERY TYPES (Increment 5)
+// ============================================
+
+export interface CreatorListItem {
+  id: number;
+  display_name?: string | null;
+  username?: string | null;
+  bio?: string | null;
+  location?: string | null;
+  profile_image?: string | null;
+  creator_type?: string | null;
+  categories: string[];
+  content_types: string[];
+  starting_price?: number | null;
+  is_shortlisted: boolean;
+}
+
+export interface CreatorListResponse {
+  creators: CreatorListItem[];
+  total: number;
+  page: number;
+  limit: number;
+  pages: number;
+}
+
+export interface CreatorListParams {
+  search?: string;
+  category?: string;
+  location?: string;
+  min_price?: number;
+  max_price?: number;
+  page?: number;
+  limit?: number;
+}
+
+export interface PublicCreatorProfile {
+  id: number;
+  display_name?: string | null;
+  username?: string | null;
+  bio?: string | null;
+  location?: string | null;
+  profile_image?: string | null;
+  creator_type?: string | null;
+  categories: string[];
+  content_types: string[];
+  languages: string[];
+  audience_age_range: string[];
+  audience_location: string[];
+  interests: string[];
+  starting_price?: number | null;
+  portfolio: any[];
+  socials: any[];
+  is_shortlisted: boolean;
+}
+
+export interface ShortlistEntry {
+  id: number;
+  creator_id: number;
+  created_at: string;
+  creator: CreatorListItem;
+}
+
+export type InviteStatus = 'pending' | 'accepted' | 'declined';
+
+export interface CreatorInvite {
+  id: number;
+  business_id: number;
+  creator_id: number;
+  campaign_id?: number | null;
+  message?: string | null;
+  status: InviteStatus;
+  created_at: string;
+  updated_at?: string | null;
+  business_name?: string | null;
+  creator_name?: string | null;
+  campaign_title?: string | null;
+}
+
+// ============================================
+// WORKSPACE TYPES (Increment 5)
+// ============================================
+
+export interface Collab {
+  id: number; // application id
+  campaign_id: number;
+  campaign_title?: string | null;
+  business_id: number;
+  business_name?: string | null;
+  business_logo?: string | null;
+  creator_id: number;
+  creator_name?: string | null;
+  creator_avatar?: string | null;
+  rate?: number | null;
+  status: string;
+  created_at: string;
+  pending_deliverables: number;
+  unread_messages: number;
+}
+
+export interface WorkspaceMessage {
+  id: number;
+  application_id: number;
+  sender_id: number;
+  sender_name?: string | null;
+  sender_role?: string | null;
+  body: string;
+  created_at: string;
+}
+
+export type CalendarEventType = 'milestone' | 'deadline' | 'call' | 'posting_date' | 'other';
+
+export interface CalendarEvent {
+  id: number;
+  application_id: number;
+  campaign_title?: string | null;
+  other_party_name?: string | null;
+  title: string;
+  description?: string | null;
+  event_date: string;
+  event_type: CalendarEventType | string;
+  created_by: number;
+  created_at: string;
+}
+
+export type DeliverableStatus = 'pending' | 'submitted' | 'approved' | 'revision_requested';
+
+export interface WorkspaceDeliverable {
+  id: number;
+  application_id: number;
+  campaign_title?: string | null;
+  other_party_name?: string | null;
+  title: string;
+  description?: string | null;
+  due_date?: string | null;
+  status: DeliverableStatus;
+  file_url?: string | null;
+  submission_note?: string | null;
+  feedback?: string | null;
+  submitted_at?: string | null;
+  created_at: string;
+  updated_at?: string | null;
 }
 
 // ============================================
@@ -465,6 +610,133 @@ export const unsaveCampaign = async (campaignId: number): Promise<void> => {
 
 export const getSavedCampaigns = async (): Promise<SavedCampaignEntry[]> => {
   const response = await api.get<SavedCampaignEntry[]>('/saved-campaigns');
+  return response.data;
+};
+
+// ============================================
+// API FUNCTIONS - FILE UPLOADS
+// ============================================
+
+// ============================================
+// API FUNCTIONS - CREATOR DISCOVERY (Increment 5)
+// ============================================
+
+export const getCreators = async (params?: CreatorListParams): Promise<CreatorListResponse> => {
+  const response = await api.get<CreatorListResponse>('/creators', { params });
+  return response.data;
+};
+
+export const getCreatorProfile = async (id: number | string): Promise<PublicCreatorProfile> => {
+  const response = await api.get<PublicCreatorProfile>(`/creators/${id}`);
+  return response.data;
+};
+
+export const shortlistCreator = async (id: number | string): Promise<ShortlistEntry> => {
+  const response = await api.post<ShortlistEntry>(`/creators/${id}/shortlist`, {});
+  return response.data;
+};
+
+export const unshortlistCreator = async (id: number | string): Promise<void> => {
+  await api.delete(`/creators/${id}/shortlist`);
+};
+
+export const getShortlist = async (): Promise<ShortlistEntry[]> => {
+  const response = await api.get<ShortlistEntry[]>('/creators/shortlist');
+  return response.data;
+};
+
+export const inviteCreator = async (
+  id: number | string,
+  data: { campaign_id?: number | null; message?: string }
+): Promise<CreatorInvite> => {
+  const response = await api.post<CreatorInvite>(`/creators/${id}/invite`, data);
+  return response.data;
+};
+
+export const getInvites = async (): Promise<CreatorInvite[]> => {
+  const response = await api.get<CreatorInvite[]>('/creators/invites');
+  return response.data;
+};
+
+export const respondToInvite = async (
+  id: number,
+  status: 'accepted' | 'declined'
+): Promise<CreatorInvite> => {
+  const response = await api.put<CreatorInvite>(`/creators/invites/${id}`, { status });
+  return response.data;
+};
+
+// ============================================
+// API FUNCTIONS - WORKSPACE (Increment 5)
+// ============================================
+
+export const getCollabs = async (): Promise<Collab[]> => {
+  const response = await api.get<Collab[]>('/workspace/collabs');
+  return response.data;
+};
+
+export const getMessages = async (collabId: number): Promise<WorkspaceMessage[]> => {
+  const response = await api.get<WorkspaceMessage[]>('/workspace/messages', { params: { collab_id: collabId } });
+  return response.data;
+};
+
+export const sendMessage = async (collabId: number, body: string): Promise<WorkspaceMessage> => {
+  const response = await api.post<WorkspaceMessage>('/workspace/messages', { collab_id: collabId, body });
+  return response.data;
+};
+
+export const getCalendarEvents = async (collabId?: number): Promise<CalendarEvent[]> => {
+  const response = await api.get<CalendarEvent[]>('/workspace/calendar', {
+    params: collabId ? { collab_id: collabId } : undefined,
+  });
+  return response.data;
+};
+
+export const createCalendarEvent = async (data: {
+  collab_id: number;
+  title: string;
+  description?: string;
+  event_date: string;
+  event_type?: string;
+}): Promise<CalendarEvent> => {
+  const response = await api.post<CalendarEvent>('/workspace/calendar', data);
+  return response.data;
+};
+
+export const deleteCalendarEvent = async (id: number): Promise<void> => {
+  await api.delete(`/workspace/calendar/${id}`);
+};
+
+export const getDeliverables = async (collabId?: number): Promise<WorkspaceDeliverable[]> => {
+  const response = await api.get<WorkspaceDeliverable[]>('/workspace/deliverables', {
+    params: collabId ? { collab_id: collabId } : undefined,
+  });
+  return response.data;
+};
+
+export const createDeliverable = async (data: {
+  collab_id: number;
+  title: string;
+  description?: string;
+  due_date?: string;
+}): Promise<WorkspaceDeliverable> => {
+  const response = await api.post<WorkspaceDeliverable>('/workspace/deliverables', data);
+  return response.data;
+};
+
+export const submitDeliverable = async (
+  id: number,
+  data: { file_url: string; submission_note?: string }
+): Promise<WorkspaceDeliverable> => {
+  const response = await api.put<WorkspaceDeliverable>(`/workspace/deliverables/${id}/submit`, data);
+  return response.data;
+};
+
+export const reviewDeliverable = async (
+  id: number,
+  data: { status: 'approved' | 'revision_requested'; feedback?: string }
+): Promise<WorkspaceDeliverable> => {
+  const response = await api.put<WorkspaceDeliverable>(`/workspace/deliverables/${id}/review`, data);
   return response.data;
 };
 

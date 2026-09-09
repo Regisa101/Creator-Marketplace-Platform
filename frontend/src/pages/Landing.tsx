@@ -8,7 +8,6 @@ import {
   Compass,
   Inbox,
   Briefcase as BriefcaseIcon,
-  UserPlus,
   PlayCircle,
   BarChart3,
   User,
@@ -26,12 +25,6 @@ import {
   Wallet,
   FileSignature,
   CreditCard,
-  LayoutDashboard,
-  Megaphone,
-  Settings as SettingsIcon,
-  FileText,
-  Bell,
-  Wand2,
 } from "lucide-react";
 
 // ============================================
@@ -39,36 +32,12 @@ import {
 // Brand Navy + Brand Coral
 // ============================================
 const MIDNIGHT_BLUE = "#1E2A78";
-const MIDNIGHT_BLUE_LIGHT = "#4A4F96";
 const MIDNIGHT_BLUE_SOFT = "#F2F4FC";
 
 const ELECTRIC_ORANGE = "#FF6B5A";
-const ELECTRIC_ORANGE_DARK = "#F0523F";
-const ELECTRIC_ORANGE_LIGHT = "#FF9686";
 const ELECTRIC_ORANGE_SOFT = "#FFF4F2";
 
-const SOFT_PURPLE = "#7B2CBF";
-const SOFT_PURPLE_LIGHT = "#9D4EDD";
-const SOFT_PURPLE_SOFT = "#F3E8FF";
-
-const LIGHT_BG = "#F8F9FA";
-const TEXT_DARK = "#0D0D0D";
-const TEXT_SOFT = "#6B7280";
-
-const VIOLET = SOFT_PURPLE;
-const VIOLET_LIGHT = SOFT_PURPLE_LIGHT;
-const VIOLET_DARK = "#5A1E8A";
-const VIOLET_SOFT = SOFT_PURPLE_SOFT;
-const CORAL = ELECTRIC_ORANGE;
-const CORAL_DARK = ELECTRIC_ORANGE_DARK;
-const CORAL_LIGHT = ELECTRIC_ORANGE_LIGHT;
-const CORAL_SOFT = ELECTRIC_ORANGE_SOFT;
-
-const FIND_NAVY = MIDNIGHT_BLUE;
 const FIND_CORAL = ELECTRIC_ORANGE;
-const FIND_CORAL_DARK = ELECTRIC_ORANGE_DARK;
-const FIND_CORAL_SOFT = ELECTRIC_ORANGE_SOFT;
-const FIND_BLOB = MIDNIGHT_BLUE_SOFT;
 
 const NAV_MENUS = {
   creator: {
@@ -231,36 +200,6 @@ const NavMegaMenu = memo(function NavMegaMenu({
 // ============================================
 // HERO DASHBOARD PREVIEW
 // ============================================
-
-function HeroFloatCard({ float }: { float: any }) {
-  const Icon = float.icon;
-  return (
-    <div className={`hero-float hero-float--${float.pos}`}>
-      {float.avatar && <img className="hero-float-avatar" src={float.avatar} alt="" />}
-      {float.avatars && (
-        <div className="hero-float-avatars">
-          {float.avatars.map((src: string) => (
-            <img key={src} src={src} alt="" />
-          ))}
-        </div>
-      )}
-      {Icon && (
-        <span className="hero-float-icon" style={float.iconBg ? { background: float.iconBg } : undefined}>
-          <Icon size={14} />
-        </span>
-      )}
-      <div className="hero-float-body">
-        <div className="hero-float-title-row">
-          <span className="hero-float-title">{float.title}</span>
-          {float.verified && <Check size={11} className="hero-float-verified" />}
-        </div>
-        {float.amount && <div className="hero-float-amount">{float.amount}</div>}
-        <div className="hero-float-sub">{float.sub}</div>
-      </div>
-      {float.time && <span className="hero-float-time">{float.time}</span>}
-    </div>
-  );
-}
 
 const HeroDashboardPreview = memo(function HeroDashboardPreview() {
   return (

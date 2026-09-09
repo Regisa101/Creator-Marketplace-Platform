@@ -26,7 +26,6 @@ import { useAuth } from '../../context/AuthContext';
 // of the site (auth panels, role picker) instead of the old one-off violet.
 const NAVY = '#1E2A78';
 const NAVY_DARK = '#182262';
-const CORAL = '#FF6B5A';
 
 const BUSINESS_TYPES = [
   'Retail', 'E-commerce', 'Agency', 'SaaS', 'Food & Beverage',

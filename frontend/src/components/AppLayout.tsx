@@ -270,8 +270,7 @@ export function AppLayout({
         }
 
         .app-nav-child {
-          padding-left: 43px;
-          font-size: 12px;
+          font-size: 13px;
         }
 
         .app-sidebar-bottom {
@@ -440,10 +439,10 @@ export function AppLayout({
           position: absolute;
           left: 0;
           bottom: 48px;
-          width: 170px;
-          padding: 5px;
+          width: 200px;
+          padding: 6px;
           border: 1px solid ${C.line};
-          border-radius: 9px;
+          border-radius: 10px;
           background: #fff;
           box-shadow: 0 12px 30px rgba(20,17,40,.12);
         }
@@ -452,15 +451,15 @@ export function AppLayout({
         .app-user-menu button {
           display: flex;
           align-items: center;
-          gap: 7px;
+          gap: 10px;
           width: 100%;
-          padding: 8px;
+          padding: 10px;
           border: 0;
-          border-radius: 6px;
+          border-radius: 7px;
           background: transparent;
           color: ${C.ink};
           text-decoration: none;
-          font-size: 10px;
+          font-size: 13px;
           cursor: pointer;
           text-align: left;
         }
@@ -481,8 +480,6 @@ export function AppLayout({
           z-index: 40;
           display: flex;
           align-items: center;
-          flex-wrap: wrap;
-          row-gap: 10px;
           justify-content: space-between;
           gap: 20px;
           padding: 16px 24px;
@@ -491,7 +488,6 @@ export function AppLayout({
 
         .app-topbar-title {
           min-width: 0;
-          flex: 1 1 220px;
         }
 
         .app-topbar-title h1 {
@@ -500,9 +496,6 @@ export function AppLayout({
           font-size: 20px;
           line-height: 1.25;
           font-weight: 700;
-          overflow: hidden;
-          text-overflow: ellipsis;
-          white-space: nowrap;
         }
 
         .app-topbar-title p {
@@ -510,9 +503,6 @@ export function AppLayout({
           color: ${C.inkSoft};
           font-size: 14px;
           line-height: 1.4;
-          overflow: hidden;
-          text-overflow: ellipsis;
-          white-space: nowrap;
         }
 
         .app-topbar-actions {
@@ -526,9 +516,7 @@ export function AppLayout({
           display: flex;
           align-items: center;
           gap: 8px;
-          width: 220px;
-          height: 36px;
-          padding: 0 12px;
+          padding: 8px 12px;
           border: 1px solid ${C.line};
           border-radius: 8px;
           background: ${C.card};
@@ -536,13 +524,13 @@ export function AppLayout({
         }
 
         .app-search input {
-          width: 100%;
+          width: 220px;
           min-width: 0;
           border: 0;
           outline: 0;
           background: transparent;
           color: ${C.ink};
-          font-size: 11px;
+          font-size: 14px;
         }
 
         .app-search input::placeholder {
@@ -552,8 +540,6 @@ export function AppLayout({
         .app-notification {
           display: grid;
           place-items: center;
-          width: 28px;
-          height: 28px;
           padding: 0;
           border: 0;
           background: transparent;
@@ -565,14 +551,13 @@ export function AppLayout({
           display: inline-flex;
           align-items: center;
           gap: 6px;
-          min-height: 36px;
-          padding: 0 14px;
+          padding: 8px 14px;
           border-radius: 8px;
           background: #15111F;
           color: #fff;
           text-decoration: none;
-          font-size: 11px;
-          font-weight: 700;
+          font-size: 14px;
+          font-weight: 600;
           white-space: nowrap;
         }
 
@@ -764,7 +749,7 @@ export function AppLayout({
                   to="/profile"
                   onClick={() => setMenuOpen(false)}
                 >
-                  <Settings size={12} />
+                  <Settings size={15} />
                   Edit profile
                 </Link>
 
@@ -773,7 +758,7 @@ export function AppLayout({
                     to="/settings"
                     onClick={() => setMenuOpen(false)}
                   >
-                    <Settings size={12} />
+                    <Settings size={15} />
                     Settings
                   </Link>
                 )}
@@ -786,7 +771,7 @@ export function AppLayout({
                     navigate('/login');
                   }}
                 >
-                  <LogOut size={12} />
+                  <LogOut size={15} />
                   Log out
                 </button>
               </div>

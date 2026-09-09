@@ -181,7 +181,6 @@ export function CampaignDetail() {
   const brandName = brandProfile?.company_name || campaign?.brand_name || 'Business';
   const brandLocation = brandProfile?.location || campaign?.brand_location || '';
   const brandIndustry = brandProfile?.industry || campaign?.category || '';
-  const heroImage = resolveMediaUrl(campaign?.hero_image);
   const brandLogo = resolveMediaUrl(brandProfile?.logo_url);
   const productImages = useMemo(() => {
     const extraPhotos = Array.isArray((campaign as (Campaign & { extra_photos?: string[] }) | null)?.extra_photos)
