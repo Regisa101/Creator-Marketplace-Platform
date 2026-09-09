@@ -20,6 +20,12 @@ import { CampaignBrowse } from './pages/Campaignbrowse';
 import { ApplicationsInbox } from './pages/Applicationsinbox';
 import { SavedCampaigns } from './pages/Savedcampaigns';
 import { BrandProfile } from './pages/Brandprofile';
+import { CreatorDiscovery } from './pages/CreatorDiscovery';
+import { CreatorPublicProfile } from './pages/CreatorPublicProfile';
+import { WorkspaceActive } from './pages/workspace/WorkspaceActive';
+import { WorkspaceMessages } from './pages/workspace/WorkspaceMessages';
+import { WorkspaceCalendar } from './pages/workspace/WorkspaceCalendar';
+import { WorkspaceDeliverables } from './pages/workspace/WorkspaceDeliverables';
 
 // /profile renders the right page for whoever's logged in, so both
 // roles share one URL (Dashboard.tsx's "Edit profile" link just points
@@ -141,6 +147,62 @@ function App() {
             element={
               <ProtectedRoute>
                 <CampaignDetail />
+              </ProtectedRoute>
+            }
+          />
+
+          {/* Increment 5: Creator Discovery */}
+          <Route
+            path="/creators"
+            element={
+              <ProtectedRoute>
+                <CreatorDiscovery />
+              </ProtectedRoute>
+            }
+          />
+
+          <Route
+            path="/creators/:id"
+            element={
+              <ProtectedRoute>
+                <CreatorPublicProfile />
+              </ProtectedRoute>
+            }
+          />
+
+          {/* Increment 5: Workspace */}
+          <Route
+            path="/workspace/active"
+            element={
+              <ProtectedRoute>
+                <WorkspaceActive />
+              </ProtectedRoute>
+            }
+          />
+
+          <Route
+            path="/workspace/messages"
+            element={
+              <ProtectedRoute>
+                <WorkspaceMessages />
+              </ProtectedRoute>
+            }
+          />
+
+          <Route
+            path="/workspace/calendar"
+            element={
+              <ProtectedRoute>
+                <WorkspaceCalendar />
+              </ProtectedRoute>
+            }
+          />
+
+          <Route
+            path="/workspace/deliverables"
+            element={
+              <ProtectedRoute>
+                <WorkspaceDeliverables />
               </ProtectedRoute>
             }
           />
