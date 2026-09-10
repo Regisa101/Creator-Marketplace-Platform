@@ -2,9 +2,10 @@ from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
+from sqlalchemy import select
 
 from app.database import get_db
-from app.models import User, Application, Campaign, Message, CalendarEvent, Deliverable
+from app.models import User, Application, Campaign, Message, CalendarEvent, Deliverable, Payment, Rating
 from app.schemas.workspace import (
     CollabResponse,
     MessageCreate,
@@ -17,6 +18,7 @@ from app.schemas.workspace import (
     DeliverableResponse,
 )
 from app.dependencies.auth import get_current_user, get_current_business, get_current_creator
+from app.services.notifications import create_notification
 
 router = APIRouter(prefix="/api/workspace", tags=["Workspace"])
 
@@ -27,20 +29,19 @@ router = APIRouter(prefix="/api/workspace", tags=["Workspace"])
 
 def _accepted_collab_query(db: Session, current_user: User):
     """Accepted Applications this user is a party to — the definition of
-    an active collaboration. No dedicated table: an "active collab" is
-    just an Application in the accepted state, joined to its Campaign."""
+    an active collaboration. A completed collaboration moves to history."""
     query = db.query(Application).filter(Application.status == "accepted")
     if current_user.role == "creator":
         query = query.filter(Application.creator_id == current_user.id)
     elif current_user.role == "business":
-        campaign_ids = db.query(Campaign.id).filter(Campaign.business_id == current_user.id).subquery()
+        campaign_ids = select(Campaign.id).where(Campaign.business_id == current_user.id)
         query = query.filter(Application.campaign_id.in_(campaign_ids))
     return query
 
 
 def _get_authorized_collab(db: Session, current_user: User, collab_id: int) -> Application:
     application = db.query(Application).filter(Application.id == collab_id).first()
-    if not application or application.status != "accepted":
+    if not application or application.status not in ("accepted", "completed"):
         raise HTTPException(status_code=404, detail="Collaboration not found")
 
     campaign = db.query(Campaign).filter(Campaign.id == application.campaign_id).first()
@@ -58,13 +59,19 @@ def _collab_to_response(db: Session, application: Application) -> CollabResponse
     business = db.query(User).filter(User.id == campaign.business_id).first() if campaign else None
     creator = db.query(User).filter(User.id == application.creator_id).first()
 
-    pending_deliverables = (
-        db.query(Deliverable)
-        .filter(
-            Deliverable.application_id == application.id,
-            Deliverable.status.in_(["pending", "revision_requested"]),
-        )
-        .count()
+    deliverables = db.query(Deliverable).filter(Deliverable.application_id == application.id).all()
+    pending_deliverables = sum(1 for d in deliverables if d.status in ("pending", "revision_requested"))
+    submitted_deliverables = sum(1 for d in deliverables if d.status == "submitted")
+    approved_deliverables = sum(1 for d in deliverables if d.status == "approved")
+
+    latest_payment = (
+        db.query(Payment)
+        .filter(Payment.application_id == application.id)
+        .order_by(Payment.created_at.desc())
+        .first()
+    )
+    already_rated = (
+        db.query(Rating).filter(Rating.application_id == application.id).first() is not None
     )
 
     return CollabResponse(
@@ -82,7 +89,28 @@ def _collab_to_response(db: Session, application: Application) -> CollabResponse
         created_at=application.created_at,
         pending_deliverables=pending_deliverables,
         unread_messages=0,
+        payment_status=latest_payment.status if latest_payment else None,
+        amount_paid=float(latest_payment.amount) if latest_payment and latest_payment.status == "completed" else None,
+        rated=already_rated,
+        campaign_type=campaign.campaign_type.value if campaign and hasattr(campaign.campaign_type, "value") else (str(campaign.campaign_type) if campaign else None),
+        deliverable_deadline=application.deliverable_deadline or (campaign.deliverable_deadline if campaign else None),
+        total_deliverables=len(deliverables),
+        submitted_deliverables=submitted_deliverables,
+        approved_deliverables=approved_deliverables,
     )
+
+
+def _maybe_complete_campaign(db: Session, campaign: Campaign):
+    required = campaign.creators_needed or 1
+    selected = db.query(Application).filter(
+        Application.campaign_id == campaign.id,
+        Application.status.in_(["accepted", "completed"]),
+    ).all()
+    completed = [a for a in selected if a.status == "completed"]
+    if len(selected) >= required and len(completed) >= required:
+        campaign.status = "completed"
+        campaign.is_active = False
+        db.commit()
 
 
 # ============================================
@@ -95,6 +123,22 @@ async def get_collabs(
     current_user: User = Depends(get_current_user),
 ):
     applications = _accepted_collab_query(db, current_user).order_by(Application.updated_at.desc()).all()
+    return [_collab_to_response(db, app) for app in applications]
+
+
+@router.get("/history", response_model=list[CollabResponse])
+async def get_collab_history(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Completed or voluntarily exited collaborations for this user."""
+    query = db.query(Application).filter(Application.status.in_(["completed", "withdrawn"]))
+    if current_user.role == "creator":
+        query = query.filter(Application.creator_id == current_user.id)
+    elif current_user.role == "business":
+        campaign_ids = select(Campaign.id).where(Campaign.business_id == current_user.id)
+        query = query.filter(Application.campaign_id.in_(campaign_ids))
+    applications = query.order_by(Application.updated_at.desc(), Application.created_at.desc()).all()
     return [_collab_to_response(db, app) for app in applications]
 
 
@@ -278,7 +322,14 @@ async def delete_calendar_event(
 def _deliverable_to_response(db: Session, deliverable: Deliverable) -> DeliverableResponse:
     application = db.query(Application).filter(Application.id == deliverable.application_id).first()
     campaign = db.query(Campaign).filter(Campaign.id == application.campaign_id).first() if application else None
-    other_party_name = campaign.title if campaign else None
+    other_party_name = None
+    if application:
+        creator = db.query(User).filter(User.id == application.creator_id).first()
+        business = db.query(User).filter(User.id == campaign.business_id).first() if campaign else None
+        # The response is role-neutral here; the frontend uses this only as a fallback label.
+        other_party_name = (business.profile or {}).get("company_name") if business else None
+        if other_party_name is None and creator:
+            other_party_name = (creator.profile or {}).get("display_name") if creator.profile else creator.full_name
 
     return DeliverableResponse(
         id=deliverable.id,
@@ -345,6 +396,14 @@ async def create_deliverable(
     db.add(deliverable)
     db.commit()
     db.refresh(deliverable)
+    create_notification(
+        db, user_id=application.creator_id, type="deliverable_requested",
+        title="New deliverable requested",
+        message=f"The brand requested: {deliverable.title}.",
+        link=f"/workspace/deliverables?collab={application.id}",
+        event_key=f"deliverable-requested:{deliverable.id}",
+    )
+    db.commit()
     return _deliverable_to_response(db, deliverable)
 
 
@@ -370,6 +429,17 @@ async def submit_deliverable(
     deliverable.status = "submitted"
     deliverable.submitted_at = datetime.now(timezone.utc)
     deliverable.feedback = None
+    db.commit()
+    application = db.query(Application).filter(Application.id == deliverable.application_id).first()
+    campaign = db.query(Campaign).filter(Campaign.id == application.campaign_id).first() if application else None
+    if campaign:
+        create_notification(
+            db, user_id=campaign.business_id, type="deliverable_submitted",
+            title="Creator submitted a deliverable",
+            message=f"{deliverable.title} is ready for your review.",
+            link=f"/workspace/deliverables?collab={deliverable.application_id}",
+            event_key=f"deliverable-submitted:{deliverable.id}:{deliverable.submitted_at.isoformat()}",
+        )
     db.commit()
     db.refresh(deliverable)
     return _deliverable_to_response(db, deliverable)
@@ -397,5 +467,36 @@ async def review_deliverable(
     deliverable.status = data.status
     deliverable.feedback = data.feedback
     db.commit()
+
+    application = db.query(Application).filter(Application.id == deliverable.application_id).first()
+    campaign = db.query(Campaign).filter(Campaign.id == application.campaign_id).first() if application else None
+    if application and campaign:
+        if data.status == "approved":
+            create_notification(db, user_id=application.creator_id, type="deliverable_approved", title="Deliverable approved", message=f"{deliverable.title} was approved by the brand.", link=f"/workspace/deliverables?collab={application.id}", event_key=f"deliverable-approved:{deliverable.id}")
+        else:
+            create_notification(db, user_id=application.creator_id, type="revision_requested", title="Revision requested", message=f"The brand requested changes to {deliverable.title}.", link=f"/workspace/deliverables?collab={application.id}", event_key=f"revision-requested:{deliverable.id}:{deliverable.updated_at or deliverable.created_at}")
+        db.commit()
+
+    # A collaboration is complete only after every deliverable is approved.
+    application = db.query(Application).filter(Application.id == deliverable.application_id).first()
+    if application and data.status == "approved":
+        all_deliverables = db.query(Deliverable).filter(Deliverable.application_id == application.id).all()
+        all_approved = bool(all_deliverables) and all(d.status == "approved" for d in all_deliverables)
+        if all_approved:
+            from app.models import Campaign, Payment
+            campaign = db.query(Campaign).filter(Campaign.id == application.campaign_id).first()
+            if campaign and campaign.campaign_type.value == "gifted":
+                from app.models import GiftFulfillment
+                fulfillment = db.query(GiftFulfillment).filter(GiftFulfillment.application_id == application.id).first()
+                if fulfillment and fulfillment.status == "received":
+                    application.status = "completed"
+            else:
+                paid = db.query(Payment).filter(Payment.application_id == application.id, Payment.status == "completed").first()
+                if paid:
+                    application.status = "completed"
+            db.commit()
+            if application.status == "completed" and campaign:
+                _maybe_complete_campaign(db, campaign)
+
     db.refresh(deliverable)
     return _deliverable_to_response(db, deliverable)

@@ -10,8 +10,11 @@ import {
   getCampaign,
   getBusinessProgress,
   saveBusinessProgress,
+  getCampaignDefaults,
+  saveCampaignDefaults,
   type Campaign,
   type CampaignType,
+  type CreatorRequirements,
   type ChecklistItem,
   type VideoSpec,
 } from '../api/client';
@@ -1748,109 +1751,195 @@ export function CampaignEdit() {
 // BUSINESS SETTINGS PAGE
 // ============================================
 
+const SETTINGS_CREATOR_TYPES = ['Beauty', 'Lifestyle', 'Fashion', 'Food', 'Tech', 'Fitness', 'Travel', 'Gaming', 'Education', 'Finance', 'Wellness', 'Skincare', 'Home Decor', 'Parenting', 'Entertainment', 'UGC', 'Photographer', 'Video Creator'];
+const SETTINGS_CONTENT_TYPES = ['Instagram Reel', 'Instagram Story', 'Instagram Post', 'TikTok Video', 'YouTube Short', 'YouTube Video', 'UGC Video', 'Product Photos'];
+const SETTINGS_CREATOR_SIZES = ['Nano', 'Micro', 'Mid-tier', 'Macro'];
+const SETTINGS_LOCATIONS = ['Nepal', 'Kathmandu Valley', 'Kathmandu', 'Pokhara', 'Any location'];
+const SETTINGS_LANGUAGES = ['Nepali', 'English', 'Hindi', 'Newari', 'Maithili'];
+const SETTINGS_FOLLOWERS = ['1K–10K', '10K–50K', '50K–100K', '100K+'];
+const SETTINGS_AGES = ['Any', '18–24', '25–34', '35–44', '45+'];
+const SETTINGS_GENDERS = ['Any', 'Female', 'Male'];
+const SETTINGS_QUESTIONS = [
+  'Why are you a good fit for this campaign?',
+  'Have you created similar content before? Share an example.',
+  'What is your content style or approach for this campaign?',
+  'How would you showcase this product to your audience?',
+  'Can you complete all deliverables by the campaign deadline?',
+];
+
+function SettingsMultiSelect({ label, options, values, onChange }: { label: string; options: string[]; values: string[]; onChange: (values: string[]) => void }) {
+  const toggle = (value: string) => onChange(values.includes(value) ? values.filter((v) => v !== value) : [...values, value]);
+  return (
+    <div style={{ marginBottom: 16 }}>
+      <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 8 }}>{label}</div>
+      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 7 }}>
+        {options.map((option) => (
+          <button
+            key={option}
+            type="button"
+            onClick={() => toggle(option)}
+            style={{
+              border: `1px solid ${values.includes(option) ? '#1E2A78' : '#DDE2F6'}`,
+              background: values.includes(option) ? '#EEF0FF' : '#fff',
+              color: '#182262', borderRadius: 999, padding: '8px 12px',
+              cursor: 'pointer', fontSize: 12, fontWeight: values.includes(option) ? 700 : 500,
+            }}
+          >
+            {option}
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 export function BusinessSettings() {
   const navigate = useNavigate();
   const { user } = useAuth();
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [message, setMessage] = useState('');
+  const [defaultDos, setDefaultDos] = useState<string[]>([]);
+  const [defaultDonts, setDefaultDonts] = useState<string[]>([]);
+  const [defaultCreatorRequirements, setDefaultCreatorRequirements] = useState<CreatorRequirements>({ categories: [] });
+  const [defaultQuestions, setDefaultQuestions] = useState<string[]>([]);
+  const [defaultDuration, setDefaultDuration] = useState('');
+  const [defaultAspectRatio, setDefaultAspectRatio] = useState('');
+  const [defaultVoiceover, setDefaultVoiceover] = useState(false);
+  const [defaultSubtitles, setDefaultSubtitles] = useState(false);
+  const [dosDraft, setDosDraft] = useState('');
+  const [dontsDraft, setDontsDraft] = useState('');
+  const [questionDraftHack, setQuestionDraftHack] = useState('');
+
+  useEffect(() => {
+    if (user?.role !== 'business') { setLoading(false); return; }
+    getCampaignDefaults()
+      .then((defaults) => {
+        if (!defaults) return;
+        setDefaultDos(defaults.default_dos || []);
+        setDefaultDonts(defaults.default_donts || []);
+        setDefaultCreatorRequirements(defaults.default_creator_requirements || { categories: [] });
+        setDefaultQuestions(defaults.default_application_questions || []);
+        const spec = defaults.default_video_spec || null;
+        setDefaultDuration(spec?.duration || '');
+        setDefaultAspectRatio(spec?.aspect_ratio || '');
+        setDefaultVoiceover(!!spec?.voiceover_required);
+        setDefaultSubtitles(!!spec?.subtitles_required);
+      })
+      .catch((err) => console.error('Could not load campaign defaults:', err))
+      .finally(() => setLoading(false));
+  }, [user]);
+
+  const addText = (draft: string, setter: (value: string) => void, setItems: (items: string[]) => void, items: string[]) => {
+    const value = draft.trim();
+    if (!value) return;
+    if (!items.some((item) => item.toLowerCase() === value.toLowerCase())) setItems([...items, value]);
+    setter('');
+  };
+
+  const save = async () => {
+    setSaving(true);
+    setMessage('');
+    try {
+      const saved = await saveCampaignDefaults({
+        default_dos: defaultDos,
+        default_donts: defaultDonts,
+        default_creator_requirements: defaultCreatorRequirements,
+        default_application_questions: defaultQuestions,
+        default_video_spec: (defaultDuration || defaultAspectRatio || defaultVoiceover || defaultSubtitles)
+          ? {
+              platform: 'General',
+              duration: defaultDuration || undefined,
+              aspect_ratio: defaultAspectRatio || undefined,
+              voiceover_required: defaultVoiceover,
+              subtitles_required: defaultSubtitles,
+            }
+          : null,
+      });
+      setDefaultDos(saved.default_dos || []);
+      setDefaultDonts(saved.default_donts || []);
+      setDefaultCreatorRequirements(saved.default_creator_requirements || { categories: [] });
+      setDefaultQuestions(saved.default_application_questions || []);
+      const spec = saved.default_video_spec || null;
+      setDefaultDuration(spec?.duration || '');
+      setDefaultAspectRatio(spec?.aspect_ratio || '');
+      setDefaultVoiceover(!!spec?.voiceover_required);
+      setDefaultSubtitles(!!spec?.subtitles_required);
+      setMessage('Campaign defaults saved ✓');
+    } catch (err) {
+      console.error('Could not save campaign defaults:', err);
+      setMessage('Could not save campaign defaults. Please try again.');
+    } finally {
+      setSaving(false);
+    }
+  };
 
   if (user?.role !== 'business') {
-    return (
-      <div className="cc">
-        <style>{`
-          .cc-settings { max-width: 600px; margin: 0 auto; padding: 40px 20px; }
-          .cc-settings .cc-card { background: #fff; border: 1px solid var(--line); border-radius: 16px; padding: 48px 20px; text-align: center; }
-          .cc-settings h2 { font-size: 24px; font-weight: 700; margin: 0 0 8px; }
-          .cc-settings p { color: var(--ink-soft); margin: 0 0 16px; }
-        `}</style>
-        <div className="cc-shell">
-          <main className="cc-main" style={{ maxWidth: '600px', margin: '0 auto' }}>
-            <div className="cc-settings">
-              <div className="cc-card">
-                <h2>Access Denied</h2>
-                <p>Only business users can access this page.</p>
-                <button
-                  className="cc-btn-draft"
-                  onClick={() => navigate('/dashboard')}
-                  style={{ marginTop: '16px' }}
-                >
-                  Go to Dashboard
-                </button>
-              </div>
-            </div>
-          </main>
-        </div>
-      </div>
-    );
+    return <div className="cc"><main className="cc-main" style={{ maxWidth: 600, margin: '0 auto', padding: 40 }}><div className="cc-card" style={{ padding: 48, textAlign: 'center' }}><h2>Access Denied</h2><p>Only business users can access this page.</p><button className="cc-btn-draft" onClick={() => navigate('/dashboard')}>Go to Dashboard</button></div></main></div>;
   }
 
   return (
     <div className="cc">
       <style>{`
-        .cc-settings { max-width: 720px; margin: 0 auto; padding: 40px 20px; }
+        .cc-settings { max-width: 820px; margin: 0 auto; padding: 36px 20px 60px; }
         .cc-settings h1 { font-size: 28px; font-weight: 700; margin: 0 0 8px; }
-        .cc-settings .sub { color: var(--ink-soft); margin: 0 0 32px; }
-        .cc-settings-card { background: #fff; border: 1px solid var(--line); border-radius: 16px; padding: 24px; margin-bottom: 20px; }
-        .cc-settings-card h3 { font-size: 16px; font-weight: 600; margin: 0 0 4px; }
-        .cc-settings-card p { color: var(--ink-soft); font-size: 13px; margin: 0 0 16px; }
-        .cc-settings-actions { display: flex; gap: 10px; flex-wrap: wrap; }
+        .cc-settings .sub { color: var(--ink-soft); margin: 0 0 24px; }
+        .cc-settings-card { background: #fff; border: 1px solid var(--line); border-radius: 16px; padding: 24px; margin-bottom: 18px; }
+        .cc-settings-card h3 { font-size: 16px; font-weight: 700; margin: 0 0 5px; }
+        .cc-settings-card p { color: var(--ink-soft); font-size: 13px; margin: 0 0 18px; line-height: 1.5; }
+        .cc-settings-row { display:flex; gap:10px; align-items:center; margin-bottom:10px; }
+        .cc-settings-row input { flex:1; }
+        .cc-settings-remove { border:1px solid var(--line); background:#fff; border-radius:8px; padding:8px 10px; cursor:pointer; }
       `}</style>
+      <div className="cc-shell"><main className="cc-main">
+        <button className="cc-back" onClick={() => navigate(-1)}><ArrowLeft size={15} /> Back</button>
+        <div className="cc-settings">
+          <h1>Business Settings</h1>
+          <p className="sub">Set defaults once and Noodle will prefill them whenever you create a new campaign.</p>
 
-      <div className="cc-shell">
-        <main className="cc-main">
-          <button className="cc-back" onClick={() => navigate(-1)}>
-            <ArrowLeft size={15} /> Back
-          </button>
-
-          <div className="cc-settings">
-            <h1>Business Settings</h1>
-            <p className="sub">Manage your business profile and campaign defaults</p>
-
-            {/* Basic Info */}
+          {loading ? <div className="cc-settings-card">Loading your defaults…</div> : <>
             <div className="cc-settings-card">
-              <h3>Business Information</h3>
-              <p>Update your company details, location, and contact info.</p>
-              <div className="cc-settings-actions">
-                <button
-                  className="cc-btn-draft"
-                  onClick={() => navigate('/profile')}
-                >
-                  Edit Business Profile
-                </button>
-              </div>
+              <h3>Creator matching defaults</h3>
+              <p>These preferences are copied into new campaigns. You can always change them for an individual campaign.</p>
+              <SettingsMultiSelect label="Creator type" options={SETTINGS_CREATOR_TYPES} values={defaultCreatorRequirements.categories || []} onChange={(v) => setDefaultCreatorRequirements((p) => ({ ...p, categories: v }))} />
+              <SettingsMultiSelect label="Content type" options={SETTINGS_CONTENT_TYPES} values={defaultCreatorRequirements.content_types || []} onChange={(v) => setDefaultCreatorRequirements((p) => ({ ...p, content_types: v }))} />
+              <SettingsMultiSelect label="Creator size" options={SETTINGS_CREATOR_SIZES} values={defaultCreatorRequirements.creator_sizes || []} onChange={(v) => setDefaultCreatorRequirements((p) => ({ ...p, creator_sizes: v }))} />
+              <SettingsMultiSelect label="Location" options={SETTINGS_LOCATIONS} values={defaultCreatorRequirements.locations || []} onChange={(v) => setDefaultCreatorRequirements((p) => ({ ...p, locations: v }))} />
+              <SettingsMultiSelect label="Languages" options={SETTINGS_LANGUAGES} values={defaultCreatorRequirements.languages || []} onChange={(v) => setDefaultCreatorRequirements((p) => ({ ...p, languages: v }))} />
+              <SettingsMultiSelect label="Follower range" options={SETTINGS_FOLLOWERS} values={defaultCreatorRequirements.follower_ranges || []} onChange={(v) => setDefaultCreatorRequirements((p) => ({ ...p, follower_ranges: v }))} />
+              <SettingsMultiSelect label="Age" options={SETTINGS_AGES} values={defaultCreatorRequirements.age_ranges || []} onChange={(v) => setDefaultCreatorRequirements((p) => ({ ...p, age_ranges: v }))} />
+              <SettingsMultiSelect label="Gender" options={SETTINGS_GENDERS} values={defaultCreatorRequirements.gender ? [defaultCreatorRequirements.gender] : []} onChange={(v) => setDefaultCreatorRequirements((p) => ({ ...p, gender: v[0] }))} />
             </div>
 
-            {/* Campaign Defaults */}
             <div className="cc-settings-card">
-              <h3>Campaign Defaults</h3>
-              <p>
-                Edit your default Do's, Don'ts, and video specs. These will prefill
-                new campaigns automatically.
-              </p>
-              <div className="cc-settings-actions">
-                <button
-                  className="cc-btn-publish"
-                  onClick={() => navigate('/campaigns/new')}
-                >
-                  Create New Campaign
-                </button>
+              <h3>Default creator application questions</h3>
+              <p>Pick the questions you commonly ask creators. They will automatically appear in new campaigns. You can add your own too.</p>
+              <div style={{ display:'flex', flexWrap:'wrap', gap:7, marginBottom:14 }}>
+                {SETTINGS_QUESTIONS.map((q) => <button key={q} type="button" className="cc-preset-chip" onClick={() => setDefaultQuestions((items) => items.some((x) => x.toLowerCase() === q.toLowerCase()) ? items : [...items, q])}>+ {q}</button>)}
               </div>
+              {defaultQuestions.map((q, i) => <div className="cc-settings-row" key={`${q}-${i}`}><input className="cc-input" value={q} onChange={(e) => setDefaultQuestions((items) => items.map((x,j) => j===i ? e.target.value : x))} /><button className="cc-settings-remove" type="button" onClick={() => setDefaultQuestions((items) => items.filter((_,j)=>j!==i))}>Remove</button></div>)}
+              <div className="cc-settings-row"><input className="cc-input" value={''} onChange={(e) => setQuestionDraftHack(e.target.value)} placeholder="Write your own question" /><button className="cc-btn-draft" type="button" onClick={() => { const value = questionDraftHack.trim(); if (value) { setDefaultQuestions((items)=>[...items,value]); setQuestionDraftHack(''); } }}>+ Add</button></div>
             </div>
 
-            {/* Account Settings */}
             <div className="cc-settings-card">
-              <h3>Account Settings</h3>
-              <p>Change your password, email preferences, and account security.</p>
-              <div className="cc-settings-actions">
-                <button
-                  className="cc-btn-draft"
-                  onClick={() => navigate('/dashboard')}
-                >
-                  Manage Account
-                </button>
-              </div>
+              <h3>Default creative rules</h3>
+              <p>These are also copied into new campaigns.</p>
+              <div className="cc-settings-row"><input className="cc-input" value={dosDraft} onChange={(e)=>setDosDraft(e.target.value)} placeholder="Default Do's" /><button className="cc-btn-draft" type="button" onClick={()=>addText(dosDraft,setDosDraft,setDefaultDos,defaultDos)}>+ Add</button></div>
+              {defaultDos.map((x,i)=><div className="cc-settings-row" key={`${x}-${i}`}><input className="cc-input" value={x} onChange={(e)=>setDefaultDos(defaultDos.map((v,j)=>j===i?e.target.value:v))}/><button className="cc-settings-remove" type="button" onClick={()=>setDefaultDos(defaultDos.filter((_,j)=>j!==i))}>Remove</button></div>)}
+              <div className="cc-settings-row"><input className="cc-input" value={dontsDraft} onChange={(e)=>setDontsDraft(e.target.value)} placeholder="Default Don'ts" /><button className="cc-btn-draft" type="button" onClick={()=>addText(dontsDraft,setDontsDraft,setDefaultDonts,defaultDonts)}>+ Add</button></div>
+              {defaultDonts.map((x,i)=><div className="cc-settings-row" key={`${x}-${i}`}><input className="cc-input" value={x} onChange={(e)=>setDefaultDonts(defaultDonts.map((v,j)=>j===i?e.target.value:v))}/><button className="cc-settings-remove" type="button" onClick={()=>setDefaultDonts(defaultDonts.filter((_,j)=>j!==i))}>Remove</button></div>)}
+              <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:10,marginTop:12}}><input className="cc-input" value={defaultDuration} onChange={(e)=>setDefaultDuration(e.target.value)} placeholder="Default video length"/><input className="cc-input" value={defaultAspectRatio} onChange={(e)=>setDefaultAspectRatio(e.target.value)} placeholder="Default aspect ratio"/></div>
+              <div style={{display:'flex',gap:16,marginTop:12}}><label><input type="checkbox" checked={defaultVoiceover} onChange={(e)=>setDefaultVoiceover(e.target.checked)}/> Voiceover required</label><label><input type="checkbox" checked={defaultSubtitles} onChange={(e)=>setDefaultSubtitles(e.target.checked)}/> Subtitles required</label></div>
             </div>
-          </div>
-        </main>
-      </div>
+
+            <div style={{display:'flex',alignItems:'center',gap:12,marginBottom:18}}><button className="cc-btn-publish" type="button" disabled={saving} onClick={save}>{saving?'Saving…':'Save Campaign Defaults'}</button>{message && <span className="cc-hint">{message}</span>}</div>
+          </>}
+
+          <div className="cc-settings-card"><h3>Business Information</h3><p>Update your company details, location, and contact information.</p><button className="cc-btn-draft" onClick={()=>navigate('/profile')}>Edit Business Profile</button></div>
+          <div className="cc-settings-card"><h3>Create a campaign</h3><p>Start with your saved defaults and adjust anything that is specific to this campaign.</p><button className="cc-btn-publish" onClick={()=>navigate('/campaigns/new')}>Create New Campaign</button></div>
+        </div>
+      </main></div>
     </div>
   );
 }
+

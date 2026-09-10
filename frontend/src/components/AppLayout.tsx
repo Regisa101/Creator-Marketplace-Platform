@@ -7,6 +7,7 @@ import {
   Compass,
   Inbox,
   Briefcase,
+  BarChart3,
   ChevronDown,
   ChevronRight,
   LogOut,
@@ -45,6 +46,7 @@ const WORKSPACE_CHILDREN = [
   { label: 'Messages', icon: MessageSquare, to: '/workspace/messages' },
   { label: 'Calendar', icon: Calendar, to: '/workspace/calendar' },
   { label: 'Deliverables', icon: PackageCheck, to: '/workspace/deliverables' },
+  { label: 'Collab History', icon: Briefcase, to: '/workspace/history' },
 ];
 
 const CREATOR_PROFILE_FIELDS: Array<string | string[]> = [
@@ -143,6 +145,7 @@ export function AppLayout({
   const role = user?.role === 'creator' ? 'creator' : 'business';
   const primary = role === 'creator' ? C.coral : C.navy;
   const primarySoft = role === 'creator' ? C.coralSoft : C.navySoft;
+  const primaryDark = role === 'creator' ? '#E85440' : '#141B52';
 
   const profileCompletion = calculateProfileCompletion(user?.profile, role);
   const profileEditRoute = `/onboarding/${role}`;
@@ -177,12 +180,14 @@ export function AppLayout({
           { label: 'Discover Collabs', icon: Compass, to: '/campaigns' },
           { label: 'My Applications', icon: Inbox, to: '/applications' },
           { label: 'Saved Campaigns', icon: Bookmark, to: '/saved' },
+          { label: 'Analytics', icon: BarChart3, to: '/analytics' },
         ]
       : [
           { label: 'Home', icon: LayoutDashboard, to: '/dashboard' },
           { label: 'My Campaigns', icon: Megaphone, to: '/campaigns' },
           { label: 'Discover Creators', icon: Compass, to: '/creators' },
           { label: 'Applications', icon: Inbox, to: '/applications' },
+          { label: 'Analytics', icon: BarChart3, to: '/analytics' },
         ];
 
   const defaultSearchPlaceholder =
@@ -508,8 +513,10 @@ export function AppLayout({
         .app-topbar-actions {
           display: flex;
           align-items: center;
+          justify-content: flex-end;
           gap: 16px;
-          flex-shrink: 0;
+          flex: 1;
+          min-width: 0;
         }
 
         .app-search {
@@ -521,10 +528,12 @@ export function AppLayout({
           border-radius: 8px;
           background: ${C.card};
           color: ${C.inkFaint};
+          flex: 1;
+          min-width: 0;
         }
 
         .app-search input {
-          width: 220px;
+          width: 100%;
           min-width: 0;
           border: 0;
           outline: 0;
@@ -538,14 +547,21 @@ export function AppLayout({
         }
 
         .app-notification {
-          display: grid;
+          display: inline-grid;
           place-items: center;
           padding: 0;
           border: 0;
           background: transparent;
           color: ${C.inkSoft};
           cursor: pointer;
+          position: relative;
+          width: 34px;
+          height: 34px;
+          border-radius: 9px;
+          text-decoration: none;
         }
+        .app-notification:hover { background: #F5F5F7; color: ${C.ink}; }
+        .app-notification-dot { position:absolute; top:5px; right:5px; width:7px; height:7px; border-radius:50%; background:#FF6B5A; border:2px solid #fff; }
 
         .app-action {
           display: inline-flex;
@@ -553,12 +569,17 @@ export function AppLayout({
           gap: 6px;
           padding: 8px 14px;
           border-radius: 8px;
-          background: #15111F;
+          background: ${primary};
           color: #fff;
           text-decoration: none;
           font-size: 14px;
           font-weight: 600;
           white-space: nowrap;
+          transition: background .15s ease;
+        }
+
+        .app-action:hover {
+          background: ${primaryDark};
         }
 
         .app-page-content {
@@ -826,13 +847,9 @@ export function AppLayout({
             )}
 
             {showNotifications && (
-              <button
-                type="button"
-                className="app-notification"
-                aria-label="Notifications"
-              >
+              <Link to="/notifications" className="app-notification" aria-label="Notifications">
                 <Bell size={19} />
-              </button>
+              </Link>
             )}
 
             {actionLabel && actionTo && (

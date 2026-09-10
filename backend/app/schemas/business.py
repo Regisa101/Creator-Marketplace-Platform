@@ -1,5 +1,6 @@
 from pydantic import BaseModel, Field
 from typing import Optional, List
+from datetime import datetime
 
 
 class BusinessOnboardingComplete(BaseModel):
@@ -58,6 +59,8 @@ class BusinessOnboardingProgress(BaseModel):
     default_dos: Optional[List[str]] = None
     default_donts: Optional[List[str]] = None
     default_video_spec: Optional[VideoSpecDict] = None
+    default_creator_requirements: Optional[dict] = None
+    default_application_questions: Optional[List[str]] = None
 
 
 # ============================================
@@ -73,6 +76,16 @@ class PublicCampaignSummary(BaseModel):
     sub_category: Optional[str] = None
     campaign_type: str
     status: str
+
+
+class BusinessWorkHistoryItem(BaseModel):
+    application_id: int
+    campaign_id: int
+    campaign_title: str
+    creator_id: int
+    creator_name: Optional[str] = None
+    completed_at: Optional[datetime] = None
+    deliverables: List[str] = []
 
 
 class PublicBusinessProfile(BaseModel):
@@ -95,3 +108,6 @@ class PublicBusinessProfile(BaseModel):
     is_published: bool
 
     campaigns: List[PublicCampaignSummary] = []
+    completed_collaborations: int = 0
+    creators_worked_with: int = 0
+    work_history: List[BusinessWorkHistoryItem] = []

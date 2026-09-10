@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Heart, Loader2, MapPin, Send, X } from 'lucide-react';
+import { Heart, Loader2, MapPin, Send, Star, X } from 'lucide-react';
 import {
   getCreators,
   shortlistCreator,
@@ -131,6 +131,8 @@ export function CreatorDiscovery() {
         }
         .cd-name { font-size: 14.5px; font-weight: 700; color: ${C.ink}; }
         .cd-username { font-size: 12px; color: ${C.inkSoft}; }
+        .cd-rating { display: inline-flex; align-items: center; gap: 4px; font-size: 12px; font-weight: 600; color: ${C.ink}; margin-top: 2px; }
+        .cd-rating-count { color: ${C.inkSoft}; font-weight: 500; }
         .cd-heart {
           border: none; background: transparent; cursor: pointer; color: ${C.inkFaint};
           padding: 4px; border-radius: 8px; flex-shrink: 0;
@@ -233,6 +235,12 @@ export function CreatorDiscovery() {
                     <div>
                       <div className="cd-name">{creator.display_name || 'Creator'}</div>
                       {creator.username && <div className="cd-username">@{creator.username}</div>}
+                      {creator.avg_rating != null && (
+                        <div className="cd-rating">
+                          <Star size={12} fill="#FFB020" color="#FFB020" /> {creator.avg_rating.toFixed(1)}
+                          <span className="cd-rating-count">({creator.ratings_count})</span>
+                        </div>
+                      )}
                     </div>
                   </div>
                   <button

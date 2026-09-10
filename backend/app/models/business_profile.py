@@ -33,6 +33,8 @@ class BusinessProfile(Base):
     default_dos = Column(JSON, nullable=True)          # ["Use good lighting", ...]
     default_donts = Column(JSON, nullable=True)         # ["Do not use competitor products", ...]
     default_video_spec = Column(JSON, nullable=True)    # {"platform": "General", "duration": "...", "aspect_ratio": "...", "voiceover_required": bool, "subtitles_required": bool}
+    default_creator_requirements = Column(JSON, nullable=True)  # reusable creator matching preferences
+    default_application_questions = Column(JSON, nullable=True) # reusable creator application questions
     
     is_onboarding_complete = Column(Boolean, default=False)
     is_published = Column(Boolean, default=False)

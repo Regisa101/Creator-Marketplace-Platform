@@ -43,6 +43,8 @@ class Campaign(Base):
     
     # Requirements
     requirements = Column(Text, nullable=True)
+    # Structured, optional creator filters used by the explainable matching engine.
+    creator_requirements = Column(JSON, nullable=True)
     deliverables = Column(JSON, nullable=True)
     before_you_apply = Column(JSON, nullable=True)  # ← ADD THIS
     
@@ -69,7 +71,14 @@ class Campaign(Base):
     extra_photos = Column(JSON, nullable=True)  # ← ADD THIS (MOST IMPORTANT)
     
     # Timeline
+    # `deadline` is kept as a backward-compatible alias for the application deadline.
     deadline = Column(DateTime(timezone=True), nullable=True)
+    application_deadline = Column(DateTime(timezone=True), nullable=True)
+    deliverable_deadline = Column(DateTime(timezone=True), nullable=True)
+
+    # Creator selection / application flow
+    creators_needed = Column(Integer, nullable=False, default=1)
+    application_questions = Column(JSON, nullable=True)
     
     # Status
     status = Column(Enum(CampaignStatus), default=CampaignStatus.DRAFT)

@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, Text, DateTime, DECIMAL, ForeignKey
+from sqlalchemy import Column, Integer, String, Text, DateTime, DECIMAL, ForeignKey, JSON
 from sqlalchemy.sql import func
 from sqlalchemy.orm import relationship
 from app.database import Base
@@ -13,6 +13,16 @@ class Application(Base):
     proposal = Column(Text, nullable=False)
     rate = Column(DECIMAL(10,2), nullable=True)
     message = Column(Text, nullable=True)
+
+    # Answers to campaign-specific application questions and the portfolio
+    # items the creator chose to show the brand. Stored as JSON so this can
+    # evolve without another table for every new question type.
+    application_answers = Column(JSON, nullable=True)
+    selected_portfolio = Column(JSON, nullable=True)
+
+    # Optional collaboration-specific deadline. If blank, the campaign
+    # deliverable deadline is used.
+    deliverable_deadline = Column(DateTime(timezone=True), nullable=True)
     
     # Status: pending, accepted, rejected, withdrawn
     status = Column(String(50), default="pending")

@@ -26,6 +26,11 @@ import { WorkspaceActive } from './pages/workspace/WorkspaceActive';
 import { WorkspaceMessages } from './pages/workspace/WorkspaceMessages';
 import { WorkspaceCalendar } from './pages/workspace/WorkspaceCalendar';
 import { WorkspaceDeliverables } from './pages/workspace/WorkspaceDeliverables';
+import { WorkspaceHistory } from './pages/workspace/WorkspaceHistory';
+import { PaymentReturn } from './pages/workspace/PaymentReturn';
+import { DemoPayment } from './pages/workspace/DemoPayment';
+import { Notifications } from './pages/Notifications';
+import { Analytics } from './pages/Analytics';
 
 // /profile renders the right page for whoever's logged in, so both
 // roles share one URL (Dashboard.tsx's "Edit profile" link just points
@@ -203,6 +208,51 @@ function App() {
             element={
               <ProtectedRoute>
                 <WorkspaceDeliverables />
+              </ProtectedRoute>
+            }
+          />
+
+          <Route
+            path="/workspace/history"
+            element={
+              <ProtectedRoute>
+                <WorkspaceHistory />
+              </ProtectedRoute>
+            }
+          />
+
+          <Route
+            path="/notifications"
+            element={
+              <ProtectedRoute>
+                <Notifications />
+              </ProtectedRoute>
+            }
+          />
+
+          <Route
+            path="/analytics"
+            element={
+              <ProtectedRoute>
+                <Analytics />
+              </ProtectedRoute>
+            }
+          />
+
+          <Route
+            path="/payments/return"
+            element={
+              <ProtectedRoute>
+                <PaymentReturn />
+              </ProtectedRoute>
+            }
+          />
+
+          <Route
+            path="/payments/demo"
+            element={
+              <ProtectedRoute>
+                <DemoPayment />
               </ProtectedRoute>
             }
           />

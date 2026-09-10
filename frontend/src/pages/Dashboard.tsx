@@ -1,563 +1,1125 @@
-// frontend/src/pages/Dashboard.tsx
+import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { AppLayout } from '../components/AppLayout';
 import {
-  Megaphone, Compass, Inbox, Briefcase, ArrowRight, Send, Eye,
-  Wallet, FileText, Users, CircleDashed, CheckCircle2, ChevronRight,
-} from 'lucide-react';
-import { useState, useEffect } from 'react';
-import { getApplications, getCampaigns, type Application, type Campaign } from '../api/client';
+  getApplications,
+  getCampaign,
+  getCampaigns,
+  getCollabHistory,
+  getCollabs,
+  getCreators,
+  getInvites,
+  getNotifications,
+  getPaymentSummary,
+  getSavedCampaigns,
+  saveCampaign,
+  shortlistCreator,
+  unsaveCampaign,
+  unshortlistCreator,
+  type Application,
+  type Campaign,
+  type Collab,
+  type CreatorInvite,
+  type CreatorListItem,
+  type Notification,
+  type SavedCampaignEntry,
+} from '../api/client';
 
-/**
- * /dashboard — now rendered through the shared <AppLayout> instead of
- * its own hand-rolled sidebar/topbar. Previously this page duplicated
- * AppLayout's nav, search box, notification bell, and "New Campaign"
- * button with slightly different sizing/spacing, which is why the
- * sidebar and topbar used to look different here vs. every other
- * page. Now the chrome (sidebar, search, bell, action button) always
- * comes from AppLayout, and this file only renders the actual
- * dashboard content: stat cards, spotlight, campaign/application
- * lists, quick actions, and the right rail.
- *
- * IMPORTANT: still renders REAL zero-state, not sample data. Numbers
- * and list items come from the same `applications` / `ownCampaigns`
- * fetches as before — nothing here is hardcoded to match the
- * reference screenshot's sample numbers. Two small honesty notes vs.
- * the reference image:
- *   - the reference shows deltas like "↑ 1 this month" on stat cards;
- *     there's no history/analytics endpoint backing that yet, so
- *     those are short status captions instead of fabricated deltas.
- *   - the reference's Application Status donut has a "Draft" segment;
- *     the Application type only has accepted/pending/rejected, so
- *     that segment is labeled "Rejected" here instead of invented.
- */
+const API_ORIGIN = 'http://localhost:8000';
 
-// Brand palette — matches Landing.tsx / CreatorOnboarding.tsx / AuthLayout.tsx
-// (navy #1E2A78 + coral #FF6B5A).
-const C = {
-  sidebar: '#FFFFFF',
-  sidebarBorder: '#EAE7F2',
-  surface: '#F5F4FA',
-  card: '#FFFFFF',
-  ink: '#1A1625',
-  inkSoft: '#6B6478',
-  inkFaint: '#A39DB8',
-  line: '#EAE7F2',
-  violet: '#1E2A78',       // business primary — brand navy
-  violetSoft: '#F2F4FC',
-  coral: '#FF6B5A',        // creator primary — brand coral
-  coralSoft: '#FFF4F2',
-  mint: '#22C55E',
-  mintSoft: '#EAFBF1',
-  sky: '#38BDF8',
-  skySoft: '#EAF8FE',
-  amber: '#F59E0B',
-  amberSoft: '#FEF6E7',
-};
+type FeedFilter = 'all' | 'open' | 'booked' | 'completed' | 'closed' | 'this_month' | 'past';
+type PriceRange = 'all' | '0-10000' | '10000-50000' | '50000-100000' | '100000+';
+type AppliedFilter = 'all' | 'applied' | 'not_applied' | 'new';
 
-// ------------------------------------------------------------------
-// PROFILE COMPLETION
-// ------------------------------------------------------------------
-// Still needed here (not just in AppLayout) because the "Update your
-// profile" Quick Task below reads profileCompletion / profileEditRoute
-// directly — AppLayout's own copy only drives its sidebar widget.
-const BASE_COMPLETION = 22;
-
-const CREATOR_PROFILE_FIELDS: Array<string | string[]> = [
-  'display_name',
-  'username',
-  'bio',
-  'location',
-  'creator_type',
-  ['niches', 'categories'],
-  'content_types',
-  ['content_languages', 'languages'],
-  ['audience_interests', 'interests'],
-  'audience_age_range',
-  'audience_location',
-  'socials',
-  'starting_price',
+const MASTER_CATEGORIES = [
+  'Beauty',
+  'Fashion',
+  'Food',
+  'Tech',
+  'Fitness',
+  'Travel',
+  'Lifestyle',
+  'Gaming',
+  'Home',
+  'Parenting',
+  'Finance',
+  'Education',
+  'Automotive',
+  'Health',
 ];
 
-const BUSINESS_PROFILE_FIELDS: Array<string | string[]> = [
-  'company_name',
-  'business_type',
-  'industry',
-  'location',
-  'website',
-  'description',
-  'logo_url',
-  'contact_phone',
-  'interested_categories',
-  'preferred_content_types',
-  'typical_budget',
+const PRICE_RANGES: { value: PriceRange; label: string }[] = [
+  { value: 'all', label: 'Price Range' },
+  { value: '0-10000', label: 'Under Rs. 10,000' },
+  { value: '10000-50000', label: 'Rs. 10,000 – 50,000' },
+  { value: '50000-100000', label: 'Rs. 50,000 – 100,000' },
+  { value: '100000+', label: 'Above Rs. 100,000' },
 ];
 
-function isFieldFilled(value: unknown): boolean {
-  if (value === null || value === undefined) return false;
-  if (typeof value === 'string') return value.trim().length > 0;
-  if (typeof value === 'number') return value > 0;
-  if (Array.isArray(value)) return value.length > 0;
-  return Boolean(value);
+const APPLIED_FILTERS: { value: AppliedFilter; label: string }[] = [
+  { value: 'all', label: 'All Campaigns' },
+  { value: 'applied', label: 'Applied' },
+  { value: 'not_applied', label: 'Not Applied' },
+  { value: 'new', label: 'New (This Week)' },
+];
+
+const CAMPAIGNS_PER_PAGE = 10;
+const ACTIVITY_VISIBLE_ROWS = 5;
+
+function mediaUrl(url?: string | null) {
+  if (!url) return '';
+  if (/^(https?:)?\/\//i.test(url) || url.startsWith('data:') || url.startsWith('blob:')) return url;
+  if (url.startsWith('/api/')) return `${API_ORIGIN}${url}`;
+  return `${API_ORIGIN}/${url.replace(/^\/+/, '')}`;
 }
 
-function isAnyAliasFilled(profile: Record<string, any>, key: string | string[]): boolean {
-  const aliases = Array.isArray(key) ? key : [key];
-  return aliases.some((alias) => isFieldFilled(profile[alias]));
+function money(value?: number | null) {
+  return value == null ? '—' : `Rs. ${Number(value).toLocaleString()}`;
 }
 
-function calculateProfileCompletion(profile: Record<string, any> | undefined, role: 'creator' | 'business'): number {
-  const fields = role === 'creator' ? CREATOR_PROFILE_FIELDS : BUSINESS_PROFILE_FIELDS;
-  if (!profile) return BASE_COMPLETION;
-  const filled = fields.filter((key) => isAnyAliasFilled(profile, key)).length;
-  const onboardingPortion = (filled / fields.length) * (100 - BASE_COMPLETION);
-  return Math.min(100, Math.round(BASE_COMPLETION + onboardingPortion));
+function timeAgo(raw?: string | null) {
+  if (!raw) return '';
+  const date = new Date(raw);
+  if (Number.isNaN(date.getTime())) return '';
+  const diffMs = Date.now() - date.getTime();
+  const minutes = Math.floor(diffMs / 60000);
+  if (minutes < 1) return 'Just now';
+  if (minutes < 60) return `${minutes}m ago`;
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) return `${hours}h ago`;
+  const days = Math.floor(hours / 24);
+  if (days < 7) return `${days}d ago`;
+  return date.toLocaleDateString();
 }
 
-const Donut = ({ segments }: { segments: { value: number; color: string; label: string }[] }) => {
-  const total = segments.reduce((s, seg) => s + seg.value, 0);
-  if (total === 0) {
-    return (
-      <div className="flex h-32 w-32 items-center justify-center rounded-full" style={{ background: C.line }}>
-        <span className="text-xs" style={{ color: C.inkFaint }}>No data yet</span>
-      </div>
-    );
+function formatStatus(campaign: Campaign, completedIds: Set<number>) {
+  if (completedIds.has(campaign.id)) return 'Completed';
+  switch (campaign.status) {
+    case 'published': return 'Open';
+    case 'in_progress': return 'Booked';
+    case 'completed': return 'Completed';
+    case 'closed': return 'Closed';
+    default: return String(campaign.status).replace('_', ' ');
   }
-  let acc = 0;
-  const stops = segments
-    .map((seg) => {
-      const start = (acc / total) * 360;
-      acc += seg.value;
-      const end = (acc / total) * 360;
-      return `${seg.color} ${start}deg ${end}deg`;
-    })
-    .join(', ');
+}
+
+function statusTone(campaign: Campaign, completedIds: Set<number>) {
+  const status = completedIds.has(campaign.id) ? 'completed' : campaign.status;
+  switch (status) {
+    case 'published': return 'open';
+    case 'in_progress': return 'booked';
+    case 'completed': return 'completed';
+    default: return 'closed';
+  }
+}
+
+function imageFor(campaign: Campaign) {
+  return mediaUrl(campaign.hero_image || campaign.extra_photos?.[0]);
+}
+
+function isThisMonth(campaign: Campaign) {
+  const raw = campaign.created_at || campaign.updated_at;
+  if (!raw) return false;
+  const date = new Date(raw);
+  if (Number.isNaN(date.getTime())) return false;
+  const now = new Date();
+  return date.getFullYear() === now.getFullYear() && date.getMonth() === now.getMonth();
+}
+
+function isOpen(campaign: Campaign, completedIds: Set<number>) {
+  return !completedIds.has(campaign.id) && campaign.status === 'published';
+}
+
+function isBooked(campaign: Campaign, completedIds: Set<number>) {
+  return !completedIds.has(campaign.id) && campaign.status === 'in_progress';
+}
+
+function isCompleted(campaign: Campaign, completedIds: Set<number>) {
+  return campaign.status === 'completed' || completedIds.has(campaign.id);
+}
+
+function isPast(campaign: Campaign, completedIds: Set<number>) {
+  return isCompleted(campaign, completedIds) || campaign.status === 'closed';
+}
+
+function isNewThisWeek(campaign: Campaign) {
+  const raw = campaign.created_at;
+  if (!raw) return false;
+  const date = new Date(raw);
+  if (Number.isNaN(date.getTime())) return false;
+  const days = (Date.now() - date.getTime()) / 86400000;
+  return days <= 7;
+}
+
+function matchesPriceRange(campaign: Campaign, range: PriceRange) {
+  if (range === 'all') return true;
+  const budget = Number(campaign.budget) || 0;
+  if (range === '100000+') return budget >= 100000;
+  const [min, max] = range.split('-').map(Number);
+  return budget >= min && budget < max;
+}
+
+/* ---------- Small inline icons (no external deps) ---------- */
+type IconProps = { size?: number };
+const IconEye = ({ size = 16 }: IconProps) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7-11-7-11-7Z"/><circle cx="12" cy="12" r="3"/></svg>
+);
+const IconSend = ({ size = 16 }: IconProps) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m22 2-7 20-4-9-9-4Z"/><path d="M22 2 11 13"/></svg>
+);
+const IconUsers = ({ size = 16 }: IconProps) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+);
+const IconMegaphone = ({ size = 16 }: IconProps) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m3 11 18-5v12L3 13v-2Z"/><path d="M11.6 16.8a3 3 0 1 1-5.8-1.6"/></svg>
+);
+const IconStar = ({ size = 16 }: IconProps) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m12 2 3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2Z"/></svg>
+);
+const IconBell = ({ size = 16 }: IconProps) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/></svg>
+);
+const IconGrid = ({ size = 14 }: IconProps) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>
+);
+const IconTag = ({ size = 14 }: IconProps) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 2H2v10l9.29 9.29a2 2 0 0 0 2.83 0l7.17-7.17a2 2 0 0 0 0-2.83L12 2Z"/><circle cx="7" cy="7" r="1.5"/></svg>
+);
+const IconFileCheck = ({ size = 16 }: IconProps) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8Z"/><path d="M14 2v6h6"/><path d="m9 15 2 2 4-4"/></svg>
+);
+const IconCheckCircle = ({ size = 16 }: IconProps) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><path d="m9 12 2 2 4-4"/></svg>
+);
+const IconHeart = ({ size = 16, filled = false }: IconProps & { filled?: boolean }) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill={filled ? 'currentColor' : 'none'} stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M19 14c1.49-1.46 3-3.21 3-5.5A5.5 5.5 0 0 0 16.5 3c-1.76 0-3 .5-4.5 2-1.5-1.5-2.74-2-4.5-2A5.5 5.5 0 0 0 2 8.5c0 2.3 1.5 4.05 3 5.5l7 7Z"/></svg>
+);
+const IconLeaf = ({ size = 14 }: IconProps) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M11 20A7 7 0 0 1 9.8 6.1C15.5 5 17 4.48 19 2c1 2 2 4.18 2 8 0 5.5-4.78 10-10 10Z"/><path d="M2 21c0-3 1.85-5.36 5.08-6C9.5 14.52 11 13 11 11"/></svg>
+);
+const IconGift = ({ size = 16 }: IconProps) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="8" width="18" height="4" rx="1"/><path d="M12 8v13"/><path d="M19 12v7a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2v-7"/><path d="M7.5 8a2.5 2.5 0 0 1 0-5C11 3 12 8 12 8"/><path d="M16.5 8a2.5 2.5 0 0 0 0-5C13 3 12 8 12 8"/></svg>
+);
+const IconCalendar = ({ size = 16 }: IconProps) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4"/><path d="M8 2v4"/><path d="M3 10h18"/></svg>
+);
+const IconChevronRight = ({ size = 16 }: IconProps) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m9 18 6-6-6-6"/></svg>
+);
+const IconZap = ({ size = 16 }: IconProps) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M13 2 3 14h9l-1 8 10-12h-9l1-8Z"/></svg>
+);
+
+function StatIcon({ tone, children }: { tone: 'green' | 'purple' | 'orange' | 'pink' | 'blue'; children: React.ReactNode }) {
+  const tones: Record<string, { bg: string; fg: string }> = {
+    green: { bg: '#E4F7EC', fg: '#16834a' },
+    purple: { bg: '#EFEBFE', fg: '#6D4DFF' },
+    orange: { bg: '#FFF3DF', fg: '#B87400' },
+    pink: { bg: '#FDE9F1', fg: '#D2418C' },
+    blue: { bg: '#E9EDFB', fg: '#1E2A78' },
+  };
+  const t = tones[tone];
   return (
-    <div className="relative flex h-32 w-32 items-center justify-center rounded-full" style={{ background: `conic-gradient(${stops})` }}>
-      <div className="flex h-[72px] w-[72px] flex-col items-center justify-center rounded-full" style={{ background: C.card }}>
-        <span className="text-lg font-bold" style={{ color: C.ink }}>{total}</span>
-        <span className="text-[10px]" style={{ color: C.inkFaint }}>Total</span>
+    <span className="stat-icon" style={{ background: t.bg, color: t.fg }}>
+      {children}
+    </span>
+  );
+}
+
+function activityKindFromTitle(title?: string | null): 'created' | 'completed' | 'applications' {
+  const text = (title || '').toLowerCase();
+  if (text.includes('completed')) return 'completed';
+  if (text.includes('application')) return 'applications';
+  return 'created';
+}
+
+function creatorInitials(name?: string | null) {
+  if (!name) return 'C';
+  return name.split(' ').map((part) => part[0]).join('').slice(0, 2).toUpperCase();
+}
+
+function galleryImages(campaign: Campaign) {
+  const extras = Array.isArray(campaign.extra_photos) ? campaign.extra_photos : [];
+  return Array.from(new Set([campaign.hero_image || '', ...extras].filter(Boolean))).map(mediaUrl);
+}
+
+function CampaignCard({
+  campaign,
+  completedCampaignIds,
+  alreadyApplied,
+  isSaved,
+  onToggleSave,
+}: {
+  campaign: Campaign;
+  completedCampaignIds: Set<number>;
+  alreadyApplied: boolean;
+  isSaved: boolean;
+  onToggleSave: (campaignId: number) => void;
+}) {
+  const [imgIndex, setImgIndex] = useState(0);
+  const images = useMemo(() => galleryImages(campaign), [campaign]);
+  const canApply = isOpen(campaign, completedCampaignIds) && !alreadyApplied;
+  const deadline = campaign.deadline ? new Date(campaign.deadline) : null;
+  const deadlineLabel = deadline && !Number.isNaN(deadline.getTime())
+    ? deadline.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+    : 'Open';
+  const activeImg = images[Math.min(imgIndex, images.length - 1)];
+
+  return (
+    <div className="campaign">
+      <div className="media">
+        {activeImg ? <img src={activeImg} alt="" /> : <div className="placeholder">Campaign image</div>}
+        <span className={`tag ${statusTone(campaign, completedCampaignIds)}`}>{formatStatus(campaign, completedCampaignIds)}</span>
+        <button
+          type="button"
+          className={`save-btn ${isSaved ? 'save-btn--active' : ''}`}
+          onClick={(event) => { event.preventDefault(); onToggleSave(campaign.id); }}
+          aria-label={isSaved ? 'Remove from saved' : 'Save campaign'}
+        >
+          <IconHeart size={15} filled={isSaved} />
+        </button>
+        {images.length > 1 && (
+          <div className="media-dots">
+            {images.map((_, index) => (
+              <button
+                type="button"
+                key={index}
+                className={`media-dot ${index === imgIndex ? 'media-dot--active' : ''}`}
+                onClick={(event) => { event.preventDefault(); setImgIndex(index); }}
+                aria-label={`Show photo ${index + 1}`}
+              />
+            ))}
+          </div>
+        )}
+      </div>
+      <div className="body">
+        <Link to={`/campaigns/${campaign.id}`} style={{ textDecoration: 'none', color: 'inherit' }}>
+          <div className="cat-pill"><IconLeaf size={12} /> {campaign.brand_name || 'Brand'} · {campaign.category}</div>
+          <div className="title">{campaign.title}</div>
+          <div className="desc">{campaign.tagline || campaign.description || 'View the brief to see the full campaign details.'}</div>
+        </Link>
+        <div className="row">
+          <span className="pay">{campaign.campaign_type === 'paid' ? money(campaign.budget) : 'Gifted product'}</span>
+          <span className="kind-pill"><IconTag size={12} /> {campaign.creators_needed || 1} creator{(campaign.creators_needed || 1) === 1 ? '' : 's'}</span>
+        </div>
+        <div className="feature-grid">
+          <div className="feature"><span className="feature-icon">{campaign.campaign_type === 'paid' ? <IconTag size={14} /> : <IconGift size={14} />}</span><span>{campaign.campaign_type === 'paid' ? 'Paid campaign' : 'Gifted product'}</span></div>
+          <div className="feature"><span className="feature-icon"><IconCalendar size={14} /></span><span>{deadlineLabel}</span></div>
+          <div className="feature"><span className="feature-icon"><IconUsers size={14} /></span><span>{campaign.creators_needed || 1} needed</span></div>
+          <div className="feature"><span className="feature-icon"><IconFileCheck size={14} /></span><span>{campaign.sub_category || campaign.category || 'General'}</span></div>
+        </div>
+        <div className="card-actions">
+          {canApply ? (
+            <Link className="btn-apply" to={`/campaigns/${campaign.id}?apply=true`}><IconSend size={14} /> Apply</Link>
+          ) : (
+            <span className="btn-apply btn-apply--disabled">
+              {alreadyApplied ? 'Applied' : formatStatus(campaign, completedCampaignIds)}
+            </span>
+          )}
+          <Link className="btn-view" to={`/campaigns/${campaign.id}`}><IconEye size={14} /> View Details</Link>
+        </div>
       </div>
     </div>
   );
-};
-
-// Small helper — status string -> display label + color, used by
-// both the campaign spotlight and the "My Campaigns" list so the two
-// stay visually consistent.
-function statusMeta(status: string | undefined) {
-  switch (status) {
-    case 'published':
-    case 'in_progress':
-      return { label: 'In progress', color: C.mint, bg: C.mintSoft };
-    case 'in_review':
-    case 'review':
-      return { label: 'In review', color: C.sky, bg: C.skySoft };
-    case 'draft':
-      return { label: 'Draft', color: C.inkFaint, bg: C.line };
-    case 'completed':
-      return { label: 'Completed', color: C.violet, bg: C.violetSoft };
-    default:
-      return { label: status || 'Active', color: C.inkSoft, bg: C.line };
-  }
 }
 
-export const Dashboard = () => {
+export function Dashboard() {
   const { user } = useAuth();
+  const isBusiness = user?.role === 'business';
+  const firstName = user?.full_name?.split(' ')[0] || 'there';
 
-  const role = user?.role === 'creator' ? 'creator' : 'business';
-  const primary = role === 'creator' ? C.coral : C.violet;
-  const primarySoft = role === 'creator' ? C.coralSoft : C.violetSoft;
-  const firstName = user?.full_name?.split(' ')[0] ?? 'there';
-
-  // Backs the top stat cards, the campaign spotlight, and the "My
-  // Campaigns" list below. GET /api/applications is already
-  // role-scoped server-side (creators get their own, businesses get
-  // applicants to their campaigns), so no extra filtering needed here.
-  // GET /api/campaigns is the same for the business "Active Campaigns"
-  // count and list. There's deliberately no "Profile Views" / "Earnings"
-  // / "Deliverables Due" / "Spend" fetch — those have no backing model
-  // anywhere in the API yet (no analytics, payments, or deliverable
-  // tracking), so those cards stay at their zero-state below rather
-  // than being wired to numbers that don't exist.
+  const [campaigns, setCampaigns] = useState<Campaign[]>([]);
   const [applications, setApplications] = useState<Application[]>([]);
-  const [ownCampaigns, setOwnCampaigns] = useState<Campaign[]>([]);
+  const [collabs, setCollabs] = useState<Collab[]>([]);
+  const [history, setHistory] = useState<Collab[]>([]);
+  const [payments, setPayments] = useState({ this_month: 0, lifetime: 0 });
+  const [invites, setInvites] = useState<CreatorInvite[]>([]);
+  const [saved, setSaved] = useState<SavedCampaignEntry[]>([]);
+  const [activity, setActivity] = useState<Notification[]>([]);
+  const [suggestedCreators, setSuggestedCreators] = useState<CreatorListItem[]>([]);
+  const [category, setCategory] = useState('All');
+  const [priceRange, setPriceRange] = useState<PriceRange>('all');
+  const [feedFilter, setFeedFilter] = useState<FeedFilter>('all');
+  const [appliedFilter, setAppliedFilter] = useState<AppliedFilter>('all');
+  const [businessTab, setBusinessTab] = useState<'all' | 'published' | 'in_progress' | 'completed' | 'draft'>('all');
+  const [activityVisibleCount, setActivityVisibleCount] = useState(3);
+  const [feedPage, setFeedPage] = useState(1);
+  const [search, setSearch] = useState('');
+  const [loading, setLoading] = useState(true);
+  const [busyCreatorId, setBusyCreatorId] = useState<number | null>(null);
 
   useEffect(() => {
     let cancelled = false;
+    const business = user?.role === 'business';
 
     (async () => {
+      setLoading(true);
       try {
-        const apps = await getApplications();
-        if (!cancelled) setApplications(apps);
-      } catch (err) {
-        console.error('Could not load applications for dashboard stats:', err);
-      }
+        const [campaignData, apps, active, finished, paymentSummary, invitesList, extra] = await Promise.all([
+          getCampaigns({ limit: 50 }),
+          getApplications(),
+          getCollabs(),
+          getCollabHistory(),
+          getPaymentSummary(),
+          getInvites(),
+          business ? Promise.all([getNotifications(), getCreators({ limit: 50 })]) : getSavedCampaigns(),
+        ]);
 
-      if (role === 'business') {
-        try {
-          const data = await getCampaigns({ limit: 50 });
-          if (!cancelled) setOwnCampaigns(data.campaigns);
-        } catch (err) {
-          console.error('Could not load campaigns for dashboard stats:', err);
+        if (cancelled) return;
+
+        const visibleCampaigns = campaignData.campaigns.filter(
+          (campaign) => campaign.status !== 'draft' && campaign.status !== 'cancelled'
+        );
+        const knownIds = new Set(visibleCampaigns.map((campaign) => campaign.id));
+        const historyIds = Array.from(new Set([...active, ...finished].map((collab) => collab.campaign_id)))
+          .filter((campaignId) => !knownIds.has(campaignId));
+
+        let recovered: Campaign[] = [];
+        if (historyIds.length > 0) {
+          const results = await Promise.allSettled(
+            historyIds.slice(0, 20).map((campaignId) => getCampaign(campaignId))
+          );
+          recovered = results
+            .filter((result): result is PromiseFulfilledResult<Campaign> => result.status === 'fulfilled')
+            .map((result) => result.value)
+            .filter((campaign) => campaign.status !== 'draft' && campaign.status !== 'cancelled');
         }
+
+        if (cancelled) return;
+        const merged = [...visibleCampaigns, ...recovered].filter(
+          (campaign, index, all) => all.findIndex((item) => item.id === campaign.id) === index
+        );
+        setCampaigns(merged);
+        setApplications(apps);
+        setCollabs(active);
+        setHistory(finished);
+        setPayments({ this_month: paymentSummary.this_month, lifetime: paymentSummary.lifetime });
+        setInvites(invitesList);
+
+        if (business) {
+          const [notes, creatorData] = extra as [Notification[], { creators: CreatorListItem[] }];
+          setActivity(notes);
+          setSuggestedCreators(creatorData.creators);
+        } else {
+          setSaved(extra as SavedCampaignEntry[]);
+        }
+      } catch (err) {
+        console.error('Could not load dashboard:', err);
+      } finally {
+        if (!cancelled) setLoading(false);
       }
     })();
 
-    return () => {
-      cancelled = true;
-    };
-  }, [role]);
+    return () => { cancelled = true; };
+  }, [user?.role]);
 
-  const acceptedApplications = applications.filter((a) => a.status === 'accepted');
-  const pendingApplications = applications.filter((a) => a.status === 'pending');
-  const rejectedApplications = applications.filter((a) => a.status === 'rejected');
-
-  const activeCollabsCount = acceptedApplications.length;
-  const activeCampaigns = ownCampaigns.filter(
-    (c) => c.status === 'published' || c.status === 'in_progress'
+  const completedCampaignIds = useMemo(
+    () => new Set(history.filter((collab) => collab.status === 'completed').map((collab) => collab.campaign_id)),
+    [history]
   );
-  const activeCampaignsCount = activeCampaigns.length;
 
-  const hour = new Date().getHours();
-  const greeting = hour < 12 ? 'Good morning' : hour < 17 ? 'Good afternoon' : 'Good evening';
+  const categories = useMemo(() => {
+    const fromCampaigns = campaigns.map((campaign) => campaign.category).filter(Boolean) as string[];
+    const values = Array.from(new Set([...MASTER_CATEGORIES, ...fromCampaigns])).sort();
+    return ['All', ...values];
+  }, [campaigns]);
 
-  const profileCompletion = calculateProfileCompletion(user?.profile, role);
-  const profileEditRoute = `/onboarding/${role}`;
+  // Applied campaign ids — computed before `feed` so the applied-status filter can use it.
+  const appliedCampaignIds = useMemo(() => new Set(applications.map((application) => application.campaign_id)), [applications]);
 
-  // Stat cards now carry a tinted background (not just a tinted icon
-  // square) plus a short status caption instead of a fabricated
-  // period-over-period delta — see file header note.
-  const STATS = role === 'creator'
-    ? [
-        { label: 'Active Collabs', value: activeCollabsCount, icon: Briefcase, color: primary, soft: primarySoft, caption: activeCollabsCount > 0 ? 'In progress' : 'None yet' },
-        { label: 'Applications Sent', value: applications.length, icon: Send, color: C.mint, soft: C.mintSoft, caption: pendingApplications.length > 0 ? `${pendingApplications.length} pending` : 'All reviewed' },
-        { label: 'Profile Views', value: 0, icon: Eye, color: C.sky, soft: C.skySoft, caption: 'No views yet' },
-        { label: 'Earnings this month', value: 'Rs. 0', icon: Wallet, color: C.amber, soft: C.amberSoft, caption: 'No payouts yet' },
-      ]
-    : [
-        { label: 'Active Campaigns', value: activeCampaignsCount, icon: Megaphone, color: primary, soft: primarySoft, caption: activeCampaignsCount > 0 ? 'Live now' : 'None yet' },
-        { label: 'Applications Received', value: applications.length, icon: Inbox, color: C.mint, soft: C.mintSoft, caption: pendingApplications.length > 0 ? `${pendingApplications.length} to review` : 'All reviewed' },
-        { label: 'Deliverables Due', value: 0, icon: FileText, color: C.sky, soft: C.skySoft, caption: 'All caught up' },
-        { label: 'Spent this month', value: 'Rs. 0', icon: Wallet, color: C.amber, soft: C.amberSoft, caption: 'No expenses yet' },
-      ];
+  const feed = useMemo(() => {
+    const query = search.trim().toLowerCase();
+    return campaigns
+      .filter((campaign) => {
+        const categoryMatch = category === 'All' || campaign.category === category;
+        const priceMatch = matchesPriceRange(campaign, priceRange);
+        const searchMatch = !query || [campaign.title, campaign.brand_name, campaign.category, campaign.sub_category, campaign.tagline]
+          .filter(Boolean)
+          .some((value) => String(value).toLowerCase().includes(query));
+        let filterMatch = true;
+        switch (feedFilter) {
+          case 'open': filterMatch = isOpen(campaign, completedCampaignIds); break;
+          case 'booked': filterMatch = isBooked(campaign, completedCampaignIds); break;
+          case 'completed': filterMatch = isCompleted(campaign, completedCampaignIds); break;
+          case 'closed': filterMatch = campaign.status === 'closed'; break;
+          case 'this_month': filterMatch = isThisMonth(campaign); break;
+          case 'past': filterMatch = isPast(campaign, completedCampaignIds); break;
+        }
+        let appliedMatch = true;
+        switch (appliedFilter) {
+          case 'applied': appliedMatch = appliedCampaignIds.has(campaign.id); break;
+          case 'not_applied': appliedMatch = !appliedCampaignIds.has(campaign.id); break;
+          case 'new': appliedMatch = isNewThisWeek(campaign); break;
+        }
+        return categoryMatch && priceMatch && searchMatch && filterMatch && appliedMatch;
+      })
+      .sort((a, b) => (new Date(b.updated_at || b.created_at).getTime() || 0) - (new Date(a.updated_at || a.created_at).getTime() || 0));
+  }, [campaigns, category, priceRange, completedCampaignIds, feedFilter, appliedFilter, appliedCampaignIds, search]);
 
-  // Campaign spotlight — when there's something real to show (a
-  // published campaign for business, an accepted collab for creator)
-  // render the light "in progress" card from the reference. Otherwise
-  // fall back to the original dark getting-started prompt.
-  const spotlightCampaign = role === 'business' ? activeCampaigns[0] : undefined;
-  const spotlightCollab = role === 'creator' ? acceptedApplications[0] : undefined;
-  const hasSpotlightContent = role === 'business' ? Boolean(spotlightCampaign) : Boolean(spotlightCollab);
+  // Reset to page 1 whenever the filtered feed changes shape (new filters/search/data)
+  useEffect(() => {
+    setFeedPage(1);
+  }, [category, priceRange, feedFilter, appliedFilter, search, campaigns.length]);
 
-  const emptySpotlight = role === 'creator'
-    ? { title: "You don't have an active collab yet", sub: 'Apply to a campaign to get your first one started.', cta: 'Browse Campaigns', ctaTo: '/campaigns' }
-    : { title: "You haven't launched a campaign yet", sub: 'Create your first campaign to start receiving applications.', cta: 'Create Campaign', ctaTo: '/campaigns/new' };
+  const feedTotalPages = Math.max(1, Math.ceil(feed.length / CAMPAIGNS_PER_PAGE));
+  const currentFeedPage = Math.min(feedPage, feedTotalPages);
+  const pagedFeed = useMemo(
+    () => feed.slice((currentFeedPage - 1) * CAMPAIGNS_PER_PAGE, currentFeedPage * CAMPAIGNS_PER_PAGE),
+    [feed, currentFeedPage]
+  );
 
-  const quickActions = role === 'creator'
-    ? [
-        { label: 'Browse Campaigns', icon: Compass, to: '/campaigns', color: primary },
-        { label: 'Complete Portfolio', icon: FileText, to: '/onboarding/creator', color: C.sky },
-        { label: 'Messages', icon: Send, to: '/messages', color: C.amber },
-      ]
-    : [
-        { label: 'Create Campaign', icon: Compass, to: '/campaigns/new', color: primary },
-        { label: 'Discover Creators', icon: Users, to: '/creators', color: C.sky },
-        { label: 'Review Applications', icon: Inbox, to: '/applications', color: C.amber },
-      ];
+  // Creator-only figures
+  const openCampaignCount = useMemo(
+    () => campaigns.filter((campaign) => isOpen(campaign, completedCampaignIds)).length,
+    [campaigns, completedCampaignIds]
+  );
+  const pendingInvites = useMemo(() => invites.filter((invite) => invite.status === 'pending'), [invites]);
+  const creatorNiches = useMemo(() => {
+    const profile = (user?.profile || {}) as Record<string, any>;
+    const raw = profile.niches || profile.categories || [];
+    return new Set((Array.isArray(raw) ? raw : []).map((value: string) => String(value).toLowerCase()));
+  }, [user?.profile]);
+  const recommended = useMemo(() => {
+    if (creatorNiches.size === 0) return [];
+    return campaigns.filter(
+      (campaign) =>
+        isOpen(campaign, completedCampaignIds) &&
+        !appliedCampaignIds.has(campaign.id) &&
+        campaign.category &&
+        creatorNiches.has(campaign.category.toLowerCase())
+    );
+  }, [campaigns, completedCampaignIds, appliedCampaignIds, creatorNiches]);
 
-  // "Quick Tasks" — same underlying checklist as before, restyled as
-  // a tappable list (chevron -> route) instead of a static checklist,
-  // matching the reference. Each task links somewhere real.
-  const quickTasks = role === 'creator'
-    ? [
-        { label: 'Complete your profile', sub: profileCompletion >= 100 ? 'Profile complete' : `${profileCompletion}% done`, done: profileCompletion >= 100, to: profileEditRoute },
-        { label: 'Apply to your first campaign', sub: applications.length > 0 ? `${applications.length} application${applications.length > 1 ? 's' : ''} sent` : 'Browse open campaigns', done: applications.length > 0, to: '/campaigns' },
-        { label: 'Get your first application approved', sub: activeCollabsCount > 0 ? `${activeCollabsCount} accepted` : 'Waiting on a response', done: activeCollabsCount > 0, to: '/applications' },
-      ]
-    : [
-        { label: 'Review applications', sub: pendingApplications.length > 0 ? `${pendingApplications.length} new application${pendingApplications.length > 1 ? 's' : ''}` : 'All caught up', done: applications.length > 0 && pendingApplications.length === 0, to: '/applications' },
-        { label: 'Publish your first campaign', sub: activeCampaignsCount > 0 ? `${activeCampaignsCount} live` : 'Get started with your brand', done: activeCampaignsCount > 0, to: '/campaigns/new' },
-        { label: 'Update your profile', sub: profileCompletion >= 100 ? 'Profile complete' : 'Complete your brand profile', done: profileCompletion >= 100, to: profileEditRoute },
-      ];
+  const savedCampaignIds = useMemo(() => new Set(saved.map((entry) => entry.campaign_id)), [saved]);
 
-  // Application Status donut — real counts. The reference screenshot's
-  // "Draft" segment doesn't map to anything the Application type has
-  // (accepted / pending / rejected), so that slot is "Rejected" here.
-  const statusSegments = [
-    { value: acceptedApplications.length, color: C.mint, label: 'Approved' },
-    { value: pendingApplications.length, color: C.amber, label: 'In review' },
-    { value: rejectedApplications.length, color: C.inkFaint, label: 'Rejected' },
-  ];
+  const handleToggleSave = async (campaignId: number) => {
+    const currentlySaved = savedCampaignIds.has(campaignId);
+    // Optimistic update
+    setSaved((previous) =>
+      currentlySaved
+        ? previous.filter((entry) => entry.campaign_id !== campaignId)
+        : [...previous, { campaign_id: campaignId } as SavedCampaignEntry]
+    );
+    try {
+      if (currentlySaved) await unsaveCampaign(campaignId);
+      else await saveCampaign(campaignId);
+    } catch (err) {
+      console.error('Could not update saved campaign:', err);
+      // Revert on failure
+      setSaved((previous) =>
+        currentlySaved
+          ? [...previous, { campaign_id: campaignId } as SavedCampaignEntry]
+          : previous.filter((entry) => entry.campaign_id !== campaignId)
+      );
+    }
+  };
 
-  const discoveryPromo = role === 'creator'
-    ? { title: 'Get discovered by the right brands.', sub: 'Complete your portfolio and browse open campaigns that match your niche.', cta: 'Browse campaigns', to: '/campaigns' }
-    : { title: 'Get better results with the right creators.', sub: 'Explore our creator database and find perfect matches for your brand.', cta: 'Discover creators', to: '/creators' };
+  // Business-only figures
+  const pendingCount = applications.filter((application) => application.status === 'pending').length;
+  const completedCampaigns = campaigns.filter((campaign) => campaign.status === 'completed').length +
+    history.filter((collab) => collab.status === 'completed' && !campaigns.some((campaign) => campaign.id === collab.campaign_id)).length;
+  const activeCreators = new Set(collabs.map((collab) => collab.creator_id)).size;
+  const totalApplications = applications.length;
+  const pendingInvitesSent = useMemo(() => invites.filter((invite) => invite.status === 'pending'), [invites]);
+  const businessNiches = useMemo(() => {
+    const profile = (user?.profile || {}) as Record<string, any>;
+    const raw = profile.interested_categories || [];
+    return new Set((Array.isArray(raw) ? raw : []).map((value: string) => String(value).toLowerCase()));
+  }, [user?.profile]);
+  const recommendedCreators = useMemo(() => {
+    if (businessNiches.size === 0) return [];
+    return suggestedCreators.filter(
+      (creator) =>
+        !creator.is_shortlisted &&
+        (creator.categories || []).some((value) => businessNiches.has(String(value).toLowerCase()))
+    );
+  }, [suggestedCreators, businessNiches]);
+
+  // Categories this brand actually runs campaigns in — used to prioritize the
+  // "Suggested Creators" list (e.g. a food brand sees food creators first).
+  const brandCampaignCategories = useMemo(
+    () => new Set(campaigns.map((campaign) => campaign.category).filter(Boolean).map((value) => String(value).toLowerCase())),
+    [campaigns]
+  );
+
+  const suggestedCreatorsRanked = useMemo(() => {
+    const query = search.trim().toLowerCase();
+    const filtered = query
+      ? suggestedCreators.filter((creator) =>
+          [creator.display_name, creator.username, ...(creator.categories || [])]
+            .filter(Boolean)
+            .some((value) => String(value).toLowerCase().includes(query))
+        )
+      : suggestedCreators;
+    return [...filtered].sort((a, b) => {
+      const aMatch = (a.categories || []).some((value) => brandCampaignCategories.has(String(value).toLowerCase()));
+      const bMatch = (b.categories || []).some((value) => brandCampaignCategories.has(String(value).toLowerCase()));
+      if (aMatch !== bMatch) return aMatch ? -1 : 1;
+      return (b.avg_rating || 0) - (a.avg_rating || 0);
+    });
+  }, [suggestedCreators, brandCampaignCategories, search]);
+
+  const toggleCreatorShortlist = async (creator: CreatorListItem) => {
+    setBusyCreatorId(creator.id);
+    try {
+      if (creator.is_shortlisted) await unshortlistCreator(creator.id);
+      else await shortlistCreator(creator.id);
+      setSuggestedCreators((prev) =>
+        prev.map((c) => (c.id === creator.id ? { ...c, is_shortlisted: !c.is_shortlisted } : c))
+      );
+    } catch (err) {
+      console.error('Could not update shortlist:', err);
+    } finally {
+      setBusyCreatorId(null);
+    }
+  };
+
+  const derivedActivity = useMemo(() => {
+    type Item = { id: string; title: string; time: string; campaignId: number; kind: 'created' | 'completed' | 'applications' };
+    const items: Item[] = [];
+
+    campaigns.forEach((campaign) => {
+      if (campaign.created_at) {
+        items.push({ id: `created-${campaign.id}`, title: `Campaign "${campaign.title}" was created`, time: campaign.created_at, campaignId: campaign.id, kind: 'created' });
+      }
+      if ((campaign.status === 'completed' || completedCampaignIds.has(campaign.id)) && (campaign.updated_at || campaign.created_at)) {
+        items.push({ id: `completed-${campaign.id}`, title: `Campaign "${campaign.title}" was completed`, time: campaign.updated_at || campaign.created_at!, campaignId: campaign.id, kind: 'completed' });
+      }
+      if (campaign.application_count > 0 && (campaign.updated_at || campaign.created_at)) {
+        items.push({
+          id: `apps-${campaign.id}`,
+          title: `${campaign.application_count} application${campaign.application_count === 1 ? '' : 's'} received for "${campaign.title}"`,
+          time: campaign.updated_at || campaign.created_at!,
+          campaignId: campaign.id,
+          kind: 'applications',
+        });
+      }
+    });
+
+    return items.sort((a, b) => new Date(b.time).getTime() - new Date(a.time).getTime());
+  }, [campaigns, completedCampaignIds]);
+
+  const activitySource = activity.length > 0 ? activity : derivedActivity;
+
+  const businessTabCounts = useMemo(() => ({
+    all: campaigns.length,
+    published: campaigns.filter((c) => c.status === 'published').length,
+    in_progress: campaigns.filter((c) => c.status === 'in_progress').length,
+    completed: campaigns.filter((c) => c.status === 'completed' || completedCampaignIds.has(c.id)).length,
+    draft: campaigns.filter((c) => c.status === 'draft').length,
+  }), [campaigns, completedCampaignIds]);
+
+  const businessCampaignList = useMemo(() => {
+    if (businessTab === 'all') return campaigns;
+    if (businessTab === 'completed') return campaigns.filter((c) => c.status === 'completed' || completedCampaignIds.has(c.id));
+    return campaigns.filter((c) => c.status === businessTab);
+  }, [campaigns, businessTab, completedCampaignIds]);
+
+  const greetingTime = new Date().getHours() < 12 ? 'morning' : new Date().getHours() < 17 ? 'afternoon' : 'evening';
 
   return (
     <AppLayout
-      title={`${greeting}, ${firstName} 👋`}
-      subtitle={role === 'creator' ? "Here's what's happening with your collabs today." : "Here's what's happening with your campaigns today."}
-      actionLabel={role === 'creator' ? 'Apply' : 'New Campaign'}
-      actionTo={role === 'creator' ? '/campaigns' : '/campaigns/new'}
+      title={undefined}
+      subtitle={undefined}
+      searchValue={search}
+      onSearchChange={setSearch}
+      searchPlaceholder={isBusiness ? 'Search creators by name or niche…' : 'Search campaigns…'}
+      actionLabel={isBusiness ? 'Create Campaign' : 'Browse Campaigns'}
+      actionTo={isBusiness ? '/campaigns/new' : '/campaigns'}
     >
-      <main className="grid grid-cols-1 gap-5 px-6 pb-10 lg:grid-cols-[1fr_320px]">
-        <div>
-          {/* Stat cards — tinted background per card, short status
-              caption instead of a fabricated delta */}
-          <div className="grid grid-cols-2 gap-4 xl:grid-cols-4">
-            {STATS.map((s) => (
-              <div key={s.label} className="rounded-xl p-4" style={{ background: s.soft }}>
-                <div className="text-xs font-medium" style={{ color: C.inkSoft }}>{s.label}</div>
-                <div className="mt-2 text-xl font-bold" style={{ color: C.ink }}>{s.value}</div>
-                <div className="mt-1.5 text-[11px] font-medium" style={{ color: s.color }}>{s.caption}</div>
-              </div>
-            ))}
-          </div>
+      <style>{`
+        .dash{max-width:1180px;margin:0 auto;padding:28px 28px 76px;color:#1A1625}
 
-          {/* Campaign / collab spotlight — light "in progress" card
-              when there's something real to show, dark
-              getting-started prompt otherwise. */}
-          {hasSpotlightContent && role === 'business' && spotlightCampaign ? (
-            <div className="relative mt-5 overflow-hidden rounded-2xl border p-6 sm:flex sm:items-center sm:justify-between sm:gap-6" style={{ borderColor: C.line, background: '#FBFAFF' }}>
-              <div className="max-w-md">
-                <div className="flex items-center gap-1.5 text-xs font-semibold" style={{ color: C.mint }}>
-                  <span className="h-1.5 w-1.5 rounded-full" style={{ background: C.mint }} />
-                  {statusMeta(spotlightCampaign.status).label === 'In progress' ? 'Campaign in progress' : statusMeta(spotlightCampaign.status).label}
+        .hero{display:grid;grid-template-columns:minmax(0,1.6fr) minmax(240px,.9fr);gap:18px;align-items:stretch;margin-bottom:24px}
+        .hero-main{position:relative;overflow:hidden;background:linear-gradient(120deg, #F4F1FE 0%, #F7EEFE 45%, #FDF1F6 100%);border:1px solid #EEE9FB;border-radius:18px;padding:28px 30px;display:grid;grid-template-columns:minmax(0,1fr) minmax(240px,380px);align-items:center;gap:14px}
+        .hero-copy-col{position:relative;z-index:1}
+        .hero-kicker{font-size:10px;letter-spacing:.09em;text-transform:uppercase;font-weight:700;color:#8B8697}
+        .hero-title{margin:6px 0 0;font-size:27px;line-height:1.15;letter-spacing:-.6px;font-weight:750;color:#1A1625}
+        .hero-title-accent{color:#1E2A78}
+        .hero-copy{margin:9px 0 0;color:#6B6478;font-size:12.5px;line-height:1.65;max-width:480px}
+        .hero-cta{display:inline-flex;align-items:center;gap:7px;margin-top:16px;width:fit-content;padding:11px 18px;border-radius:10px;background:var(--accent);color:#fff;text-decoration:none;font-size:12.5px;font-weight:650}
+        .hero-illustration-wrap{position:relative;z-index:1;display:flex;align-items:center;justify-content:center}
+        .hero-illustration-wrap img{width:100%;max-width:380px;height:auto;object-fit:contain}
+
+        .hero-stats{background:#fff;border:1px solid #EAE7F2;border-radius:18px;padding:22px;display:flex;flex-direction:column}
+        .hero-stats-title{display:flex;align-items:center;justify-content:space-between;font-size:11px;font-weight:700;color:#6B6478;text-transform:uppercase;letter-spacing:.07em}
+        .hero-stats-title a{text-transform:none;font-weight:700;font-size:11px;letter-spacing:0;color:var(--accent);text-decoration:none}
+        .hero-stats-rows{flex:1;display:flex;flex-direction:column;justify-content:space-evenly}
+        .hero-stat-row{display:flex;justify-content:space-between;align-items:center;gap:10px;padding:13px 0;border-bottom:1px solid #EAE7F2}
+        .hero-stat-row:last-child{border-bottom:0;padding-bottom:0}
+        .hero-stat-row .label-group{display:flex;align-items:center;gap:9px}
+        .hero-stat-row span{font-size:11.5px;color:#6B6478;font-weight:600}
+        .hero-stat-row strong{font-size:19px;font-weight:700;color:#1A1625}
+        .hero-stat-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:12px}
+        .overview-card{border:0;border-radius:14px;padding:14px;background:var(--accent-tint)}
+        .overview-card small{display:block;color:#A39DB8;font-size:10px;font-weight:650}
+        .overview-card strong{display:block;margin-top:6px;font-size:19px;font-weight:700;color:#1A1625}
+
+        .stat-icon{display:inline-flex;align-items:center;justify-content:center;width:34px;height:34px;border-radius:10px;flex:0 0 auto}
+
+        .stats{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin-bottom:24px}
+        .stat{border:0;border-radius:16px;padding:16px 18px;display:flex;align-items:center;gap:13px}
+        .stat:nth-child(1){background:#E6F9EF}
+        .stat:nth-child(2){background:#EFEBFE}
+        .stat:nth-child(3){background:#FFF2DF}
+        .stat-body small{display:block;color:#A39DB8;font-size:10px;font-weight:650}.stat-body strong{display:block;margin-top:4px;color:#1A1625;font-size:20px;font-weight:700;letter-spacing:-.2px}
+
+        .section-head{margin:28px 0 14px}.section-head h2{margin:0;font-size:18px;font-weight:700;letter-spacing:-.2px;color:#1A1625}.section-head p{margin:4px 0 0;color:#A39DB8;font-size:11.5px;line-height:1.5}
+        .feed-controls{display:flex;gap:9px;align-items:center;flex-wrap:wrap;margin-bottom:16px}
+        .feed-label{font-size:10px;font-weight:650;color:#6B6478}
+
+        /* Coral pill by default (white text), flips to white bg / black text while its dropdown is open */
+        .filter-pill{display:flex;align-items:center;gap:7px;height:36px;padding:0 16px;border:1px solid var(--accent);border-radius:999px;background:var(--accent);color:#fff;transition:background .15s ease,color .15s ease}
+        .filter-pill:focus-within{background:#fff;color:#1A1625}
+        .feed-select{border:0;background:transparent;color:inherit;font:650 11.5px -apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;outline:none;min-width:120px;accent-color:var(--accent)}
+        .feed-select:focus{outline:none}
+
+        .feed{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:18px;align-items:start}
+        .campaign{display:flex;flex-direction:column;height:100%;background:#fff;border:1px solid #EAE7F2;border-radius:18px;overflow:hidden;color:inherit;transition:box-shadow .15s ease,transform .15s ease}
+        .campaign:hover{box-shadow:0 10px 26px rgba(20,20,30,.07);transform:translateY(-2px)}
+
+        .media{aspect-ratio:1.35/1;background:#F5F4FA;overflow:hidden;position:relative;flex:0 0 auto}
+        .media img{width:100%;height:100%;object-fit:cover;display:block}
+        .placeholder{height:100%;display:grid;place-items:center;color:#A39DB8;font-size:11px}
+        .tag{position:absolute;left:12px;top:12px;padding:6px 10px;border-radius:999px;background:rgba(255,255,255,.96);font-size:10px;font-weight:700;display:inline-flex;align-items:center;gap:5px}
+        .tag.open{color:#16834a}.tag.booked{color:#1E2A78}.tag.completed{color:#6B6478}.tag.closed{color:#7b7582}
+        .save-btn{position:absolute;right:12px;top:12px;width:34px;height:34px;border-radius:50%;border:0;background:rgba(255,255,255,.96);color:#8B8697;display:flex;align-items:center;justify-content:center;cursor:pointer;box-shadow:0 3px 10px rgba(20,20,30,.12)}
+        .save-btn--active{color:var(--accent)}
+        .media-dots{position:absolute;left:0;right:0;bottom:11px;display:flex;justify-content:center;gap:6px}
+        .media-dot{width:6px;height:6px;border-radius:50%;border:0;padding:0;background:rgba(255,255,255,.65);cursor:pointer}
+        .media-dot--active{background:#fff;width:16px;border-radius:4px}
+
+        /* body becomes a flex column so the actions row always sits at the bottom, aligned across cards */
+        .body{padding:16px;display:flex;flex-direction:column;flex:1 1 auto}
+        .body > a{display:block}
+        .cat-pill{display:inline-flex;align-items:center;gap:6px;padding:5px 10px;border-radius:999px;background:var(--accent-tint);color:var(--accent);font-size:10px;font-weight:650}
+        .title{
+          font-size:16px;font-weight:700;line-height:1.32;margin-top:9px;color:#1A1625;
+          display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;overflow:hidden;min-height:42px
+        }
+        .desc{font-size:11.5px;line-height:1.6;color:#6B6478;margin-top:5px;display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;overflow:hidden;min-height:37px}
+        .row{display:flex;justify-content:space-between;align-items:center;gap:10px;margin-top:13px}
+        .pay{font-size:16px;font-weight:700;color:#1A1625}
+        .kind-pill{display:inline-flex;align-items:center;gap:5px;padding:5px 9px;border-radius:999px;background:var(--accent-tint);color:var(--accent);font-size:10px;font-weight:650}
+
+        .feature-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-top:14px;padding-top:13px;border-top:1px solid #EAE7F2}
+        .feature{display:flex;flex-direction:column;align-items:center;gap:6px;text-align:center;font-size:9px;color:#6B6478;font-weight:550;line-height:1.3}
+        .feature span{display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;overflow:hidden;min-height:23px}
+        .feature-icon{width:30px;height:30px;border-radius:50%;background:var(--accent-tint);color:var(--accent);display:flex;align-items:center;justify-content:center;flex:0 0 auto}
+
+        /* pushed to the bottom of the flex column + margin-top:auto keeps every card's button row on the same baseline */
+        .card-actions{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:auto;padding-top:14px}
+        .btn-apply,.btn-view{display:flex;align-items:center;justify-content:center;gap:6px;height:40px;border-radius:11px;font-size:12px;font-weight:650;text-decoration:none;text-align:center;transition:filter .15s ease,background .15s ease}
+        .btn-apply{background:var(--accent);color:#fff;border:1px solid var(--accent)}
+        .btn-apply:hover{filter:brightness(0.94)}
+        .btn-apply--disabled{opacity:.55;pointer-events:none}
+        .btn-view{background:#fff;color:#1A1625;border:1px solid #EAE7F2}
+        .btn-view:hover{background:#F7F6FB}
+
+        .feed-pagination{display:flex;align-items:center;justify-content:center;gap:14px;margin-top:22px}
+        .page-btn{display:inline-flex;align-items:center;gap:6px;height:38px;padding:0 18px;border-radius:999px;border:1px solid var(--accent);background:#fff;color:var(--accent);font:650 11.5px -apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;cursor:pointer}
+        .page-btn:disabled{opacity:.4;cursor:not-allowed}
+        .page-status{font-size:11px;font-weight:650;color:#6B6478}
+
+        .hero--solo{grid-template-columns:1fr}
+
+        .campaign-list{margin-top:14px;display:flex;flex-direction:column;gap:12px}
+        .campaign-row{display:flex;align-items:center;gap:14px;padding:12px;border:1px solid #EAE7F2;border-radius:14px;text-decoration:none;color:inherit;transition:box-shadow .15s ease,transform .15s ease}
+        .campaign-row:hover{box-shadow:0 8px 20px rgba(20,20,30,.06);transform:translateY(-1px)}
+        .campaign-row-media{position:relative;flex:0 0 auto;width:92px;height:92px;border-radius:12px;overflow:hidden;background:#F5F4FA}
+        .campaign-row-media img{width:100%;height:100%;object-fit:cover;display:block}
+        .campaign-row-media .tag{left:6px;top:6px;padding:4px 8px;font-size:9px}
+        .campaign-row-body{flex:1;min-width:0}
+        .campaign-row-title{font-size:14px;font-weight:700;color:#1A1625;margin-top:7px;line-height:1.3}
+        .campaign-row-price{font-size:14px;font-weight:700;color:#1A1625;margin-top:5px}
+        .campaign-row-meta{display:flex;flex-wrap:wrap;gap:14px;margin-top:7px;font-size:11px;color:#6B6478;font-weight:600}
+        .campaign-row-meta span{display:inline-flex;align-items:center;gap:5px}
+        .campaign-row-created{display:flex;align-items:center;gap:5px;margin-top:7px;font-size:10px;color:#A39DB8}
+        .campaign-row-action{flex:0 0 auto;display:flex;align-items:center;gap:6px;color:#C9C4D9}
+        .btn-view-sm{padding:9px 16px;border-radius:10px;background:var(--accent-tint);color:var(--accent);font-size:11.5px;font-weight:650;white-space:nowrap}
+
+        .activity--scroll{max-height:305px;overflow-y:auto;padding-right:4px}
+        .activity--scroll::-webkit-scrollbar{width:5px}
+        .activity--scroll::-webkit-scrollbar-thumb{background:#E2DEEF;border-radius:99px}
+
+        .brand-side-col{display:flex;flex-direction:column;gap:16px}
+        .panel-head{display:flex;align-items:center;justify-content:space-between;gap:10px}
+        .panel-head-title{display:flex;align-items:center;gap:8px;font-size:14px;font-weight:700;color:#1A1625}
+        .panel-head-title .icon-badge{width:26px;height:26px;border-radius:8px;background:var(--accent-tint);color:var(--accent);display:flex;align-items:center;justify-content:center}
+
+        .brand-layout{display:grid;grid-template-columns:minmax(0,1.45fr) minmax(300px,.75fr);gap:16px;align-items:start}.panel{background:#fff;border:1px solid #EAE7F2;border-radius:18px;padding:21px}
+        .panel--compact{padding:18px}
+        .tabs{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px}
+        .tab-btn{height:32px;padding:0 14px;border-radius:999px;border:1px solid #EAE7F2;background:#fff;color:#6B6478;font:600 11px -apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;cursor:pointer}
+        .tab-btn.active{background:#1E2A78;border-color:#1E2A78;color:#fff}
+        .list{margin-top:10px}.item{display:flex;justify-content:space-between;gap:14px;align-items:center;padding:14px 0;border-bottom:1px solid #EAE7F2}.item:last-child{border-bottom:0}.item-title{font-size:12.5px;font-weight:650;color:#1A1625}.item-meta{font-size:10.5px;color:#A39DB8;margin-top:3px}.meter{height:5px;background:#F5F4FA;border-radius:99px;overflow:hidden;margin-top:7px}.meter span{display:block;height:100%;background:#1E2A78}.mini-link{color:#1E2A78;font-size:10.5px;font-weight:700;text-decoration:none}
+        .mini-btn{color:#1E2A78;font-size:10.5px;font-weight:700;text-decoration:none;background:none;border:0;cursor:pointer;padding:0;font-family:inherit}
+        .summary{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-top:18px}.summary-card{padding:14px;border:0;border-radius:14px;background:var(--accent-tint)}.summary-label{font-size:10px;color:#A39DB8}.summary-value{font-size:18px;font-weight:700;margin-top:3px;color:#1A1625}.summary-note{font-size:9.5px;color:#A39DB8;margin-top:3px}
+
+        .activity{display:grid;gap:0}.activity-item{display:flex;gap:11px;padding:14px 0;border-bottom:1px solid #EAE7F2;color:inherit;text-decoration:none}.activity-item:last-child{border-bottom:0}
+        .activity-item--clickable{cursor:pointer;margin:0 -10px;padding-left:10px;padding-right:10px;border-radius:10px;transition:background .15s ease}
+        .activity-item--clickable:hover{background:var(--accent-tint)}
+        .activity-dot{width:7px;height:7px;border-radius:50%;background:#EAE7F2;margin-top:5px;flex:0 0 auto}
+        .activity-dot.unread{box-shadow:0 0 0 3px rgba(30,42,120,0.14)}
+        .activity-dot--completed{background:#1DB876}
+        .activity-dot--applications{background:#FFB020}
+        .activity-dot--created{background:#C9C4D9}
+        .activity-title{font-size:12px;font-weight:650;color:#1A1625;line-height:1.4}.activity-time{font-size:10px;color:#A39DB8;margin-top:3px}
+
+        .creator-suggest-list{margin-top:12px;display:flex;flex-direction:column;gap:9px}
+        .creator-suggest-item{display:flex;align-items:center;gap:10px;padding:9px;border:1px solid #EAE7F2;border-radius:12px;text-decoration:none;color:inherit;transition:box-shadow .15s ease,transform .15s ease}
+        .creator-suggest-item:hover{box-shadow:0 6px 16px rgba(20,20,30,.06);transform:translateY(-1px)}
+        .creator-suggest-avatar{width:36px;height:36px;border-radius:50%;background:var(--accent);color:#fff;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:12.5px;flex:0 0 auto;object-fit:cover}
+        .creator-suggest-body{flex:1;min-width:0}
+        .creator-suggest-name{font-size:12px;font-weight:700;color:#1A1625;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+        .creator-suggest-username{font-size:10.5px;color:#A39DB8;font-weight:600;margin-top:1px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+        .creator-suggest-meta{display:flex;align-items:center;gap:6px;margin-top:4px;flex-wrap:wrap}
+        .creator-suggest-rating{display:inline-flex;align-items:center;gap:3px;font-size:10px;color:#6B6478;font-weight:650}
+        .creator-suggest-rating svg{color:#FFB020}
+        .creator-suggest-tag{font-size:9px;font-weight:650;padding:3px 8px;border-radius:999px;background:#F5F4FA;color:#6B6478}
+        .creator-suggest-tag--match{background:var(--accent-tint);color:var(--accent)}
+        .creator-suggest-heart{border:0;background:transparent;cursor:pointer;color:#C9C4D9;padding:4px;flex:0 0 auto}
+        .creator-suggest-heart--active{color:var(--accent)}
+        .creator-suggest-heart:disabled{opacity:.5;cursor:not-allowed}
+
+        .empty{padding:50px;text-align:center;color:#A39DB8;font-size:12px;border:1px dashed #EAE7F2;border-radius:16px;background:#fff}
+
+        @media(max-width:900px){.feed{grid-template-columns:repeat(2,minmax(0,1fr))}.brand-layout{grid-template-columns:1fr}.hero{grid-template-columns:1fr}.hero-main{grid-template-columns:1fr}.hero-illustration-wrap img{max-width:220px;margin:0 auto}}
+        @media(max-width:620px){.dash{padding:20px 15px 50px}.stats,.summary,.hero-stat-grid{grid-template-columns:1fr}.feed{grid-template-columns:1fr}.campaign{max-width:100%}.campaign-row{flex-wrap:wrap}.campaign-row-action{width:100%;justify-content:flex-end;margin-top:8px}}
+      `}</style>
+
+      <div
+        className="dash"
+        style={{
+          ['--accent' as string]: isBusiness ? '#1E2A78' : '#FF6B5A',
+          ['--accent-dark' as string]: isBusiness ? '#141B52' : '#E85440',
+          ['--accent2' as string]: isBusiness ? '#FF6B5A' : '#1E2A78',
+          ['--accent-tint' as string]: isBusiness ? '#EFF1FB' : '#FFF3F1',
+        }}
+      >
+        {!isBusiness ? (
+          <>
+            <div className="hero">
+              <div className="hero-main">
+                <div className="hero-copy-col">
+                  <div className="hero-kicker">Good {greetingTime}, {firstName}</div>
+                  <h1 className="hero-title">Find your next <span className="hero-title-accent">collaboration.</span></h1>
+                  <p className="hero-copy">Browse paid and gifted brand opportunities in one feed. Open campaigns, booked work, and completed collaborations stay visible so the marketplace feels like a living portfolio.</p>
                 </div>
-                <h2 className="mt-1 text-xl font-bold" style={{ color: C.ink }}>{spotlightCampaign.title}</h2>
-                {spotlightCampaign.description && (
-                  <p className="mt-1 text-sm" style={{ color: C.inkSoft }}>{spotlightCampaign.description}</p>
+                <div className="hero-illustration-wrap">
+                  <img src="/assets/hero-illustration.png" alt="Creator working on a laptop" />
+                </div>
+              </div>
+              <aside className="hero-stats">
+                <div className="hero-stats-title">Your stats</div>
+                <div className="hero-stats-rows">
+                  <div className="hero-stat-row">
+                    <span>Applications sent</span>
+                    <strong>{applications.length}</strong>
+                  </div>
+                  <div className="hero-stat-row">
+                    <span>Active collaborations</span>
+                    <strong>{collabs.length}</strong>
+                  </div>
+                  <div className="hero-stat-row">
+                    <span>Saved campaigns</span>
+                    <strong>{saved.length}</strong>
+                  </div>
+                </div>
+              </aside>
+            </div>
+
+            <div className="stats">
+              <div className="stat">
+                <div className="stat-body"><small>Active campaigns</small><strong>{openCampaignCount}</strong></div>
+              </div>
+              <div className="stat">
+                <div className="stat-body"><small>New invitations</small><strong>{pendingInvites.length}</strong></div>
+              </div>
+              <div className="stat">
+                <div className="stat-body"><small>Recommended for you</small><strong>{recommended.length}</strong></div>
+              </div>
+            </div>
+
+            <div className="section-head">
+              <h2>Explore Campaigns</h2>
+            </div>
+
+            <div className="feed-controls">
+              <div className="filter-pill">
+                <select id="campaign-category-filter" className="feed-select" value={category} onChange={(event) => setCategory(event.target.value)}>
+                  {categories.map((value) => <option key={value} value={value}>{value === 'All' ? 'All Categories' : value}</option>)}
+                </select>
+              </div>
+              <div className="filter-pill">
+                <select id="campaign-price-filter" className="feed-select" value={priceRange} onChange={(event) => setPriceRange(event.target.value as PriceRange)}>
+                  {PRICE_RANGES.map((range) => <option key={range.value} value={range.value}>{range.label}</option>)}
+                </select>
+              </div>
+              <div className="filter-pill">
+                <select id="campaign-applied-filter" className="feed-select" value={appliedFilter} onChange={(event) => setAppliedFilter(event.target.value as AppliedFilter)}>
+                  {APPLIED_FILTERS.map((f) => <option key={f.value} value={f.value}>{f.label}</option>)}
+                </select>
+              </div>
+            </div>
+
+            {loading ? <div className="empty">Loading campaigns…</div> : feed.length === 0 ? <div className="empty">No campaigns match these filters yet.</div> : (
+              <>
+                <div className="feed">
+                  {pagedFeed.map((campaign) => (
+                    <CampaignCard
+                      key={campaign.id}
+                      campaign={campaign}
+                      completedCampaignIds={completedCampaignIds}
+                      alreadyApplied={appliedCampaignIds.has(campaign.id)}
+                      isSaved={savedCampaignIds.has(campaign.id)}
+                      onToggleSave={handleToggleSave}
+                    />
+                  ))}
+                </div>
+
+                {feedTotalPages > 1 && (
+                  <div className="feed-pagination">
+                    <button
+                      type="button"
+                      className="page-btn"
+                      disabled={currentFeedPage <= 1}
+                      onClick={() => setFeedPage((page) => Math.max(1, page - 1))}
+                    >
+                      ← Prev
+                    </button>
+                    <span className="page-status">Page {currentFeedPage} of {feedTotalPages}</span>
+                    <button
+                      type="button"
+                      className="page-btn"
+                      disabled={currentFeedPage >= feedTotalPages}
+                      onClick={() => setFeedPage((page) => Math.min(feedTotalPages, page + 1))}
+                    >
+                      Next →
+                    </button>
+                  </div>
                 )}
-                <Link
-                  to={`/campaigns/${spotlightCampaign.id}`}
-                  className="mt-5 inline-flex items-center gap-1.5 rounded-lg px-4 py-2.5 text-sm font-semibold text-white"
-                  style={{ background: '#15111F' }}
-                >
-                  View campaign <ArrowRight size={14} />
-                </Link>
-              </div>
-              {(spotlightCampaign as any).image_url && (
-                <img
-                  src={(spotlightCampaign as any).image_url}
-                  alt=""
-                  className="mt-5 h-40 w-full rounded-xl object-cover sm:mt-0 sm:h-32 sm:w-56"
-                />
-              )}
-            </div>
-          ) : hasSpotlightContent && role === 'creator' && spotlightCollab ? (
-            <div className="relative mt-5 overflow-hidden rounded-2xl border p-6" style={{ borderColor: C.line, background: '#FBFAFF' }}>
-              <div className="flex items-center gap-1.5 text-xs font-semibold" style={{ color: C.mint }}>
-                <span className="h-1.5 w-1.5 rounded-full" style={{ background: C.mint }} />
-                Active collab
-              </div>
-              <h2 className="mt-1 text-xl font-bold" style={{ color: C.ink }}>{(spotlightCollab as any).campaign_title ?? 'Your accepted campaign'}</h2>
-              <p className="mt-1 text-sm" style={{ color: C.inkSoft }}>You're in! Head to your workspace to see deliverables and message the brand.</p>
-              <Link
-                to="/workspace/active"
-                className="mt-5 inline-flex items-center gap-1.5 rounded-lg px-4 py-2.5 text-sm font-semibold text-white"
-                style={{ background: '#15111F' }}
-              >
-                Go to workspace <ArrowRight size={14} />
-              </Link>
-            </div>
-          ) : (
-            <div className="relative mt-5 overflow-hidden rounded-2xl p-6" style={{ background: 'linear-gradient(120deg, #15111F 40%, #241D38 100%)' }}>
-              <div
-                className="pointer-events-none absolute -right-10 -top-10 h-56 w-56 rounded-full opacity-50"
-                style={{ background: `radial-gradient(circle at 30% 30%, ${primary}, transparent 70%)`, filter: 'blur(10px)' }}
-              />
-              <div className="relative flex items-center gap-1.5 text-xs font-semibold" style={{ color: '#B8AEE8' }}>
-                <CircleDashed size={13} /> Getting started
-              </div>
-              <h2 className="relative mt-1 text-xl font-bold text-white">{emptySpotlight.title}</h2>
-              <p className="relative mt-1 text-sm" style={{ color: '#B7B0C9' }}>{emptySpotlight.sub}</p>
-              <Link
-                to={emptySpotlight.ctaTo}
-                className="relative mt-5 inline-flex items-center gap-1.5 rounded-lg px-4 py-2 text-sm font-semibold text-white"
-                style={{ background: primary }}
-              >
-                {emptySpotlight.cta} <ArrowRight size={14} />
-              </Link>
-            </div>
-          )}
-
-          {/* My Campaigns / My Applications + Recent Activity */}
-          <div className="mt-5 grid grid-cols-1 gap-5 lg:grid-cols-2">
-            <div className="rounded-xl border p-4" style={{ borderColor: C.line, background: C.card }}>
-              <div className="flex items-center justify-between">
-                <h3 className="text-sm font-semibold" style={{ color: C.ink }}>
-                  {role === 'creator' ? 'My Applications' : 'My Campaigns'}
-                </h3>
-                <Link to={role === 'creator' ? '/applications' : '/campaigns'} className="flex items-center gap-1 text-xs font-medium" style={{ color: primary }}>
-                  View all <ArrowRight size={12} />
-                </Link>
+              </>
+            )}
+          </>
+        ) : (
+          <>
+            <div className="hero">
+              <div className="hero-main">
+                <div className="hero-copy-col">
+                  <div className="hero-kicker">Good {greetingTime}, {firstName}</div>
+                  <h1 className="hero-title">Let's create something <span className="hero-title-accent">amazing today.</span></h1>
+                  <p className="hero-copy">Discover talented creators, launch campaigns and grow your brand with authentic collaborations.</p>
+                </div>
+                <div className="hero-illustration-wrap">
+                  <img src="/assets/hero-illustration.png" alt="Brand manager working on a laptop" />
+                </div>
               </div>
 
-              <div className="mt-3 flex flex-col gap-2">
-                {role === 'business' ? (
-                  ownCampaigns.length === 0 ? (
-                    <div className="flex flex-col items-center justify-center py-8 text-center">
-                      <div className="flex h-9 w-9 items-center justify-center rounded-full" style={{ background: primarySoft, color: primary }}>
-                        <Megaphone size={16} />
-                      </div>
-                      <p className="mt-2.5 text-xs font-medium" style={{ color: C.ink }}>No campaigns yet</p>
-                      <p className="mt-1 max-w-[200px] text-[11px]" style={{ color: C.inkFaint }}>Create your first campaign to start receiving applications.</p>
-                    </div>
-                  ) : (
-                    ownCampaigns.slice(0, 3).map((c) => {
-                      const meta = statusMeta(c.status);
-                      return (
-                        <Link
-                          key={c.id}
-                          to={`/campaigns/${c.id}`}
-                          className="flex items-center gap-3 rounded-lg border p-2.5"
-                          style={{ borderColor: C.line }}
-                        >
-                          <div className="flex h-11 w-11 shrink-0 items-center justify-center overflow-hidden rounded-lg" style={{ background: primarySoft, color: primary }}>
-                            {(c as any).image_url ? (
-                              <img src={(c as any).image_url} alt="" className="h-full w-full object-cover" />
-                            ) : (
-                              <Megaphone size={16} />
-                            )}
+              <aside className="panel hero-activity-aside">
+                <div className="panel-head">
+                  <div className="panel-head-title">Recent activity</div>
+                  {activitySource.length > activityVisibleCount && (
+                    <button type="button" className="mini-btn" onClick={() => setActivityVisibleCount((count) => count + 5)}>See more →</button>
+                  )}
+                </div>
+                <div className="activity activity--scroll">
+                  {activitySource.length > 0 ? (
+                    activity.length > 0 ? (
+                      activity.slice(0, activityVisibleCount).map((note) => {
+                        const noteCampaignId = (note as unknown as { campaign_id?: number }).campaign_id;
+                        const noteKind = activityKindFromTitle(note.title);
+                        const content = (
+                          <>
+                            <span className={`activity-dot activity-dot--${noteKind} ${note.is_read ? '' : 'unread'}`} />
+                            <div>
+                              <div className="activity-title">{note.title}{note.message ? ` — ${note.message}` : ''}</div>
+                              <div className="activity-time">{timeAgo(note.created_at)}</div>
+                            </div>
+                          </>
+                        );
+                        return noteCampaignId ? (
+                          <Link className="activity-item activity-item--clickable" key={note.id} to={`/campaigns/${noteCampaignId}`}>
+                            {content}
+                          </Link>
+                        ) : (
+                          <div className="activity-item" key={note.id}>{content}</div>
+                        );
+                      })
+                    ) : (
+                      derivedActivity.slice(0, activityVisibleCount).map((item) => (
+                        <Link className="activity-item activity-item--clickable" key={item.id} to={`/campaigns/${item.campaignId}`}>
+                          <span className={`activity-dot activity-dot--${item.kind}`} />
+                          <div>
+                            <div className="activity-title">{item.title}</div>
+                            <div className="activity-time">{timeAgo(item.time)}</div>
                           </div>
-                          <div className="min-w-0 flex-1">
-                            <div className="truncate text-xs font-semibold" style={{ color: C.ink }}>{c.title}</div>
-                            <div className="mt-0.5 truncate text-[11px]" style={{ color: C.inkFaint }}>
-                              {(c as any).creator_count !== undefined ? `${(c as any).creator_count} creators` : meta.label}
+                        </Link>
+                      ))
+                    )
+                  ) : (
+                    !loading && <div className="empty">No activity yet.</div>
+                  )}
+                </div>
+                {activityVisibleCount > 3 && activitySource.length > 3 && (
+                  <button
+                    type="button"
+                    className="mini-btn"
+                    style={{ marginTop: 10 }}
+                    onClick={() => setActivityVisibleCount(3)}
+                  >
+                    Show less
+                  </button>
+                )}
+                {pendingCount > 0 && (
+                  <Link className="mini-link" to="/applications" style={{ display: 'block', marginTop: 12 }}>
+                    {pendingCount} application{pendingCount === 1 ? '' : 's'} waiting for review →
+                  </Link>
+                )}
+              </aside>
+            </div>
+
+            <div className="brand-layout">
+              <section className="panel">
+                <div className="panel-head">
+                  <div>
+                    <h2 style={{ margin: 0, fontSize: 16, fontWeight: 700 }}>Your Campaigns</h2>
+                    <p style={{ margin: '4px 0 0', color: '#A39DB8', fontSize: 11.5 }}>Manage your active and past campaigns, track progress, and view performance.</p>
+                  </div>
+                  <Link className="mini-link" to="/campaigns" style={{ flex: '0 0 auto' }}>View all →</Link>
+                </div>
+                <div className="tabs">
+                  <button type="button" className={`tab-btn ${businessTab === 'all' ? 'active' : ''}`} onClick={() => setBusinessTab('all')}>All ({businessTabCounts.all})</button>
+                  <button type="button" className={`tab-btn ${businessTab === 'published' ? 'active' : ''}`} onClick={() => setBusinessTab('published')}>Active ({businessTabCounts.published})</button>
+                  <button type="button" className={`tab-btn ${businessTab === 'in_progress' ? 'active' : ''}`} onClick={() => setBusinessTab('in_progress')}>Booked ({businessTabCounts.in_progress})</button>
+                  <button type="button" className={`tab-btn ${businessTab === 'completed' ? 'active' : ''}`} onClick={() => setBusinessTab('completed')}>Completed ({businessTabCounts.completed})</button>
+                  <button type="button" className={`tab-btn ${businessTab === 'draft' ? 'active' : ''}`} onClick={() => setBusinessTab('draft')}>Draft ({businessTabCounts.draft})</button>
+                </div>
+                <div className="campaign-list">
+                  {businessCampaignList.slice(0, 8).map((campaign) => {
+                    const img = imageFor(campaign);
+                    const createdLabel = campaign.created_at ? timeAgo(campaign.created_at) : '';
+                    return (
+                      <Link className="campaign-row" key={campaign.id} to={`/campaigns/${campaign.id}`}>
+                        <div className="campaign-row-media">
+                          {img ? <img src={img} alt="" /> : <div className="placeholder">No image</div>}
+                          <span className={`tag ${statusTone(campaign, completedCampaignIds)}`}>{formatStatus(campaign, completedCampaignIds)}</span>
+                        </div>
+                        <div className="campaign-row-body">
+                          <div className="cat-pill"><IconLeaf size={11} /> {campaign.category}</div>
+                          <div className="campaign-row-title">{campaign.title}</div>
+                          <div className="campaign-row-price">{campaign.campaign_type === 'paid' ? money(campaign.budget) : 'Gifted product'}</div>
+                          <div className="campaign-row-meta">
+                            <span><IconUsers size={12} /> {campaign.creators_needed || 1} creator{(campaign.creators_needed || 1) === 1 ? '' : 's'}</span>
+                            <span><IconFileCheck size={12} /> {campaign.application_count} application{campaign.application_count === 1 ? '' : 's'}</span>
+                          </div>
+                          {createdLabel && <div className="campaign-row-created"><IconCalendar size={11} /> Created {createdLabel}</div>}
+                        </div>
+                        <span className="campaign-row-action">
+                          <span className="btn-view-sm">View Details</span>
+                          <IconChevronRight size={16} />
+                        </span>
+                      </Link>
+                    );
+                  })}
+                  {businessCampaignList.length === 0 && !loading && <div className="empty">No campaigns in this view yet.</div>}
+                </div>
+                <div className="summary">
+                  <div className="summary-card"><div className="summary-label">Applications received</div><div className="summary-value">{totalApplications}</div><div className="summary-note">Across your campaigns</div></div>
+                  <div className="summary-card"><div className="summary-label">Active creators</div><div className="summary-value">{activeCreators}</div><div className="summary-note">Currently collaborating</div></div>
+                  <div className="summary-card"><div className="summary-label">Completed campaigns</div><div className="summary-value">{completedCampaigns}</div><div className="summary-note">Finished work stays visible</div></div>
+                </div>
+              </section>
+
+              <div className="brand-side-col">
+                <section className="panel panel--compact">
+                  <div className="panel-head">
+                    <div className="panel-head-title">Campaign overview</div>
+                    <Link className="mini-link" to="/campaigns">View All →</Link>
+                  </div>
+                  <div className="hero-stat-grid" style={{ marginTop: 14 }}>
+                    <div className="overview-card">
+                      <small>Total campaigns</small>
+                      <strong>{campaigns.length}</strong>
+                    </div>
+                    <div className="overview-card">
+                      <small>Active creators</small>
+                      <strong>{activeCreators}</strong>
+                    </div>
+                    <div className="overview-card">
+                      <small>Applications received</small>
+                      <strong>{totalApplications}</strong>
+                    </div>
+                    <div className="overview-card">
+                      <small>Completed</small>
+                      <strong>{completedCampaigns}</strong>
+                    </div>
+                  </div>
+                </section>
+
+                <section className="panel panel--compact">
+                  <div className="panel-head">
+                    <div className="panel-head-title">{search.trim() ? 'Creators matching your search' : 'Suggested Creators'}</div>
+                    <Link
+                      className="mini-link"
+                      to={search.trim() ? `/creators?search=${encodeURIComponent(search.trim())}` : '/creators'}
+                    >
+                      See more →
+                    </Link>
+                  </div>
+                  <div className="creator-suggest-list">
+                    {suggestedCreatorsRanked.slice(0, 4).map((creator) => {
+                      const avatar = mediaUrl(creator.profile_image);
+                      const topCategory = creator.categories?.[0];
+                      const isMatch = (creator.categories || []).some((value) =>
+                        brandCampaignCategories.has(String(value).toLowerCase())
+                      );
+                      return (
+                        <Link className="creator-suggest-item" key={creator.id} to={`/creators/${creator.id}`}>
+                          {avatar ? (
+                            <img className="creator-suggest-avatar" src={avatar} alt="" />
+                          ) : (
+                            <div className="creator-suggest-avatar">{creatorInitials(creator.display_name)}</div>
+                          )}
+                          <div className="creator-suggest-body">
+                            <div className="creator-suggest-name">{creator.display_name || 'Creator'}</div>
+                            {creator.username && <div className="creator-suggest-username">@{creator.username}</div>}
+                            <div className="creator-suggest-meta">
+                              {creator.avg_rating != null && (
+                                <span className="creator-suggest-rating"><IconStar size={11} /> {creator.avg_rating.toFixed(1)}</span>
+                              )}
+                              {topCategory && (
+                                <span className={`creator-suggest-tag ${isMatch ? 'creator-suggest-tag--match' : ''}`}>{topCategory}</span>
+                              )}
                             </div>
                           </div>
-                          <span className="shrink-0 rounded-full px-2 py-1 text-[10px] font-semibold" style={{ background: meta.bg, color: meta.color }}>
-                            {meta.label}
-                          </span>
-                          <ChevronRight size={14} style={{ color: C.inkFaint }} />
+                          <button
+                            type="button"
+                            className={`creator-suggest-heart ${creator.is_shortlisted ? 'creator-suggest-heart--active' : ''}`}
+                            disabled={busyCreatorId === creator.id}
+                            onClick={(event) => { event.preventDefault(); toggleCreatorShortlist(creator); }}
+                            aria-label={creator.is_shortlisted ? 'Remove from shortlist' : 'Shortlist creator'}
+                          >
+                            <IconHeart size={14} filled={creator.is_shortlisted} />
+                          </button>
                         </Link>
                       );
-                    })
-                  )
-                ) : applications.length === 0 ? (
-                  <div className="flex flex-col items-center justify-center py-8 text-center">
-                    <div className="flex h-9 w-9 items-center justify-center rounded-full" style={{ background: primarySoft, color: primary }}>
-                      <Inbox size={16} />
-                    </div>
-                    <p className="mt-2.5 text-xs font-medium" style={{ color: C.ink }}>No applications yet</p>
-                    <p className="mt-1 max-w-[200px] text-[11px]" style={{ color: C.inkFaint }}>Browse campaigns and apply to get your first collab.</p>
-                  </div>
-                ) : (
-                  applications.slice(0, 3).map((a, i) => {
-                    const meta = statusMeta(a.status === 'accepted' ? 'in_progress' : a.status === 'rejected' ? 'draft' : 'in_review');
-                    return (
-                      <div key={(a as any).id ?? i} className="flex items-center gap-3 rounded-lg border p-2.5" style={{ borderColor: C.line }}>
-                        <div className="flex h-11 w-11 shrink-0 items-center justify-center overflow-hidden rounded-lg" style={{ background: primarySoft, color: primary }}>
-                          <Send size={16} />
-                        </div>
-                        <div className="min-w-0 flex-1">
-                          <div className="truncate text-xs font-semibold" style={{ color: C.ink }}>{(a as any).campaign_title ?? 'Campaign application'}</div>
-                          <div className="mt-0.5 truncate text-[11px]" style={{ color: C.inkFaint }}>{a.status}</div>
-                        </div>
-                        <span className="shrink-0 rounded-full px-2 py-1 text-[10px] font-semibold" style={{ background: meta.bg, color: meta.color }}>
-                          {meta.label}
-                        </span>
+                    })}
+                    {suggestedCreatorsRanked.length === 0 && !loading && (
+                      <div className="empty" style={{ padding: 24 }}>
+                        {search.trim() ? 'No creators match your search.' : 'No creators to suggest yet.'}
                       </div>
-                    );
-                  })
-                )}
+                    )}
+                  </div>
+                </section>
               </div>
             </div>
-
-            <div className="rounded-xl border p-4" style={{ borderColor: C.line, background: C.card }}>
-              <h3 className="text-sm font-semibold" style={{ color: C.ink }}>Recent Activity</h3>
-              {/* No activity/events endpoint exists yet (see comment
-                  above the `applications` fetch), so this stays a
-                  real empty state rather than sample rows. */}
-              <div className="mt-6 flex flex-col items-center justify-center py-6 text-center">
-                <div className="flex h-10 w-10 items-center justify-center rounded-full" style={{ background: primarySoft, color: primary }}>
-                  <CircleDashed size={18} />
-                </div>
-                <div className="mt-3 text-xs font-medium" style={{ color: C.ink }}>Nothing here yet</div>
-                <p className="mt-1 max-w-[220px] text-[11px]" style={{ color: C.inkFaint }}>
-                  {role === 'creator'
-                    ? 'Applications, messages, and status updates will show up here.'
-                    : 'New applications and deliverable updates will show up here.'}
-                </p>
-              </div>
-            </div>
-          </div>
-
-          {/* Quick actions */}
-          <div className="mt-5 rounded-xl border p-4" style={{ borderColor: C.line, background: C.card }}>
-            <h3 className="text-sm font-semibold" style={{ color: C.ink }}>Quick Actions</h3>
-            <div className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-3">
-              {quickActions.map((a) => {
-                const Icon = a.icon;
-                return (
-                  <Link key={a.label} to={a.to} className="flex items-center gap-2.5 rounded-lg border p-2.5 text-xs font-medium" style={{ borderColor: C.line, color: C.ink }}>
-                    <div className="flex h-7 w-7 items-center justify-center rounded-md" style={{ background: `${a.color}1A`, color: a.color }}>
-                      <Icon size={14} />
-                    </div>
-                    {a.label}
-                  </Link>
-                );
-              })}
-            </div>
-          </div>
-        </div>
-
-        {/* Right rail */}
-        <aside className="flex flex-col gap-5">
-          <div className="rounded-xl border p-5" style={{ borderColor: C.line, background: C.card }}>
-            <div className="flex items-center justify-between">
-              <h3 className="text-sm font-semibold" style={{ color: C.ink }}>Application Status</h3>
-              <span className="text-[11px]" style={{ color: C.inkFaint }}>This month</span>
-            </div>
-            <div className="mt-4 flex items-center justify-center">
-              <Donut segments={statusSegments} />
-            </div>
-            <div className="mt-4 flex flex-col gap-2">
-              {statusSegments.map((seg) => (
-                <div key={seg.label} className="flex items-center justify-between text-xs">
-                  <span className="flex items-center gap-2" style={{ color: C.inkSoft }}>
-                    <span className="h-2 w-2 rounded-full" style={{ background: seg.color }} />
-                    {seg.label}
-                  </span>
-                  <span className="font-medium" style={{ color: C.ink }}>{seg.value}</span>
-                </div>
-              ))}
-            </div>
-          </div>
-
-          <div className="rounded-xl border p-5" style={{ borderColor: C.line, background: C.card }}>
-            <h3 className="text-sm font-semibold" style={{ color: C.ink }}>Quick Tasks</h3>
-            <div className="mt-3 flex flex-col gap-1">
-              {quickTasks.map((item) => (
-                <Link
-                  key={item.label}
-                  to={item.to}
-                  className="flex items-center gap-2.5 rounded-lg px-2 py-2 -mx-2"
-                >
-                  {item.done
-                    ? <CheckCircle2 size={16} style={{ color: C.mint }} className="shrink-0" />
-                    : <CircleDashed size={16} style={{ color: C.inkFaint }} className="shrink-0" />}
-                  <span className="min-w-0 flex-1">
-                    <div className="text-xs font-medium" style={{ color: C.ink }}>{item.label}</div>
-                    <div className="truncate text-[11px]" style={{ color: C.inkFaint }}>{item.sub}</div>
-                  </span>
-                  <ChevronRight size={14} style={{ color: C.inkFaint }} className="shrink-0" />
-                </Link>
-              ))}
-            </div>
-          </div>
-
-          <div className="rounded-xl p-5" style={{ background: primarySoft }}>
-            <h3 className="text-sm font-semibold" style={{ color: C.ink }}>{discoveryPromo.title}</h3>
-            <p className="mt-1.5 text-xs leading-relaxed" style={{ color: C.inkSoft }}>{discoveryPromo.sub}</p>
-            <Link to={discoveryPromo.to} className="mt-2.5 inline-flex items-center gap-1 text-xs font-semibold" style={{ color: primary }}>
-              {discoveryPromo.cta} <ArrowRight size={12} />
-            </Link>
-          </div>
-        </aside>
-      </main>
+          </>
+        )}
+      </div>
     </AppLayout>
   );
-};
+}
+
+export default Dashboard;

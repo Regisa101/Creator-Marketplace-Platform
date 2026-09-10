@@ -46,6 +46,7 @@ class CampaignBase(BaseModel):
     budget: Optional[float] = Field(None, gt=0)
     compensation_description: Optional[str] = None
     requirements: Optional[str] = None
+    creator_requirements: Optional[dict] = None
     deliverables: Optional[List[str]] = None
     before_you_apply: Optional[List[str]] = None
     checklist: Optional[List[ChecklistItem]] = None
@@ -57,6 +58,10 @@ class CampaignBase(BaseModel):
     hashtags: Optional[List[str]] = None
     guidelines_note: Optional[str] = None
     deadline: Optional[datetime] = None
+    application_deadline: Optional[datetime] = None
+    deliverable_deadline: Optional[datetime] = None
+    creators_needed: int = Field(1, ge=1, le=100)
+    application_questions: Optional[List[str]] = None
     hero_image: Optional[str] = None
     extra_photos: Optional[List[str]] = None  # ← ADD THIS
 
@@ -78,6 +83,7 @@ class CampaignUpdate(BaseModel):
     budget: Optional[float] = None
     compensation_description: Optional[str] = None
     requirements: Optional[str] = None
+    creator_requirements: Optional[dict] = None
     deliverables: Optional[List[str]] = None
     before_you_apply: Optional[List[str]] = None
     checklist: Optional[List[ChecklistItem]] = None
@@ -89,6 +95,10 @@ class CampaignUpdate(BaseModel):
     hashtags: Optional[List[str]] = None
     guidelines_note: Optional[str] = None
     deadline: Optional[datetime] = None
+    application_deadline: Optional[datetime] = None
+    deliverable_deadline: Optional[datetime] = None
+    creators_needed: Optional[int] = Field(None, ge=1, le=100)
+    application_questions: Optional[List[str]] = None
     status: Optional[CampaignStatus] = None
     hero_image: Optional[str] = None
     extra_photos: Optional[List[str]] = None  # ← ADD THIS

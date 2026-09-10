@@ -116,6 +116,8 @@ export interface BusinessOnboardingData {
   default_dos?: string[];
   default_donts?: string[];
   default_video_spec?: VideoSpec;
+  default_creator_requirements?: CreatorRequirements;
+  default_application_questions?: string[];
 }
 
 // ============================================
@@ -162,6 +164,7 @@ export interface Campaign {
   budget?: number | null;
   compensation_description?: string | null;
   requirements?: string | null;
+  creator_requirements?: CreatorRequirements | null;
   deliverables?: string[] | null;
   before_you_apply?: string[] | null;
   checklist?: ChecklistItem[] | null;
@@ -173,6 +176,10 @@ export interface Campaign {
   hashtags?: string[] | null;
   guidelines_note?: string | null;
   deadline?: string | null;
+  application_deadline?: string | null;
+  deliverable_deadline?: string | null;
+  creators_needed: number;
+  application_questions?: string[] | null;
   hero_image?: string | null;
   extra_photos?: string[] | null;
   status: CampaignStatus;
@@ -198,6 +205,17 @@ export interface CampaignListParams {
   limit?: number;
 }
 
+export interface CreatorRequirements {
+  categories?: string[];
+  content_types?: string[];
+  creator_sizes?: string[];
+  locations?: string[];
+  languages?: string[];
+  follower_ranges?: string[];
+  gender?: string;
+  age_ranges?: string[];
+}
+
 export interface CampaignCreateData {
   title: string;
   tagline?: string;
@@ -211,6 +229,7 @@ export interface CampaignCreateData {
   budget?: number;
   compensation_description?: string;
   requirements?: string;
+  creator_requirements?: CreatorRequirements;
   deliverables?: string[];
   before_you_apply?: string[];
   checklist?: ChecklistItem[];
@@ -222,6 +241,10 @@ export interface CampaignCreateData {
   hashtags?: string[];
   guidelines_note?: string;
   deadline?: string;
+  application_deadline?: string;
+  deliverable_deadline?: string;
+  creators_needed?: number;
+  application_questions?: string[];
   hero_image?: string | null;
   extra_photos?: string[] | null;
 }
@@ -251,13 +274,16 @@ export interface PublicBusinessProfile {
   is_onboarding_complete: boolean;
   is_published: boolean;
   campaigns: PublicBusinessCampaign[];
+  completed_collaborations?: number;
+  creators_worked_with?: number;
+  work_history?: any[];
 }
 
 // ============================================
 // APPLICATION TYPES
 // ============================================
 
-export type ApplicationStatus = 'pending' | 'accepted' | 'rejected' | 'withdrawn';
+export type ApplicationStatus = 'pending' | 'accepted' | 'rejected' | 'withdrawn' | 'completed';
 
 export interface Application {
   id: number;
@@ -269,6 +295,15 @@ export interface Application {
   proposal: string;
   rate?: number | null;
   message?: string | null;
+  application_answers?: { question: string; answer: string }[] | null;
+  selected_portfolio?: any[] | null;
+  deliverable_deadline?: string | null;
+  completed_collaborations?: number;
+  creators_needed?: number;
+  match_score?: number | null;
+  match_breakdown?: { key: string; label: string; score: number; max: number; matched: boolean; detail?: string }[] | null;
+  match_reasons?: string[] | null;
+  match_configured_count?: number;
   status: ApplicationStatus;
   created_at: string;
   updated_at?: string | null;
@@ -279,6 +314,8 @@ export interface ApplicationCreateData {
   proposal: string;
   rate?: number | null;
   message?: string | null;
+  application_answers?: { question: string; answer: string }[];
+  selected_portfolio?: any[];
 }
 
 // ============================================
@@ -309,6 +346,8 @@ export interface CreatorListItem {
   content_types: string[];
   starting_price?: number | null;
   is_shortlisted: boolean;
+  avg_rating?: number | null;
+  ratings_count: number;
 }
 
 export interface CreatorListResponse {
@@ -347,6 +386,8 @@ export interface PublicCreatorProfile {
   portfolio: any[];
   socials: any[];
   is_shortlisted: boolean;
+  avg_rating?: number | null;
+  ratings_count: number;
 }
 
 export interface ShortlistEntry {
@@ -372,6 +413,24 @@ export interface CreatorInvite {
   campaign_title?: string | null;
 }
 
+export interface Notification {
+  id: number;
+  type: string;
+  title: string;
+  message: string;
+  link?: string | null;
+  reference_id?: number | null;
+  is_read: boolean;
+  created_at: string;
+}
+
+export interface PaymentSummary {
+  role: 'creator' | 'business' | string;
+  this_month: number;
+  lifetime: number;
+  completed_payment_count: number;
+}
+
 // ============================================
 // WORKSPACE TYPES (Increment 5)
 // ============================================
@@ -391,6 +450,46 @@ export interface Collab {
   created_at: string;
   pending_deliverables: number;
   unread_messages: number;
+  payment_status?: 'initiated' | 'completed' | 'failed' | 'refunded' | null;
+  amount_paid?: number | null;
+  rated?: boolean;
+  campaign_type?: 'paid' | 'gifted' | string | null;
+  deliverable_deadline?: string | null;
+  total_deliverables: number;
+  submitted_deliverables: number;
+  approved_deliverables: number;
+}
+
+export interface Payment {
+  id: number;
+  application_id: number;
+  purchase_order_id: string;
+  pidx?: string | null;
+  transaction_id?: string | null;
+  amount: number;
+  currency: string;
+  status: 'initiated' | 'completed' | 'failed' | 'refunded';
+  method: string;
+  paid_at?: string | null;
+  created_at: string;
+}
+
+export interface Rating {
+  id: number;
+  application_id: number;
+  business_id: number;
+  creator_id: number;
+  business_name?: string | null;
+  campaign_title?: string | null;
+  score: number;
+  review?: string | null;
+  created_at: string;
+}
+
+export interface CreatorRatingSummary {
+  average?: number | null;
+  count: number;
+  ratings: Rating[];
 }
 
 export interface WorkspaceMessage {
@@ -516,6 +615,30 @@ export const getBusinessProgress = async (): Promise<{ profile: any } | null> =>
   }
 };
 
+export interface CampaignDefaults {
+  default_dos: string[];
+  default_donts: string[];
+  default_video_spec: VideoSpec | null;
+  default_creator_requirements: CreatorRequirements | null;
+  default_application_questions: string[];
+}
+
+export const getCampaignDefaults = async (): Promise<CampaignDefaults | null> => {
+  try {
+    const response = await api.get<CampaignDefaults>('/onboarding/business/campaign-defaults');
+    return response.data;
+  } catch (error: any) {
+    if (error?.response?.status === 404) return null;
+    throw error;
+  }
+};
+
+export const saveCampaignDefaults = async (data: CampaignDefaults): Promise<CampaignDefaults> => {
+  const response = await api.patch<CampaignDefaults>('/onboarding/business/campaign-defaults', data);
+  return response.data;
+};
+
+
 // ============================================
 // API FUNCTIONS - CAMPAIGNS
 // ============================================
@@ -562,6 +685,19 @@ export const publishCampaign = async (id: number | string): Promise<Campaign> =>
 
 export const deleteCampaign = async (id: number | string): Promise<void> => {
   await api.delete(`/campaigns/${id}`);
+};
+
+// A campaign auto-flips to "in_progress" as soon as one application on it
+// is accepted, and the backend refuses to delete anything "in_progress"
+// (app/routes/campaigns.py). There was previously no way back out of that
+// state. This calls the same PUT /campaigns/{id} update endpoint (which only
+// blocks changes on "completed" campaigns) to move the status to
+// "cancelled" instead, after which delete works normally. Kept separate
+// from updateCampaign's typed payload since `status` isn't part of
+// CampaignCreateData.
+export const closeCampaign = async (id: number | string): Promise<Campaign> => {
+  const response = await api.put<Campaign>(`/campaigns/${id}/close`, {});
+  return response.data;
 };
 
 // ============================================
@@ -672,6 +808,81 @@ export const respondToInvite = async (
 
 export const getCollabs = async (): Promise<Collab[]> => {
   const response = await api.get<Collab[]>('/workspace/collabs');
+  return response.data;
+};
+
+export const getCollabHistory = async (): Promise<Collab[]> => {
+  const response = await api.get<Collab[]>('/workspace/history');
+  return response.data;
+};
+
+// ============================================
+// API FUNCTIONS - PAYMENTS (Khalti)
+// ============================================
+
+export const initiatePayment = async (
+  collabId: number,
+  amount?: number
+): Promise<{ payment_url: string; pidx: string; purchase_order_id: string }> => {
+  const response = await api.post('/payments/initiate', { collab_id: collabId, amount });
+  return response.data;
+};
+
+export const verifyPayment = async (pidx: string): Promise<Payment> => {
+  const response = await api.get<Payment>('/payments/verify', { params: { pidx } });
+  return response.data;
+};
+
+export const completeDemoPayment = async (pidx: string): Promise<Payment> => {
+  const response = await api.post<Payment>('/payments/demo/complete', null, { params: { pidx } });
+  return response.data;
+};
+
+export const getPaymentsForCollab = async (collabId: number): Promise<Payment[]> => {
+  const response = await api.get<Payment[]>(`/payments/by-collab/${collabId}`);
+  return response.data;
+};
+
+export const getPaymentSummary = async (): Promise<PaymentSummary> => {
+  const response = await api.get<PaymentSummary>('/payments/summary');
+  return response.data;
+};
+
+export const getNotifications = async (unreadOnly = false): Promise<Notification[]> => {
+  const response = await api.get<Notification[]>('/notifications/', { params: { unread_only: unreadOnly } });
+  return response.data;
+};
+
+export const getUnreadNotificationCount = async (): Promise<number> => {
+  const response = await api.get<{ count: number }>('/notifications/unread-count');
+  return response.data.count;
+};
+
+export const markNotificationRead = async (notificationId: number): Promise<Notification> => {
+  const response = await api.put<Notification>(`/notifications/${notificationId}/read`);
+  return response.data;
+};
+
+export const markAllNotificationsRead = async (): Promise<void> => {
+  await api.put('/notifications/read-all');
+};
+
+// ============================================
+// API FUNCTIONS - RATINGS
+// ============================================
+
+export const rateCreator = async (collabId: number, score: number, review?: string): Promise<Rating> => {
+  const response = await api.post<Rating>('/ratings/', { collab_id: collabId, score, review });
+  return response.data;
+};
+
+export const getRatingForCollab = async (collabId: number): Promise<Rating | null> => {
+  const response = await api.get<Rating | null>(`/ratings/by-collab/${collabId}`);
+  return response.data;
+};
+
+export const getCreatorRatings = async (creatorId: number | string): Promise<CreatorRatingSummary> => {
+  const response = await api.get<CreatorRatingSummary>(`/ratings/creator/${creatorId}`);
   return response.data;
 };
 

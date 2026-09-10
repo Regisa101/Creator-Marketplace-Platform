@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { Loader2, Plus, Trash2, X } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Loader2, Plus, Trash2, X } from 'lucide-react';
 import {
   getCollabs,
   getCalendarEvents,
@@ -33,6 +33,21 @@ const EVENT_TYPES = [
   { value: 'other', label: 'Other' },
 ];
 
+const WEEKDAY_LABELS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+
+// YYYY-MM-DD in the *local* timezone (not UTC — toISOString() would shift
+// evening events onto the wrong day for anyone west of UTC).
+function dateKey(d: Date): string {
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${y}-${m}-${day}`;
+}
+
+function isSameDay(a: Date, b: Date): boolean {
+  return dateKey(a) === dateKey(b);
+}
+
 export function WorkspaceCalendar() {
   const { user } = useAuth();
   const isBusiness = user?.role === 'business';
@@ -47,6 +62,11 @@ export function WorkspaceCalendar() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [showForm, setShowForm] = useState(false);
+
+  // The actual month grid — this is the "calendar" part that was missing.
+  // Defaults to today's month; navigable with the arrows in the header.
+  const [viewDate, setViewDate] = useState(() => new Date());
+  const [selectedDay, setSelectedDay] = useState<Date | null>(null);
 
   useEffect(() => {
     getCollabs()
@@ -73,17 +93,68 @@ export function WorkspaceCalendar() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedId]);
 
-  const grouped = useMemo(() => {
-    const now = new Date();
-    const upcoming = events.filter((e) => new Date(e.event_date) >= now);
-    const past = events.filter((e) => new Date(e.event_date) < now);
-    return { upcoming, past };
+  // Events keyed by day, for O(1) lookup while rendering grid cells.
+  const eventsByDay = useMemo(() => {
+    const map = new Map<string, CalendarEvent[]>();
+    for (const e of events) {
+      const key = dateKey(new Date(e.event_date));
+      const list = map.get(key) || [];
+      list.push(e);
+      map.set(key, list);
+    }
+    return map;
   }, [events]);
 
-  const handleDelete = async (id: number) => {
+  // 6 rows x 7 cols, starting the Sunday on/before the 1st of the month and
+  // running through the Saturday on/after the last day, so every visible
+  // cell is a real, fully-populated week.
+  const gridDays = useMemo(() => {
+    const year = viewDate.getFullYear();
+    const month = viewDate.getMonth();
+    const firstOfMonth = new Date(year, month, 1);
+    const start = new Date(firstOfMonth);
+    start.setDate(start.getDate() - firstOfMonth.getDay());
+
+    const days: Date[] = [];
+    for (let i = 0; i < 42; i++) {
+      const d = new Date(start);
+      d.setDate(start.getDate() + i);
+      days.push(d);
+    }
+    return days;
+  }, [viewDate]);
+
+  const today = new Date();
+  const monthLabel = viewDate.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
+
+  const goToMonth = (offset: number) => {
+    setViewDate((prev) => new Date(prev.getFullYear(), prev.getMonth() + offset, 1));
+    setSelectedDay(null);
+  };
+  const goToToday = () => {
+    setViewDate(new Date());
+    setSelectedDay(new Date());
+  };
+
+  const dayEvents = useMemo(() => {
+    if (!selectedDay) return [];
+    return (eventsByDay.get(dateKey(selectedDay)) || []).sort(
+      (a, b) => new Date(a.event_date).getTime() - new Date(b.event_date).getTime()
+    );
+  }, [selectedDay, eventsByDay]);
+
+  const upcoming = useMemo(() => {
+    return events
+      .filter((e) => new Date(e.event_date) >= today)
+      .sort((a, b) => new Date(a.event_date).getTime() - new Date(b.event_date).getTime())
+      .slice(0, 6);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [events]);
+
+  const handleDelete = async (eventId: number) => {
     try {
-      await deleteCalendarEvent(id);
-      setEvents((prev) => prev.filter((e) => e.id !== id));
+      await deleteCalendarEvent(eventId);
+      setEvents((prev) => prev.filter((e) => e.id !== eventId));
     } catch (err) {
       console.error('Could not delete event:', err);
     }
@@ -92,14 +163,43 @@ export function WorkspaceCalendar() {
   return (
     <AppLayout title="Calendar" subtitle="Milestones and deadlines across your collaborations." showSearch={false} showNotifications={false}>
       <style>{`
-        .wcal-content { padding: 28px 24px 40px; max-width: 900px; margin: 0 auto; }
+        .wcal-content { padding: 28px 24px 40px; max-width: 980px; margin: 0 auto; }
         .wcal-tabs { display: flex; gap: 8px; margin-bottom: 20px; flex-wrap: wrap; align-items: center; }
         .wcal-tab { font-size: 12.5px; font-weight: 600; padding: 8px 16px; border-radius: 999px; border: 1px solid ${C.line}; background: ${C.card}; color: ${C.inkSoft}; cursor: pointer; }
         .wcal-tab--active { background: ${primary}; border-color: ${primary}; color: #fff; }
         .wcal-add { margin-left: auto; display: inline-flex; align-items: center; gap: 6px; font-size: 12.5px; font-weight: 700; padding: 9px 16px; border-radius: 8px; border: none; background: ${primary}; color: #fff; cursor: pointer; }
         .wcal-add:disabled { opacity: 0.5; cursor: not-allowed; }
 
-        .wcal-group-title { font-size: 13px; font-weight: 700; color: ${C.ink}; margin: 20px 0 10px; }
+        .wcal-grid-card { background: ${C.card}; border: 1px solid ${C.line}; border-radius: 16px; padding: 18px 20px 10px; margin-bottom: 24px; }
+        .wcal-grid-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 14px; }
+        .wcal-grid-month { font-size: 15.5px; font-weight: 800; color: ${C.ink}; }
+        .wcal-grid-nav { display: flex; align-items: center; gap: 6px; }
+        .wcal-nav-btn { border: 1px solid ${C.line}; background: ${C.card}; color: ${C.inkSoft}; border-radius: 8px; padding: 6px; cursor: pointer; display: flex; }
+        .wcal-nav-btn:hover { background: ${C.surface}; }
+        .wcal-today-btn { font-size: 11.5px; font-weight: 700; padding: 6px 12px; border-radius: 8px; border: 1px solid ${C.line}; background: ${C.card}; color: ${C.inkSoft}; cursor: pointer; margin-right: 4px; }
+        .wcal-today-btn:hover { background: ${C.surface}; }
+
+        .wcal-weekdays { display: grid; grid-template-columns: repeat(7, 1fr); margin-bottom: 4px; }
+        .wcal-weekday { text-align: center; font-size: 10.5px; font-weight: 700; text-transform: uppercase; color: ${C.inkFaint}; padding: 4px 0 8px; }
+
+        .wcal-days { display: grid; grid-template-columns: repeat(7, 1fr); grid-auto-rows: 1fr; gap: 4px; }
+        .wcal-day {
+          min-height: 68px; border-radius: 10px; padding: 6px 6px 8px; cursor: pointer;
+          border: 1px solid transparent; display: flex; flex-direction: column; gap: 3px;
+          background: ${C.card};
+        }
+        .wcal-day:hover { background: ${C.surface}; }
+        .wcal-day--outside { opacity: 0.35; }
+        .wcal-day--today .wcal-day-num { background: ${primary}; color: #fff; }
+        .wcal-day--selected { border-color: ${primary}; background: ${primarySoft}; }
+        .wcal-day-num { font-size: 12px; font-weight: 700; color: ${C.ink}; width: 22px; height: 22px; display: flex; align-items: center; justify-content: center; border-radius: 999px; }
+        .wcal-day-dots { display: flex; flex-wrap: wrap; gap: 3px; }
+        .wcal-day-dot { width: 6px; height: 6px; border-radius: 999px; background: ${primary}; }
+        .wcal-day-more { font-size: 9.5px; font-weight: 700; color: ${C.inkFaint}; }
+
+        .wcal-panel-title { font-size: 13px; font-weight: 700; color: ${C.ink}; margin: 0 0 10px; display: flex; align-items: center; justify-content: space-between; }
+        .wcal-panel-clear { font-size: 11.5px; font-weight: 600; color: ${C.inkSoft}; background: none; border: none; cursor: pointer; }
+
         .wcal-card { background: ${C.card}; border: 1px solid ${C.line}; border-radius: 14px; padding: 14px 18px; margin-bottom: 10px; display: flex; align-items: center; gap: 14px; }
         .wcal-date { width: 58px; text-align: center; flex-shrink: 0; }
         .wcal-date-day { font-size: 18px; font-weight: 800; color: ${primary}; }
@@ -148,21 +248,74 @@ export function WorkspaceCalendar() {
 
         {loading && <div className="wcal-state"><Loader2 size={18} className="wcal-spin" /></div>}
         {!loading && error && <div className="wcal-state">{error}</div>}
-        {!loading && !error && events.length === 0 && (
-          <div className="wcal-state">Nothing on the calendar yet.</div>
-        )}
 
-        {!loading && !error && grouped.upcoming.length > 0 && (
+        {!loading && !error && (
           <>
-            <div className="wcal-group-title">Upcoming</div>
-            {grouped.upcoming.map((e) => <EventCard key={e.id} event={e} onDelete={handleDelete} primary={primarySoft} />)}
-          </>
-        )}
+            <div className="wcal-grid-card">
+              <div className="wcal-grid-head">
+                <div className="wcal-grid-month">{monthLabel}</div>
+                <div className="wcal-grid-nav">
+                  <button className="wcal-today-btn" onClick={goToToday}>Today</button>
+                  <button className="wcal-nav-btn" onClick={() => goToMonth(-1)} aria-label="Previous month"><ChevronLeft size={16} /></button>
+                  <button className="wcal-nav-btn" onClick={() => goToMonth(1)} aria-label="Next month"><ChevronRight size={16} /></button>
+                </div>
+              </div>
 
-        {!loading && !error && grouped.past.length > 0 && (
-          <>
-            <div className="wcal-group-title">Past</div>
-            {grouped.past.map((e) => <EventCard key={e.id} event={e} onDelete={handleDelete} primary={primarySoft} />)}
+              <div className="wcal-weekdays">
+                {WEEKDAY_LABELS.map((w) => <div className="wcal-weekday" key={w}>{w}</div>)}
+              </div>
+
+              <div className="wcal-days">
+                {gridDays.map((d) => {
+                  const key = dateKey(d);
+                  const dayItems = eventsByDay.get(key) || [];
+                  const isOutside = d.getMonth() !== viewDate.getMonth();
+                  const isToday = isSameDay(d, today);
+                  const isSelected = selectedDay ? isSameDay(d, selectedDay) : false;
+                  const shownDots = dayItems.slice(0, 4);
+
+                  return (
+                    <div
+                      key={key}
+                      className={[
+                        'wcal-day',
+                        isOutside ? 'wcal-day--outside' : '',
+                        isToday ? 'wcal-day--today' : '',
+                        isSelected ? 'wcal-day--selected' : '',
+                      ].join(' ').trim()}
+                      onClick={() => setSelectedDay(isSelected ? null : d)}
+                    >
+                      <div className="wcal-day-num">{d.getDate()}</div>
+                      {shownDots.length > 0 && (
+                        <div className="wcal-day-dots">
+                          {shownDots.map((e) => <span className="wcal-day-dot" key={e.id} />)}
+                          {dayItems.length > shownDots.length && (
+                            <span className="wcal-day-more">+{dayItems.length - shownDots.length}</span>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+
+            {selectedDay ? (
+              <>
+                <div className="wcal-panel-title">
+                  {selectedDay.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })}
+                  <button className="wcal-panel-clear" onClick={() => setSelectedDay(null)}>Show upcoming instead</button>
+                </div>
+                {dayEvents.length === 0 && <div className="wcal-state">Nothing scheduled this day.</div>}
+                {dayEvents.map((e) => <EventCard key={e.id} event={e} onDelete={handleDelete} primary={primarySoft} />)}
+              </>
+            ) : (
+              <>
+                <div className="wcal-panel-title">Upcoming</div>
+                {upcoming.length === 0 && <div className="wcal-state">Nothing on the calendar yet. Click a day above to add something.</div>}
+                {upcoming.map((e) => <EventCard key={e.id} event={e} onDelete={handleDelete} primary={primarySoft} />)}
+              </>
+            )}
           </>
         )}
       </div>
@@ -171,6 +324,7 @@ export function WorkspaceCalendar() {
         <AddEventModal
           collabs={collabs}
           defaultCollabId={selectedId || undefined}
+          initialDate={selectedDay || undefined}
           onClose={() => setShowForm(false)}
           onCreated={(event) => {
             setEvents((prev) => [...prev, event]);
@@ -206,18 +360,28 @@ function EventCard({ event, onDelete, primary }: { event: CalendarEvent; onDelet
 function AddEventModal({
   collabs,
   defaultCollabId,
+  initialDate,
   onClose,
   onCreated,
 }: {
   collabs: Collab[];
   defaultCollabId?: string;
+  initialDate?: Date;
   onClose: () => void;
   onCreated: (event: CalendarEvent) => void;
 }) {
   const [collabId, setCollabId] = useState(defaultCollabId || String(collabs[0]?.id || ''));
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
-  const [eventDate, setEventDate] = useState('');
+  // Pre-fill from whatever day the person clicked on the grid, defaulting
+  // to 9am local so the datetime-local input isn't just a bare date.
+  const [eventDate, setEventDate] = useState(() => {
+    if (!initialDate) return '';
+    const d = new Date(initialDate);
+    d.setHours(9, 0, 0, 0);
+    const pad = (n: number) => String(n).padStart(2, '0');
+    return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+  });
   const [eventType, setEventType] = useState('milestone');
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');

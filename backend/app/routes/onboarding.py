@@ -3,7 +3,7 @@ from sqlalchemy.orm import Session
 from sqlalchemy.exc import IntegrityError
 
 from app.database import get_db
-from app.models import User, CreatorProfile, CreatorSocial, BusinessProfile
+from app.models import User, CreatorProfile, CreatorSocial, BusinessProfile, Campaign, Application, Deliverable
 from app.schemas.creator import CreatorOnboardingComplete, CreatorOnboardingProgress
 from app.schemas.business import BusinessOnboardingComplete, BusinessOnboardingProgress
 from app.dependencies.auth import get_current_user
@@ -227,7 +227,22 @@ async def save_business_progress(
     db.commit()
     db.refresh(profile)
 
-    return {"profile": profile}
+    completed_apps = (
+        db.query(Application)
+        .join(Campaign, Campaign.id == Application.campaign_id)
+        .filter(Campaign.business_id == current_user.id, Application.status == "completed")
+        .order_by(Application.updated_at.desc())
+        .all()
+    )
+    history = []
+    creator_ids = set()
+    for app in completed_apps:
+        creator = db.query(User).filter(User.id == app.creator_id).first()
+        campaign = db.query(Campaign).filter(Campaign.id == app.campaign_id).first()
+        ds = db.query(Deliverable).filter(Deliverable.application_id == app.id).all()
+        creator_ids.add(app.creator_id)
+        history.append({"application_id": app.id, "campaign_id": app.campaign_id, "campaign_title": campaign.title if campaign else "Campaign", "creator_id": app.creator_id, "creator_name": (creator.profile or {}).get("display_name") if creator and creator.profile else (creator.full_name if creator else None), "completed_at": app.updated_at, "deliverables": [d.title for d in ds]})
+    return {"profile": profile, "completed_collaborations": len(history), "creators_worked_with": len(creator_ids), "work_history": history}
 
 
 # ============================================
@@ -249,7 +264,19 @@ async def get_creator_profile(
     if not profile:
         raise HTTPException(status_code=404, detail="Creator profile not found")
 
-    return {"profile": profile, "socials": profile.socials}
+    completed_apps = (
+        db.query(Application)
+        .filter(Application.creator_id == current_user.id, Application.status == "completed")
+        .order_by(Application.updated_at.desc())
+        .all()
+    )
+    history = []
+    for app in completed_apps:
+        campaign = db.query(Campaign).filter(Campaign.id == app.campaign_id).first()
+        business = db.query(User).filter(User.id == campaign.business_id).first() if campaign else None
+        ds = db.query(Deliverable).filter(Deliverable.application_id == app.id).all()
+        history.append({"campaign_id": app.campaign_id, "campaign_title": campaign.title if campaign else "Campaign", "business_name": (business.profile or {}).get("company_name") if business else None, "completed_at": app.updated_at, "deliverables": [d.title for d in ds]})
+    return {"profile": profile, "socials": profile.socials, "work_history": history, "completed_collaborations": len(history)}
 
 
 @router.get("/business/profile")
@@ -268,3 +295,62 @@ async def get_business_profile(
         raise HTTPException(status_code=404, detail="Business profile not found")
 
     return {"profile": profile}
+
+# ============================================
+# BUSINESS — CAMPAIGN DEFAULTS
+# ============================================
+
+@router.get("/business/campaign-defaults")
+async def get_business_campaign_defaults(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """Return reusable campaign defaults from the business profile."""
+    if current_user.role != "business":
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Only businesses can access campaign defaults")
+
+    profile = db.query(BusinessProfile).filter(BusinessProfile.user_id == current_user.id).first()
+    if not profile:
+        raise HTTPException(status_code=404, detail="Business profile not found")
+
+    return {
+        "default_dos": profile.default_dos or [],
+        "default_donts": profile.default_donts or [],
+        "default_video_spec": profile.default_video_spec,
+        "default_creator_requirements": profile.default_creator_requirements,
+        "default_application_questions": profile.default_application_questions or [],
+    }
+
+
+@router.patch("/business/campaign-defaults")
+async def save_business_campaign_defaults(
+    data: BusinessOnboardingProgress,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """Persist reusable campaign defaults and return the values actually saved."""
+    if current_user.role != "business":
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Only businesses can update campaign defaults")
+
+    profile = db.query(BusinessProfile).filter(BusinessProfile.user_id == current_user.id).first()
+    if not profile:
+        raise HTTPException(status_code=404, detail="Complete business onboarding before saving campaign defaults")
+
+    # Explicitly assign every default field. Clearing a value therefore really
+    # clears the database value instead of silently keeping the old one.
+    profile.default_dos = data.default_dos or []
+    profile.default_donts = data.default_donts or []
+    profile.default_creator_requirements = data.default_creator_requirements
+    profile.default_application_questions = data.default_application_questions or []
+    profile.default_video_spec = data.default_video_spec.dict() if data.default_video_spec else None
+
+    db.commit()
+    db.refresh(profile)
+
+    return {
+        "default_dos": profile.default_dos or [],
+        "default_donts": profile.default_donts or [],
+        "default_video_spec": profile.default_video_spec,
+        "default_creator_requirements": profile.default_creator_requirements,
+        "default_application_questions": profile.default_application_questions or [],
+    }

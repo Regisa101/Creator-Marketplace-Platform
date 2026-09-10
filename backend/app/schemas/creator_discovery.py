@@ -19,6 +19,8 @@ class CreatorListItem(BaseModel):
     content_types: List[str] = []
     starting_price: Optional[float] = None
     is_shortlisted: bool = False
+    avg_rating: Optional[float] = None
+    ratings_count: int = 0
 
     class Config:
         from_attributes = True
@@ -35,6 +37,14 @@ class CreatorListResponse(BaseModel):
 # ============================================
 # PUBLIC PROFILE (full detail view)
 # ============================================
+
+class CreatorWorkHistoryItem(BaseModel):
+    campaign_id: int
+    campaign_title: str
+    business_name: Optional[str] = None
+    completed_at: Optional[datetime] = None
+    deliverables: List[str] = []
+
 
 class PublicCreatorProfile(BaseModel):
     id: int
@@ -54,6 +64,9 @@ class PublicCreatorProfile(BaseModel):
     portfolio: List[Any] = []
     socials: List[Any] = []
     is_shortlisted: bool = False
+    avg_rating: Optional[float] = None
+    ratings_count: int = 0
+    work_history: List[CreatorWorkHistoryItem] = []
 
 
 # ============================================

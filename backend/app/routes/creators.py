@@ -5,7 +5,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 
 from app.database import get_db
-from app.models import User, CreatorProfile, CreatorShortlist, CreatorInvite, Campaign
+from app.models import User, CreatorProfile, CreatorShortlist, CreatorInvite, Campaign, Rating, Application
 from app.schemas.creator_discovery import (
     CreatorListItem,
     CreatorListResponse,
@@ -13,14 +13,32 @@ from app.schemas.creator_discovery import (
     ShortlistEntry,
     CreatorInviteCreate,
     CreatorInviteUpdate,
-    CreatorInviteResponse,
+    CreatorInviteResponse, CreatorWorkHistoryItem,
 )
 from app.dependencies.auth import get_current_user, get_current_business, get_current_creator
 
 router = APIRouter(prefix="/api/creators", tags=["Creators"])
 
 
-def _to_list_item(profile: CreatorProfile, shortlisted_ids: set) -> CreatorListItem:
+def _rating_map(db: Session, creator_ids: list) -> dict:
+    """{creator_id: (avg, count)} for a batch of creators in one query —
+    avoids a round-trip per card in the discovery grid."""
+    if not creator_ids:
+        return {}
+    from sqlalchemy import func
+
+    rows = (
+        db.query(Rating.creator_id, func.avg(Rating.score), func.count(Rating.id))
+        .filter(Rating.creator_id.in_(creator_ids))
+        .group_by(Rating.creator_id)
+        .all()
+    )
+    return {creator_id: (float(avg), count) for creator_id, avg, count in rows}
+
+
+def _to_list_item(profile: CreatorProfile, shortlisted_ids: set, ratings_map: dict = None) -> CreatorListItem:
+    ratings_map = ratings_map or {}
+    avg, count = ratings_map.get(profile.user_id, (None, 0))
     return CreatorListItem(
         id=profile.user_id,
         display_name=profile.display_name,
@@ -33,6 +51,8 @@ def _to_list_item(profile: CreatorProfile, shortlisted_ids: set) -> CreatorListI
         content_types=profile.content_types or [],
         starting_price=float(profile.starting_price) if profile.starting_price is not None else None,
         is_shortlisted=profile.user_id in shortlisted_ids,
+        avg_rating=round(avg, 2) if avg is not None else None,
+        ratings_count=count,
     )
 
 
@@ -51,6 +71,7 @@ async def get_shortlist(
     )
 
     shortlisted_ids = {e.creator_id for e in entries}
+    ratings_map = _rating_map(db, [e.creator_id for e in entries])
     result = []
     for entry in entries:
         profile = db.query(CreatorProfile).filter(CreatorProfile.user_id == entry.creator_id).first()
@@ -61,7 +82,7 @@ async def get_shortlist(
                 id=entry.id,
                 creator_id=entry.creator_id,
                 created_at=entry.created_at,
-                creator=_to_list_item(profile, shortlisted_ids),
+                creator=_to_list_item(profile, shortlisted_ids, ratings_map),
             )
         )
     return result
@@ -201,8 +222,10 @@ async def get_creators(
             for row in db.query(CreatorShortlist).filter(CreatorShortlist.business_id == current_user.id).all()
         }
 
+    ratings_map = _rating_map(db, [p.user_id for p in page_profiles])
+
     return CreatorListResponse(
-        creators=[_to_list_item(p, shortlisted_ids) for p in page_profiles],
+        creators=[_to_list_item(p, shortlisted_ids, ratings_map) for p in page_profiles],
         total=total,
         page=page,
         limit=limit,
@@ -236,6 +259,29 @@ async def get_creator_profile(
     creator_user = db.query(User).filter(User.id == creator_id).first()
     socials = (creator_user.profile or {}).get("socials", []) if creator_user else []
 
+    ratings_map = _rating_map(db, [creator_id])
+    avg, count = ratings_map.get(creator_id, (None, 0))
+
+    from app.models import Deliverable, Payment
+    completed_apps = (
+        db.query(Application)
+        .filter(Application.creator_id == creator_id, Application.status == "completed")
+        .order_by(Application.updated_at.desc())
+        .all()
+    )
+    history = []
+    for app in completed_apps:
+        campaign = db.query(Campaign).filter(Campaign.id == app.campaign_id).first()
+        business = db.query(User).filter(User.id == campaign.business_id).first() if campaign else None
+        ds = db.query(Deliverable).filter(Deliverable.application_id == app.id).all()
+        history.append(CreatorWorkHistoryItem(
+            campaign_id=app.campaign_id,
+            campaign_title=campaign.title if campaign else "Campaign",
+            business_name=(business.profile or {}).get("company_name") if business else None,
+            completed_at=app.updated_at,
+            deliverables=[d.title for d in ds],
+        ))
+
     return PublicCreatorProfile(
         id=profile.user_id,
         display_name=profile.display_name,
@@ -254,6 +300,9 @@ async def get_creator_profile(
         portfolio=profile.portfolio or [],
         socials=socials,
         is_shortlisted=is_shortlisted,
+        avg_rating=round(avg, 2) if avg is not None else None,
+        ratings_count=count,
+        work_history=history,
     )
 
 

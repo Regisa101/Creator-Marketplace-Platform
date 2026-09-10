@@ -16,3 +16,7 @@ from app.models.creator_invite import CreatorInvite         # ← Increment 5
 from app.models.message import Message                       # ← Increment 5 (Workspace)
 from app.models.calendar_event import CalendarEvent           # ← Increment 5 (Workspace)
 from app.models.deliverable import Deliverable                 # ← Increment 5 (Workspace)
+from app.models.payment import Payment                          # ← Payments (Khalti)
+from app.models.rating import Rating                            # ← Ratings (brand rates creator)
+from app.models.notification import Notification
+from app.models.gift_fulfillment import GiftFulfillment

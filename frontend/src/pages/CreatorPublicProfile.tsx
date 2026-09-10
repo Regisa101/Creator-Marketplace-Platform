@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useParams } from 'react-router-dom';
-import { Heart, Loader2, MapPin, Send, X } from 'lucide-react';
+import { Heart, Loader2, MapPin, Send, Star, X } from 'lucide-react';
 import {
   getCreatorProfile,
   shortlistCreator,
@@ -87,6 +87,8 @@ export function CreatorPublicProfile() {
         .cp-name { font-size: 21px; font-weight: 700; color: ${C.ink}; }
         .cp-username { font-size: 13px; color: ${C.inkSoft}; margin-top: 2px; }
         .cp-location { display: flex; align-items: center; gap: 5px; font-size: 12.5px; color: ${C.inkSoft}; margin-top: 8px; }
+        .cp-rating { display: flex; align-items: center; gap: 5px; font-size: 12.5px; font-weight: 600; color: ${C.ink}; margin-top: 8px; }
+        .cp-rating-count { color: ${C.inkSoft}; font-weight: 500; }
         .cp-bio { font-size: 13.5px; color: #3d3d42; line-height: 1.6; margin-top: 12px; white-space: pre-wrap; }
         .cp-actions { display: flex; gap: 10px; margin-left: auto; }
         .cp-heart-btn, .cp-invite-btn {
@@ -143,6 +145,12 @@ export function CreatorPublicProfile() {
                 {profile.username && <div className="cp-username">@{profile.username}</div>}
                 {profile.location && (
                   <div className="cp-location"><MapPin size={13} /> {profile.location}</div>
+                )}
+                {profile.avg_rating != null && (
+                  <div className="cp-rating">
+                    <Star size={14} fill="#FFB020" color="#FFB020" /> {profile.avg_rating.toFixed(1)}
+                    <span className="cp-rating-count">({profile.ratings_count} rating{profile.ratings_count === 1 ? '' : 's'})</span>
+                  </div>
                 )}
                 {profile.bio && <div className="cp-bio">{profile.bio}</div>}
               </div>

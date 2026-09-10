@@ -24,6 +24,18 @@ class CollabResponse(BaseModel):
     pending_deliverables: int = 0
     unread_messages: int = 0
 
+    # Status of the most recent Payment attempt for this collab, if any
+    # (initiated, completed, failed, refunded) — lets the collab list
+    # show a "Paid" badge without a separate request per row.
+    payment_status: Optional[str] = None
+    amount_paid: Optional[float] = None
+    rated: bool = False
+    campaign_type: Optional[str] = None
+    deliverable_deadline: Optional[datetime] = None
+    total_deliverables: int = 0
+    submitted_deliverables: int = 0
+    approved_deliverables: int = 0
+
     class Config:
         from_attributes = True
 

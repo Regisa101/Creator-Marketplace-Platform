@@ -388,6 +388,19 @@ export function BusinessProfile() {
             )}
 
             <div className="bp-section">
+              <p className="bp-section-title">Collaboration History</p>
+              <div className="bp-info-grid">
+                <div className="bp-info-card"><span className="bp-info-icon"><Users size={16} /></span><span><p className="bp-info-label">Creators worked with</p><p className="bp-info-value">{profile?.creators_worked_with ?? 0}</p></span></div>
+                <div className="bp-info-card"><span className="bp-info-icon"><BadgeCheck size={16} /></span><span><p className="bp-info-label">Completed collaborations</p><p className="bp-info-value">{profile?.completed_collaborations ?? 0}</p></span></div>
+              </div>
+              {Array.isArray(profile?.work_history) && profile.work_history.length > 0 && (
+                <div style={{display:'grid',gap:10,marginTop:14}}>
+                  {profile.work_history.map((item:any) => <div key={item.application_id} style={{border:'1px solid #ececf2',borderRadius:10,padding:'11px 13px'}}><div style={{fontWeight:700,fontSize:13}}>{item.campaign_title}</div><div style={{fontSize:11.5,color:'#6b6478',marginTop:3}}>{item.creator_name || `Creator #${item.creator_id}`} · Completed</div>{item.deliverables?.length > 0 && <div style={{fontSize:11,color:'#6b6478',marginTop:5}}>{item.deliverables.join(' · ')}</div>}</div>)}
+                </div>
+              )}
+            </div>
+
+            <div className="bp-section">
               <p className="bp-section-title">Company Info</p>
               <div className="bp-info-grid">
                 <div className="bp-info-card">

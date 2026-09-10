@@ -530,6 +530,15 @@ export function CreatorProfile() {
               )}
             </div>
             <div className="cp-section">
+              <p className="cp-section-title">Work History</p>
+              {Array.isArray(profile?.work_history) && profile.work_history.length > 0 ? (
+                <div style={{display:'grid',gap:10}}>
+                  {profile.work_history.map((item:any, i:number) => <div key={`${item.campaign_id}-${i}`} style={{border:'1px solid #eae7f2',borderRadius:11,padding:'12px 14px'}}><div style={{fontWeight:700,fontSize:13}}>{item.campaign_title}</div><div style={{fontSize:11.5,color:'var(--ink-soft)',marginTop:3}}>{item.business_name || 'Brand'} · Completed</div>{item.deliverables?.length > 0 && <div style={{fontSize:11,color:'var(--ink-soft)',marginTop:5}}>{item.deliverables.join(' · ')}</div>}</div>)}
+                </div>
+              ) : <p className="cp-empty">Completed collaborations will appear here automatically.</p>}
+            </div>
+
+            <div className="cp-section">
               <p className="cp-section-title">Danger Zone</p>
               <div className="cp-danger-zone">
                 <div>

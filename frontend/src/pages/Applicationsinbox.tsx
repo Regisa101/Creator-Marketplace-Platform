@@ -54,7 +54,16 @@ export function ApplicationsInbox() {
 
   useEffect(() => {
     load();
-  }, []);
+
+    // Keep the brand inbox fresh while it is open. A creator's application
+    // should appear as soon as it reaches the backend; it must not wait for
+    // another creator to apply or for the brand to navigate away and back.
+    if (!isBusiness) return;
+    const timer = window.setInterval(() => {
+      if (document.visibilityState === 'visible') load();
+    }, 5000);
+    return () => window.clearInterval(timer);
+  }, [isBusiness]);
 
   // Tab filter, then free-text search over campaign title / creator name
   // (the search box lives in AppLayout's topbar, so it needs to reach in here).
@@ -84,7 +93,10 @@ export function ApplicationsInbox() {
       }
       map.get(key)!.items.push(app);
     }
-    return Array.from(map.values());
+    return Array.from(map.values()).map((group) => ({
+      ...group,
+      items: [...group.items].sort((a, b) => (b.match_score ?? -1) - (a.match_score ?? -1)),
+    }));
   }, [filtered]);
 
   const handleAction = async (app: Application, status: 'accepted' | 'rejected') => {
@@ -209,6 +221,14 @@ export function ApplicationsInbox() {
         .ai-accept:disabled, .ai-reject:disabled { opacity: 0.6; cursor: not-allowed; }
         .ai-action-error { font-size: 12px; color: #d64545; margin-top: 8px; }
 
+        .ai-match { display:flex; align-items:center; gap:10px; margin-bottom:10px; }
+        .ai-match-score { font-size:13px; font-weight:800; color:#16834A; background:#EAF8F0; border-radius:999px; padding:5px 10px; }
+        .ai-match-label { font-size:11.5px; font-weight:700; color:${C.inkSoft}; }
+        .ai-match-breakdown { display:flex; flex-wrap:wrap; gap:6px; margin:8px 0 11px; }
+        .ai-match-chip { font-size:10.5px; color:${C.inkSoft}; background:${C.surface}; border:1px solid ${C.line}; border-radius:999px; padding:4px 8px; }
+        .ai-match-chip--good { color:#16834A; background:#F0FAF4; border-color:#CDEEDB; }
+        .ai-why { font-size:11.5px; color:${C.inkSoft}; line-height:1.5; background:#FAFAFD; border-radius:8px; padding:8px 10px; margin-bottom:11px; }
+
         .ai-state { text-align: center; padding: 60px 20px; color: ${C.inkSoft}; font-size: 13px; }
         .ai-spin { animation: ai-spin 0.8s linear infinite; }
         @keyframes ai-spin { to { transform: rotate(360deg); } }
@@ -244,6 +264,13 @@ export function ApplicationsInbox() {
             <div className="ai-group" key={group.campaignId}>
               <div className="ai-group-title">
                 <Link to={`/campaigns/${group.campaignId}`}>{group.campaignTitle}</Link>
+                {isBusiness && (
+                  <span style={{ float: 'right', fontWeight: 500, color: C.inkSoft }}>
+                    {group.items.length} application{group.items.length === 1 ? '' : 's'}
+                    {group.items[0]?.creators_needed ? ` · ${group.items[0].creators_needed} creator${group.items[0].creators_needed === 1 ? '' : 's'} needed` : ''}
+                    {group.items.some((a) => a.match_score != null) ? ' · sorted by match' : ''}
+                  </span>
+                )}
               </div>
 
               {group.items.map((app) => (
@@ -271,7 +298,43 @@ export function ApplicationsInbox() {
                     <span className={`ai-status-pill ai-status-pill--${app.status}`}>{app.status}</span>
                   </div>
 
+                  {isBusiness && app.match_score != null && (
+                    <>
+                      <div className="ai-match">
+                        <span className="ai-match-score">⭐ {app.match_score}% Match</span>
+                        <span className="ai-match-label">{app.match_score >= 90 ? 'Recommended creator' : app.match_score >= 75 ? 'Good Match' : 'Other Applicant'}</span>
+                      </div>
+                      <div className="ai-match-breakdown">
+                        {(app.match_breakdown || []).map((b) => (
+                          <span key={b.key} className={`ai-match-chip ${b.matched ? 'ai-match-chip--good' : ''}`}>
+                            {b.label} {b.matched ? '✓' : '·'} {b.score}/{b.max}
+                          </span>
+                        ))}
+                      </div>
+                      {app.match_configured_count ? <div className="ai-why"><strong>Why we're suggesting them:</strong> Their profile matches {app.match_reasons?.filter((r) => r.endsWith('✓')).length ?? 0}/{app.match_configured_count - 1} configured campaign requirements. Experience is shown as a soft signal and never automatically rejects a creator.</div> : null}
+                    </>
+                  )}
+
                   <div className="ai-proposal">{app.proposal}</div>
+
+                  {isBusiness && (app.completed_collaborations ?? 0) > 0 && (
+                    <div style={{fontSize:11.5,color:C.inkSoft,marginTop:7}}>✓ {app.completed_collaborations} completed collaboration{app.completed_collaborations === 1 ? '' : 's'} · <Link to={`/creators/${app.creator_id}`} style={{color:C.navy,fontWeight:700}}>View profile & history</Link></div>
+                  )}
+
+                  {isBusiness && app.selected_portfolio && app.selected_portfolio.length > 0 && (
+                    <div style={{marginTop:10}}>
+                      <div style={{fontSize:11,fontWeight:700,color:C.inkSoft,marginBottom:6}}>Selected work</div>
+                      <div style={{display:'grid',gridTemplateColumns:'repeat(4,1fr)',gap:6}}>
+                        {app.selected_portfolio.slice(0,4).map((item:any,i:number)=><div key={i} style={{border:'1px solid #EAE7F2',borderRadius:8,overflow:'hidden'}}>{item.media_url && <img src={item.media_url} alt={item.title || 'Work'} style={{width:'100%',aspectRatio:1,objectFit:'cover',display:'block'}} />}<div style={{fontSize:9,padding:'4px 5px',whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{item.title}</div></div>)}
+                      </div>
+                    </div>
+                  )}
+
+                  {isBusiness && app.application_answers && app.application_answers.length > 0 && (
+                    <div style={{marginTop:10,fontSize:11.5}}>
+                      {app.application_answers.map((a:any,i:number)=><div key={i} style={{marginBottom:6}}><strong>{a.question}</strong><div style={{color:C.inkSoft,marginTop:2}}>{a.answer}</div></div>)}
+                    </div>
+                  )}
 
                   {app.rate != null && (
                     <div className="ai-rate">

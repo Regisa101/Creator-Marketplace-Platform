@@ -6,6 +6,7 @@ import {
   BriefcaseBusiness,
   Building2,
   CalendarDays,
+  CheckCircle2,
   ExternalLink,
   Globe,
   MapPin,
@@ -332,6 +333,19 @@ export function BrandProfile() {
                   <div className="bp-stat-label">Content types</div>
                 </div>
               </div>
+            </section>
+
+            <section className="bp-card">
+              <h2 className="bp-card-title"><CheckCircle2 size={17} /> Completed Collaborations</h2>
+              <div className="bp-stat-grid">
+                <div className="bp-stat"><div className="bp-stat-number">{brand.completed_collaborations ?? 0}</div><div className="bp-stat-label">Completed</div></div>
+                <div className="bp-stat"><div className="bp-stat-number">{brand.creators_worked_with ?? 0}</div><div className="bp-stat-label">Creators worked with</div></div>
+              </div>
+              {Array.isArray(brand.work_history) && brand.work_history.length > 0 && (
+                <div style={{display:'grid',gap:9,marginTop:16}}>
+                  {brand.work_history.map((item:any)=><div key={item.application_id} style={{border:'1px solid #ececf2',borderRadius:10,padding:'10px 12px'}}><div style={{fontWeight:700,fontSize:12.5}}>{item.campaign_title}</div><div style={{fontSize:11,color:'#6b6478',marginTop:3}}>{item.creator_name || `Creator #${item.creator_id}`} · Completed</div></div>)}
+                </div>
+              )}
             </section>
 
             <section className="bp-card bp-note-card">

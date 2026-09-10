@@ -15,6 +15,8 @@ STATEMENTS = [
     "ALTER TABLE business_profiles ADD COLUMN IF NOT EXISTS default_dos JSON",
     "ALTER TABLE business_profiles ADD COLUMN IF NOT EXISTS default_donts JSON",
     "ALTER TABLE business_profiles ADD COLUMN IF NOT EXISTS default_video_spec JSON",
+    "ALTER TABLE business_profiles ADD COLUMN IF NOT EXISTS default_creator_requirements JSON",
+    "ALTER TABLE business_profiles ADD COLUMN IF NOT EXISTS default_application_questions JSON",
 ]
 
 print("=" * 50)
@@ -27,4 +29,4 @@ with engine.connect() as conn:
         conn.execute(text(stmt))
     conn.commit()
 
-print("\n✅ Done. business_profiles now has: default_dos, default_donts, default_video_spec")
+print("\n✅ Done. business_profiles now has: default_dos, default_donts, default_video_spec, default_creator_requirements, default_application_questions")

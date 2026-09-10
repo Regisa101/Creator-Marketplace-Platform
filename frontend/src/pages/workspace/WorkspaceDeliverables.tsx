@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { Check, Loader2, Plus, RefreshCw, Upload, X } from 'lucide-react';
+import { Check, CreditCard, Loader2, Plus, RefreshCw, Upload, X } from 'lucide-react';
 import {
   getCollabs,
   getDeliverables,
@@ -9,6 +9,7 @@ import {
   reviewDeliverable,
   type Collab,
   type WorkspaceDeliverable,
+  initiatePayment,
 } from '../../api/client';
 import { useAuth } from '../../context/AuthContext';
 import { AppLayout } from '../../components/AppLayout';
@@ -47,6 +48,8 @@ export function WorkspaceDeliverables() {
   const [error, setError] = useState('');
   const [showForm, setShowForm] = useState(false);
   const [actingId, setActingId] = useState<number | null>(null);
+  const [payingId, setPayingId] = useState<number | null>(null);
+  const [paymentError, setPaymentError] = useState('');
 
   useEffect(() => {
     getCollabs()
@@ -68,6 +71,37 @@ export function WorkspaceDeliverables() {
     }
   };
 
+
+  const selectedCollab = selectedId ? collabs.find((c) => c.id === Number(selectedId)) : undefined;
+  const selectedDeliverables = selectedId
+    ? deliverables.filter((d) => d.application_id === Number(selectedId))
+    : [];
+  const selectedApprovedCount = selectedDeliverables.filter((d) => d.status === 'approved').length;
+  const selectedCount = selectedDeliverables.length;
+  const selectedAllApproved = Boolean(selectedCollab && (selectedCount === 0 || selectedApprovedCount === selectedCount));
+
+  const handlePaySelected = async () => {
+    if (!selectedCollab) return;
+    let amount = selectedCollab.rate ?? undefined;
+    if (amount == null) {
+      const input = window.prompt(`Set the amount to pay for "${selectedCollab.campaign_title || 'this collab'}" (NPR):`);
+      if (!input) return;
+      const parsed = Number(input);
+      if (!Number.isFinite(parsed) || parsed <= 0) { alert('Enter a valid amount greater than 0.'); return; }
+      amount = parsed;
+    }
+    setPayingId(selectedCollab.id);
+    setPaymentError('');
+    try {
+      const result = await initiatePayment(selectedCollab.id, amount);
+      window.location.href = result.payment_url;
+    } catch (err: any) {
+      setPaymentError(err?.response?.data?.detail || 'Could not start the payment.');
+    } finally {
+      setPayingId(null);
+    }
+  };
+
   useEffect(() => {
     loadDeliverables();
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -80,7 +114,9 @@ export function WorkspaceDeliverables() {
         .wd-tabs { display: flex; gap: 8px; margin-bottom: 20px; flex-wrap: wrap; align-items: center; }
         .wd-tab { font-size: 12.5px; font-weight: 600; padding: 8px 16px; border-radius: 999px; border: 1px solid ${C.line}; background: ${C.card}; color: ${C.inkSoft}; cursor: pointer; }
         .wd-tab--active { background: ${primary}; border-color: ${primary}; color: #fff; }
-        .wd-add { margin-left: auto; display: inline-flex; align-items: center; gap: 6px; font-size: 12.5px; font-weight: 700; padding: 9px 16px; border-radius: 8px; border: none; background: ${primary}; color: #fff; cursor: pointer; }
+        .wd-pay { margin-left: auto; display: inline-flex; align-items: center; gap: 6px; font-size: 12.5px; font-weight: 700; padding: 9px 16px; border-radius: 8px; border: none; background: ${C.navy}; color: #fff; cursor: pointer; }
+        .wd-pay:disabled { opacity: 0.55; cursor: not-allowed; }
+        .wd-add { display: inline-flex; align-items: center; gap: 6px; font-size: 12.5px; font-weight: 700; padding: 9px 16px; border-radius: 8px; border: none; background: ${primary}; color: #fff; cursor: pointer; }
         .wd-add:disabled { opacity: 0.5; cursor: not-allowed; }
 
         .wd-card { background: ${C.card}; border: 1px solid ${C.line}; border-radius: 14px; padding: 18px 20px; margin-bottom: 12px; }
@@ -102,6 +138,9 @@ export function WorkspaceDeliverables() {
         .wd-btn--revise { background: #fdecec; color: #d64545; }
         .wd-btn--ghost { background: ${C.surface}; color: ${C.ink}; }
         .wd-btn:disabled { opacity: 0.6; cursor: not-allowed; }
+
+        .wd-payment-note { margin-bottom: 14px; padding: 10px 12px; border-radius: 9px; background: #EAF8F0; color: #16834A; font-size: 12px; font-weight: 650; }
+        .wd-payment-error { margin-bottom: 14px; padding: 10px 12px; border-radius: 9px; background: #fdecec; color: #d64545; font-size: 12px; }
 
         .wd-state { text-align: center; padding: 40px 20px; color: ${C.inkSoft}; font-size: 13px; }
         .wd-spin { animation: wd-spin 0.8s linear infinite; }
@@ -133,12 +172,28 @@ export function WorkspaceDeliverables() {
               {c.campaign_title || `Campaign #${c.campaign_id}`}
             </button>
           ))}
+          {isBusiness && selectedCollab && selectedCollab.campaign_type !== 'gifted' && selectedCollab.payment_status !== 'completed' && selectedAllApproved && (
+            <button className="wd-pay" disabled={payingId === selectedCollab.id} onClick={handlePaySelected}>
+              <CreditCard size={14} /> {payingId === selectedCollab.id ? 'Opening payment…' : 'Pay creator'}
+            </button>
+          )}
           {isBusiness && (
             <button className="wd-add" disabled={collabs.length === 0} onClick={() => setShowForm(true)}>
               <Plus size={14} /> Request deliverable
             </button>
           )}
         </div>
+
+        {paymentError && <div className="wd-payment-error">{paymentError}</div>}
+        {isBusiness && selectedCollab && selectedCollab.campaign_type !== 'gifted' && selectedCollab.payment_status !== 'completed' && (
+          <div className="wd-payment-note">
+            {selectedAllApproved
+              ? selectedDeliverables.length === 0
+                ? 'No deliverables were requested. This collaboration is ready for payment.'
+                : `All ${selectedDeliverables.length} deliverables are approved. This collaboration is ready for payment.`
+              : `Payment unlocks after all ${selectedDeliverables.length} deliverable${selectedDeliverables.length === 1 ? '' : 's'} are approved.`}
+          </div>
+        )}
 
         {loading && <div className="wd-state"><Loader2 size={18} className="wd-spin" /></div>}
         {!loading && error && <div className="wd-state">{error}</div>}
