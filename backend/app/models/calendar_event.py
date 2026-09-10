@@ -7,7 +7,13 @@ class CalendarEvent(Base):
     __tablename__ = "calendar_events"
 
     id = Column(Integer, primary_key=True, index=True)
-    application_id = Column(Integer, ForeignKey("applications.id"), nullable=False)
+    # Nullable: an event can be tied to a specific collaboration
+    # (application_id) once a creator is accepted, OR to the campaign as a
+    # whole (campaign_id) from the moment it's published — before anyone's
+    # accepted, so the brand can track it too. An event has at least one
+    # of the two set.
+    application_id = Column(Integer, ForeignKey("applications.id"), nullable=True)
+    campaign_id = Column(Integer, ForeignKey("campaigns.id"), nullable=True)
     created_by = Column(Integer, ForeignKey("users.id"), nullable=False)
 
     title = Column(String(255), nullable=False)

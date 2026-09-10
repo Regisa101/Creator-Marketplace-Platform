@@ -329,7 +329,8 @@ async def update_application_status(
         if collab_due:
             db.add(CalendarEvent(application_id=application.id, created_by=campaign.business_id, title="Deliverables due", description=f"Complete the approved campaign deliverables for {campaign.title}.", event_date=collab_due, event_type="deadline"))
         if getattr(campaign, "completion_mode", "approval_only") == "publication_required" and campaign.publication_deadline:
-            db.add(CalendarEvent(application_id=application.id, created_by=campaign.business_id, title="Publication deadline", description=f"Publish the approved content on {campaign.required_platform or 'the required platform'}.", event_date=campaign.publication_deadline, event_type="posting_date"))
+            _platforms_label = ", ".join(campaign.required_platforms) if getattr(campaign, "required_platforms", None) else (campaign.required_platform or "the required platform")
+            db.add(CalendarEvent(application_id=application.id, created_by=campaign.business_id, title="Publication deadline", description=f"Publish the approved content on {_platforms_label}.", event_date=campaign.publication_deadline, event_type="posting_date"))
 
         if getattr(campaign.campaign_type, "value", str(campaign.campaign_type)) == "gifted":
             if not db.query(GiftFulfillment).filter(GiftFulfillment.application_id == application.id).first():

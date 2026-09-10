@@ -35,8 +35,10 @@ class CollabResponse(BaseModel):
     rated: bool = False
     campaign_type: Optional[str] = None
     completion_mode: Optional[str] = None
-    required_platform: Optional[str] = None
-    required_post_type: Optional[str] = None
+    required_platforms: Optional[list] = None
+    required_post_types: Optional[list] = None
+    required_platform: Optional[str] = None  # deprecated
+    required_post_type: Optional[str] = None  # deprecated
     publication_deadline: Optional[datetime] = None
     deliverable_deadline: Optional[datetime] = None
     total_deliverables: int = 0
@@ -83,7 +85,8 @@ class CalendarEventCreate(BaseModel):
 
 class CalendarEventResponse(BaseModel):
     id: int
-    application_id: int
+    application_id: Optional[int] = None
+    campaign_id: Optional[int] = None
     campaign_title: Optional[str] = None
     other_party_name: Optional[str] = None
     title: str

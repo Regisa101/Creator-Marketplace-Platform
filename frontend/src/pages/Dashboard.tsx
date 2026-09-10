@@ -368,9 +368,11 @@ export function Dashboard() {
 
         if (cancelled) return;
 
-        const visibleCampaigns = campaignData.campaigns.filter(
-          (campaign) => campaign.status !== 'draft' && campaign.status !== 'cancelled'
-        );
+        // Business owners need to see their own drafts (the Draft tab depends on
+        // it) and cancelled campaigns; only the creator feed should hide them.
+        const visibleCampaigns = business
+          ? campaignData.campaigns
+          : campaignData.campaigns.filter((campaign) => campaign.status !== 'draft' && campaign.status !== 'cancelled');
         const knownIds = new Set(visibleCampaigns.map((campaign) => campaign.id));
         const historyIds = Array.from(new Set([...active, ...finished].map((collab) => collab.campaign_id)))
           .filter((campaignId) => !knownIds.has(campaignId));
@@ -383,7 +385,7 @@ export function Dashboard() {
           recovered = results
             .filter((result): result is PromiseFulfilledResult<Campaign> => result.status === 'fulfilled')
             .map((result) => result.value)
-            .filter((campaign) => campaign.status !== 'draft' && campaign.status !== 'cancelled');
+            .filter((campaign) => business || (campaign.status !== 'draft' && campaign.status !== 'cancelled'));
         }
 
         if (cancelled) return;

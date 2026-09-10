@@ -72,8 +72,10 @@ class Campaign(Base):
     
     # Completion / publication requirements
     completion_mode = Column(String(30), nullable=False, default="approval_only")  # approval_only | publication_required
-    required_platform = Column(String(50), nullable=True)
-    required_post_type = Column(String(50), nullable=True)
+    required_platform = Column(String(50), nullable=True)  # deprecated: single-platform, kept for backward compat
+    required_post_type = Column(String(50), nullable=True)  # deprecated: single-post-type, kept for backward compat
+    required_platforms = Column(JSON, nullable=True)  # list[str], e.g. ["instagram", "tiktok"]
+    required_post_types = Column(JSON, nullable=True)  # list[str], e.g. ["reel", "story"]
     publication_deadline = Column(DateTime(timezone=True), nullable=True)
     required_mentions = Column(JSON, nullable=True)
 

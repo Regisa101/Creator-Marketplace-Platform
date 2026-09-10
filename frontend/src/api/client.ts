@@ -183,6 +183,8 @@ export interface Campaign {
   hero_image?: string | null;
   extra_photos?: string[] | null;
   completion_mode?: 'approval_only' | 'publication_required' | string;
+  required_platforms?: string[] | null;
+  required_post_types?: string[] | null;
   required_platform?: string | null;
   required_post_type?: string | null;
   publication_deadline?: string | null;
@@ -253,6 +255,8 @@ export interface CampaignCreateData {
   hero_image?: string | null;
   extra_photos?: string[] | null;
   completion_mode?: 'approval_only' | 'publication_required';
+  required_platforms?: string[];
+  required_post_types?: string[];
   required_platform?: string;
   required_post_type?: string;
   publication_deadline?: string;
@@ -489,6 +493,8 @@ export interface Collab {
   unread_messages: number;
   payment_status?: 'initiated' | 'funded' | 'released' | 'completed' | 'failed' | 'refunded' | null;
   completion_mode?: 'approval_only' | 'publication_required' | string | null;
+  required_platforms?: string[] | null;
+  required_post_types?: string[] | null;
   required_platform?: string | null;
   required_post_type?: string | null;
   publication_deadline?: string | null;
@@ -547,7 +553,8 @@ export type CalendarEventType = 'milestone' | 'deadline' | 'call' | 'posting_dat
 
 export interface CalendarEvent {
   id: number;
-  application_id: number;
+  application_id?: number | null;
+  campaign_id?: number | null;
   campaign_title?: string | null;
   other_party_name?: string | null;
   title: string;

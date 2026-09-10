@@ -3,7 +3,7 @@ from datetime import datetime, timedelta, timezone
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
-from sqlalchemy import select
+from sqlalchemy import select, or_
 
 from app.database import get_db
 from app.models import User, Application, Campaign, Message, CalendarEvent, Deliverable, Payment, Rating
@@ -22,6 +22,14 @@ from app.dependencies.auth import get_current_user, get_current_business, get_cu
 from app.services.notifications import create_notification
 
 router = APIRouter(prefix="/api/workspace", tags=["Workspace"])
+
+
+def _format_platforms(campaign) -> str:
+    """Human-readable platform list for notification/calendar copy, e.g. 'Instagram, TikTok'."""
+    platforms = getattr(campaign, "required_platforms", None)
+    if platforms:
+        return ", ".join(platforms)
+    return campaign.required_platform or "the required platform"
 
 
 # ============================================
@@ -98,6 +106,8 @@ def _collab_to_response(db: Session, application: Application) -> CollabResponse
         rated=already_rated,
         campaign_type=campaign.campaign_type.value if campaign and hasattr(campaign.campaign_type, "value") else (str(campaign.campaign_type) if campaign else None),
         completion_mode=getattr(campaign, "completion_mode", "approval_only") if campaign else None,
+        required_platforms=getattr(campaign, "required_platforms", None) if campaign else None,
+        required_post_types=getattr(campaign, "required_post_types", None) if campaign else None,
         required_platform=getattr(campaign, "required_platform", None) if campaign else None,
         required_post_type=getattr(campaign, "required_post_type", None) if campaign else None,
         publication_deadline=getattr(campaign, "publication_deadline", None) if campaign else None,
@@ -230,8 +240,12 @@ async def send_message(
 # ============================================
 
 def _calendar_to_response(db: Session, event: CalendarEvent) -> CalendarEventResponse:
-    application = db.query(Application).filter(Application.id == event.application_id).first()
-    campaign = db.query(Campaign).filter(Campaign.id == application.campaign_id).first() if application else None
+    application = db.query(Application).filter(Application.id == event.application_id).first() if event.application_id else None
+    campaign = (
+        db.query(Campaign).filter(Campaign.id == application.campaign_id).first() if application
+        else db.query(Campaign).filter(Campaign.id == event.campaign_id).first() if event.campaign_id
+        else None
+    )
 
     other_party_name = None
     if application:
@@ -245,6 +259,7 @@ def _calendar_to_response(db: Session, event: CalendarEvent) -> CalendarEventRes
     return CalendarEventResponse(
         id=event.id,
         application_id=event.application_id,
+        campaign_id=event.campaign_id,
         campaign_title=campaign.title if campaign else None,
         other_party_name=other_party_name,
         title=event.title,
@@ -271,13 +286,33 @@ async def get_calendar_events(
             .all()
         )
     else:
-        collab_ids = [c.id for c in _accepted_collab_query(db, current_user).all()]
+        # Every collaboration this user has ever been party to — accepted
+        # or completed — so history stays on the calendar instead of
+        # vanishing once a collaboration wraps up.
+        collab_query = db.query(Application).filter(Application.status.in_(["accepted", "completed"]))
+        if current_user.role == "creator":
+            collab_query = collab_query.filter(Application.creator_id == current_user.id)
+        elif current_user.role == "business":
+            campaign_ids_owned = select(Campaign.id).where(Campaign.business_id == current_user.id)
+            collab_query = collab_query.filter(Application.campaign_id.in_(campaign_ids_owned))
+        collab_ids = [c.id for c in collab_query.all()]
+
+        filters = []
+        if collab_ids:
+            filters.append(CalendarEvent.application_id.in_(collab_ids))
+        if current_user.role == "business":
+            # Campaign-level events (published campaigns, before/without an
+            # accepted creator) belong to the business that owns them.
+            owned_campaign_ids = [c.id for c in db.query(Campaign.id).filter(Campaign.business_id == current_user.id).all()]
+            if owned_campaign_ids:
+                filters.append(CalendarEvent.campaign_id.in_(owned_campaign_ids))
+
         events = (
             db.query(CalendarEvent)
-            .filter(CalendarEvent.application_id.in_(collab_ids))
+            .filter(or_(*filters))
             .order_by(CalendarEvent.event_date.asc())
             .all()
-            if collab_ids
+            if filters
             else []
         )
 
@@ -316,7 +351,14 @@ async def delete_calendar_event(
     if not event:
         raise HTTPException(status_code=404, detail="Event not found")
 
-    _get_authorized_collab(db, current_user, event.application_id)
+    if event.application_id:
+        _get_authorized_collab(db, current_user, event.application_id)
+    elif event.campaign_id:
+        campaign = db.query(Campaign).filter(Campaign.id == event.campaign_id).first()
+        if not campaign or current_user.role != "business" or campaign.business_id != current_user.id:
+            raise HTTPException(status_code=403, detail="You're not part of this campaign")
+    else:
+        raise HTTPException(status_code=404, detail="Event not found")
 
     db.delete(event)
     db.commit()
@@ -526,10 +568,10 @@ async def review_deliverable(
                     db.add(CalendarEvent(
                         application_id=application.id, created_by=campaign.business_id,
                         title=f"Publish: {deliverable.title}",
-                        description=f"Publish the approved content on {campaign.required_platform or 'the required platform'} and submit publication proof.",
+                        description=f"Publish the approved content on {_format_platforms(campaign)} and submit publication proof.",
                         event_date=campaign.publication_deadline, event_type="posting_date",
                     ))
-                create_notification(db, user_id=application.creator_id, type="publication_ready", title="Content approved — publish now", message=f"{deliverable.title} is approved. Publish it on {campaign.required_platform or 'the required platform'} and submit the post URL and proof by the campaign deadline.", link=f"/workspace/deliverables?collab={application.id}", event_key=f"publication-ready:{deliverable.id}")
+                create_notification(db, user_id=application.creator_id, type="publication_ready", title="Content approved — publish now", message=f"{deliverable.title} is approved. Publish it on {_format_platforms(campaign)} and submit the post URL and proof by the campaign deadline.", link=f"/workspace/deliverables?collab={application.id}", event_key=f"publication-ready:{deliverable.id}")
         else:
             create_notification(db, user_id=application.creator_id, type="revision_requested", title="Revision requested", message=f"The brand requested changes to {deliverable.title}.", link=f"/workspace/deliverables?collab={application.id}", event_key=f"revision-requested:{deliverable.id}:{deliverable.updated_at or deliverable.created_at}")
         db.commit()

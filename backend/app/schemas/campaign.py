@@ -65,6 +65,17 @@ class CampaignBase(BaseModel):
     hero_image: Optional[str] = None
     extra_photos: Optional[List[str]] = None  # ← ADD THIS
 
+    # Completion / publication requirements
+    completion_mode: str = "approval_only"  # approval_only | publication_required
+    required_platforms: Optional[List[str]] = None
+    required_post_types: Optional[List[str]] = None
+    publication_deadline: Optional[datetime] = None
+    required_mentions: Optional[List[str]] = None
+
+    # Deprecated single-value fields — still accepted so older clients don't break.
+    required_platform: Optional[str] = None
+    required_post_type: Optional[str] = None
+
 # ===== CREATE =====
 class CampaignCreate(CampaignBase):
     pass
@@ -103,6 +114,15 @@ class CampaignUpdate(BaseModel):
     hero_image: Optional[str] = None
     extra_photos: Optional[List[str]] = None  # ← ADD THIS
     is_active: Optional[bool] = None
+
+    # Completion / publication requirements
+    completion_mode: Optional[str] = None
+    required_platforms: Optional[List[str]] = None
+    required_post_types: Optional[List[str]] = None
+    publication_deadline: Optional[datetime] = None
+    required_mentions: Optional[List[str]] = None
+    required_platform: Optional[str] = None  # deprecated
+    required_post_type: Optional[str] = None  # deprecated
 
 # ===== RESPONSE =====
 class CampaignResponse(CampaignBase):

@@ -92,6 +92,13 @@ def ensure_schema() -> None:
         "ALTER TABLE campaigns ADD COLUMN IF NOT EXISTS required_post_type VARCHAR(50)",
         "ALTER TABLE campaigns ADD COLUMN IF NOT EXISTS publication_deadline TIMESTAMPTZ",
         "ALTER TABLE campaigns ADD COLUMN IF NOT EXISTS required_mentions JSONB",
+        "ALTER TABLE campaigns ADD COLUMN IF NOT EXISTS required_platforms JSONB",
+        "ALTER TABLE campaigns ADD COLUMN IF NOT EXISTS required_post_types JSONB",
+        # Backfill the new multi-select columns from any existing single-value data.
+        "UPDATE campaigns SET required_platforms = to_jsonb(ARRAY[required_platform]) "
+        "WHERE required_platforms IS NULL AND required_platform IS NOT NULL",
+        "UPDATE campaigns SET required_post_types = to_jsonb(ARRAY[required_post_type]) "
+        "WHERE required_post_types IS NULL AND required_post_type IS NOT NULL",
 
         # ----------------------------------------------------
         # APPLICATIONS
@@ -114,6 +121,16 @@ def ensure_schema() -> None:
         # NOTIFICATIONS
         # ----------------------------------------------------
         "ALTER TABLE notifications ADD COLUMN IF NOT EXISTS event_key VARCHAR(255)",
+
+        # ----------------------------------------------------
+        # CALENDAR EVENTS
+        # ----------------------------------------------------
+        # Campaign-level events (application deadline, deliverable deadline,
+        # publication deadline) exist from the moment a campaign is
+        # published, before any creator is accepted — so application_id can
+        # no longer be required.
+        "ALTER TABLE calendar_events ADD COLUMN IF NOT EXISTS campaign_id INTEGER REFERENCES campaigns(id)",
+        "ALTER TABLE calendar_events ALTER COLUMN application_id DROP NOT NULL",
 
         # ----------------------------------------------------
         # CAMPAIGN PERFORMANCE / ROI
