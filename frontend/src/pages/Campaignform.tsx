@@ -335,6 +335,10 @@ export function CampaignForm({ mode }: { mode: 'create' | 'edit' }) {
   const [deadline, setDeadline] = useState('');
   const [deliverableDeadline, setDeliverableDeadline] = useState('');
   const [creatorsNeeded, setCreatorsNeeded] = useState('1');
+  const [completionMode, setCompletionMode] = useState<'approval_only' | 'publication_required'>('approval_only');
+  const [requiredPlatform, setRequiredPlatform] = useState('instagram');
+  const [requiredPostType, setRequiredPostType] = useState('reel');
+  const [publicationDeadline, setPublicationDeadline] = useState('');
 
   const [requirements, setRequirements] = useState('');
   const [creatorRequirements, setCreatorRequirements] = useState<CreatorRequirements>({ categories: [] });
@@ -406,6 +410,10 @@ export function CampaignForm({ mode }: { mode: 'create' | 'edit' }) {
         setDeadline(c.application_deadline ? c.application_deadline.slice(0, 10) : (c.deadline ? c.deadline.slice(0, 10) : ''));
         setDeliverableDeadline(c.deliverable_deadline ? c.deliverable_deadline.slice(0, 10) : '');
         setCreatorsNeeded(String(c.creators_needed || 1));
+        setCompletionMode(c.completion_mode === 'publication_required' ? 'publication_required' : 'approval_only');
+        setRequiredPlatform(c.required_platform || 'instagram');
+        setRequiredPostType(c.required_post_type || 'reel');
+        setPublicationDeadline(c.publication_deadline ? c.publication_deadline.slice(0, 10) : '');
         setApplicationQuestions(c.application_questions || []);
         setRequirements(c.requirements || '');
         const loadedRequirements: CreatorRequirements = c.creator_requirements || { categories: [] };
@@ -604,6 +612,10 @@ export function CampaignForm({ mode }: { mode: 'create' | 'edit' }) {
         application_deadline: deadline ? new Date(deadline).toISOString() : undefined,
         deliverable_deadline: deliverableDeadline ? new Date(deliverableDeadline).toISOString() : undefined,
         creators_needed: Number(creatorsNeeded) || 1,
+        completion_mode: completionMode,
+        required_platform: completionMode === 'publication_required' ? requiredPlatform : undefined,
+        required_post_type: completionMode === 'publication_required' ? requiredPostType : undefined,
+        publication_deadline: completionMode === 'publication_required' && publicationDeadline ? new Date(publicationDeadline).toISOString() : undefined,
         application_questions: applicationQuestions.filter((q) => q.trim()),
         requirements: requirements.trim() || undefined,
         creator_requirements: {
@@ -1097,6 +1109,20 @@ export function CampaignForm({ mode }: { mode: 'create' | 'edit' }) {
                             <input className="cc-input" type="number" min="1" max="100" value={creatorsNeeded} onChange={(e) => setCreatorsNeeded(e.target.value)} />
                           </div>
                         </div>
+
+                        <div className="cc-field" style={{marginTop:12}}>
+                          <label className="cc-label">Completion & payment protection</label>
+                          <select className="cc-input" value={completionMode} onChange={(e) => setCompletionMode(e.target.value as any)}>
+                            <option value="approval_only">Content approval is the final requirement</option>
+                            <option value="publication_required">Require social publication + proof</option>
+                          </select>
+                          <div className="cc-hint">Paid campaigns are funded at the agreed amount before work starts. Payment is released only after requirements are verified.</div>
+                        </div>
+                        {completionMode === 'publication_required' && <div className="cc-row">
+                          <div className="cc-field"><label className="cc-label">Required platform</label><select className="cc-input" value={requiredPlatform} onChange={(e)=>setRequiredPlatform(e.target.value)}><option value="instagram">Instagram</option><option value="tiktok">TikTok</option><option value="youtube">YouTube</option><option value="facebook">Facebook</option></select></div>
+                          <div className="cc-field"><label className="cc-label">Post type</label><select className="cc-input" value={requiredPostType} onChange={(e)=>setRequiredPostType(e.target.value)}><option value="reel">Reel / Short video</option><option value="post">Post</option><option value="story">Story</option><option value="video">Video</option></select></div>
+                          <div className="cc-field"><label className="cc-label">Publication deadline</label><input className="cc-input" type="date" value={publicationDeadline} onChange={(e)=>setPublicationDeadline(e.target.value)} /></div>
+                        </div>}
 
                         <div className="cc-row">
                           <div className="cc-field">

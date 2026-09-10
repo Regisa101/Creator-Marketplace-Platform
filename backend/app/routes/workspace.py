@@ -1,4 +1,5 @@
 from typing import Optional
+from datetime import datetime, timedelta, timezone
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
@@ -85,14 +86,21 @@ def _collab_to_response(db: Session, application: Application) -> CollabResponse
         creator_name=(creator.profile or {}).get("display_name") if creator and creator.profile else (creator.full_name if creator else None),
         creator_avatar=(creator.profile or {}).get("profile_image") if creator and creator.profile else None,
         rate=float(application.rate) if application.rate is not None else None,
+        agreed_rate=float(application.agreed_rate) if application.agreed_rate is not None else None,
+        rate_locked=bool(application.rate_locked),
+        negotiation_status=application.negotiation_status or "not_started",
         status=application.status,
         created_at=application.created_at,
         pending_deliverables=pending_deliverables,
         unread_messages=0,
         payment_status=latest_payment.status if latest_payment else None,
-        amount_paid=float(latest_payment.amount) if latest_payment and latest_payment.status == "completed" else None,
+        amount_paid=float(latest_payment.amount) if latest_payment and latest_payment.status == "released" else None,
         rated=already_rated,
         campaign_type=campaign.campaign_type.value if campaign and hasattr(campaign.campaign_type, "value") else (str(campaign.campaign_type) if campaign else None),
+        completion_mode=getattr(campaign, "completion_mode", "approval_only") if campaign else None,
+        required_platform=getattr(campaign, "required_platform", None) if campaign else None,
+        required_post_type=getattr(campaign, "required_post_type", None) if campaign else None,
+        publication_deadline=getattr(campaign, "publication_deadline", None) if campaign else None,
         deliverable_deadline=application.deliverable_deadline or (campaign.deliverable_deadline if campaign else None),
         total_deliverables=len(deliverables),
         submitted_deliverables=submitted_deliverables,
@@ -341,6 +349,7 @@ def _deliverable_to_response(db: Session, deliverable: Deliverable) -> Deliverab
         due_date=deliverable.due_date,
         status=deliverable.status,
         file_url=deliverable.file_url,
+        media_type=deliverable.media_type,
         submission_note=deliverable.submission_note,
         feedback=deliverable.feedback,
         submitted_at=deliverable.submitted_at,
@@ -394,6 +403,9 @@ async def create_deliverable(
         status="pending",
     )
     db.add(deliverable)
+    db.flush()
+    if deliverable.due_date:
+        db.add(CalendarEvent(application_id=application.id, created_by=current_user.id, title=f"Deliverable: {deliverable.title}", description=deliverable.description, event_date=deliverable.due_date, event_type="deadline"))
     db.commit()
     db.refresh(deliverable)
     create_notification(
@@ -423,12 +435,43 @@ async def submit_deliverable(
     application = _get_authorized_collab(db, current_user, deliverable.application_id)
     if application.creator_id != current_user.id:
         raise HTTPException(status_code=403, detail="Not your deliverable")
+    if deliverable.status not in ("pending", "revision_requested"):
+        raise HTTPException(status_code=400, detail="This deliverable is not awaiting a submission.")
+    if data.media_type not in ("image", "video"):
+        raise HTTPException(status_code=400, detail="A real image or video upload is required.")
+    if not data.file_url.strip() or "/static/uploads/" not in data.file_url:
+        raise HTTPException(status_code=400, detail="A real image or video upload from this platform is required.")
 
-    deliverable.file_url = data.file_url
+    campaign = db.query(Campaign).filter(Campaign.id == application.campaign_id).first()
+    campaign_type = getattr(campaign.campaign_type, "value", str(campaign.campaign_type)) if campaign else None
+    if campaign_type == "paid":
+        secured = db.query(Payment).filter(Payment.application_id == application.id, Payment.status.in_(["funded", "released", "completed"])).first()
+        if not secured:
+            raise HTTPException(status_code=400, detail="The brand must secure the agreed payment before you can start this deliverable.")
+    if campaign_type == "gifted":
+        from app.models import GiftFulfillment
+        fulfillment = db.query(GiftFulfillment).filter(GiftFulfillment.application_id == application.id).first()
+        if not fulfillment or fulfillment.status != "received":
+            raise HTTPException(status_code=400, detail="Confirm that you received the gifted product before submitting deliverables.")
+
+    deliverable.file_url = data.file_url.strip()
+    deliverable.media_type = data.media_type
     deliverable.submission_note = data.submission_note
     deliverable.status = "submitted"
     deliverable.submitted_at = datetime.now(timezone.utc)
     deliverable.feedback = None
+    # Give the brand a concrete review window and put it on both parties' timeline.
+    review_due = deliverable.submitted_at + timedelta(hours=48)
+    if not db.query(CalendarEvent).filter(
+        CalendarEvent.application_id == application.id,
+        CalendarEvent.title == f"Review: {deliverable.title}",
+    ).first():
+        db.add(CalendarEvent(
+            application_id=application.id, created_by=application.creator_id,
+            title=f"Review: {deliverable.title}",
+            description=f"Brand review window for {deliverable.title}.",
+            event_date=review_due, event_type="deadline",
+        ))
     db.commit()
     application = db.query(Application).filter(Application.id == deliverable.application_id).first()
     campaign = db.query(Campaign).filter(Campaign.id == application.campaign_id).first() if application else None
@@ -463,6 +506,8 @@ async def review_deliverable(
 
     if deliverable.status != "submitted":
         raise HTTPException(status_code=400, detail="Deliverable hasn't been submitted yet")
+    if not deliverable.file_url or deliverable.media_type not in ("image", "video"):
+        raise HTTPException(status_code=400, detail="This deliverable has no valid image/video submission to review.")
 
     deliverable.status = data.status
     deliverable.feedback = data.feedback
@@ -473,6 +518,18 @@ async def review_deliverable(
     if application and campaign:
         if data.status == "approved":
             create_notification(db, user_id=application.creator_id, type="deliverable_approved", title="Deliverable approved", message=f"{deliverable.title} was approved by the brand.", link=f"/workspace/deliverables?collab={application.id}", event_key=f"deliverable-approved:{deliverable.id}")
+            if getattr(campaign, "completion_mode", "approval_only") == "publication_required" and campaign.publication_deadline:
+                if not db.query(CalendarEvent).filter(
+                    CalendarEvent.application_id == application.id,
+                    CalendarEvent.title == f"Publish: {deliverable.title}",
+                ).first():
+                    db.add(CalendarEvent(
+                        application_id=application.id, created_by=campaign.business_id,
+                        title=f"Publish: {deliverable.title}",
+                        description=f"Publish the approved content on {campaign.required_platform or 'the required platform'} and submit publication proof.",
+                        event_date=campaign.publication_deadline, event_type="posting_date",
+                    ))
+                create_notification(db, user_id=application.creator_id, type="publication_ready", title="Content approved — publish now", message=f"{deliverable.title} is approved. Publish it on {campaign.required_platform or 'the required platform'} and submit the post URL and proof by the campaign deadline.", link=f"/workspace/deliverables?collab={application.id}", event_key=f"publication-ready:{deliverable.id}")
         else:
             create_notification(db, user_id=application.creator_id, type="revision_requested", title="Revision requested", message=f"The brand requested changes to {deliverable.title}.", link=f"/workspace/deliverables?collab={application.id}", event_key=f"revision-requested:{deliverable.id}:{deliverable.updated_at or deliverable.created_at}")
         db.commit()
@@ -485,16 +542,22 @@ async def review_deliverable(
         if all_approved:
             from app.models import Campaign, Payment
             campaign = db.query(Campaign).filter(Campaign.id == application.campaign_id).first()
-            if campaign and campaign.campaign_type.value == "gifted":
+            campaign_type = getattr(campaign.campaign_type, "value", str(campaign.campaign_type)) if campaign else None
+            if campaign and campaign_type == "gifted":
                 from app.models import GiftFulfillment
                 fulfillment = db.query(GiftFulfillment).filter(GiftFulfillment.application_id == application.id).first()
                 if fulfillment and fulfillment.status == "received":
                     application.status = "completed"
             else:
-                paid = db.query(Payment).filter(Payment.application_id == application.id, Payment.status == "completed").first()
-                if paid:
-                    application.status = "completed"
+                if getattr(campaign, "completion_mode", "approval_only") != "publication_required":
+                    paid = db.query(Payment).filter(Payment.application_id == application.id, Payment.status == "released").first()
+                    if paid:
+                        application.status = "completed"
             db.commit()
+            if application.status != "completed" and campaign and getattr(campaign, "completion_mode", "approval_only") == "approval_only":
+                from app.routes.publication import maybe_complete
+                maybe_complete(db, application)
+                db.commit()
             if application.status == "completed" and campaign:
                 _maybe_complete_campaign(db, campaign)
 

@@ -16,7 +16,8 @@ class Deliverable(Base):
     # pending -> submitted -> approved | revision_requested -> submitted -> ...
     status = Column(String(50), default="pending")
 
-    file_url = Column(String(255), nullable=True)
+    file_url = Column(String(500), nullable=True)
+    media_type = Column(String(20), nullable=True)  # image | video
     submission_note = Column(Text, nullable=True)
     feedback = Column(Text, nullable=True)
 

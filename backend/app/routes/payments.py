@@ -18,7 +18,7 @@ from app.routes.workspace import _get_authorized_collab
 router = APIRouter(prefix="/api/payments", tags=["Payments"])
 
 _STATUS_MAP = {
-    "Completed": "completed",
+    "Completed": "funded",
     "Pending": "initiated",
     "Initiated": "initiated",
     "Refunded": "refunded",
@@ -45,7 +45,7 @@ def _payment_to_response(payment: Payment) -> PaymentResponse:
 
 
 def _complete_local_payment(db: Session, payment: Payment, payment_method: str = "demo_wallet", metadata: dict | None = None) -> Payment:
-    payment.status = "completed"
+    payment.status = "funded"
     payment.method = payment_method
     payment.transaction_id = payment.transaction_id or f"DEMO-{uuid4().hex[:12].upper()}"
     payment.paid_at = payment.paid_at or datetime.now(timezone.utc)
@@ -55,41 +55,8 @@ def _complete_local_payment(db: Session, payment: Payment, payment_method: str =
     application = db.query(Application).filter(Application.id == payment.application_id).first()
     campaign = db.query(Campaign).filter(Campaign.id == application.campaign_id).first() if application else None
     if application and campaign:
-        deliverables = db.query(Deliverable).filter(Deliverable.application_id == application.id).all()
-        all_approved = (not deliverables) or all(d.status == "approved" for d in deliverables)
-        if all_approved:
-            application.status = "completed"
-            create_notification(
-                db, user_id=application.creator_id, type="payment_received",
-                title="Payment received",
-                message=f"You received Rs. {float(payment.amount):,.2f} for {campaign.title}.",
-                link="/workspace/history",
-                event_key=f"payment-received:{payment.id}",
-            )
-            create_notification(
-                db, user_id=campaign.business_id, type="payment_completed",
-                title="Payment completed",
-                message=f"Your Rs. {float(payment.amount):,.2f} payment for {campaign.title} was recorded successfully.",
-                link=f"/workspace/active",
-                event_key=f"payment-completed-business:{payment.id}",
-            )
-
-            required = campaign.creators_needed or 1
-            selected = db.query(Application).filter(
-                Application.campaign_id == campaign.id,
-                Application.status.in_(["accepted", "completed"]),
-            ).all()
-            completed_count = sum(1 for a in selected if a.status == "completed")
-            if len(selected) >= required and completed_count >= required:
-                campaign.status = "completed"
-                campaign.is_active = False
-                create_notification(
-                    db, user_id=campaign.business_id, type="campaign_completed",
-                    title="Campaign completed",
-                    message=f"All creator collaborations for {campaign.title} are complete.",
-                    link="/workspace/history",
-                    event_key=f"campaign-completed:{campaign.id}",
-                )
+        create_notification(db,user_id=application.creator_id,type="payment_funded",title="Payment secured",message=f"Rs. {float(payment.amount):,.2f} is secured for {campaign.title} and will be released after verification.",link=f"/workspace/active?collab={application.id}",event_key=f"payment-funded:{payment.id}")
+        create_notification(db,user_id=campaign.business_id,type="payment_funded",title="Payment secured",message=f"Rs. {float(payment.amount):,.2f} has been secured for {campaign.title}.",link=f"/workspace/active?collab={application.id}",event_key=f"payment-funded-business:{payment.id}")
 
     db.commit()
     db.refresh(payment)
@@ -110,13 +77,15 @@ async def initiate(
     if campaign and getattr(campaign.campaign_type, "value", str(campaign.campaign_type)) == "gifted":
         raise HTTPException(status_code=400, detail="Gifted collaborations do not require payment.")
 
-    amount = data.amount if data.amount is not None else (float(application.rate) if application.rate is not None else None)
-    if amount is None:
-        raise HTTPException(status_code=400, detail="No rate is set for this collaboration — specify an amount to pay.")
+    # Never accept a payment amount from the browser. The only payable amount
+    # is the immutable, mutually agreed rate recorded on the application.
+    if not application.rate_locked or application.agreed_rate is None:
+        raise HTTPException(status_code=400, detail="Payment is unavailable until the payment amount has been agreed and locked.")
+    amount = float(application.agreed_rate)
     if amount <= 0:
-        raise HTTPException(status_code=400, detail="Amount must be greater than zero")
+        raise HTTPException(status_code=400, detail="The agreed payment amount must be greater than zero.")
 
-    latest_completed = db.query(Payment).filter(Payment.application_id == application.id, Payment.status == "completed").first()
+    latest_completed = db.query(Payment).filter(Payment.application_id == application.id, Payment.status.in_(["funded", "completed", "released"])).first()
     if latest_completed:
         raise HTTPException(status_code=400, detail="This collaboration has already been paid.")
 
@@ -215,6 +184,25 @@ async def verify(
     return _payment_to_response(payment)
 
 
+@router.post("/release/{collab_id}", response_model=PaymentResponse)
+async def release_payment(collab_id:int, db:Session=Depends(get_db), current_user:User=Depends(get_current_business)):
+    application=_get_authorized_collab(db,current_user,collab_id)
+    payment=db.query(Payment).filter(Payment.application_id==collab_id,Payment.status.in_(["funded","completed"])).order_by(Payment.created_at.desc()).first()
+    if not payment: raise HTTPException(400,"No secured payment is available to release.")
+    campaign=db.query(Campaign).filter(Campaign.id==application.campaign_id).first()
+    ds=db.query(Deliverable).filter(Deliverable.application_id==application.id).all()
+    if ds and not all(d.status=="approved" for d in ds): raise HTTPException(400,"All deliverables must be approved before payment release.")
+    if getattr(campaign,"completion_mode","approval_only")=="publication_required":
+        from app.models import PublicationProof
+        ps=db.query(PublicationProof).filter(PublicationProof.application_id==application.id).all()
+        if not ps or not all(x.status=="verified" for x in ps): raise HTTPException(400,"Publication proof must be verified before payment release.")
+    payment.status="released"; application.status="completed"
+    create_notification(db,user_id=application.creator_id,type="payment_released",title="Payment released",message=f"Rs. {float(payment.amount):,.2f} has been released for {campaign.title}.",link="/workspace/history",event_key=f"payment-released:{payment.id}")
+    create_notification(db,user_id=campaign.business_id,type="campaign_completed",title="Campaign completed",message=f"{campaign.title} is complete and the agreed payment of Rs. {float(payment.amount):,.2f} has been released.",link="/workspace/history",event_key=f"campaign-completed:{application.id}")
+    from app.routes.workspace import _maybe_complete_campaign
+    _maybe_complete_campaign(db, campaign)
+    db.commit(); db.refresh(payment); return _payment_to_response(payment)
+
 @router.get("/by-collab/{collab_id}", response_model=list[PaymentResponse])
 async def list_for_collab(collab_id: int, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
     _get_authorized_collab(db, current_user, collab_id)
@@ -231,7 +219,7 @@ async def payment_summary(db: Session = Depends(get_db), current_user: User = De
         db.query(Payment)
         .join(Application, Payment.application_id == Application.id)
         .join(Campaign, Application.campaign_id == Campaign.id)
-        .filter(Payment.status == "completed")
+        .filter(Payment.status == "released")
     )
     if current_user.role == "creator":
         base_query = base_query.filter(Application.creator_id == current_user.id)

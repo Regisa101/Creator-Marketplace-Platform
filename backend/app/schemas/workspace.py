@@ -18,6 +18,9 @@ class CollabResponse(BaseModel):
     creator_name: Optional[str] = None
     creator_avatar: Optional[str] = None
     rate: Optional[float] = None
+    agreed_rate: Optional[float] = None
+    rate_locked: bool = False
+    negotiation_status: str = "not_started"
     status: str
     created_at: datetime
 
@@ -31,6 +34,10 @@ class CollabResponse(BaseModel):
     amount_paid: Optional[float] = None
     rated: bool = False
     campaign_type: Optional[str] = None
+    completion_mode: Optional[str] = None
+    required_platform: Optional[str] = None
+    required_post_type: Optional[str] = None
+    publication_deadline: Optional[datetime] = None
     deliverable_deadline: Optional[datetime] = None
     total_deliverables: int = 0
     submitted_deliverables: int = 0
@@ -103,6 +110,7 @@ class DeliverableCreate(BaseModel):
 
 class DeliverableSubmit(BaseModel):
     file_url: str
+    media_type: str  # image | video
     submission_note: Optional[str] = None
 
 
@@ -121,6 +129,7 @@ class DeliverableResponse(BaseModel):
     due_date: Optional[datetime] = None
     status: str
     file_url: Optional[str] = None
+    media_type: Optional[str] = None
     submission_note: Optional[str] = None
     feedback: Optional[str] = None
     submitted_at: Optional[datetime] = None

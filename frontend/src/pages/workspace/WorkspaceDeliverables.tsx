@@ -10,6 +10,14 @@ import {
   type Collab,
   type WorkspaceDeliverable,
   initiatePayment,
+  uploadMedia,
+  uploadImage,
+  getPublicationProofs,
+  submitPublicationProof,
+  reviewPublicationProof,
+  releasePayment,
+  getGiftFulfillment,
+  type GiftFulfillment,
 } from '../../api/client';
 import { useAuth } from '../../context/AuthContext';
 import { AppLayout } from '../../components/AppLayout';
@@ -50,6 +58,10 @@ export function WorkspaceDeliverables() {
   const [actingId, setActingId] = useState<number | null>(null);
   const [payingId, setPayingId] = useState<number | null>(null);
   const [paymentError, setPaymentError] = useState('');
+  const [giftFulfillment, setGiftFulfillment] = useState<GiftFulfillment | null>(null);
+  const [proofs, setProofs] = useState<any[]>([]);
+  const [proofError, setProofError] = useState('');
+  const [proofBusy, setProofBusy] = useState(false);
 
   useEffect(() => {
     getCollabs()
@@ -73,6 +85,17 @@ export function WorkspaceDeliverables() {
 
 
   const selectedCollab = selectedId ? collabs.find((c) => c.id === Number(selectedId)) : undefined;
+
+  useEffect(() => {
+    setProofs([]); setProofError('');
+    if (selectedId) getPublicationProofs(Number(selectedId)).then(setProofs).catch(() => setProofs([]));
+    setGiftFulfillment(null);
+    if (selectedCollab?.campaign_type === 'gifted') {
+      getGiftFulfillment(selectedCollab.id).then(setGiftFulfillment).catch((err) => {
+        console.error('Could not load gift fulfillment:', err);
+      });
+    }
+  }, [selectedCollab?.id, selectedCollab?.campaign_type]);
   const selectedDeliverables = selectedId
     ? deliverables.filter((d) => d.application_id === Number(selectedId))
     : [];
@@ -82,24 +105,18 @@ export function WorkspaceDeliverables() {
 
   const handlePaySelected = async () => {
     if (!selectedCollab) return;
-    let amount = selectedCollab.rate ?? undefined;
-    if (amount == null) {
-      const input = window.prompt(`Set the amount to pay for "${selectedCollab.campaign_title || 'this collab'}" (NPR):`);
-      if (!input) return;
-      const parsed = Number(input);
-      if (!Number.isFinite(parsed) || parsed <= 0) { alert('Enter a valid amount greater than 0.'); return; }
-      amount = parsed;
-    }
-    setPayingId(selectedCollab.id);
-    setPaymentError('');
-    try {
-      const result = await initiatePayment(selectedCollab.id, amount);
-      window.location.href = result.payment_url;
-    } catch (err: any) {
-      setPaymentError(err?.response?.data?.detail || 'Could not start the payment.');
-    } finally {
-      setPayingId(null);
-    }
+    setPayingId(selectedCollab.id); setPaymentError('');
+    try { const result = await initiatePayment(selectedCollab.id); window.location.href = result.payment_url; }
+    catch (err: any) { setPaymentError(err?.response?.data?.detail || 'Could not start the payment.'); }
+    finally { setPayingId(null); }
+  };
+
+  const handleRelease = async () => {
+    if (!selectedCollab) return;
+    setPayingId(selectedCollab.id); setPaymentError('');
+    try { await releasePayment(selectedCollab.id); setCollabs(await getCollabs()); }
+    catch (err: any) { setPaymentError(err?.response?.data?.detail || 'Payment cannot be released yet.'); }
+    finally { setPayingId(null); }
   };
 
   useEffect(() => {
@@ -129,6 +146,16 @@ export function WorkspaceDeliverables() {
         .wd-feedback { font-size: 12.5px; color: #d64545; background: #fdecec; padding: 10px 12px; border-radius: 8px; margin: 10px 0; }
         .wd-file-link { font-size: 12.5px; color: ${C.navy}; word-break: break-all; }
 
+        .wd-media-preview { margin-top: 12px; border: 1px solid ${C.line}; border-radius: 12px; padding: 10px; background: #fafafd; }
+        .wd-media-label { font-size: 11px; font-weight: 700; color: ${C.inkSoft}; margin-bottom: 8px; }
+        .wd-media-image, .wd-media-video { display: block; width: 100%; max-height: 420px; object-fit: contain; border-radius: 9px; background: #111; }
+        .wd-media-image { background: #f1eff6; }
+        .wd-media-footer { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; margin-top: 8px; font-size: 11px; color: ${C.inkSoft}; }
+        .wd-upload-box { border: 1.5px dashed ${C.line}; border-radius: 10px; padding: 16px; display: flex; flex-direction: column; align-items: center; gap: 5px; text-align: center; cursor: pointer; color: ${C.inkSoft}; }
+        .wd-upload-box strong { color: ${C.ink}; font-size: 12.5px; }
+        .wd-upload-box span { font-size: 10.5px; }
+        .wd-upload-box input { display: none; }
+        .wd-form-error { color: #d64545; font-size: 11.5px; }
         .wd-inline-form { display: flex; flex-direction: column; gap: 8px; margin-top: 12px; }
         .wd-inline-form input, .wd-inline-form textarea { border: 1px solid ${C.line}; border-radius: 8px; padding: 9px 12px; font: 13px/1.5 -apple-system, sans-serif; }
         .wd-inline-actions { display: flex; gap: 8px; }
@@ -142,6 +169,10 @@ export function WorkspaceDeliverables() {
         .wd-payment-note { margin-bottom: 14px; padding: 10px 12px; border-radius: 9px; background: #EAF8F0; color: #16834A; font-size: 12px; font-weight: 650; }
         .wd-payment-error { margin-bottom: 14px; padding: 10px 12px; border-radius: 9px; background: #fdecec; color: #d64545; font-size: 12px; }
 
+        .wd-gift-gate { margin-bottom: 18px; padding: 14px 16px; border: 1px solid #f2d6a1; background: #fff9ec; border-radius: 12px; display: flex; flex-direction: column; gap: 4px; color: ${C.ink}; font-size: 12.5px; }
+        .wd-gift-gate span { color: ${C.inkSoft}; }
+        .wd-gift-gate a { color: ${C.navy}; font-weight: 700; text-decoration: none; margin-top: 4px; }
+        .wd-gift-ready { margin-bottom: 18px; padding: 11px 14px; border-radius: 10px; background: #eafbf1; color: #16834a; font-size: 12px; font-weight: 700; }
         .wd-state { text-align: center; padding: 40px 20px; color: ${C.inkSoft}; font-size: 13px; }
         .wd-spin { animation: wd-spin 0.8s linear infinite; }
         @keyframes wd-spin { to { transform: rotate(360deg); } }
@@ -172,9 +203,14 @@ export function WorkspaceDeliverables() {
               {c.campaign_title || `Campaign #${c.campaign_id}`}
             </button>
           ))}
-          {isBusiness && selectedCollab && selectedCollab.campaign_type !== 'gifted' && selectedCollab.payment_status !== 'completed' && selectedAllApproved && (
+          {isBusiness && selectedCollab && selectedCollab.campaign_type !== 'gifted' && !['funded','released','completed'].includes(selectedCollab.payment_status || '') && (
             <button className="wd-pay" disabled={payingId === selectedCollab.id} onClick={handlePaySelected}>
-              <CreditCard size={14} /> {payingId === selectedCollab.id ? 'Opening payment…' : 'Pay creator'}
+              <CreditCard size={14} /> {payingId === selectedCollab.id ? 'Opening payment…' : `Secure Rs. ${selectedCollab.agreed_rate?.toLocaleString() || '—'}`}
+            </button>
+          )}
+          {isBusiness && selectedCollab?.payment_status === 'funded' && selectedAllApproved && (selectedCollab.completion_mode !== 'publication_required' || proofs.length > 0 && proofs.every(p => p.status === 'verified')) && (
+            <button className="wd-pay" disabled={payingId === selectedCollab.id} onClick={handleRelease}>
+              <CreditCard size={14} /> Release payment
             </button>
           )}
           {isBusiness && (
@@ -185,15 +221,25 @@ export function WorkspaceDeliverables() {
         </div>
 
         {paymentError && <div className="wd-payment-error">{paymentError}</div>}
-        {isBusiness && selectedCollab && selectedCollab.campaign_type !== 'gifted' && selectedCollab.payment_status !== 'completed' && (
+        {isBusiness && selectedCollab && selectedCollab.campaign_type !== 'gifted' && (
           <div className="wd-payment-note">
-            {selectedAllApproved
-              ? selectedDeliverables.length === 0
-                ? 'No deliverables were requested. This collaboration is ready for payment.'
-                : `All ${selectedDeliverables.length} deliverables are approved. This collaboration is ready for payment.`
-              : `Payment unlocks after all ${selectedDeliverables.length} deliverable${selectedDeliverables.length === 1 ? '' : 's'} are approved.`}
+            {selectedCollab.payment_status === 'funded' ? `🔒 Rs. ${(selectedCollab.agreed_rate || 0).toLocaleString()} secured. It will be released after the campaign requirements are verified.` : selectedCollab.payment_status === 'released' ? '✓ Payment released.' : `Secure the locked agreed amount (Rs. ${(selectedCollab.agreed_rate || 0).toLocaleString()}) before the creator starts work.`}
           </div>
         )}
+
+        {selectedCollab?.campaign_type === 'gifted' && giftFulfillment && !isBusiness && giftFulfillment.status !== 'received' && (
+          <div className="wd-gift-gate">
+            <strong>Product receipt required</strong>
+            <span>For this gifted campaign, confirm that you received the product in Messages before you can submit a deliverable.</span>
+            <a href={`/workspace/messages?collab=${selectedCollab.id}`}>Open gift conversation →</a>
+          </div>
+        )}
+
+        {selectedCollab?.campaign_type === 'gifted' && giftFulfillment?.status === 'received' && !isBusiness && (
+          <div className="wd-gift-ready">✓ Product received — you can now submit your authentic image/video deliverables.</div>
+        )}
+
+        {selectedCollab?.completion_mode === 'publication_required' && selectedId && <PublicationProofPanel collabId={Number(selectedId)} isBusiness={isBusiness} proofs={proofs} setProofs={setProofs} error={proofError} setError={setProofError} busy={proofBusy} setBusy={setProofBusy} platform={selectedCollab.required_platform} postType={selectedCollab.required_post_type} />}
 
         {loading && <div className="wd-state"><Loader2 size={18} className="wd-spin" /></div>}
         {!loading && error && <div className="wd-state">{error}</div>}
@@ -211,6 +257,8 @@ export function WorkspaceDeliverables() {
             busy={actingId === d.id}
             setBusy={setActingId}
             onUpdate={(updated) => setDeliverables((prev) => prev.map((x) => (x.id === updated.id ? updated : x)))}
+            giftReceived={giftFulfillment?.status === 'received'}
+            campaignType={selectedCollab?.campaign_type}
           />
         ))}
       </div>
@@ -236,45 +284,70 @@ function DeliverableCard({
   busy,
   setBusy,
   onUpdate,
+  giftReceived,
+  campaignType,
 }: {
   deliverable: WorkspaceDeliverable;
   isBusiness: boolean;
   busy: boolean;
   setBusy: (id: number | null) => void;
   onUpdate: (d: WorkspaceDeliverable) => void;
+  giftReceived: boolean;
+  campaignType?: string | null;
 }) {
   const [submitOpen, setSubmitOpen] = useState(false);
-  const [fileUrl, setFileUrl] = useState('');
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [note, setNote] = useState('');
+  const [submitError, setSubmitError] = useState('');
+  const [uploading, setUploading] = useState(false);
   const [feedback, setFeedback] = useState('');
   const [reviseOpen, setReviseOpen] = useState(false);
+  const [reviewError, setReviewError] = useState('');
   const meta = STATUS_META[deliverable.status] || STATUS_META.pending;
 
   const handleSubmit = async () => {
-    if (!fileUrl.trim()) return;
+    if (!selectedFile) {
+      setSubmitError('Upload the actual image or video file before submitting.');
+      return;
+    }
+    if (campaignType === 'gifted' && !giftReceived) {
+      setSubmitError('Confirm product receipt in Messages before submitting.');
+      return;
+    }
     setBusy(deliverable.id);
+    setUploading(true);
+    setSubmitError('');
     try {
-      const updated = await submitDeliverable(deliverable.id, { file_url: fileUrl.trim(), submission_note: note.trim() || undefined });
+      const uploaded = await uploadMedia(selectedFile);
+      const updated = await submitDeliverable(deliverable.id, {
+        file_url: uploaded.url,
+        media_type: uploaded.media_type,
+        submission_note: note.trim() || undefined,
+      });
       onUpdate(updated);
       setSubmitOpen(false);
-      setFileUrl('');
+      setSelectedFile(null);
       setNote('');
-    } catch (err) {
+    } catch (err: any) {
       console.error('Could not submit deliverable:', err);
+      setSubmitError(err?.response?.data?.detail || 'Could not upload or submit this deliverable.');
     } finally {
+      setUploading(false);
       setBusy(null);
     }
   };
 
   const handleReview = async (status: 'approved' | 'revision_requested') => {
     setBusy(deliverable.id);
+    setReviewError('');
     try {
       const updated = await reviewDeliverable(deliverable.id, { status, feedback: status === 'revision_requested' ? feedback.trim() || undefined : undefined });
       onUpdate(updated);
       setReviseOpen(false);
       setFeedback('');
-    } catch (err) {
+    } catch (err: any) {
       console.error('Could not review deliverable:', err);
+      setReviewError(err?.response?.data?.detail || 'Could not update the deliverable review.');
     } finally {
       setBusy(null);
     }
@@ -298,27 +371,41 @@ function DeliverableCard({
       {deliverable.feedback && <div className="wd-feedback">Feedback: {deliverable.feedback}</div>}
 
       {deliverable.file_url && (
-        <div className="wd-meta">
-          Submitted: <a className="wd-file-link" href={deliverable.file_url} target="_blank" rel="noreferrer">{deliverable.file_url}</a>
-          {deliverable.submission_note ? ` — ${deliverable.submission_note}` : ''}
+        <div className="wd-media-preview">
+          <div className="wd-media-label">Creator submission</div>
+          {deliverable.media_type === 'video' ? (
+            <video className="wd-media-video" src={deliverable.file_url} controls preload="metadata" />
+          ) : (
+            <img className="wd-media-image" src={deliverable.file_url} alt={`${deliverable.title} submission`} />
+          )}
+          <div className="wd-media-footer">
+            <a className="wd-file-link" href={deliverable.file_url} target="_blank" rel="noreferrer">Open full media</a>
+            {deliverable.submission_note ? <span>{deliverable.submission_note}</span> : null}
+          </div>
         </div>
       )}
 
       {!isBusiness && (deliverable.status === 'pending' || deliverable.status === 'revision_requested') && (
         submitOpen ? (
           <div className="wd-inline-form">
-            <input placeholder="Link to your content (drive, video, etc.)" value={fileUrl} onChange={(e) => setFileUrl(e.target.value)} />
+            <label className="wd-upload-box">
+              <Upload size={18} />
+              <strong>{selectedFile ? selectedFile.name : 'Upload the actual image or video'}</strong>
+              <span>JPG, PNG, WebP, GIF, MP4, WebM or MOV · up to 100 MB</span>
+              <input type="file" accept="image/jpeg,image/png,image/webp,image/gif,video/mp4,video/webm,video/quicktime" onChange={(e) => setSelectedFile(e.target.files?.[0] || null)} />
+            </label>
             <textarea rows={2} placeholder="Note (optional)" value={note} onChange={(e) => setNote(e.target.value)} />
+            {submitError && <div className="wd-form-error">{submitError}</div>}
             <div className="wd-inline-actions">
-              <button className="wd-btn wd-btn--primary" disabled={busy || !fileUrl.trim()} onClick={handleSubmit}>
-                {busy ? <Loader2 size={13} className="wd-spin" /> : <Upload size={13} />} Submit
+              <button className="wd-btn wd-btn--primary" disabled={busy || uploading || !selectedFile || (campaignType === 'gifted' && !giftReceived)} onClick={handleSubmit}>
+                {busy ? <Loader2 size={13} className="wd-spin" /> : <Upload size={13} />} {uploading ? 'Uploading…' : 'Submit'}
               </button>
-              <button className="wd-btn wd-btn--ghost" onClick={() => setSubmitOpen(false)}>Cancel</button>
+              <button className="wd-btn wd-btn--ghost" onClick={() => { setSubmitOpen(false); setSubmitError(''); }}>Cancel</button>
             </div>
           </div>
         ) : (
           <div className="wd-inline-actions">
-            <button className="wd-btn wd-btn--primary" onClick={() => setSubmitOpen(true)}>
+            <button className="wd-btn wd-btn--primary" disabled={campaignType === 'gifted' && !giftReceived} onClick={() => { setSubmitOpen(true); setSubmitError(''); }}>
               <Upload size={13} /> Submit content
             </button>
           </div>
@@ -326,7 +413,9 @@ function DeliverableCard({
       )}
 
       {isBusiness && deliverable.status === 'submitted' && (
-        reviseOpen ? (
+        <>
+        {reviewError && <div className="wd-form-error">{reviewError}</div>}
+        {reviseOpen ? (
           <div className="wd-inline-form">
             <textarea rows={2} placeholder="What needs to change?" value={feedback} onChange={(e) => setFeedback(e.target.value)} />
             <div className="wd-inline-actions">
@@ -345,10 +434,18 @@ function DeliverableCard({
               <RefreshCw size={13} /> Request revision
             </button>
           </div>
-        )
+        )}
+        </>
       )}
     </div>
   );
+}
+
+function PublicationProofPanel({ collabId, isBusiness, proofs, setProofs, error, setError, busy, setBusy, platform, postType }: any) {
+  const [url,setUrl]=useState(''); const [file,setFile]=useState<File|null>(null); const [feedback,setFeedback]=useState('');
+  const submit=async()=>{ if(!url.trim()){setError('Add the public post URL.');return;} setBusy(true);setError(''); try{let screenshot_url;if(file)screenshot_url=(await uploadImage(file)).url;const p=await submitPublicationProof(collabId,{platform:platform||'social',post_type:postType||undefined,post_url:url.trim(),screenshot_url});setProofs((x:any[])=>[p,...x]);setUrl('');setFile(null);}catch(e:any){setError(e?.response?.data?.detail||'Could not submit proof.')}finally{setBusy(false)}};
+  const review=async(id:number,status:string)=>{setBusy(true);setError('');try{const p=await reviewPublicationProof(collabId,id,{status,feedback:status==='correction_requested'?feedback.trim()||'Please correct the publication proof.':undefined});setProofs((x:any[])=>x.map(a=>a.id===id?p:a));setFeedback('')}catch(e:any){setError(e?.response?.data?.detail||'Could not review proof.')}finally{setBusy(false)}};
+  return <div className="wd-card" style={{border:'1px solid #d9d5ef'}}><div className="wd-title">📱 Publication verification</div><div className="wd-sub">{platform?`Required platform: ${platform}`:'Publish the approved content and submit proof.'}{postType?` · ${postType}`:''}</div>{!isBusiness && proofs.every((p:any)=>p.status!=='pending') && <div className="wd-inline-form"><input value={url} onChange={e=>setUrl(e.target.value)} placeholder="Public post URL (https://...)"/><label className="wd-upload-box"><Upload size={16}/><strong>{file?file.name:'Upload publication screenshot'}</strong><span>Optional screenshot evidence</span><input type="file" accept="image/*" onChange={e=>setFile(e.target.files?.[0]||null)}/></label>{error&&<div className="wd-form-error">{error}</div>}<button className="wd-btn wd-btn--primary" disabled={busy} onClick={submit}>{busy?'Submitting…':'Submit publication proof'}</button></div>}{proofs.map((p:any)=><div key={p.id} style={{marginTop:12,padding:12,border:'1px solid #eeeaf5',borderRadius:10}}><div style={{fontSize:12,fontWeight:700}}>{p.platform} · {p.status}</div><a className="wd-file-link" href={p.post_url} target="_blank" rel="noreferrer">Open published post</a>{p.screenshot_url&&<img className="wd-media-image" style={{marginTop:8,maxHeight:240}} src={p.screenshot_url} alt="Publication proof"/>}{p.feedback&&<div className="wd-feedback">{p.feedback}</div>}{isBusiness&&p.status==='pending'&&<div className="wd-inline-actions" style={{marginTop:8}}><button className="wd-btn wd-btn--approve" disabled={busy} onClick={()=>review(p.id,'verified')}><Check size={13}/> Verify</button><button className="wd-btn wd-btn--revise" disabled={busy} onClick={()=>review(p.id,'correction_requested')}><RefreshCw size={13}/> Request correction</button></div>}</div>)}{!proofs.length&&<div className="wd-sub" style={{marginTop:10}}>No publication proof submitted yet.</div>}{error&&isBusiness&&<div className="wd-form-error" style={{marginTop:8}}>{error}</div>} </div>
 }
 
 function RequestModal({

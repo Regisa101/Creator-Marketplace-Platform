@@ -31,6 +31,11 @@ class ApplicationResponse(ApplicationBase):
     creator_name: Optional[str] = None
     creator_avatar: Optional[str] = None
     campaign_title: Optional[str] = None
+    agreed_rate: Optional[float] = None
+    rate_locked: bool = False
+    negotiation_status: str = "not_started"
+    campaign_budget: Optional[float] = None
+    campaign_type: Optional[str] = None
     match_score: Optional[int] = None
     match_breakdown: Optional[List[dict]] = None
     match_reasons: Optional[List[str]] = None

@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Check, X, DollarSign, Loader2 } from 'lucide-react';
-import { getApplications, updateApplicationStatus, type Application, type ApplicationStatus } from '../api/client';
+import { Check, X, DollarSign, Loader2, MessageCircle, ShieldCheck } from 'lucide-react';
+import { getApplications, updateApplicationStatus, getNegotiation, makeNegotiationOffer, acceptNegotiationOffer, rejectNegotiationOffer, type Application, type ApplicationStatus, type NegotiationOffer } from '../api/client';
 import { useAuth } from '../context/AuthContext';
 import { AppLayout } from '../components/AppLayout';
 
@@ -37,6 +37,12 @@ export function ApplicationsInbox() {
   const [activeTab, setActiveTab] = useState<ApplicationStatus | 'all'>('pending');
   const [actingOn, setActingOn] = useState<number | null>(null);
   const [actionError, setActionError] = useState<{ id: number; message: string } | null>(null);
+  const [negotiatingApp, setNegotiatingApp] = useState<Application | null>(null);
+  const [offers, setOffers] = useState<NegotiationOffer[]>([]);
+  const [offerAmount, setOfferAmount] = useState('');
+  const [offerMessage, setOfferMessage] = useState('');
+  const [negotiationLoading, setNegotiationLoading] = useState(false);
+  const [negotiationError, setNegotiationError] = useState('');
 
   const load = async () => {
     setLoading(true);
@@ -114,6 +120,56 @@ export function ApplicationsInbox() {
     } finally {
       setActingOn(null);
     }
+  };
+
+  const openNegotiation = async (app: Application) => {
+    setNegotiatingApp(app);
+    setNegotiationError('');
+    setOfferAmount(app.agreed_rate?.toString() || app.rate?.toString() || app.campaign_budget?.toString() || '');
+    setOfferMessage('');
+    try {
+      setNegotiationLoading(true);
+      setOffers(await getNegotiation(app.id));
+    } catch (err: any) {
+      setNegotiationError(err?.response?.data?.detail || 'Could not load negotiation.');
+    } finally {
+      setNegotiationLoading(false);
+    }
+  };
+
+  const refreshNegotiation = async () => {
+    if (!negotiatingApp) return;
+    setOffers(await getNegotiation(negotiatingApp.id));
+    const apps = await getApplications();
+    setApplications(apps);
+    const updated = apps.find((a) => a.id === negotiatingApp.id);
+    if (updated) setNegotiatingApp(updated);
+  };
+
+  const sendOffer = async () => {
+    if (!negotiatingApp) return;
+    const amount = Number(offerAmount);
+    if (!Number.isFinite(amount) || amount <= 0) { setNegotiationError('Enter a valid amount greater than 0.'); return; }
+    try {
+      setNegotiationLoading(true); setNegotiationError('');
+      await makeNegotiationOffer(negotiatingApp.id, amount, offerMessage.trim() || undefined);
+      setOfferMessage('');
+      await refreshNegotiation();
+    } catch (err: any) {
+      setNegotiationError(err?.response?.data?.detail || 'Could not send the offer.');
+    } finally { setNegotiationLoading(false); }
+  };
+
+  const respondToOffer = async (offer: NegotiationOffer, action: 'accept' | 'reject') => {
+    if (!negotiatingApp) return;
+    try {
+      setNegotiationLoading(true); setNegotiationError('');
+      if (action === 'accept') await acceptNegotiationOffer(negotiatingApp.id, offer.id);
+      else await rejectNegotiationOffer(negotiatingApp.id, offer.id);
+      await refreshNegotiation();
+    } catch (err: any) {
+      setNegotiationError(err?.response?.data?.detail || 'Could not respond to the offer.');
+    } finally { setNegotiationLoading(false); }
   };
 
   const counts = useMemo(() => {
@@ -229,6 +285,31 @@ export function ApplicationsInbox() {
         .ai-match-chip--good { color:#16834A; background:#F0FAF4; border-color:#CDEEDB; }
         .ai-why { font-size:11.5px; color:${C.inkSoft}; line-height:1.5; background:#FAFAFD; border-radius:8px; padding:8px 10px; margin-bottom:11px; }
 
+        .ai-negotiate { display:inline-flex;align-items:center;gap:6px;font-size:13px;font-weight:700;border:1px solid ${C.navy};background:#fff;color:${C.navy};border-radius:8px;padding:8px 14px;cursor:pointer; }
+        .ai-select { display:inline-flex;align-items:center;gap:6px;font-size:13px;font-weight:700;border:0;background:#1a8a4a;color:#fff;border-radius:8px;padding:8px 14px;cursor:pointer; }
+        .ai-select:disabled,.ai-negotiate:disabled { opacity:.55;cursor:not-allowed; }
+        .ai-neg-summary { margin:10px 0 12px;padding:10px 12px;border:1px solid ${C.line};border-radius:10px;background:#FAFAFD;font-size:12px;color:${C.inkSoft}; }
+        .ai-modal-backdrop { position:fixed;inset:0;background:rgba(26,22,37,.48);z-index:120;display:flex;align-items:center;justify-content:center;padding:20px; }
+        .ai-modal { width:100%;max-width:560px;background:#fff;border-radius:16px;padding:22px;box-shadow:0 20px 60px rgba(0,0,0,.18); }
+        .ai-modal-head { display:flex;justify-content:space-between;align-items:flex-start;gap:12px;margin-bottom:14px; }
+        .ai-modal-title { font-size:17px;font-weight:800;color:${C.ink}; }
+        .ai-modal-sub { font-size:11.5px;color:${C.inkSoft};margin-top:3px; }
+        .ai-offers { max-height:280px;overflow:auto;border:1px solid ${C.line};border-radius:10px;padding:10px;margin-bottom:12px; }
+        .ai-offer { padding:10px 4px;border-bottom:1px solid ${C.line}; }
+        .ai-offer:last-child { border-bottom:0; }
+        .ai-offer-row { display:flex;justify-content:space-between;gap:8px;align-items:center; }
+        .ai-offer-amount { font-size:14px;font-weight:800;color:${C.navy}; }
+        .ai-offer-meta { font-size:10.5px;color:${C.inkSoft}; }
+        .ai-offer-message { font-size:11.5px;color:#3d3d42;margin-top:5px;white-space:pre-wrap; }
+        .ai-offer-actions { display:flex;gap:6px;margin-top:8px; }
+        .ai-modal-input { width:100%;height:40px;border:1px solid ${C.line};border-radius:8px;padding:0 10px;font-size:12px;outline:none;box-sizing:border-box; }
+        .ai-modal-textarea { width:100%;min-height:70px;border:1px solid ${C.line};border-radius:8px;padding:9px 10px;font-size:12px;resize:vertical;box-sizing:border-box; }
+        .ai-modal-label { display:block;font-size:11.5px;font-weight:700;color:${C.ink};margin:9px 0 5px; }
+        .ai-modal-footer { display:flex;justify-content:flex-end;gap:8px;margin-top:12px; }
+        .ai-close { border:1px solid ${C.line};background:#fff;color:${C.inkSoft};border-radius:8px;padding:8px 13px;cursor:pointer;font-size:12px;font-weight:700; }
+        .ai-send { border:0;background:${C.navy};color:#fff;border-radius:8px;padding:8px 14px;cursor:pointer;font-size:12px;font-weight:700; }
+        .ai-send:disabled { opacity:.55;cursor:not-allowed; }
+        .ai-neg-error { margin:8px 0;padding:9px 10px;border-radius:8px;background:#fdecec;color:#d64545;font-size:11.5px; }
         .ai-state { text-align: center; padding: 60px 20px; color: ${C.inkSoft}; font-size: 13px; }
         .ai-spin { animation: ai-spin 0.8s linear infinite; }
         @keyframes ai-spin { to { transform: rotate(360deg); } }
@@ -344,24 +425,28 @@ export function ApplicationsInbox() {
 
                   {app.message && <div className="ai-message">{app.message}</div>}
 
-                  {isBusiness && app.status === 'pending' && (
+                  {app.status === 'pending' && (
                     <div className="ai-actions">
-                      <button
-                        className="ai-accept"
-                        disabled={actingOn === app.id}
-                        onClick={() => handleAction(app, 'accepted')}
-                      >
-                        {actingOn === app.id ? <Loader2 size={14} className="ai-spin" /> : <Check size={14} />}
-                        Accept
-                      </button>
-                      <button
-                        className="ai-reject"
-                        disabled={actingOn === app.id}
-                        onClick={() => handleAction(app, 'rejected')}
-                      >
-                        {actingOn === app.id ? <Loader2 size={14} className="ai-spin" /> : <X size={14} />}
-                        Reject
-                      </button>
+                      {app.campaign_type === 'paid' && (
+                        <button className="ai-negotiate" onClick={() => openNegotiation(app)} disabled={negotiationLoading}>
+                          <MessageCircle size={14} /> {app.negotiation_status === 'agreed' ? 'View agreed deal' : 'Negotiate payment'}
+                        </button>
+                      )}
+                      {isBusiness && (
+                        <button
+                          className="ai-select"
+                          disabled={actingOn === app.id || (app.campaign_type === 'paid' && (!app.rate_locked || app.agreed_rate == null))}
+                          onClick={() => handleAction(app, 'accepted')}
+                        >
+                          {actingOn === app.id ? <Loader2 size={14} className="ai-spin" /> : <Check size={14} />}
+                          {app.campaign_type === 'paid' && (!app.rate_locked || app.agreed_rate == null) ? 'Agree on payment first' : 'Select creator'}
+                        </button>
+                      )}
+                      {isBusiness && (
+                        <button className="ai-reject" disabled={actingOn === app.id} onClick={() => handleAction(app, 'rejected')}>
+                          <X size={14} /> Reject
+                        </button>
+                      )}
                     </div>
                   )}
 
@@ -371,6 +456,62 @@ export function ApplicationsInbox() {
             </div>
           ))}
       </div>
+
+      {negotiatingApp && (
+        <div className="ai-modal-backdrop" onClick={() => !negotiationLoading && setNegotiatingApp(null)}>
+          <div className="ai-modal" onClick={(e) => e.stopPropagation()}>
+            <div className="ai-modal-head">
+              <div>
+                <div className="ai-modal-title">Payment negotiation</div>
+                <div className="ai-modal-sub">{negotiatingApp.creator_name || `Creator #${negotiatingApp.creator_id}`} · {negotiatingApp.campaign_title || 'Campaign'}</div>
+              </div>
+              <button className="ai-close" onClick={() => setNegotiatingApp(null)} disabled={negotiationLoading}>Close</button>
+            </div>
+
+            <div className="ai-neg-summary">
+              <strong>Campaign budget:</strong> {negotiatingApp.campaign_budget != null ? `Rs. ${negotiatingApp.campaign_budget.toLocaleString()}` : 'Not specified'}
+              {' · '}<strong>Creator request:</strong> {negotiatingApp.rate != null ? `Rs. ${negotiatingApp.rate.toLocaleString()}` : 'Not specified'}
+              {negotiatingApp.agreed_rate != null && <> {' · '}<strong>Locked:</strong> Rs. {negotiatingApp.agreed_rate.toLocaleString()}</>}
+            </div>
+
+            {negotiationError && <div className="ai-neg-error">{negotiationError}</div>}
+            <div className="ai-offers">
+              {negotiationLoading && offers.length === 0 ? <div className="ai-state" style={{padding:20}}>Loading offers…</div> : offers.length === 0 ? <div className="ai-state" style={{padding:20}}>No offers yet.</div> : offers.map((offer) => {
+                const mine = offer.sender_id === user?.id;
+                const canRespond = !mine && offer.status === 'pending';
+                return (
+                  <div className="ai-offer" key={offer.id}>
+                    <div className="ai-offer-row"><span className="ai-offer-amount">Rs. {offer.amount.toLocaleString()}</span><span className="ai-offer-meta">{mine ? 'You' : offer.sender_name || offer.sender_role || 'Other party'} · {offer.status}</span></div>
+                    {offer.message && <div className="ai-offer-message">{offer.message}</div>}
+                    {canRespond && (
+                      <div className="ai-offer-actions">
+                        <button className="ai-accept" disabled={negotiationLoading} onClick={() => respondToOffer(offer, 'accept')}><ShieldCheck size={13}/> Accept & lock</button>
+                        <button className="ai-reject" disabled={negotiationLoading} onClick={() => respondToOffer(offer, 'reject')}><X size={13}/> Reject</button>
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+
+            {negotiatingApp.negotiation_status !== 'agreed' && (
+              <>
+                <label className="ai-modal-label">Your counter-offer (Rs.)</label>
+                <input className="ai-modal-input" type="number" min="1" value={offerAmount} onChange={(e) => setOfferAmount(e.target.value)} placeholder="Enter your offer" />
+                <label className="ai-modal-label">Message (optional)</label>
+                <textarea className="ai-modal-textarea" value={offerMessage} onChange={(e) => setOfferMessage(e.target.value)} placeholder="Explain your proposed amount…" />
+                <div className="ai-modal-footer">
+                  <button className="ai-send" disabled={negotiationLoading} onClick={sendOffer}>{negotiationLoading ? 'Sending…' : 'Send offer'}</button>
+                </div>
+              </>
+            )}
+
+            {negotiatingApp.negotiation_status === 'agreed' && (
+              <div className="ai-neg-summary" style={{background:'#EAF8F0',color:'#16834A'}}>✓ Payment amount locked at <strong>Rs. {(negotiatingApp.agreed_rate || 0).toLocaleString()}</strong>. The brand can now select the creator and later pay this exact amount.</div>
+            )}
+          </div>
+        </div>
+      )}
     </AppLayout>
   );
 }

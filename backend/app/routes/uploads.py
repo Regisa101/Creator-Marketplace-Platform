@@ -23,8 +23,16 @@ ALLOWED_CONTENT_TYPES = {
     "image/gif": ".gif",
 }
 
+ALLOWED_MEDIA_CONTENT_TYPES = {
+    **ALLOWED_CONTENT_TYPES,
+    "video/mp4": ".mp4",
+    "video/webm": ".webm",
+    "video/quicktime": ".mov",
+}
+
 # Matches the "up to 20 MB" copy already shown in the onboarding UI.
 MAX_FILE_SIZE = 20 * 1024 * 1024
+MAX_MEDIA_FILE_SIZE = 100 * 1024 * 1024
 
 # Hardcoded to match the frontend's hardcoded API_BASE_URL
 # ('http://localhost:8000/api') in src/api/client.ts — both need to
@@ -69,3 +77,32 @@ async def upload_image(
         f.write(contents)
 
     return {"url": f"{PUBLIC_BASE_URL}/static/uploads/{filename}"}
+
+@router.post("/media")
+async def upload_media(
+    file: UploadFile = File(...),
+    current_user: User = Depends(get_current_user),
+):
+    """Upload authentic creator deliverable media (image or video)."""
+    ext = ALLOWED_MEDIA_CONTENT_TYPES.get(file.content_type)
+    if not ext:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Only JPG, PNG, WebP, GIF, MP4, WebM, or MOV files are allowed.",
+        )
+
+    contents = await file.read()
+    if len(contents) > MAX_MEDIA_FILE_SIZE:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Media must be 100 MB or smaller.")
+    if not contents:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="That file is empty.")
+
+    filename = f"{current_user.id}_{uuid.uuid4().hex}{ext}"
+    filepath = UPLOAD_DIR / filename
+    with open(filepath, "wb") as f:
+        f.write(contents)
+
+    return {
+        "url": f"{PUBLIC_BASE_URL}/static/uploads/{filename}",
+        "media_type": "video" if file.content_type.startswith("video/") else "image",
+    }

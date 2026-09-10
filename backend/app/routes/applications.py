@@ -4,7 +4,7 @@ from typing import Optional
 from datetime import datetime, timezone
 
 from app.database import get_db
-from app.models import User, Campaign, Application, Deliverable, GiftFulfillment
+from app.models import User, Campaign, Application, Deliverable, GiftFulfillment, CalendarEvent, NegotiationOffer
 from app.schemas.application import ApplicationCreate, ApplicationUpdate, ApplicationResponse
 from app.dependencies.auth import get_current_user, get_current_creator
 from app.services.notifications import create_notification
@@ -167,6 +167,22 @@ async def create_application(
         selected_portfolio=data.selected_portfolio,
     )
     db.add(application)
+    db.flush()
+
+    # A paid application starts with the creator's requested rate. It is an
+    # offer, not a final deal, until the other party accepts it. If the creator
+    # omitted a rate, the campaign budget is used as the opening offer so the
+    # brand and creator still have a concrete amount to negotiate.
+    if getattr(campaign.campaign_type, "value", str(campaign.campaign_type)) == "paid":
+        opening_amount = data.rate if data.rate is not None else campaign.budget
+        if opening_amount is not None and float(opening_amount) > 0:
+            db.add(NegotiationOffer(
+                application_id=application.id, sender_id=current_user.id,
+                amount=float(opening_amount),
+                message=data.message, status="pending",
+            ))
+            application.negotiation_status = "pending"
+
     db.commit()
     db.refresh(application)
 
@@ -213,6 +229,8 @@ async def get_applications(
         item = ApplicationResponse.model_validate(app).model_dump()
         item["completed_collaborations"] = db.query(Application).filter(Application.creator_id == app.creator_id, Application.status == "completed").count()
         item["creators_needed"] = campaign.creators_needed or 1
+        item["campaign_budget"] = float(campaign.budget) if campaign.budget is not None else None
+        item["campaign_type"] = getattr(campaign.campaign_type, "value", str(campaign.campaign_type))
         profile = app.creator.creator_profile if app.creator else None
         if current_user.role == "business" and profile:
             score, breakdown, reasons, configured_count = _score_application(campaign, profile, db)
@@ -275,6 +293,9 @@ async def update_application_status(
         raise HTTPException(status_code=400, detail="Status must be accepted or rejected")
 
     if data.status == "accepted":
+        if getattr(campaign.campaign_type, "value", str(campaign.campaign_type)) == "paid":
+            if not application.agreed_rate or not application.rate_locked or application.negotiation_status != "agreed":
+                raise HTTPException(status_code=400, detail="Agree on the payment amount with the creator before selecting them.")
         now = datetime.now(timezone.utc)
         deadline = campaign.application_deadline or campaign.deadline
         if deadline and deadline.tzinfo is None:
@@ -304,6 +325,12 @@ async def update_application_status(
                         due_date=application.deliverable_deadline or campaign.deliverable_deadline,
                         status="pending",
                     ))
+        collab_due = application.deliverable_deadline or campaign.deliverable_deadline
+        if collab_due:
+            db.add(CalendarEvent(application_id=application.id, created_by=campaign.business_id, title="Deliverables due", description=f"Complete the approved campaign deliverables for {campaign.title}.", event_date=collab_due, event_type="deadline"))
+        if getattr(campaign, "completion_mode", "approval_only") == "publication_required" and campaign.publication_deadline:
+            db.add(CalendarEvent(application_id=application.id, created_by=campaign.business_id, title="Publication deadline", description=f"Publish the approved content on {campaign.required_platform or 'the required platform'}.", event_date=campaign.publication_deadline, event_type="posting_date"))
+
         if getattr(campaign.campaign_type, "value", str(campaign.campaign_type)) == "gifted":
             if not db.query(GiftFulfillment).filter(GiftFulfillment.application_id == application.id).first():
                 db.add(GiftFulfillment(application_id=application.id, status="pending"))

@@ -13,7 +13,7 @@ from app.dependencies.auth import get_current_user, get_current_business
 router = APIRouter(prefix="/api/campaigns", tags=["Campaigns"])
 
 
-def _validate_campaign_dates(application_deadline, deliverable_deadline):
+def _validate_campaign_dates(application_deadline, deliverable_deadline, publication_deadline=None):
     """Validate selected calendar dates, not a strict 24-hour window.
 
     A browser date input sends midnight for the selected day. Comparing that
@@ -40,6 +40,11 @@ def _validate_campaign_dates(application_deadline, deliverable_deadline):
         raise HTTPException(status_code=400, detail="Deliverable deadline must be tomorrow or later.")
     if app_date and deliverable_date and deliverable_date <= app_date:
         raise HTTPException(status_code=400, detail="Deliverable deadline must be after the application deadline.")
+    publication_date = as_date(publication_deadline)
+    if publication_date is not None and publication_date < tomorrow:
+        raise HTTPException(status_code=400, detail="Publication deadline must be tomorrow or later.")
+    if publication_date and deliverable_date and publication_date < deliverable_date:
+        raise HTTPException(status_code=400, detail="Publication deadline must be on or after the deliverable deadline.")
 
 
 @router.post("/", response_model=CampaignResponse)
@@ -48,7 +53,7 @@ async def create_campaign(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_business)
 ):
-    _validate_campaign_dates(data.application_deadline or data.deadline, data.deliverable_deadline)
+    _validate_campaign_dates(data.application_deadline or data.deadline, data.deliverable_deadline, data.publication_deadline)
 
     campaign = Campaign(
         business_id=current_user.id,
@@ -81,7 +86,12 @@ async def create_campaign(
         application_questions=data.application_questions,
         hero_image=data.hero_image,
         extra_photos=data.extra_photos,
-        tagline=data.tagline
+        tagline=data.tagline,
+        completion_mode=data.completion_mode,
+        required_platform=data.required_platform,
+        required_post_type=data.required_post_type,
+        publication_deadline=data.publication_deadline,
+        required_mentions=data.required_mentions,
     )
     db.add(campaign)
     db.commit()
@@ -142,6 +152,11 @@ async def duplicate_campaign(
         guidelines_note=original.guidelines_note,
         hero_image=original.hero_image,
         extra_photos=original.extra_photos,
+        completion_mode=original.completion_mode,
+        required_platform=original.required_platform,
+        required_post_type=original.required_post_type,
+        publication_deadline=None,
+        required_mentions=original.required_mentions,
         status="draft",
         creators_needed=original.creators_needed,
         application_questions=original.application_questions,
@@ -290,10 +305,12 @@ async def update_campaign(
     deliverable_deadline = update_data.get("deliverable_deadline", campaign.deliverable_deadline)
     if "deadline" in update_data and "application_deadline" not in update_data:
         app_deadline = update_data["deadline"]
-    _validate_campaign_dates(app_deadline, deliverable_deadline) if (app_deadline or deliverable_deadline) else None
+    _validate_campaign_dates(app_deadline, deliverable_deadline, update_data.get("publication_deadline", campaign.publication_deadline)) if (app_deadline or deliverable_deadline or update_data.get("publication_deadline", campaign.publication_deadline)) else None
     for key, value in update_data.items():
         if key == "campaign_type" and value:
             setattr(campaign, key, value.value)
+        elif key == "completion_mode" and value not in ("approval_only", "publication_required"):
+            raise HTTPException(status_code=400, detail="completion_mode must be approval_only or publication_required")
         else:
             setattr(campaign, key, value)
     

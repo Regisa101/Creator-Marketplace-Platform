@@ -182,6 +182,11 @@ export interface Campaign {
   application_questions?: string[] | null;
   hero_image?: string | null;
   extra_photos?: string[] | null;
+  completion_mode?: 'approval_only' | 'publication_required' | string;
+  required_platform?: string | null;
+  required_post_type?: string | null;
+  publication_deadline?: string | null;
+  required_mentions?: string[] | null;
   status: CampaignStatus;
   is_active: boolean;
   created_at: string;
@@ -247,6 +252,11 @@ export interface CampaignCreateData {
   application_questions?: string[];
   hero_image?: string | null;
   extra_photos?: string[] | null;
+  completion_mode?: 'approval_only' | 'publication_required';
+  required_platform?: string;
+  required_post_type?: string;
+  publication_deadline?: string;
+  required_mentions?: string[];
 }
 
 export interface PublicBusinessCampaign {
@@ -292,6 +302,8 @@ export interface Application {
   creator_name?: string | null;
   creator_avatar?: string | null;
   campaign_title?: string | null;
+  campaign_budget?: number | null;
+  campaign_type?: string | null;
   proposal: string;
   rate?: number | null;
   message?: string | null;
@@ -305,6 +317,9 @@ export interface Application {
   match_reasons?: string[] | null;
   match_configured_count?: number;
   status: ApplicationStatus;
+  agreed_rate?: number | null;
+  rate_locked?: boolean;
+  negotiation_status?: string;
   created_at: string;
   updated_at?: string | null;
 }
@@ -424,6 +439,25 @@ export interface Notification {
   created_at: string;
 }
 
+
+export interface CampaignPerformance {
+  id?: number | null;
+  campaign_id: number;
+  campaign_title?: string | null;
+  creator_spend: number;
+  revenue: number;
+  other_costs: number;
+  total_cost: number;
+  estimated_profit: number;
+  roi_percent: number;
+  sales_count?: number | null;
+  reach?: number | null;
+  engagement?: number | null;
+  notes?: string | null;
+  created_at?: string | null;
+  updated_at?: string | null;
+}
+
 export interface PaymentSummary {
   role: 'creator' | 'business' | string;
   this_month: number;
@@ -446,11 +480,18 @@ export interface Collab {
   creator_name?: string | null;
   creator_avatar?: string | null;
   rate?: number | null;
+  agreed_rate?: number | null;
+  rate_locked?: boolean;
+  negotiation_status?: string;
   status: string;
   created_at: string;
   pending_deliverables: number;
   unread_messages: number;
-  payment_status?: 'initiated' | 'completed' | 'failed' | 'refunded' | null;
+  payment_status?: 'initiated' | 'funded' | 'released' | 'completed' | 'failed' | 'refunded' | null;
+  completion_mode?: 'approval_only' | 'publication_required' | string | null;
+  required_platform?: string | null;
+  required_post_type?: string | null;
+  publication_deadline?: string | null;
   amount_paid?: number | null;
   rated?: boolean;
   campaign_type?: 'paid' | 'gifted' | string | null;
@@ -468,7 +509,7 @@ export interface Payment {
   transaction_id?: string | null;
   amount: number;
   currency: string;
-  status: 'initiated' | 'completed' | 'failed' | 'refunded';
+  status: 'initiated' | 'funded' | 'released' | 'completed' | 'failed' | 'refunded';
   method: string;
   paid_at?: string | null;
   created_at: string;
@@ -519,6 +560,10 @@ export interface CalendarEvent {
 
 export type DeliverableStatus = 'pending' | 'submitted' | 'approved' | 'revision_requested';
 
+export interface PublicationProof {
+  id: number; application_id: number; deliverable_id?: number | null; platform: string; post_type?: string | null; post_url: string; screenshot_url?: string | null; status: string; feedback?: string | null; submitted_at?: string | null; verified_at?: string | null; verified_by?: number | null;
+}
+
 export interface WorkspaceDeliverable {
   id: number;
   application_id: number;
@@ -529,6 +574,7 @@ export interface WorkspaceDeliverable {
   due_date?: string | null;
   status: DeliverableStatus;
   file_url?: string | null;
+  media_type?: 'image' | 'video' | null;
   submission_note?: string | null;
   feedback?: string | null;
   submitted_at?: string | null;
@@ -821,10 +867,45 @@ export const getCollabHistory = async (): Promise<Collab[]> => {
 // ============================================
 
 export const initiatePayment = async (
-  collabId: number,
-  amount?: number
+  collabId: number
 ): Promise<{ payment_url: string; pidx: string; purchase_order_id: string }> => {
-  const response = await api.post('/payments/initiate', { collab_id: collabId, amount });
+  const response = await api.post('/payments/initiate', { collab_id: collabId });
+  return response.data;
+};
+
+
+export const releasePayment = async (collabId: number): Promise<Payment> => (await api.post<Payment>(`/payments/release/${collabId}`)).data;
+
+export interface NegotiationOffer {
+  id: number;
+  application_id: number;
+  sender_id: number;
+  sender_name?: string | null;
+  sender_role?: string | null;
+  amount: number;
+  message?: string | null;
+  status: 'pending' | 'accepted' | 'rejected' | 'superseded';
+  created_at: string;
+  responded_at?: string | null;
+}
+
+export const getNegotiation = async (applicationId: number): Promise<NegotiationOffer[]> => {
+  const response = await api.get<NegotiationOffer[]>(`/negotiations/${applicationId}`);
+  return response.data;
+};
+
+export const makeNegotiationOffer = async (applicationId: number, amount: number, message?: string): Promise<NegotiationOffer> => {
+  const response = await api.post<NegotiationOffer>(`/negotiations/${applicationId}/offers`, { amount, message });
+  return response.data;
+};
+
+export const acceptNegotiationOffer = async (applicationId: number, offerId: number): Promise<NegotiationOffer> => {
+  const response = await api.post<NegotiationOffer>(`/negotiations/${applicationId}/offers/${offerId}/accept`);
+  return response.data;
+};
+
+export const rejectNegotiationOffer = async (applicationId: number, offerId: number): Promise<NegotiationOffer> => {
+  const response = await api.post<NegotiationOffer>(`/negotiations/${applicationId}/offers/${offerId}/reject`);
   return response.data;
 };
 
@@ -848,6 +929,24 @@ export const getPaymentSummary = async (): Promise<PaymentSummary> => {
   return response.data;
 };
 
+
+export const getCampaignPerformances = async (): Promise<CampaignPerformance[]> => {
+  const response = await api.get<CampaignPerformance[]>('/campaign-performance');
+  return response.data;
+};
+
+export const getCampaignPerformance = async (campaignId: number): Promise<CampaignPerformance> => {
+  const response = await api.get<CampaignPerformance>(`/campaign-performance/${campaignId}`);
+  return response.data;
+};
+
+export const updateCampaignPerformance = async (campaignId: number, data: {
+  revenue: number; other_costs: number; sales_count?: number; reach?: number; engagement?: number; notes?: string;
+}): Promise<CampaignPerformance> => {
+  const response = await api.put<CampaignPerformance>(`/campaign-performance/${campaignId}`, data);
+  return response.data;
+};
+
 export const getNotifications = async (unreadOnly = false): Promise<Notification[]> => {
   const response = await api.get<Notification[]>('/notifications/', { params: { unread_only: unreadOnly } });
   return response.data;
@@ -859,12 +958,12 @@ export const getUnreadNotificationCount = async (): Promise<number> => {
 };
 
 export const markNotificationRead = async (notificationId: number): Promise<Notification> => {
-  const response = await api.put<Notification>(`/notifications/${notificationId}/read`);
+  const response = await api.patch<Notification>(`/notifications/${notificationId}/read`, { is_read: true });
   return response.data;
 };
 
 export const markAllNotificationsRead = async (): Promise<void> => {
-  await api.put('/notifications/read-all');
+  await api.post('/notifications/read-all');
 };
 
 // ============================================
@@ -937,11 +1036,15 @@ export const createDeliverable = async (data: {
 
 export const submitDeliverable = async (
   id: number,
-  data: { file_url: string; submission_note?: string }
+  data: { file_url: string; media_type: 'image' | 'video'; submission_note?: string }
 ): Promise<WorkspaceDeliverable> => {
   const response = await api.put<WorkspaceDeliverable>(`/workspace/deliverables/${id}/submit`, data);
   return response.data;
 };
+
+export const getPublicationProofs = async (collabId: number): Promise<PublicationProof[]> => (await api.get<PublicationProof[]>(`/publication/${collabId}`)).data;
+export const submitPublicationProof = async (collabId: number, data: { deliverable_id?: number; platform: string; post_type?: string; post_url: string; screenshot_url?: string }): Promise<PublicationProof> => (await api.post<PublicationProof>(`/publication/${collabId}`, data)).data;
+export const reviewPublicationProof = async (collabId: number, proofId: number, data: { status: string; feedback?: string }): Promise<PublicationProof> => (await api.post<PublicationProof>(`/publication/${collabId}/${proofId}/review`, data)).data;
 
 export const reviewDeliverable = async (
   id: number,
@@ -972,4 +1075,61 @@ export const uploadImage = async (file: File): Promise<{ url: string }> => {
   return response.data;
 };
 
+export const uploadMedia = async (file: File): Promise<{ url: string; media_type: 'image' | 'video' }> => {
+  const formData = new FormData();
+  formData.append('file', file);
+  const token = localStorage.getItem('access_token');
+  const response = await axios.post<{ url: string; media_type: 'image' | 'video' }>(
+    `${API_BASE_URL}/uploads/media`, formData,
+    { headers: token ? { Authorization: `Bearer ${token}` } : undefined }
+  );
+  return response.data;
+};
+
+export interface GiftFulfillment {
+  id: number;
+  application_id: number;
+  method: 'pickup' | 'shipping' | null;
+  status: 'pending' | 'preparing' | 'ready_for_pickup' | 'shipped' | 'received';
+  recipient_name?: string | null;
+  shipping_address?: string | null;
+  phone?: string | null;
+  pickup_location?: string | null;
+  pickup_available_from?: string | null;
+  pickup_code?: string | null;
+  courier?: string | null;
+  tracking_number?: string | null;
+  notes?: string | null;
+  received_at?: string | null;
+  created_at: string;
+  updated_at?: string | null;
+}
+
+export const getGiftFulfillment = async (collabId: number): Promise<GiftFulfillment> => {
+  const response = await api.get<GiftFulfillment>(`/workspace/fulfillment/${collabId}`);
+  return response.data;
+};
+
+export const updateGiftFulfillment = async (
+  collabId: number,
+  data: Partial<Omit<GiftFulfillment, 'id' | 'application_id' | 'created_at' | 'updated_at'>>
+): Promise<GiftFulfillment> => {
+  const response = await api.patch<GiftFulfillment>(`/workspace/fulfillment/${collabId}`, data);
+  return response.data;
+};
+
+export const confirmGiftReceived = async (collabId: number): Promise<GiftFulfillment> => {
+  const response = await api.post<GiftFulfillment>(`/workspace/fulfillment/${collabId}/received`);
+  return response.data;
+};
+
 export default api;
+export interface AdminOverview { users:number; brands:number; creators:number; active_campaigns:number; active_collaborations:number; open_cases:number; funded_payments:number; }
+export interface AdminCase { id:number; application_id?:number|null; reported_user_id:number; case_type:string; status:string; severity:string; description?:string|null; created_at?:string|null; resolved_at?:string|null; }
+export const getAdminOverview = async (): Promise<AdminOverview> => (await api.get<AdminOverview>('/admin/overview')).data;
+export const getAdminCases = async (): Promise<AdminCase[]> => (await api.get<AdminCase[]>('/admin/cases')).data;
+export const updateAdminCase = async (id:number,data:{status:string;severity?:string;resolution?:string}): Promise<AdminCase> => (await api.patch<AdminCase>(`/admin/cases/${id}`,data)).data;
+export const getAdminUsers = async (): Promise<any[]> => (await api.get<any[]>('/admin/users')).data;
+export const adminUserAction = async (id:number,action:'warn'|'suspend'|'activate'|'ban') => (await api.post(`/admin/users/${id}/action`,{action})).data;
+
+export const openDispute = async (collabId:number, reason:string): Promise<AdminCase> => (await api.post<AdminCase>(`/disputes/${collabId}`,{reason})).data;

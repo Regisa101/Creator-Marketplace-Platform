@@ -51,7 +51,7 @@ export function DemoPayment() {
     verifyPayment(pidx)
       .then((result) => {
         setPayment(result);
-        if (result.status === 'completed') setDone(true);
+        if (result.status === 'funded' || result.status === 'released') setDone(true);
       })
       .catch((err: any) => {
         console.error('Could not load payment:', err);
@@ -76,7 +76,7 @@ export function DemoPayment() {
     try {
       const result = await completeDemoPayment(pidx);
       setPayment(result);
-      setDone(result.status === 'completed');
+      setDone(result.status === 'funded' || result.status === 'released');
     } catch (err: any) {
       console.error('Could not complete payment:', err);
       setError(err?.response?.data?.detail || 'Could not complete this payment.');

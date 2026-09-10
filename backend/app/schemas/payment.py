@@ -5,11 +5,6 @@ from datetime import datetime
 
 class PaymentInitiateRequest(BaseModel):
     collab_id: int  # application id
-    # Optional override — lets the brand pay a different amount than the
-    # rate on file (e.g. a bonus, or filling in a rate that was never set
-    # because the collab started as "gifted"). Falls back to
-    # Application.rate on the backend when omitted.
-    amount: Optional[float] = None
 
 
 class PaymentInitiateResponse(BaseModel):

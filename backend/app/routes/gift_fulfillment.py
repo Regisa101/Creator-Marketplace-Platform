@@ -124,6 +124,7 @@ async def update_fulfillment(
                     event_key=f"gift-details:{collab_id}",
                 )
         elif fulfillment.method == "pickup":
+            fulfillment.status = "preparing"
             if business:
                 create_notification(
                     db, user_id=business.id, type="gift_pickup_requested",

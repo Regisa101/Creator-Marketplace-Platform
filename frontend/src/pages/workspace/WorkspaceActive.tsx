@@ -75,25 +75,13 @@ export function WorkspaceActive() {
   }, []);
 
   const handlePay = async (collab: Collab) => {
-    let amount = collab.rate ?? undefined;
-
-    // Gifted collabs (or ones where a rate was never agreed) have no
-    // rate on file — let the brand set the pay amount themselves
-    // rather than blocking payment entirely.
-    if (amount == null) {
-      const input = window.prompt(`Set the amount to pay for "${collab.campaign_title || 'this collab'}" (NPR):`);
-      if (!input) return;
-      const parsed = Number(input);
-      if (!Number.isFinite(parsed) || parsed <= 0) {
-        alert('Enter a valid amount greater than 0.');
-        return;
-      }
-      amount = parsed;
+    if (collab.agreed_rate == null || !collab.rate_locked) {
+      alert('Payment is available only after the final collaboration amount is agreed and locked.');
+      return;
     }
-
     setPayingId(collab.id);
     try {
-      const { payment_url } = await initiatePayment(collab.id, amount);
+      const { payment_url } = await initiatePayment(collab.id);
       window.location.href = payment_url;
     } catch (err: any) {
       console.error('Could not start payment:', err);
@@ -179,8 +167,8 @@ export function WorkspaceActive() {
                 <div className="wa-sub">with {name || 'your collaborator'}</div>
               </div>
 
-              {collab.rate != null && (
-                <div className="wa-rate"><DollarSign size={13} /> Rs. {collab.rate.toLocaleString()}</div>
+              {collab.campaign_type !== 'gifted' && collab.agreed_rate != null && (
+                <div className="wa-rate"><DollarSign size={13} /> Agreed: Rs. {collab.agreed_rate.toLocaleString()}</div>
               )}
 
               {collab.total_deliverables > 0 && (
@@ -190,7 +178,7 @@ export function WorkspaceActive() {
                 </div>
               )}
 
-              {collab.payment_status === 'completed' ? (
+              {collab.payment_status === 'released' ? (
                 <span className="wa-paid">
                   <CreditCard size={12} /> Paid Rs. {collab.amount_paid?.toLocaleString()}
                 </span>
@@ -202,28 +190,22 @@ export function WorkspaceActive() {
                 <span className="wa-badge">Active</span>
               )}
 
-              {isBusiness && collab.campaign_type !== 'gifted' && collab.payment_status !== 'completed' && (
-                (collab.total_deliverables === 0 || collab.approved_deliverables === collab.total_deliverables) ? (
-                  <button className="wa-pay-btn" onClick={() => handlePay(collab)} disabled={payingId === collab.id}>
-                    <CreditCard size={13} />
-                    {payingId === collab.id ? 'Starting…' : collab.payment_status === 'initiated' ? 'Retry Payment' : 'Pay Creator'}
-                  </button>
-                ) : (
-                  <span className="wa-pending-payment">
-                    <CreditCard size={12} /> Approve all deliverables to pay
-                  </span>
-                )
+              {isBusiness && collab.campaign_type !== 'gifted' && !['funded','released'].includes(collab.payment_status || '') && (
+                <button className="wa-pay-btn" onClick={() => handlePay(collab)} disabled={payingId === collab.id}>
+                  <CreditCard size={13} /> {payingId === collab.id ? 'Starting…' : 'Secure payment'}
+                </button>
               )}
+              {isBusiness && collab.payment_status === 'funded' && <span className="wa-ready">🔒 Payment secured</span>}
 
-              {!isBusiness && collab.campaign_type !== 'gifted' && collab.payment_status !== 'completed' && (
+              {!isBusiness && collab.campaign_type !== 'gifted' && !['funded','released'].includes(collab.payment_status || '') && (
                 <span className="wa-pending-payment"><CreditCard size={12} /> Payment pending</span>
               )}
 
-              {isBusiness && collab.campaign_type === 'gifted' && collab.payment_status !== 'completed' && (
+              {isBusiness && collab.campaign_type === 'gifted' && !['funded','released'].includes(collab.payment_status || '') && (
                 <span className="wa-free"><CheckCircle2 size={12} /> No payment required</span>
               )}
 
-              {isBusiness && collab.payment_status === 'completed' && (
+              {isBusiness && collab.payment_status === 'released' && (
                 collab.rated ? (
                   <span className="wa-rated"><Star size={13} fill={C.inkSoft} /> Rated</span>
                 ) : (

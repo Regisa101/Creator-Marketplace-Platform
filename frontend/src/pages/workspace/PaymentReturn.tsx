@@ -80,19 +80,19 @@ export function PaymentReturn() {
             </>
           )}
 
-          {!loading && payment && payment.status === 'completed' && (
+          {!loading && payment && (payment.status === 'funded' || payment.status === 'released') && (
             <>
               <CheckCircle2 size={36} color={C.green} />
-              <div className="pr-title">Payment successful</div>
+              <div className="pr-title">Payment secured</div>
               <div className="pr-amount">Rs. {payment.amount.toLocaleString()}</div>
-              <div className="pr-sub">Paid via Khalti · Ref {payment.transaction_id || payment.purchase_order_id}</div>
+              <div className="pr-sub">Funds secured via Khalti · Ref {payment.transaction_id || payment.purchase_order_id}</div>
               <Link className="pr-btn" to={collabHref}>
                 Back to Collaboration
               </Link>
             </>
           )}
 
-          {!loading && payment && payment.status !== 'completed' && (
+          {!loading && payment && payment.status !== 'funded' && payment.status !== 'released' && (
             <>
               <XCircle size={36} color={C.red} />
               <div className="pr-title">

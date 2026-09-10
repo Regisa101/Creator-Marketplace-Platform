@@ -70,6 +70,13 @@ class Campaign(Base):
     hero_image = Column(String(255), nullable=True)
     extra_photos = Column(JSON, nullable=True)  # ← ADD THIS (MOST IMPORTANT)
     
+    # Completion / publication requirements
+    completion_mode = Column(String(30), nullable=False, default="approval_only")  # approval_only | publication_required
+    required_platform = Column(String(50), nullable=True)
+    required_post_type = Column(String(50), nullable=True)
+    publication_deadline = Column(DateTime(timezone=True), nullable=True)
+    required_mentions = Column(JSON, nullable=True)
+
     # Timeline
     # `deadline` is kept as a backward-compatible alias for the application deadline.
     deadline = Column(DateTime(timezone=True), nullable=True)
