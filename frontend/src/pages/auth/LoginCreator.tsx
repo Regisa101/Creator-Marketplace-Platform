@@ -13,12 +13,21 @@ export function LoginCreator() {
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
 
+  const validate = () => {
+    const email = data.email.trim();
+    if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return 'Please enter a valid email address.';
+    if (!data.password) return 'Please enter your password.';
+    return '';
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
+    const validation = validate();
+    if (validation) { setError(validation); return; }
     setLoading(true);
     try {
-      await loginUser({ ...data, role: 'creator' });
+      await loginUser({ ...data, email: data.email.trim(), role: 'creator' });
       navigate('/dashboard');
     } catch (err: any) {
       setError(err.response?.data?.detail || 'Login failed. Please try again.');

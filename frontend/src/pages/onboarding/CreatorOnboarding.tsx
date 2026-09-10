@@ -12,6 +12,7 @@ import {
   Image as ImageIcon,
   Video,
   UploadCloud,
+  MapPin,
 } from 'lucide-react';
 
 import {
@@ -47,23 +48,20 @@ interface PortfolioItem {
 // CONSTANTS
 // ============================================================
 
-// Soft-coral accent — matches the creator color used across the rest
-// of the site (auth panels, role picker) instead of the old one-off
-// #FF8A5B shade, so buttons, chips, and focus states all read as the
-// same "creator" coral everywhere.
 const CORAL = '#FF6B5A';
 const CORAL_DARK = '#F0523F';
 
 const LANGUAGES = ['English', 'Nepali', 'Hindi', 'Newari', 'Maithili'];
 
-const INTERESTS = [
-  'Travel', 'Food', 'Fashion', 'Beauty', 'Tech',
-  'Fitness', 'Gaming', 'Music', 'Home', 'Wellness',
-];
-
+// NOTE: "Content niches" and "Your audience's interests" used to be
+// two separate questions with the *same* option list — pure
+// redundancy. Merged into one field (`categories`) and expanded with
+// a few more common niches (Lifestyle, Parenting, Finance, etc).
 const CATEGORIES = [
   'Beauty', 'Fashion', 'Food', 'Fitness', 'Tech',
   'Travel', 'Gaming', 'Music', 'Home', 'Wellness',
+  'Lifestyle', 'Parenting', 'Finance', 'Sports', 'Art & Design',
+  'Comedy', 'Education', 'Automotive', 'Pets',
 ];
 
 const CONTENT_TYPES = [
@@ -86,18 +84,56 @@ const USERNAME_REGEX = /^[a-zA-Z0-9_]{3,24}$/;
 
 const PLATFORMS = [
   { id: 'instagram', label: 'Instagram', handleLabel: 'Followers' },
-  { id: 'youtube', label: 'YouTube', handleLabel: 'Subscribers' },
   { id: 'tiktok', label: 'TikTok', handleLabel: 'Followers' },
-  { id: 'facebook', label: 'Facebook', handleLabel: 'Followers' },
-  { id: 'twitter', label: 'X / Twitter', handleLabel: 'Followers' },
-  { id: 'other', label: 'Other', handleLabel: 'Followers' },
 ];
 
-// Figures out which step to land on when resuming: checks each step's
-// required fields against the saved profile and stops at the first
-// incomplete one. Portfolio (step 4) is optional, so completing steps
-// 1–3 always resumes there — the natural next stop — rather than
-// jumping straight to the terminal Publish step.
+const INSTAGRAM_USERNAME_REGEX = /^[a-zA-Z0-9._]{1,30}$/;
+const TIKTOK_USERNAME_REGEX = /^[a-zA-Z0-9._]{2,24}$/;
+
+const LOCATION_SUGGESTIONS = [
+  'Kathmandu, Nepal', 'Lalitpur, Nepal', 'Bhaktapur, Nepal', 'Pokhara, Nepal',
+  'Biratnagar, Nepal', 'Birgunj, Nepal', 'Dharan, Nepal', 'Bharatpur, Nepal',
+  'Butwal, Nepal', 'Hetauda, Nepal', 'Nepalgunj, Nepal', 'Itahari, Nepal',
+  'Janakpur, Nepal', 'Dhangadhi, Nepal', 'Tulsipur, Nepal', 'Ghorahi, Nepal',
+  'Birendranagar, Nepal', 'Kalaiya, Nepal', 'Damak, Nepal', 'Dhulikhel, Nepal',
+];
+
+function validateSocialAccount(platform: string, username: string, profileUrl: string) {
+  const handle = username.trim().replace(/^@/, '');
+  const url = profileUrl.trim();
+
+  if (!handle) return 'Please enter your Instagram or TikTok username.';
+
+  if (platform === 'instagram' && !INSTAGRAM_USERNAME_REGEX.test(handle)) {
+    return 'Enter a valid Instagram username (letters, numbers, dots and underscores only).';
+  }
+
+  if (platform === 'tiktok' && !TIKTOK_USERNAME_REGEX.test(handle)) {
+    return 'Enter a valid TikTok username (letters, numbers, dots and underscores only).';
+  }
+
+  const expectedHost = platform === 'instagram' ? 'instagram.com' : 'tiktok.com';
+  if (!url) return `Please enter your ${platform === 'instagram' ? 'Instagram' : 'TikTok'} profile URL.`;
+
+  try {
+    const parsed = new URL(url.startsWith('http') ? url : `https://${url}`);
+    const host = parsed.hostname.toLowerCase().replace(/^www\./, '');
+    if (host !== expectedHost) return `Use a valid ${platform === 'instagram' ? 'Instagram' : 'TikTok'} profile URL.`;
+
+    const path = parsed.pathname.replace(/^\//, '').replace(/\/$/, '').replace(/^@/, '');
+    if (!path || path.includes('/')) return 'Profile URL must point to a single account.';
+
+    const urlHandle = path.replace(/^@/, '');
+    if (urlHandle.toLowerCase() !== handle.toLowerCase()) {
+      return 'Username and profile URL do not match.';
+    }
+  } catch {
+    return 'Please enter a valid profile URL.';
+  }
+
+  return '';
+}
+
 function resolveCreatorStep(
   profile: Record<string, any> | null | undefined,
   socials: any[] | null | undefined
@@ -116,7 +152,6 @@ function resolveCreatorStep(
     Array.isArray(profile.categories) && profile.categories.length > 0 &&
     Array.isArray(profile.content_types) && profile.content_types.length > 0 &&
     Array.isArray(profile.languages) && profile.languages.length > 0 &&
-    Array.isArray(profile.interests) && profile.interests.length > 0 &&
     Array.isArray(profile.audience_age_range) && profile.audience_age_range.length > 0 &&
     Array.isArray(profile.audience_location) && profile.audience_location.length > 0;
   if (!step2Done) return 2;
@@ -128,7 +163,7 @@ function resolveCreatorStep(
 }
 
 // ============================================================
-// CHIP
+// CHIP + CHIP GROUP (with "show 7, then expand" behavior)
 // ============================================================
 
 interface ChipProps {
@@ -142,6 +177,85 @@ function Chip({ label, active, onClick }: ChipProps) {
     <button type="button" className={`co-chip ${active ? 'co-chip-active' : ''}`} onClick={onClick}>
       {label}
     </button>
+  );
+}
+
+interface ChipGroupProps {
+  items: string[];
+  isActive: (item: string) => boolean;
+  onToggle: (item: string) => void;
+  limit?: number;
+}
+
+function ChipGroup({ items, isActive, onToggle, limit = 7 }: ChipGroupProps) {
+  const [expanded, setExpanded] = useState(false);
+  const hasMore = items.length > limit;
+  const visible = expanded ? items : items.slice(0, limit);
+
+  return (
+    <div className="co-chips">
+      {visible.map((item) => (
+        <Chip key={item} label={item} active={isActive(item)} onClick={() => onToggle(item)} />
+      ))}
+      {hasMore && (
+        <button
+          type="button"
+          className="co-chip co-chip-more"
+          onClick={() => setExpanded((e) => !e)}
+        >
+          {expanded ? 'Show less' : `+${items.length - limit} more`}
+        </button>
+      )}
+    </div>
+  );
+}
+
+// ============================================================
+// LOCATION AUTOCOMPLETE
+// ============================================================
+
+interface LocationAutocompleteProps {
+  value: string;
+  onChange: (value: string) => void;
+}
+
+function LocationAutocomplete({ value, onChange }: LocationAutocompleteProps) {
+  const [open, setOpen] = useState(false);
+
+  const query = value.trim().toLowerCase();
+  const filtered = (
+    query
+      ? LOCATION_SUGGESTIONS.filter((loc) => loc.toLowerCase().includes(query))
+      : LOCATION_SUGGESTIONS
+  ).slice(0, 6);
+
+  return (
+    <div className="co-autocomplete">
+      <input
+        className="co-input"
+        value={value}
+        onChange={(e) => { onChange(e.target.value); setOpen(true); }}
+        onFocus={() => setOpen(true)}
+        onBlur={() => setTimeout(() => setOpen(false), 150)}
+        placeholder="City, Province, Country"
+        autoComplete="off"
+      />
+      {open && filtered.length > 0 && (
+        <div className="co-autocomplete-list">
+          {filtered.map((loc) => (
+            <button
+              type="button"
+              key={loc}
+              className="co-autocomplete-item"
+              onMouseDown={() => { onChange(loc); setOpen(false); }}
+            >
+              <MapPin size={13} style={{ flexShrink: 0, opacity: 0.6 }} />
+              {loc}
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
   );
 }
 
@@ -213,10 +327,9 @@ export function CreatorOnboarding() {
   // ----------------------------------------------------------
 
   const [creatorType, setCreatorType] = useState('');
-  const [categories, setCategories] = useState<string[]>([]);
+  const [categories, setCategories] = useState<string[]>([]); // doubles as content niche + audience interest
   const [contentTypes, setContentTypes] = useState<string[]>([]);
   const [languages, setLanguages] = useState<string[]>([]);
-  const [interests, setInterests] = useState<string[]>([]);
   const [audienceAgeRanges, setAudienceAgeRanges] = useState<string[]>([]);
   const [audienceLocations, setAudienceLocations] = useState<string[]>([]);
 
@@ -225,11 +338,12 @@ export function CreatorOnboarding() {
   // ----------------------------------------------------------
 
   const [socials, setSocials] = useState<Social[]>([]);
+  const [socialError, setSocialError] = useState('');
   const [socialDraft, setSocialDraft] = useState({
     platform: 'instagram',
     username: '',
     profile_url: '',
-    follower_count: '',
+    follower_count: '0',
   });
 
   // ----------------------------------------------------------
@@ -283,10 +397,16 @@ export function CreatorOnboarding() {
           setLocation(profile.location ?? '');
 
           setCreatorType(profile.creator_type ?? '');
-          setCategories(profile.categories ?? profile.niches ?? []);
+          // Merge legacy `interests` into `categories` too, in case
+          // a draft was saved before the two fields were combined.
+          setCategories(
+            Array.from(new Set([
+              ...(profile.categories ?? profile.niches ?? []),
+              ...(profile.interests ?? profile.audience_interests ?? []),
+            ]))
+          );
           setContentTypes(profile.content_types ?? []);
           setLanguages(profile.languages ?? profile.content_languages ?? []);
-          setInterests(profile.interests ?? profile.audience_interests ?? []);
           setAudienceAgeRanges(profile.audience_age_range ?? []);
           setAudienceLocations(profile.audience_location ?? []);
 
@@ -362,12 +482,15 @@ export function CreatorOnboarding() {
   };
 
   const saveStep2Progress = () => {
+    // `categories` is sent as both niches and audience_interests so
+    // the backend/matching logic that reads either field still works
+    // — same list, no separate question for the user anymore.
     const payload = {
       creator_type: creatorType,
       niches: categories,
       content_types: contentTypes,
       content_languages: languages,
-      audience_interests: interests,
+      audience_interests: categories,
       audience_age_range: audienceAgeRanges,
       audience_location: audienceLocations,
     };
@@ -400,9 +523,6 @@ export function CreatorOnboarding() {
     return Promise.resolve();
   };
 
-  // Saves the current step and heads back to the dashboard — the same
-  // "don't lose what's filled in" behavior as before, just relabeled
-  // to match the reference design's top-left nav link.
   const handleBackToDashboard = () => {
     saveCurrentStepProgress()?.catch((err) => {
       console.error('Could not save progress:', err);
@@ -410,8 +530,6 @@ export function CreatorOnboarding() {
     navigate('/dashboard');
   };
 
-  // Saves the current step and stays on the page, with a brief
-  // confirmation — matches the reference design's "Save Draft" button.
   const handleSaveDraft = async () => {
     try {
       await saveCurrentStepProgress();
@@ -428,16 +546,30 @@ export function CreatorOnboarding() {
   // ==========================================================
 
   const addSocial = () => {
-    if (!socialDraft.username.trim()) return;
+    setSocialError('');
+
+    const handle = socialDraft.username.trim().replace(/^@/, '');
+    const url = socialDraft.profile_url.trim();
+    const validation = validateSocialAccount(socialDraft.platform, handle, url);
+
+    if (validation) {
+      setSocialError(validation);
+      return;
+    }
+
+    if (socials.some((s) => s.platform === socialDraft.platform)) {
+      setSocialError(`You can add only one ${socialDraft.platform === 'instagram' ? 'Instagram' : 'TikTok'} account.`);
+      return;
+    }
 
     setSocials([...socials, {
       platform: socialDraft.platform,
-      username: socialDraft.username.trim(),
-      profile_url: socialDraft.profile_url.trim(),
-      follower_count: Number(socialDraft.follower_count) || 0,
+      username: handle,
+      profile_url: url.startsWith('http') ? url : `https://${url}`,
+      follower_count: 0,
     }]);
 
-    setSocialDraft({ platform: 'instagram', username: '', profile_url: '', follower_count: '' });
+    setSocialDraft({ platform: 'instagram', username: '', profile_url: '', follower_count: '0' });
   };
 
   const removeSocial = (index: number) => {
@@ -495,11 +627,10 @@ export function CreatorOnboarding() {
     categories.length > 0 &&
     contentTypes.length > 0 &&
     languages.length > 0 &&
-    interests.length > 0 &&
     audienceAgeRanges.length > 0 &&
     audienceLocations.length > 0;
 
-  const canContinueStep3 = socials.length > 0;
+  const canContinueStep3 = socials.length > 0 && socials.every((s) => !validateSocialAccount(s.platform, s.username, s.profile_url));
 
   // Portfolio is optional — always fine to move on.
   const canContinueStep4 = true;
@@ -526,7 +657,7 @@ export function CreatorOnboarding() {
       content_types: contentTypes,
       audience_age_range: audienceAgeRanges,
       audience_location: audienceLocations,
-      audience_interests: interests,
+      audience_interests: categories,
       socials,
       portfolio,
       starting_price: Number(startingPrice) || 0,
@@ -686,6 +817,21 @@ export function CreatorOnboarding() {
         .co-chips { display: flex; flex-wrap: wrap; gap: 8px; }
         .co-chip { font-size: 12.5px; font-weight: 500; color: var(--ink); background: var(--surface); border: 1.5px solid var(--line); padding: 7px 13px; border-radius: 100px; }
         .co-chip-active { background: var(--accent); color: #fff; border-color: var(--accent); }
+        .co-chip-more { background: #fff; border-style: dashed; color: var(--accent); font-weight: 600; }
+
+        .co-autocomplete { position: relative; }
+        .co-autocomplete-list {
+          position: absolute; top: calc(100% + 6px); left: 0; right: 0; z-index: 20;
+          background: #fff; border: 1.5px solid var(--line); border-radius: 9px;
+          box-shadow: 0 8px 20px rgba(17,18,23,0.08); overflow: hidden;
+          max-height: 210px; overflow-y: auto;
+        }
+        .co-autocomplete-item {
+          width: 100%; display: flex; align-items: center; gap: 8px;
+          text-align: left; font-size: 13px; color: var(--ink);
+          background: #fff; border: none; padding: 10px 13px;
+        }
+        .co-autocomplete-item:hover { background: var(--surface); }
 
         .co-social-list, .co-portfolio-list { display: flex; flex-direction: column; gap: 8px; margin-bottom: 18px; }
         .co-social-item, .co-portfolio-item { display: flex; align-items: center; gap: 11px; border: 1.5px solid var(--line); border-radius: 10px; padding: 10px 12px; }
@@ -752,10 +898,6 @@ export function CreatorOnboarding() {
           <LogoMark size={34} />
           <span>creatorhub</span>
         </Link>
-
-        {/* ==================================================
-            HEADER — Back to Dashboard / Save Draft
-        ================================================== */}
 
         <div className="co-header">
           <button type="button" className="co-back-link" onClick={handleBackToDashboard}>
@@ -869,7 +1011,7 @@ export function CreatorOnboarding() {
 
                   <div className="co-field">
                     <label className="co-label">Location *</label>
-                    <input className="co-input" value={location} onChange={(e) => setLocation(e.target.value)} placeholder="City, Province, Country" />
+                    <LocationAutocomplete value={location} onChange={setLocation} />
                   </div>
                 </>
               )}
@@ -891,10 +1033,12 @@ export function CreatorOnboarding() {
                   </div>
 
                   <p className="co-section-label">Content niches *</p>
-                  <div className="co-chips" style={{ marginBottom: 22 }}>
-                    {CATEGORIES.map((c) => (
-                      <Chip key={c} label={c} active={categories.includes(c)} onClick={() => toggle(categories, setCategories, c)} />
-                    ))}
+                  <div style={{ marginBottom: 22 }}>
+                    <ChipGroup
+                      items={CATEGORIES}
+                      isActive={(item) => categories.includes(item)}
+                      onToggle={(item) => toggle(categories, setCategories, item)}
+                    />
                   </div>
 
                   <p className="co-section-label">Content types *</p>
@@ -911,13 +1055,6 @@ export function CreatorOnboarding() {
                     ))}
                   </div>
 
-                  <p className="co-section-label">Your audience's interests *</p>
-                  <div className="co-chips" style={{ marginBottom: 22 }}>
-                    {INTERESTS.map((i) => (
-                      <Chip key={i} label={i} active={interests.includes(i)} onClick={() => toggle(interests, setInterests, i)} />
-                    ))}
-                  </div>
-
                   <p className="co-section-label">Audience age range *</p>
                   <div className="co-chips" style={{ marginBottom: 22 }}>
                     {AUDIENCE_AGE_RANGES.map((a) => (
@@ -926,11 +1063,11 @@ export function CreatorOnboarding() {
                   </div>
 
                   <p className="co-section-label">Audience location *</p>
-                  <div className="co-chips">
-                    {AUDIENCE_LOCATIONS.map((l) => (
-                      <Chip key={l} label={l} active={audienceLocations.includes(l)} onClick={() => toggle(audienceLocations, setAudienceLocations, l)} />
-                    ))}
-                  </div>
+                  <ChipGroup
+                    items={AUDIENCE_LOCATIONS}
+                    isActive={(item) => audienceLocations.includes(item)}
+                    onToggle={(item) => toggle(audienceLocations, setAudienceLocations, item)}
+                  />
                 </>
               )}
 
@@ -950,7 +1087,7 @@ export function CreatorOnboarding() {
                           <span className="co-social-icon">{s.platform.slice(0, 2).toUpperCase()}</span>
                           <span className="co-social-main">
                             <div className="co-social-handle">@{s.username}</div>
-                            <div className="co-social-meta">{s.platform} · {s.follower_count.toLocaleString()} followers</div>
+                            <div className="co-social-meta">{s.platform} · Account connected</div>
                           </span>
                           <button className="co-social-remove" onClick={() => removeSocial(i)}><Trash2 size={15} /></button>
                         </div>
@@ -966,10 +1103,16 @@ export function CreatorOnboarding() {
                       <input className="co-input" placeholder="Username" value={socialDraft.username} onChange={(e) => setSocialDraft({ ...socialDraft, username: e.target.value })} />
                     </div>
                     <div className="co-social-form-row">
-                      <input className="co-input" placeholder="Profile URL (optional)" value={socialDraft.profile_url} onChange={(e) => setSocialDraft({ ...socialDraft, profile_url: e.target.value })} />
-                      <input className="co-input" type="number" min={0} placeholder="Follower count" value={socialDraft.follower_count} onChange={(e) => setSocialDraft({ ...socialDraft, follower_count: e.target.value })} />
+                      <input
+                        className="co-input"
+                        placeholder={socialDraft.platform === 'instagram' ? 'https://instagram.com/username' : 'https://tiktok.com/@username'}
+                        value={socialDraft.profile_url}
+                        onChange={(e) => setSocialDraft({ ...socialDraft, profile_url: e.target.value })}
+                      />
                     </div>
-                    <button className="co-add-btn" onClick={addSocial} disabled={!socialDraft.username.trim()}>
+                    <p className="co-hint"><Info size={13} style={{ marginTop: 1, flexShrink: 0 }} />Follower count is not manually entered. It should be synced from the platform when social API verification is connected.</p>
+                    {socialError && <p className="co-hint" style={{ color: '#E8544E' }}>{socialError}</p>}
+                    <button className="co-add-btn" onClick={addSocial} disabled={!socialDraft.username.trim() || !socialDraft.profile_url.trim()}>
                       <Plus size={14} /> Add account
                     </button>
                   </div>

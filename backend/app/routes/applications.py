@@ -4,12 +4,28 @@ from typing import Optional
 from datetime import datetime, timezone
 
 from app.database import get_db
-from app.models import User, Campaign, Application, Deliverable, GiftFulfillment, CalendarEvent, NegotiationOffer
-from app.schemas.application import ApplicationCreate, ApplicationUpdate, ApplicationResponse
+from app.models import (
+    User,
+    Campaign,
+    Application,
+    Deliverable,
+    GiftFulfillment,
+    CalendarEvent,
+    NegotiationOffer,
+)
+from app.schemas.application import (
+    ApplicationCreate,
+    ApplicationUpdate,
+    ApplicationResponse,
+)
 from app.dependencies.auth import get_current_user, get_current_creator
 from app.services.notifications import create_notification
 
-router = APIRouter(prefix="/api/applications", tags=["Applications"])
+
+router = APIRouter(
+    prefix="/api/applications",
+    tags=["Applications"]
+)
 
 
 MATCH_WEIGHTS = {
@@ -29,7 +45,9 @@ def _norm(value):
 
 def _creator_follower_count(profile):
     socials = getattr(profile, "socials", None) or []
-    return max([int(getattr(s, "follower_count", 0) or 0) for s in socials] or [0])
+    return max(
+        [int(getattr(s, "follower_count", 0) or 0) for s in socials] or [0]
+    )
 
 
 def _creator_size(followers):
@@ -44,118 +62,356 @@ def _creator_size(followers):
 
 def _range_match(followers, requested):
     r = _norm(requested).replace("–", "-")
-    if r == "1k-10k": return 1000 <= followers <= 10000
-    if r == "10k-50k": return 10000 <= followers <= 50000
-    if r == "50k-100k": return 50000 <= followers <= 100000
-    if r == "100k+": return followers >= 100000
+
+    if r == "1k-10k":
+        return 1000 <= followers <= 10000
+
+    if r == "10k-50k":
+        return 10000 <= followers <= 50000
+
+    if r == "50k-100k":
+        return 50000 <= followers <= 100000
+
+    if r == "100k+":
+        return followers >= 100000
+
     return False
 
 
 def _location_match(creator_location, requested):
     c = _norm(creator_location)
     r = _norm(requested)
-    if not r or r == "any location": return True
-    if r == "nepal": return "nepal" in c or c in {"kathmandu", "lalitpur", "bhaktapur", "pokhara"}
-    if r == "kathmandu valley": return any(x in c for x in ("kathmandu", "lalitpur", "patan", "bhaktapur"))
+
+    if not r or r == "any location":
+        return True
+
+    if r == "nepal":
+        return (
+            "nepal" in c
+            or c in {
+                "kathmandu",
+                "lalitpur",
+                "bhaktapur",
+                "pokhara",
+            }
+        )
+
+    if r == "kathmandu valley":
+        return any(
+            x in c
+            for x in (
+                "kathmandu",
+                "lalitpur",
+                "patan",
+                "bhaktapur",
+            )
+        )
+
     return r in c
 
 
 def _matches_any(values, requested):
     values = {_norm(v) for v in (values or [])}
-    return any(_norm(r) in values for r in (requested or []))
+    return any(
+        _norm(r) in values
+        for r in (requested or [])
+    )
 
 
 def _score_application(campaign, profile, db):
     req = campaign.creator_requirements or {}
+
     followers = _creator_follower_count(profile)
     creator_size = _creator_size(followers)
+
     completed = db.query(Application).filter(
         Application.creator_id == profile.user_id,
         Application.status == "completed",
     ).count()
 
     checks = []
+
     def add(key, label, matched, detail):
         max_score = MATCH_WEIGHTS[key]
-        checks.append({"key": key, "label": label, "score": max_score if matched else 0, "max": max_score, "matched": bool(matched), "detail": detail})
 
+        checks.append({
+            "key": key,
+            "label": label,
+            "score": max_score if matched else 0,
+            "max": max_score,
+            "matched": bool(matched),
+            "detail": detail,
+        })
+
+    # Category
     categories = req.get("categories") or []
     cat_values = list(profile.categories or [])
-    # Campaign requirement labels can describe either a niche or creator type.
-    cat_aliases = {"ugc": "ugc creator", "video creator": "videographer", "photographer": "photographer"}
-    cat_match = _matches_any(cat_values, categories) or any(_norm(r) == _norm(profile.creator_type) or _norm(profile.creator_type) == cat_aliases.get(_norm(r), "__none__") for r in categories)
-    add("category", "Category", cat_match, ", ".join(categories) if categories else "Any")
 
+    cat_aliases = {
+        "ugc": "ugc creator",
+        "video creator": "videographer",
+        "photographer": "photographer",
+    }
+
+    cat_match = (
+        _matches_any(cat_values, categories)
+        or any(
+            _norm(r) == _norm(profile.creator_type)
+            or _norm(profile.creator_type)
+            == cat_aliases.get(_norm(r), "__none__")
+            for r in categories
+        )
+    )
+
+    add(
+        "category",
+        "Category",
+        cat_match,
+        ", ".join(categories) if categories else "Any",
+    )
+
+    # Content type
     content_req = req.get("content_types") or []
-    content_match = _matches_any(profile.content_types or [], content_req) if content_req else True
-    add("content_type", "Content type", content_match, ", ".join(content_req) if content_req else "Any")
 
+    content_match = (
+        _matches_any(profile.content_types or [], content_req)
+        if content_req
+        else True
+    )
+
+    add(
+        "content_type",
+        "Content type",
+        content_match,
+        ", ".join(content_req) if content_req else "Any",
+    )
+
+    # Creator size
     size_req = req.get("creator_sizes") or []
-    size_match = creator_size in size_req if size_req else True
-    add("creator_size", "Creator size", size_match, creator_size)
 
+    size_match = (
+        creator_size in size_req
+        if size_req
+        else True
+    )
+
+    add(
+        "creator_size",
+        "Creator size",
+        size_match,
+        creator_size,
+    )
+
+    # Location
     locations = req.get("locations") or []
-    loc_match = any(_location_match(profile.location, r) for r in locations) if locations else True
-    add("location", "Location", loc_match, profile.location or "Not specified")
 
+    loc_match = (
+        any(
+            _location_match(profile.location, r)
+            for r in locations
+        )
+        if locations
+        else True
+    )
+
+    add(
+        "location",
+        "Location",
+        loc_match,
+        profile.location or "Not specified",
+    )
+
+    # Language
     langs = req.get("languages") or []
-    lang_match = _matches_any(profile.languages or [], langs) if langs else True
-    add("language", "Language", lang_match, ", ".join(profile.languages or []) or "Not specified")
 
+    lang_match = (
+        _matches_any(profile.languages or [], langs)
+        if langs
+        else True
+    )
+
+    add(
+        "language",
+        "Language",
+        lang_match,
+        ", ".join(profile.languages or []) or "Not specified",
+    )
+
+    # Followers
     follower_ranges = req.get("follower_ranges") or []
-    follower_match = any(_range_match(followers, r) for r in follower_ranges) if follower_ranges else True
-    add("followers", "Followers", follower_match, f"{followers:,}")
 
-    # Experience is intentionally a soft, always-on signal. It rewards completed work
-    # without rejecting newer creators. 0 completed = 6/15, 1 = 9, 2 = 12, 3+ = 15.
-    exp_score = min(15, 6 + completed * 3)
-    checks.append({"key": "experience", "label": "Experience", "score": exp_score, "max": 15, "matched": exp_score >= 12, "detail": f"{completed} completed collaboration{'' if completed == 1 else 's'}"})
+    follower_match = (
+        any(
+            _range_match(followers, r)
+            for r in follower_ranges
+        )
+        if follower_ranges
+        else True
+    )
 
-    total = sum(c["score"] for c in checks)
-    configured = sum(1 for key in ("categories", "content_types", "creator_sizes", "locations", "languages", "follower_ranges") if req.get(key))
-    # Explainable reasons only mention criteria the brand actually configured.
+    add(
+        "followers",
+        "Followers",
+        follower_match,
+        f"{followers:,}",
+    )
+
+    # Experience
+    exp_score = min(
+        15,
+        6 + completed * 3
+    )
+
+    checks.append({
+        "key": "experience",
+        "label": "Experience",
+        "score": exp_score,
+        "max": 15,
+        "matched": exp_score >= 12,
+        "detail": (
+            f"{completed} completed collaboration"
+            f"{'' if completed == 1 else 's'}"
+        ),
+    })
+
+    total = sum(
+        c["score"]
+        for c in checks
+    )
+
+    configured = sum(
+        1
+        for key in (
+            "categories",
+            "content_types",
+            "creator_sizes",
+            "locations",
+            "languages",
+            "follower_ranges",
+        )
+        if req.get(key)
+    )
+
     reasons = []
-    for c in checks:
-        if c["key"] == "experience" or not req.get({"category":"categories","content_type":"content_types","creator_size":"creator_sizes","location":"locations","language":"languages","followers":"follower_ranges"}.get(c["key"], "")):
-            continue
-        reasons.append(f"{c['label']} ✓" if c["matched"] else f"{c['label']} does not match")
-    return round(total), checks, reasons, configured + 1  # experience is always shown as the soft signal
 
-@router.post("/", response_model=ApplicationResponse)
+    key_map = {
+        "category": "categories",
+        "content_type": "content_types",
+        "creator_size": "creator_sizes",
+        "location": "locations",
+        "language": "languages",
+        "followers": "follower_ranges",
+    }
+
+    for c in checks:
+        if (
+            c["key"] == "experience"
+            or not req.get(
+                key_map.get(c["key"], "")
+            )
+        ):
+            continue
+
+        reasons.append(
+            f"{c['label']} ✓"
+            if c["matched"]
+            else f"{c['label']} does not match"
+        )
+
+    return (
+        round(total),
+        checks,
+        reasons,
+        configured + 1,
+    )
+
+
+# ============================================================
+# CREATE APPLICATION
+# ============================================================
+
+@router.post(
+    "/",
+    response_model=ApplicationResponse
+)
 async def create_application(
     data: ApplicationCreate,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_creator)
+    current_user: User = Depends(get_current_creator),
 ):
-    # Check campaign exists and is published
-    campaign = db.query(Campaign).filter(Campaign.id == data.campaign_id).first()
-    if not campaign:
-        raise HTTPException(status_code=404, detail="Campaign not found")
-    
-    if campaign.status != "published":
-        raise HTTPException(status_code=400, detail="Campaign is not accepting applications")
+    # Check campaign
+    campaign = db.query(Campaign).filter(
+        Campaign.id == data.campaign_id
+    ).first()
 
-    deadline = campaign.application_deadline or campaign.deadline
+    if not campaign:
+        raise HTTPException(
+            status_code=404,
+            detail="Campaign not found",
+        )
+
+    if campaign.status != "published":
+        raise HTTPException(
+            status_code=400,
+            detail="Campaign is not accepting applications",
+        )
+
+    # Check deadline
+    deadline = (
+        campaign.application_deadline
+        or campaign.deadline
+    )
+
     if deadline:
         if deadline.tzinfo is None:
-            deadline = deadline.replace(tzinfo=timezone.utc)
-        if datetime.now(timezone.utc) > deadline:
-            raise HTTPException(status_code=400, detail="The application deadline has passed.")
+            deadline = deadline.replace(
+                tzinfo=timezone.utc
+            )
 
+        if datetime.now(timezone.utc) > deadline:
+            raise HTTPException(
+                status_code=400,
+                detail="The application deadline has passed.",
+            )
+
+    # Check creator limit
     accepted_count = db.query(Application).filter(
-        Application.campaign_id == campaign.id, Application.status.in_(["accepted", "completed"])
+        Application.campaign_id == campaign.id,
+        Application.status.in_(
+            ["accepted", "completed"]
+        ),
     ).count()
-    if accepted_count >= (campaign.creators_needed or 1):
-        raise HTTPException(status_code=400, detail="This campaign has already selected all required creators.")
-    
-    # Check if already applied
+
+    if accepted_count >= (
+        campaign.creators_needed or 1
+    ):
+        raise HTTPException(
+            status_code=400,
+            detail=(
+                "This campaign has already selected "
+                "all required creators."
+            ),
+        )
+
+    # ========================================================
+    # CHECK EXISTING APPLICATION
+    #
+    # IMPORTANT:
+    # Withdrawn applications are allowed to apply again.
+    # ========================================================
+
     existing = db.query(Application).filter(
         Application.campaign_id == data.campaign_id,
-        Application.creator_id == current_user.id
+        Application.creator_id == current_user.id,
+        Application.status != "withdrawn",
     ).first()
+
     if existing:
-        raise HTTPException(status_code=400, detail="Already applied to this campaign")
-    
+        raise HTTPException(
+            status_code=400,
+            detail="Already applied to this campaign",
+        )
+
     # Create application
     application = Application(
         campaign_id=data.campaign_id,
@@ -166,262 +422,744 @@ async def create_application(
         application_answers=data.application_answers,
         selected_portfolio=data.selected_portfolio,
     )
+
     db.add(application)
     db.flush()
 
-    # A paid application starts with the creator's requested rate. It is an
-    # offer, not a final deal, until the other party accepts it. If the creator
-    # omitted a rate, the campaign budget is used as the opening offer so the
-    # brand and creator still have a concrete amount to negotiate.
-    if getattr(campaign.campaign_type, "value", str(campaign.campaign_type)) == "paid":
-        opening_amount = data.rate if data.rate is not None else campaign.budget
-        if opening_amount is not None and float(opening_amount) > 0:
-            db.add(NegotiationOffer(
-                application_id=application.id, sender_id=current_user.id,
-                amount=float(opening_amount),
-                message=data.message, status="pending",
-            ))
+    # Paid campaign opening negotiation offer
+    if getattr(
+        campaign.campaign_type,
+        "value",
+        str(campaign.campaign_type),
+    ) == "paid":
+
+        opening_amount = (
+            data.rate
+            if data.rate is not None
+            else campaign.budget
+        )
+
+        if (
+            opening_amount is not None
+            and float(opening_amount) > 0
+        ):
+            db.add(
+                NegotiationOffer(
+                    application_id=application.id,
+                    sender_id=current_user.id,
+                    amount=float(opening_amount),
+                    message=data.message,
+                    status="pending",
+                )
+            )
+
             application.negotiation_status = "pending"
 
     db.commit()
     db.refresh(application)
 
+    # Notify business
     create_notification(
         db,
         user_id=campaign.business_id,
         type="application_received",
         title="New application received",
-        message=f"A creator applied to {campaign.title}.",
-        link=f"/applications?campaign={campaign.id}",
+        message=(
+            f"A creator applied to {campaign.title}."
+        ),
+        link=(
+            f"/applications?campaign={campaign.id}"
+        ),
         reference_id=application.id,
-        event_key=f"application-received:{application.id}",
+        event_key=(
+            f"application-received:{application.id}"
+        ),
     )
+
     db.commit()
+
     return application
 
 
-@router.get("/", response_model=list[ApplicationResponse])
+# ============================================================
+# GET APPLICATIONS
+# ============================================================
+
+@router.get(
+    "/",
+    response_model=list[ApplicationResponse]
+)
 async def get_applications(
-    campaign_id: Optional[int] = Query(None, description="Filter by campaign ID"),
-    status: Optional[str] = Query(None, description="Filter by status"),
+    campaign_id: Optional[int] = Query(
+        None,
+        description="Filter by campaign ID",
+    ),
+    status: Optional[str] = Query(
+        None,
+        description="Filter by status",
+    ),
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(get_current_user),
 ):
-    """Get applications based on user role"""
+    """Get applications based on user role."""
+
     query = db.query(Application)
-    
+
     if current_user.role == "creator":
-        query = query.filter(Application.creator_id == current_user.id)
+        query = query.filter(
+            Application.creator_id == current_user.id
+        )
+
     elif current_user.role == "business":
-        # Get campaigns owned by business
-        campaign_ids = db.query(Campaign.id).filter(Campaign.business_id == current_user.id).subquery()
-        query = query.filter(Application.campaign_id.in_(campaign_ids))
-    
+        campaign_ids = (
+            db.query(Campaign.id)
+            .filter(
+                Campaign.business_id
+                == current_user.id
+            )
+            .subquery()
+        )
+
+        query = query.filter(
+            Application.campaign_id.in_(
+                campaign_ids
+            )
+        )
+
     if campaign_id is not None:
-        query = query.filter(Application.campaign_id == campaign_id)
+        query = query.filter(
+            Application.campaign_id == campaign_id
+        )
+
     if status:
-        query = query.filter(Application.status == status)
-    
-    applications = query.order_by(Application.created_at.desc()).all()
+        query = query.filter(
+            Application.status == status
+        )
+
+    applications = query.order_by(
+        Application.created_at.desc()
+    ).all()
+
     result = []
+
     for app in applications:
-        campaign = db.query(Campaign).filter(Campaign.id == app.campaign_id).first()
-        item = ApplicationResponse.model_validate(app).model_dump()
-        item["completed_collaborations"] = db.query(Application).filter(Application.creator_id == app.creator_id, Application.status == "completed").count()
-        item["creators_needed"] = campaign.creators_needed or 1
-        item["campaign_budget"] = float(campaign.budget) if campaign.budget is not None else None
-        item["campaign_type"] = getattr(campaign.campaign_type, "value", str(campaign.campaign_type))
-        profile = app.creator.creator_profile if app.creator else None
-        if current_user.role == "business" and profile:
-            score, breakdown, reasons, configured_count = _score_application(campaign, profile, db)
+        campaign = db.query(Campaign).filter(
+            Campaign.id == app.campaign_id
+        ).first()
+
+        item = (
+            ApplicationResponse
+            .model_validate(app)
+            .model_dump()
+        )
+
+        item["completed_collaborations"] = (
+            db.query(Application)
+            .filter(
+                Application.creator_id
+                == app.creator_id,
+                Application.status
+                == "completed",
+            )
+            .count()
+        )
+
+        item["creators_needed"] = (
+            campaign.creators_needed or 1
+        )
+
+        item["campaign_budget"] = (
+            float(campaign.budget)
+            if campaign.budget is not None
+            else None
+        )
+
+        item["campaign_type"] = getattr(
+            campaign.campaign_type,
+            "value",
+            str(campaign.campaign_type),
+        )
+
+        profile = (
+            app.creator.creator_profile
+            if app.creator
+            else None
+        )
+
+        if (
+            current_user.role == "business"
+            and profile
+        ):
+            (
+                score,
+                breakdown,
+                reasons,
+                configured_count,
+            ) = _score_application(
+                campaign,
+                profile,
+                db,
+            )
+
             item["match_score"] = score
             item["match_breakdown"] = breakdown
             item["match_reasons"] = reasons
-            item["match_configured_count"] = configured_count
+            item["match_configured_count"] = (
+                configured_count
+            )
+
         result.append(item)
+
     return result
 
 
-@router.put("/{application_id}", response_model=ApplicationResponse)
+# ============================================================
+# UPDATE APPLICATION STATUS
+# ============================================================
+
+@router.put(
+    "/{application_id}",
+    response_model=ApplicationResponse,
+)
 async def update_application_status(
     application_id: int,
     data: ApplicationUpdate,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(get_current_user),
 ):
-    """Update application status (Accept/Reject) - Business only"""
-    application = db.query(Application).filter(Application.id == application_id).first()
+    """Update application status (Accept/Reject) - Business only."""
+
+    application = db.query(Application).filter(
+        Application.id == application_id
+    ).first()
+
     if not application:
-        raise HTTPException(status_code=404, detail="Application not found")
-    
-    # Check permission - user must own the campaign
-    campaign = db.query(Campaign).filter(Campaign.id == application.campaign_id).first()
+        raise HTTPException(
+            status_code=404,
+            detail="Application not found",
+        )
+
+    # Check campaign ownership
+    campaign = db.query(Campaign).filter(
+        Campaign.id == application.campaign_id
+    ).first()
+
     if campaign.business_id != current_user.id:
-        raise HTTPException(status_code=403, detail="Access denied")
-    
+        raise HTTPException(
+            status_code=403,
+            detail="Access denied",
+        )
+
+    # Update collaboration deadline
     if data.deliverable_deadline is not None:
-        if application.status not in ("accepted", "completed"):
-            raise HTTPException(status_code=400, detail="Set a collaboration deadline after accepting the creator.")
+
+        if application.status not in (
+            "accepted",
+            "completed",
+        ):
+            raise HTTPException(
+                status_code=400,
+                detail=(
+                    "Set a collaboration deadline "
+                    "after accepting the creator."
+                ),
+            )
+
         d = data.deliverable_deadline
-        if d.tzinfo is None: d = d.replace(tzinfo=timezone.utc)
+
+        if d.tzinfo is None:
+            d = d.replace(
+                tzinfo=timezone.utc
+            )
+
         if d <= datetime.now(timezone.utc):
-            raise HTTPException(status_code=400, detail="Deliverable deadline must be in the future.")
-        application.deliverable_deadline = data.deliverable_deadline
-        deliverables = db.query(Deliverable).filter(Deliverable.application_id == application.id).all()
+            raise HTTPException(
+                status_code=400,
+                detail=(
+                    "Deliverable deadline must "
+                    "be in the future."
+                ),
+            )
+
+        application.deliverable_deadline = (
+            data.deliverable_deadline
+        )
+
+        deliverables = db.query(
+            Deliverable
+        ).filter(
+            Deliverable.application_id
+            == application.id
+        ).all()
+
         for deliverable in deliverables:
-            if deliverable.status in ("pending", "revision_requested"):
-                deliverable.due_date = data.deliverable_deadline
+            if deliverable.status in (
+                "pending",
+                "revision_requested",
+            ):
+                deliverable.due_date = (
+                    data.deliverable_deadline
+                )
+
         db.commit()
+
         create_notification(
             db,
             user_id=application.creator_id,
             type="deadline_updated",
-            title="Your collaboration deadline was updated",
-            message=f"Your deliverables for {campaign.title} are due {data.deliverable_deadline.strftime('%b %d, %Y')}.",
-            link=f"/workspace/deliverables?collab={application.id}",
+            title=(
+                "Your collaboration deadline "
+                "was updated"
+            ),
+            message=(
+                f"Your deliverables for "
+                f"{campaign.title} are due "
+                f"{data.deliverable_deadline.strftime('%b %d, %Y')}."
+            ),
+            link=(
+                f"/workspace/deliverables"
+                f"?collab={application.id}"
+            ),
             reference_id=application.id,
-            event_key=f"deadline-updated:{application.id}:{data.deliverable_deadline.isoformat()}",
+            event_key=(
+                f"deadline-updated:"
+                f"{application.id}:"
+                f"{data.deliverable_deadline.isoformat()}"
+            ),
         )
+
         db.commit()
         db.refresh(application)
+
         return application
 
+    # Only pending applications can be accepted/rejected
     if application.status != "pending":
-        raise HTTPException(status_code=400, detail="Application is no longer pending")
+        raise HTTPException(
+            status_code=400,
+            detail="Application is no longer pending",
+        )
 
-    if data.status not in ("accepted", "rejected"):
-        raise HTTPException(status_code=400, detail="Status must be accepted or rejected")
+    if data.status not in (
+        "accepted",
+        "rejected",
+    ):
+        raise HTTPException(
+            status_code=400,
+            detail=(
+                "Status must be accepted or rejected"
+            ),
+        )
+
+    # ========================================================
+    # ACCEPT
+    # ========================================================
 
     if data.status == "accepted":
-        if getattr(campaign.campaign_type, "value", str(campaign.campaign_type)) == "paid":
-            if not application.agreed_rate or not application.rate_locked or application.negotiation_status != "agreed":
-                raise HTTPException(status_code=400, detail="Agree on the payment amount with the creator before selecting them.")
-        now = datetime.now(timezone.utc)
-        deadline = campaign.application_deadline or campaign.deadline
-        if deadline and deadline.tzinfo is None:
-            deadline = deadline.replace(tzinfo=timezone.utc)
-        if deadline and now > deadline:
-            raise HTTPException(status_code=400, detail="The application deadline has passed.")
-        accepted_count = db.query(Application).filter(
-            Application.campaign_id == campaign.id, Application.status.in_(["accepted", "completed"])
-        ).count()
-        if accepted_count >= (campaign.creators_needed or 1):
-            raise HTTPException(status_code=400, detail="The campaign has reached its creator limit.")
 
+        if getattr(
+            campaign.campaign_type,
+            "value",
+            str(campaign.campaign_type),
+        ) == "paid":
+
+            if (
+                not application.agreed_rate
+                or not application.rate_locked
+                or application.negotiation_status
+                != "agreed"
+            ):
+                raise HTTPException(
+                    status_code=400,
+                    detail=(
+                        "Agree on the payment amount "
+                        "with the creator before "
+                        "selecting them."
+                    ),
+                )
+
+        now = datetime.now(timezone.utc)
+
+        deadline = (
+            campaign.application_deadline
+            or campaign.deadline
+        )
+
+        if deadline and deadline.tzinfo is None:
+            deadline = deadline.replace(
+                tzinfo=timezone.utc
+            )
+
+        if deadline and now > deadline:
+            raise HTTPException(
+                status_code=400,
+                detail=(
+                    "The application deadline "
+                    "has passed."
+                ),
+            )
+
+        accepted_count = db.query(
+            Application
+        ).filter(
+            Application.campaign_id
+            == campaign.id,
+            Application.status.in_(
+                ["accepted", "completed"]
+            ),
+        ).count()
+
+        if accepted_count >= (
+            campaign.creators_needed or 1
+        ):
+            raise HTTPException(
+                status_code=400,
+                detail=(
+                    "The campaign has reached "
+                    "its creator limit."
+                ),
+            )
+
+    # Update application status
     application.status = data.status
+
     db.commit()
     db.refresh(application)
 
-    if data.status == "accepted":
-        campaign.status = "in_progress"
-        # Turn campaign deliverable presets into actual collaboration tasks.
-        if campaign.deliverables:
-            existing = db.query(Deliverable).filter(Deliverable.application_id == application.id).count()
-            if existing == 0:
-                for item in campaign.deliverables:
-                    db.add(Deliverable(
-                        application_id=application.id,
-                        title=str(item),
-                        due_date=application.deliverable_deadline or campaign.deliverable_deadline,
-                        status="pending",
-                    ))
-        collab_due = application.deliverable_deadline or campaign.deliverable_deadline
-        if collab_due:
-            db.add(CalendarEvent(application_id=application.id, created_by=campaign.business_id, title="Deliverables due", description=f"Complete the approved campaign deliverables for {campaign.title}.", event_date=collab_due, event_type="deadline"))
-        if getattr(campaign, "completion_mode", "approval_only") == "publication_required" and campaign.publication_deadline:
-            _platforms_label = ", ".join(campaign.required_platforms) if getattr(campaign, "required_platforms", None) else (campaign.required_platform or "the required platform")
-            db.add(CalendarEvent(application_id=application.id, created_by=campaign.business_id, title="Publication deadline", description=f"Publish the approved content on {_platforms_label}.", event_date=campaign.publication_deadline, event_type="posting_date"))
+    # ========================================================
+    # ACCEPTED
+    # ========================================================
 
-        if getattr(campaign.campaign_type, "value", str(campaign.campaign_type)) == "gifted":
-            if not db.query(GiftFulfillment).filter(GiftFulfillment.application_id == application.id).first():
-                db.add(GiftFulfillment(application_id=application.id, status="pending"))
+    if data.status == "accepted":
+
+        campaign.status = "in_progress"
+
+        # Create deliverables
+        if campaign.deliverables:
+
+            existing = db.query(
+                Deliverable
+            ).filter(
+                Deliverable.application_id
+                == application.id
+            ).count()
+
+            if existing == 0:
+
+                for item in campaign.deliverables:
+
+                    db.add(
+                        Deliverable(
+                            application_id=application.id,
+                            title=str(item),
+                            due_date=(
+                                application.deliverable_deadline
+                                or campaign.deliverable_deadline
+                            ),
+                            status="pending",
+                        )
+                    )
+
+        # Deliverable calendar event
+        collab_due = (
+            application.deliverable_deadline
+            or campaign.deliverable_deadline
+        )
+
+        if collab_due:
+
+            db.add(
+                CalendarEvent(
+                    application_id=application.id,
+                    created_by=campaign.business_id,
+                    title="Deliverables due",
+                    description=(
+                        "Complete the approved campaign "
+                        f"deliverables for {campaign.title}."
+                    ),
+                    event_date=collab_due,
+                    event_type="deadline",
+                )
+            )
+
+        # Publication deadline
+        if (
+            getattr(
+                campaign,
+                "completion_mode",
+                "approval_only",
+            )
+            == "publication_required"
+            and campaign.publication_deadline
+        ):
+
+            _platforms_label = (
+                ", ".join(
+                    campaign.required_platforms
+                )
+                if getattr(
+                    campaign,
+                    "required_platforms",
+                    None,
+                )
+                else (
+                    campaign.required_platform
+                    or "the required platform"
+                )
+            )
+
+            db.add(
+                CalendarEvent(
+                    application_id=application.id,
+                    created_by=campaign.business_id,
+                    title="Publication deadline",
+                    description=(
+                        "Publish the approved content "
+                        f"on {_platforms_label}."
+                    ),
+                    event_date=(
+                        campaign.publication_deadline
+                    ),
+                    event_type="posting_date",
+                )
+            )
+
+        # Gift fulfillment
+        if getattr(
+            campaign.campaign_type,
+            "value",
+            str(campaign.campaign_type),
+        ) == "gifted":
+
+            if not db.query(
+                GiftFulfillment
+            ).filter(
+                GiftFulfillment.application_id
+                == application.id
+            ).first():
+
+                db.add(
+                    GiftFulfillment(
+                        application_id=application.id,
+                        status="pending",
+                    )
+                )
+
         db.commit()
+
         create_notification(
             db,
             user_id=application.creator_id,
             type="application_accepted",
             title="You've been accepted!",
-            message=f"{campaign.brand_name or 'The brand'} selected you for {campaign.title}.",
-            link=f"/workspace/active",
+            message=(
+                f"{campaign.brand_name or 'The brand'} "
+                f"selected you for {campaign.title}."
+            ),
+            link="/workspace/active",
             reference_id=application.id,
-            event_key=f"application-accepted:{application.id}",
+            event_key=(
+                f"application-accepted:"
+                f"{application.id}"
+            ),
         )
+
         db.commit()
+
+    # ========================================================
+    # REJECTED
+    # ========================================================
+
     else:
+
         create_notification(
             db,
             user_id=application.creator_id,
             type="application_rejected",
             title="Application update",
-            message=f"Your application to {campaign.title} was not selected this time.",
-            link=f"/applications",
+            message=(
+                f"Your application to "
+                f"{campaign.title} was not selected "
+                "this time."
+            ),
+            link="/applications",
             reference_id=application.id,
-            event_key=f"application-rejected:{application.id}",
+            event_key=(
+                f"application-rejected:"
+                f"{application.id}"
+            ),
         )
+
         db.commit()
 
     return application
+
+
+# ============================================================
+# WITHDRAW APPLICATION
+# ============================================================
 
 @router.delete("/{application_id}")
 async def withdraw_application(
     application_id: int,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_creator)
+    current_user: User = Depends(get_current_creator),
 ):
     """
     Creator withdraws their application.
 
-    - If it's still "pending", the row is simply removed (nothing else
-      references it yet).
-    - If it's already "accepted" — i.e. the creator is mid-collaboration and
-      wants to leave — we can't delete the row anymore: messages,
-      deliverables, and calendar events all point at this application's id.
-      Instead we mark it "withdrawn" and, if this was the campaign's last
-      active acceptance, put the campaign back to "published" so the
-      business can accept someone else.
-    - "rejected" or already-"withdrawn" applications can't be withdrawn
-      again — there's nothing active left to leave.
+    Pending:
+        Mark the application as withdrawn instead of deleting it.
+        This prevents foreign-key errors because negotiation offers
+        can already reference the application.
+
+    Accepted:
+        Mark the application as withdrawn and, if this was the
+        campaign's last active creator, return the campaign to
+        published.
+
+    Rejected/withdrawn:
+        Cannot be withdrawn again.
     """
-    # Get the application
-    application = db.query(Application).filter(Application.id == application_id).first()
-    
+
+    # Find application
+    application = db.query(Application).filter(
+        Application.id == application_id
+    ).first()
+
     if not application:
-        raise HTTPException(status_code=404, detail="Application not found")
-    
-    # Check if the current user is the creator who applied
+        raise HTTPException(
+            status_code=404,
+            detail="Application not found",
+        )
+
+    # Make sure this creator owns the application
     if application.creator_id != current_user.id:
-        raise HTTPException(status_code=403, detail="Not your application")
-    
+        raise HTTPException(
+            status_code=403,
+            detail="Not your application",
+        )
+
+    # ========================================================
+    # PENDING APPLICATION
+    # ========================================================
+    #
+    # DO NOT use:
+    #
+    #     db.delete(application)
+    #
+    # because paid applications can already have a
+    # NegotiationOffer referencing this application.
+    #
+    # Instead, preserve the application and change its status.
+    # ========================================================
+
     if application.status == "pending":
-        campaign = db.query(Campaign).filter(Campaign.id == application.campaign_id).first()
-        db.delete(application)
-        if campaign:
-            create_notification(
-                db, user_id=campaign.business_id, type="application_withdrawn",
-                title="Application withdrawn", message=f"A creator withdrew their application to {campaign.title}.",
-                link=f"/applications?campaign={campaign.id}", event_key=f"application-withdrawn:{application_id}",
-            )
+
+        campaign = db.query(Campaign).filter(
+            Campaign.id == application.campaign_id
+        ).first()
+
+        application.status = "withdrawn"
+
+        # If negotiation exists, mark it closed/cancelled
+        # rather than deleting the application.
+        offers = db.query(
+            NegotiationOffer
+        ).filter(
+            NegotiationOffer.application_id
+            == application.id
+        ).all()
+
+        for offer in offers:
+            if offer.status == "pending":
+                offer.status = "cancelled"
+
         db.commit()
-        return {"message": "Application withdrawn successfully"}
+
+        # Notify business
+        if campaign:
+
+            create_notification(
+                db,
+                user_id=campaign.business_id,
+                type="application_withdrawn",
+                title="Application withdrawn",
+                message=(
+                    "A creator withdrew their "
+                    f"application to {campaign.title}."
+                ),
+                link=(
+                    f"/applications"
+                    f"?campaign={campaign.id}"
+                ),
+                reference_id=application.id,
+                event_key=(
+                    f"application-withdrawn:"
+                    f"{application.id}"
+                ),
+            )
+
+            db.commit()
+
+        return {
+            "message": (
+                "Application withdrawn successfully"
+            )
+        }
+
+    # ========================================================
+    # ACCEPTED APPLICATION
+    # ========================================================
 
     if application.status == "accepted":
+
         application.status = "withdrawn"
+
         db.commit()
 
-        campaign = db.query(Campaign).filter(Campaign.id == application.campaign_id).first()
-        if campaign and campaign.status == "in_progress":
-            still_active = (
-                db.query(Application)
-                .filter(Application.campaign_id == campaign.id, Application.status == "accepted")
-                .count()
-            )
+        campaign = db.query(Campaign).filter(
+            Campaign.id == application.campaign_id
+        ).first()
+
+        # If this was the last accepted creator,
+        # allow the campaign to accept another creator.
+        if (
+            campaign
+            and campaign.status == "in_progress"
+        ):
+
+            still_active = db.query(
+                Application
+            ).filter(
+                Application.campaign_id
+                == campaign.id,
+                Application.status
+                == "accepted",
+            ).count()
+
             if still_active == 0:
+
                 campaign.status = "published"
+
                 db.commit()
 
-        return {"message": "You've left this collaboration. The brand has been notified."}
+        return {
+            "message": (
+                "You've left this collaboration. "
+                "The brand has been notified."
+            )
+        }
+
+    # ========================================================
+    # REJECTED / ALREADY WITHDRAWN
+    # ========================================================
 
     raise HTTPException(
         status_code=400,
-        detail="This application is already rejected or withdrawn — there's nothing active to withdraw from"
+        detail=(
+            "This application is already rejected "
+            "or withdrawn — there's nothing active "
+            "to withdraw from"
+        ),
     )

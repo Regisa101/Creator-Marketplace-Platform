@@ -12,13 +12,21 @@ export function LoginBusiness() {
   const [showPw, setShowPw] = useState(false);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  const [fieldError, setFieldError] = useState('');
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
+    setFieldError('');
+
+    const email = data.email.trim();
+    if (!email) return setFieldError('Email is required.');
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return setFieldError('Please enter a valid email address.');
+    if (!data.password) return setFieldError('Password is required.');
+
     setLoading(true);
     try {
-      await loginUser({ ...data, role: 'business' });
+      await loginUser({ email, password: data.password, role: 'business' });
       navigate('/dashboard');
     } catch (err: any) {
       setError(err.response?.data?.detail || 'Login failed. Please try again.');
@@ -65,6 +73,7 @@ export function LoginBusiness() {
           </div>
         </div>
 
+        {fieldError && <div className="az-error">{fieldError}</div>}
         {error && <div className="az-error">{error}</div>}
 
         <button type="submit" className="az-submit" disabled={loading}>

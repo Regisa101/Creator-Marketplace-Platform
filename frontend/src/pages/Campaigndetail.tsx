@@ -96,6 +96,9 @@ export function CampaignDetail() {
   const [myApplication, setMyApplication] = useState<Application | null>(null);
   const [showApplyForm, setShowApplyForm] = useState(false);
   const [withdrawing, setWithdrawing] = useState(false);
+  const [showWithdrawConfirm, setShowWithdrawConfirm] = useState(false);
+  const [withdrawError, setWithdrawError] = useState('');
+  const [applicationWithdrawn, setApplicationWithdrawn] = useState(false);
 
   const [isSaved, setIsSaved] = useState(false);
   const [savingBookmark, setSavingBookmark] = useState(false);
@@ -195,23 +198,35 @@ export function CampaignDetail() {
     }
   };
 
+  const openWithdrawConfirmation = () => {
+    if (!myApplication || myApplication.status !== 'pending' || withdrawing) return;
+    setWithdrawError('');
+    setShowWithdrawConfirm(true);
+  };
+
+  const cancelWithdraw = () => {
+    if (withdrawing) return;
+    setShowWithdrawConfirm(false);
+    setWithdrawError('');
+  };
+
   const handleWithdraw = async () => {
-    if (!myApplication) return;
-    const isActive = myApplication.status === 'accepted';
-    const confirmMsg = isActive
-      ? "Leave this collaboration? The brand will be notified, and you'll lose access to its messages, calendar, and deliverables here."
-      : 'Are you sure you want to withdraw your application?';
-    if (!confirm(confirmMsg)) return;
+    if (!myApplication || myApplication.status !== 'pending' || withdrawing) return;
 
     setWithdrawing(true);
+    setWithdrawError('');
     try {
       await withdrawApplication(myApplication.id);
-      if (id) {
-        const apps = await getApplications({ campaign_id: parseInt(id) });
-        setMyApplication(apps[0] ?? null);
-      }
+      setMyApplication(null);
+      setApplicationWithdrawn(true);
+      setShowWithdrawConfirm(false);
     } catch (err: any) {
       console.error('Could not withdraw application:', err);
+      setWithdrawError(
+        err?.response?.data?.detail ||
+        err?.response?.data?.message ||
+        'We could not withdraw your application. Please try again.'
+      );
     } finally {
       setWithdrawing(false);
     }
@@ -264,20 +279,88 @@ export function CampaignDetail() {
     if (!campaign) return null;
 
     if (myApplication) {
-      const label =
-        myApplication.status === 'pending' ? 'Application pending'
-          : myApplication.status === 'accepted' ? 'Application accepted ✓'
-          : myApplication.status === 'rejected' ? 'Application rejected ✗'
-          : 'Application withdrawn';
+      if (myApplication.status === 'pending') {
+        return (
+          <div>
+            <div className="cd-application-status cd-application-status--pending cd-application-status--with-action">
+              <div className="cd-application-status-main">
+                <span className="cd-status-dot" aria-hidden="true" />
+                <div>
+                  <strong>Application pending</strong>
+                  <span>The brand has received your application.</span>
+                </div>
+              </div>
+              <button
+                type="button"
+                className="cd-withdraw-button"
+                onClick={openWithdrawConfirmation}
+                disabled={withdrawing}
+                aria-label="Withdraw application"
+              >
+                <Trash2 size={14} />
+                Withdraw application
+              </button>
+            </div>
+            {showWithdrawConfirm && (
+              <div className="cd-withdraw-confirm" role="alertdialog" aria-label="Confirm application withdrawal">
+                <div className="cd-withdraw-confirm-title">Withdraw your application?</div>
+                <p className="cd-withdraw-confirm-copy">The brand will no longer see this application as pending. You can apply again while the campaign is open.</p>
+                {withdrawError && <div className="cd-withdraw-error">{withdrawError}</div>}
+                <div className="cd-withdraw-confirm-actions">
+                  <button type="button" className="cd-withdraw-cancel" onClick={cancelWithdraw} disabled={withdrawing}>Keep application</button>
+                  <button type="button" className="cd-withdraw-confirm-button" onClick={handleWithdraw} disabled={withdrawing}>
+                    {withdrawing ? <Loader2 size={13} className="cd-spin" /> : <Trash2 size={13} />}
+                    {withdrawing ? 'Withdrawing…' : 'Yes, withdraw'}
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+        );
+      }
 
+      if (myApplication.status === 'accepted') {
+        return (
+          <div className="cd-application-status cd-application-status--accepted">
+            <CheckCircle2 size={17} />
+            <div>
+              <strong>Application accepted</strong>
+              <span>Your collaboration with {brandName} is active.</span>
+            </div>
+          </div>
+        );
+      }
+
+      if (myApplication.status === 'rejected') {
+        return (
+          <div className="cd-application-status cd-application-status--rejected">
+            <X size={17} />
+            <div>
+              <strong>Application not selected</strong>
+              <span>This campaign won't be available for this application.</span>
+            </div>
+          </div>
+        );
+      }
+    }
+
+    if (applicationWithdrawn) {
       return (
-        <div className={`cd-application-status cd-application-status--${myApplication.status}`}>
-          <CheckCircle2 size={17} />
-          {label}
-          {(myApplication.status === 'pending' || myApplication.status === 'accepted') && (
-            <button className="cd-withdraw-button" onClick={handleWithdraw} disabled={withdrawing}>
-              {withdrawing ? <Loader2 size={14} className="cd-spin" /> : <Trash2 size={14} />}
-              {withdrawing ? 'Withdrawing...' : myApplication.status === 'accepted' ? 'Leave collaboration' : 'Withdraw'}
+        <div className="cd-application-status cd-application-status--withdrawn cd-application-status--with-action">
+          <div className="cd-application-status-main">
+            <CheckCircle2 size={17} />
+            <div>
+              <strong>Application withdrawn</strong>
+              <span>Your application was withdrawn successfully.</span>
+            </div>
+          </div>
+          {user?.role === 'creator' && !deadline?.closed && campaign.status === 'published' && (
+            <button
+              type="button"
+              className="cd-reapply-button"
+              onClick={() => { setApplicationWithdrawn(false); setShowApplyForm(true); }}
+            >
+              Apply again <ChevronRight size={14} />
             </button>
           )}
         </div>
@@ -454,9 +537,27 @@ export function CampaignDetail() {
           .cd-guidelines-note-title { font-size: 14px; font-weight: 750; margin-bottom: 5px; }
           .cd-guidelines-note-copy { margin: 0; color: #5c5d66; font-size: 13px; line-height: 1.7; }
 
-          .cd-withdraw-button { display: inline-flex; align-items: center; gap: 6px; font-size: 11.5px; font-weight: 700; padding: 6px 14px; border-radius: 8px; border: 1px solid #fca5a5; background: #fee2e2; color: #dc2626; cursor: pointer; margin-left: 10px; }
-          .cd-withdraw-button:hover { background: #fca5a5; border-color: #ef4444; }
-          .cd-withdraw-button:disabled { opacity: 0.6; cursor: not-allowed; }
+          .cd-withdraw-button { display: inline-flex; align-items: center; justify-content: center; gap: 6px; min-height: 34px; padding: 7px 12px; border-radius: 9px; border: 1px solid #f1b4ad; background: #fff; color: #c84642; font-size: 11.5px; font-weight: 750; cursor: pointer; white-space: nowrap; transition: background .16s ease, border-color .16s ease, transform .16s ease; }
+          .cd-withdraw-button:hover:not(:disabled) { background: #fff5f3; border-color: #e98e84; transform: translateY(-1px); }
+          .cd-withdraw-button:disabled { opacity: 0.6; cursor: not-allowed; transform: none; }
+          .cd-application-status--with-action { justify-content: space-between; text-align: left; }
+          .cd-application-status-main { display: flex; align-items: center; gap: 9px; min-width: 0; }
+          .cd-application-status-main > div, .cd-application-status > div:not(.cd-application-status-main) { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+          .cd-application-status strong { font-size: 12px; line-height: 1.35; }
+          .cd-application-status span:not(.cd-status-dot) { font-size: 10.5px; font-weight: 550; line-height: 1.45; opacity: .82; }
+          .cd-status-dot { width: 8px; height: 8px; border-radius: 999px; background: #d39b00; flex: 0 0 auto; box-shadow: 0 0 0 4px rgba(211,155,0,.12); }
+          .cd-reapply-button { display: inline-flex; align-items: center; justify-content: center; gap: 4px; min-height: 34px; padding: 7px 12px; border: 1px solid #d7ddf5; border-radius: 9px; background: #fff; color: var(--navy); font-size: 11.5px; font-weight: 750; cursor: pointer; white-space: nowrap; }
+          .cd-reapply-button:hover { background: #f7f8fe; border-color: #bdc6ec; }
+          .cd-withdraw-confirm { margin-top: 9px; padding: 12px; border: 1px solid #f0d5d0; border-radius: 10px; background: #fff9f7; }
+          .cd-withdraw-confirm-title { color: #33333a; font-size: 11.5px; font-weight: 750; margin-bottom: 3px; }
+          .cd-withdraw-confirm-copy { color: #6b6478; font-size: 10.5px; line-height: 1.5; margin: 0 0 9px; }
+          .cd-withdraw-confirm-actions { display: flex; justify-content: flex-end; gap: 7px; }
+          .cd-withdraw-cancel, .cd-withdraw-confirm-button { min-height: 32px; padding: 6px 11px; border-radius: 8px; font-size: 10.5px; font-weight: 750; cursor: pointer; }
+          .cd-withdraw-cancel { border: 1px solid var(--line); background: #fff; color: #55565e; }
+          .cd-withdraw-confirm-button { border: 1px solid #dc6d63; background: #dc6d63; color: #fff; }
+          .cd-withdraw-confirm-button:hover:not(:disabled) { background: #c9584e; border-color: #c9584e; }
+          .cd-withdraw-confirm-button:disabled, .cd-withdraw-cancel:disabled { opacity: .6; cursor: not-allowed; }
+          .cd-withdraw-error { margin-top: 8px; color: #c84642; font-size: 10.5px; line-height: 1.45; }
 
           /* --- sidebar cards --- */
           .cd-side-card { background: #fff; border-radius: var(--radius-md); padding: 18px; box-shadow: var(--shadow); }
@@ -829,6 +930,7 @@ export function CampaignDetail() {
           campaign={campaign}
           onClose={() => setShowApplyForm(false)}
           onSuccess={async () => {
+            setApplicationWithdrawn(false);
             try {
               const apps = await getApplications({ campaign_id: campaign.id });
               setMyApplication(apps[0] ?? null);

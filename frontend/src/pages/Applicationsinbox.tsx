@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Check, X, DollarSign, Loader2, MessageCircle, ShieldCheck } from 'lucide-react';
+import { Check, X, Loader2, MessageCircle, ShieldCheck } from 'lucide-react';
 import { getApplications, updateApplicationStatus, getNegotiation, makeNegotiationOffer, acceptNegotiationOffer, rejectNegotiationOffer, type Application, type ApplicationStatus, type NegotiationOffer } from '../api/client';
 import { useAuth } from '../context/AuthContext';
 import { AppLayout } from '../components/AppLayout';
@@ -25,6 +25,8 @@ const TABS: { key: ApplicationStatus | 'all'; label: string }[] = [
   { key: 'rejected', label: 'Rejected' },
 ];
 
+type SortKey = 'match' | 'recent';
+
 export function ApplicationsInbox() {
   const { user } = useAuth();
   const isBusiness = user?.role === 'business';
@@ -35,6 +37,8 @@ export function ApplicationsInbox() {
   const [error, setError] = useState('');
   const [search, setSearch] = useState('');
   const [activeTab, setActiveTab] = useState<ApplicationStatus | 'all'>('pending');
+  const [sortBy, setSortBy] = useState<SortKey>('match');
+  const [campaignFilter, setCampaignFilter] = useState<number | 'all'>('all');
   const [actingOn, setActingOn] = useState<number | null>(null);
   const [actionError, setActionError] = useState<{ id: number; message: string } | null>(null);
   const [negotiatingApp, setNegotiatingApp] = useState<Application | null>(null);
@@ -43,18 +47,20 @@ export function ApplicationsInbox() {
   const [offerMessage, setOfferMessage] = useState('');
   const [negotiationLoading, setNegotiationLoading] = useState(false);
   const [negotiationError, setNegotiationError] = useState('');
+  const [matchDetailApp, setMatchDetailApp] = useState<Application | null>(null);
 
-  const load = async () => {
-    setLoading(true);
-    setError('');
+  const load = async (opts?: { silent?: boolean }) => {
+    const silent = !!opts?.silent;
+    if (!silent) setLoading(true);
+    if (!silent) setError('');
     try {
       const data = await getApplications();
       setApplications(data);
     } catch (err) {
       console.error('Could not load applications:', err);
-      setError('Could not load applications. Please try again.');
+      if (!silent) setError('Could not load applications. Please try again.');
     } finally {
-      setLoading(false);
+      if (!silent) setLoading(false);
     }
   };
 
@@ -64,19 +70,46 @@ export function ApplicationsInbox() {
     // Keep the brand inbox fresh while it is open. A creator's application
     // should appear as soon as it reaches the backend; it must not wait for
     // another creator to apply or for the brand to navigate away and back.
+    // The refresh is silent (no spinner/flash) and pauses while a modal is
+    // open so it never interrupts something the user is in the middle of.
     if (!isBusiness) return;
     const timer = window.setInterval(() => {
-      if (document.visibilityState === 'visible') load();
-    }, 5000);
+      if (document.visibilityState === 'visible' && !negotiatingApp && !matchDetailApp) {
+        load({ silent: true });
+      }
+    }, 15000);
     return () => window.clearInterval(timer);
-  }, [isBusiness]);
+  }, [isBusiness, negotiatingApp, matchDetailApp]);
 
-  // Tab filter, then free-text search over campaign title / creator name
-  // (the search box lives in AppLayout's topbar, so it needs to reach in here).
-  const tabFiltered = useMemo(
-    () => (activeTab === 'all' ? applications : applications.filter((a) => a.status === activeTab)),
-    [applications, activeTab]
-  );
+  // Every distinct campaign the business has applications for. Used to power
+  // the "which campaign" filter so a brand running several campaigns at once
+  // can jump straight to one instead of scanning every grouped section.
+  const campaignOptions = useMemo(() => {
+    const map = new Map<number, string>();
+    for (const a of applications) {
+      if (!map.has(a.campaign_id)) {
+        map.set(a.campaign_id, a.campaign_title || `Campaign #${a.campaign_id}`);
+      }
+    }
+    return Array.from(map.entries()).map(([id, title]) => ({ id, title }));
+  }, [applications]);
+
+  // If the currently selected campaign disappears from the list (e.g. all its
+  // applications got filtered out elsewhere), fall back to "All campaigns".
+  useEffect(() => {
+    if (campaignFilter !== 'all' && !campaignOptions.some((c) => c.id === campaignFilter)) {
+      setCampaignFilter('all');
+    }
+  }, [campaignOptions, campaignFilter]);
+
+  // Tab filter, then campaign filter, then free-text search over campaign
+  // title / creator name (the search box lives in AppLayout's topbar, so it
+  // needs to reach in here).
+  const tabFiltered = useMemo(() => {
+    let list = activeTab === 'all' ? applications : applications.filter((a) => a.status === activeTab);
+    if (campaignFilter !== 'all') list = list.filter((a) => a.campaign_id === campaignFilter);
+    return list;
+  }, [applications, activeTab, campaignFilter]);
 
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
@@ -89,7 +122,7 @@ export function ApplicationsInbox() {
   }, [tabFiltered, search]);
 
   // Group by campaign so a business managing several campaigns doesn't
-  // get one long undifferentiated list.
+  // get one long undifferentiated list — each campaign gets its own section.
   const grouped = useMemo(() => {
     const map = new Map<number, { campaignId: number; campaignTitle: string; items: Application[] }>();
     for (const app of filtered) {
@@ -101,9 +134,14 @@ export function ApplicationsInbox() {
     }
     return Array.from(map.values()).map((group) => ({
       ...group,
-      items: [...group.items].sort((a, b) => (b.match_score ?? -1) - (a.match_score ?? -1)),
+      items: [...group.items].sort((a, b) => {
+        if (sortBy === 'recent') {
+          return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
+        }
+        return (b.match_score ?? -1) - (a.match_score ?? -1);
+      }),
     }));
-  }, [filtered]);
+  }, [filtered, sortBy]);
 
   const handleAction = async (app: Application, status: 'accepted' | 'rejected') => {
     setActingOn(app.id);
@@ -199,7 +237,9 @@ export function ApplicationsInbox() {
           margin: 0 auto;
         }
 
-        .ai-tabs { display: flex; gap: 10px; margin-bottom: 26px; flex-wrap: wrap; }
+        .ai-tabs { display: flex; gap: 10px; margin-bottom: 26px; flex-wrap: wrap; align-items: center; justify-content: space-between; }
+        .ai-tabs-left { display: flex; gap: 10px; flex-wrap: wrap; }
+        .ai-tabs-right { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
         .ai-tab {
           font-size: 14.5px;
           font-weight: 600;
@@ -211,6 +251,18 @@ export function ApplicationsInbox() {
           cursor: pointer;
         }
         .ai-tab--active { background: ${primary}; border-color: ${primary}; color: #fff; }
+
+        .ai-sort-select {
+          font-size: 13px;
+          font-weight: 600;
+          color: ${C.ink};
+          background: ${C.card};
+          border: 1px solid ${C.line};
+          border-radius: 10px;
+          padding: 10px 14px;
+          cursor: pointer;
+          outline: none;
+        }
 
         .ai-group { margin-bottom: 28px; }
         .ai-group-title {
@@ -232,7 +284,8 @@ export function ApplicationsInbox() {
           margin-bottom: 12px;
         }
         .ai-card-top { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; margin-bottom: 10px; }
-        .ai-applicant { display: flex; align-items: center; gap: 10px; }
+        .ai-applicant { display: flex; align-items: center; gap: 10px; text-decoration: none; color: inherit; }
+        .ai-applicant:hover .ai-applicant-name { text-decoration: underline; }
         .ai-avatar {
           width: 38px; height: 38px; border-radius: 50%;
           background: ${primary}; color: #fff;
@@ -278,7 +331,11 @@ export function ApplicationsInbox() {
         .ai-action-error { font-size: 12px; color: #d64545; margin-top: 8px; }
 
         .ai-match { display:flex; align-items:center; gap:10px; margin-bottom:10px; }
-        .ai-match-score { font-size:13px; font-weight:800; color:#16834A; background:#EAF8F0; border-radius:999px; padding:5px 10px; }
+        .ai-match-score {
+          font-size:13px; font-weight:800; color:#16834A; background:#EAF8F0;
+          border-radius:999px; padding:5px 10px; border: none; cursor: pointer;
+        }
+        .ai-match-score:hover { background:#DEF3E6; }
         .ai-match-label { font-size:11.5px; font-weight:700; color:${C.inkSoft}; }
         .ai-match-breakdown { display:flex; flex-wrap:wrap; gap:6px; margin:8px 0 11px; }
         .ai-match-chip { font-size:10.5px; color:${C.inkSoft}; background:${C.surface}; border:1px solid ${C.line}; border-radius:999px; padding:4px 8px; }
@@ -317,15 +374,43 @@ export function ApplicationsInbox() {
 
       <div className="ai-content">
         <div className="ai-tabs">
-          {TABS.map((tab) => (
-            <button
-              key={tab.key}
-              className={`ai-tab ${activeTab === tab.key ? 'ai-tab--active' : ''}`}
-              onClick={() => setActiveTab(tab.key)}
-            >
-              {tab.label} ({counts[tab.key] || 0})
-            </button>
-          ))}
+          <div className="ai-tabs-left">
+            {TABS.map((tab) => (
+              <button
+                key={tab.key}
+                className={`ai-tab ${activeTab === tab.key ? 'ai-tab--active' : ''}`}
+                onClick={() => setActiveTab(tab.key)}
+              >
+                {tab.label} ({counts[tab.key] || 0})
+              </button>
+            ))}
+          </div>
+          {isBusiness && (
+            <div className="ai-tabs-right">
+              {campaignOptions.length > 1 && (
+                <select
+                  className="ai-sort-select"
+                  value={campaignFilter}
+                  onChange={(e) => setCampaignFilter(e.target.value === 'all' ? 'all' : Number(e.target.value))}
+                  aria-label="Filter by campaign"
+                >
+                  <option value="all">All campaigns</option>
+                  {campaignOptions.map((c) => (
+                    <option key={c.id} value={c.id}>{c.title}</option>
+                  ))}
+                </select>
+              )}
+              <select
+                className="ai-sort-select"
+                value={sortBy}
+                onChange={(e) => setSortBy(e.target.value as SortKey)}
+                aria-label="Sort applications"
+              >
+                <option value="match">Sort: Best match</option>
+                <option value="recent">Sort: Most recent</option>
+              </select>
+            </div>
+          )}
         </div>
 
         {loading && <div className="ai-state">Loading applications…</div>}
@@ -349,7 +434,6 @@ export function ApplicationsInbox() {
                   <span style={{ float: 'right', fontWeight: 500, color: C.inkSoft }}>
                     {group.items.length} application{group.items.length === 1 ? '' : 's'}
                     {group.items[0]?.creators_needed ? ` · ${group.items[0].creators_needed} creator${group.items[0].creators_needed === 1 ? '' : 's'} needed` : ''}
-                    {group.items.some((a) => a.match_score != null) ? ' · sorted by match' : ''}
                   </span>
                 )}
               </div>
@@ -358,7 +442,7 @@ export function ApplicationsInbox() {
                 <div className="ai-card" key={app.id}>
                   <div className="ai-card-top">
                     {isBusiness ? (
-                      <div className="ai-applicant">
+                      <Link to={`/creators/${app.creator_id}`} className="ai-applicant">
                         {app.creator_avatar ? (
                           <img className="ai-avatar" src={app.creator_avatar} alt={app.creator_name || 'Creator'} />
                         ) : (
@@ -370,7 +454,7 @@ export function ApplicationsInbox() {
                             Applied {new Date(app.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
                           </div>
                         </div>
-                      </div>
+                      </Link>
                     ) : (
                       <div className="ai-applicant-date">
                         Applied {new Date(app.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
@@ -380,26 +464,22 @@ export function ApplicationsInbox() {
                   </div>
 
                   {isBusiness && app.match_score != null && (
-                    <>
-                      <div className="ai-match">
-                        <span className="ai-match-score">⭐ {app.match_score}% Match</span>
-                        <span className="ai-match-label">{app.match_score >= 90 ? 'Recommended creator' : app.match_score >= 75 ? 'Good Match' : 'Other Applicant'}</span>
-                      </div>
-                      <div className="ai-match-breakdown">
-                        {(app.match_breakdown || []).map((b) => (
-                          <span key={b.key} className={`ai-match-chip ${b.matched ? 'ai-match-chip--good' : ''}`}>
-                            {b.label} {b.matched ? '✓' : '·'} {b.score}/{b.max}
-                          </span>
-                        ))}
-                      </div>
-                      {app.match_configured_count ? <div className="ai-why"><strong>Why we're suggesting them:</strong> Their profile matches {app.match_reasons?.filter((r) => r.endsWith('✓')).length ?? 0}/{app.match_configured_count - 1} configured campaign requirements. Experience is shown as a soft signal and never automatically rejects a creator.</div> : null}
-                    </>
+                    <div className="ai-match">
+                      <button
+                        type="button"
+                        className="ai-match-score"
+                        onClick={() => setMatchDetailApp(app)}
+                      >
+                        {app.match_score}% matching
+                      </button>
+                      <span className="ai-match-label">{app.match_score >= 90 ? 'Recommended creator' : app.match_score >= 75 ? 'Good Match' : 'Other Applicant'}</span>
+                    </div>
                   )}
 
                   <div className="ai-proposal">{app.proposal}</div>
 
                   {isBusiness && (app.completed_collaborations ?? 0) > 0 && (
-                    <div style={{fontSize:11.5,color:C.inkSoft,marginTop:7}}>✓ {app.completed_collaborations} completed collaboration{app.completed_collaborations === 1 ? '' : 's'} · <Link to={`/creators/${app.creator_id}`} style={{color:C.navy,fontWeight:700}}>View profile & history</Link></div>
+                    <div style={{fontSize:11.5,color:C.inkSoft,marginTop:7}}>{app.completed_collaborations} completed collaboration{app.completed_collaborations === 1 ? '' : 's'} · <Link to={`/creators/${app.creator_id}`} style={{color:C.navy,fontWeight:700}}>View profile & history</Link></div>
                   )}
 
                   {isBusiness && app.selected_portfolio && app.selected_portfolio.length > 0 && (
@@ -419,7 +499,7 @@ export function ApplicationsInbox() {
 
                   {app.rate != null && (
                     <div className="ai-rate">
-                      <DollarSign size={13} /> Rs. {app.rate.toLocaleString()}
+                      Rs. {app.rate.toLocaleString()}
                     </div>
                   )}
 
@@ -456,6 +536,34 @@ export function ApplicationsInbox() {
             </div>
           ))}
       </div>
+
+      {matchDetailApp && (
+        <div className="ai-modal-backdrop" onClick={() => setMatchDetailApp(null)}>
+          <div className="ai-modal" onClick={(e) => e.stopPropagation()}>
+            <div className="ai-modal-head">
+              <div>
+                <div className="ai-modal-title">{matchDetailApp.match_score}% matching</div>
+                <div className="ai-modal-sub">{matchDetailApp.creator_name || `Creator #${matchDetailApp.creator_id}`} · {matchDetailApp.campaign_title || 'Campaign'}</div>
+              </div>
+              <button className="ai-close" onClick={() => setMatchDetailApp(null)}>Close</button>
+            </div>
+
+            <div className="ai-match-breakdown">
+              {(matchDetailApp.match_breakdown || []).map((b) => (
+                <span key={b.key} className={`ai-match-chip ${b.matched ? 'ai-match-chip--good' : ''}`}>
+                  {b.label} · {b.matched ? 'matched' : 'not matched'} · {b.score}/{b.max}
+                </span>
+              ))}
+            </div>
+
+            {matchDetailApp.match_configured_count ? (
+              <div className="ai-why">
+                <strong>Why we're suggesting them:</strong> Their profile matches {matchDetailApp.match_reasons?.filter((r) => r.endsWith('✓')).length ?? 0}/{matchDetailApp.match_configured_count - 1} configured campaign requirements. Experience is shown as a soft signal and never automatically rejects a creator.
+              </div>
+            ) : null}
+          </div>
+        </div>
+      )}
 
       {negotiatingApp && (
         <div className="ai-modal-backdrop" onClick={() => !negotiationLoading && setNegotiatingApp(null)}>
@@ -507,7 +615,7 @@ export function ApplicationsInbox() {
             )}
 
             {negotiatingApp.negotiation_status === 'agreed' && (
-              <div className="ai-neg-summary" style={{background:'#EAF8F0',color:'#16834A'}}>✓ Payment amount locked at <strong>Rs. {(negotiatingApp.agreed_rate || 0).toLocaleString()}</strong>. The brand can now select the creator and later pay this exact amount.</div>
+              <div className="ai-neg-summary" style={{background:'#EAF8F0',color:'#16834A'}}>Payment amount locked at <strong>Rs. {(negotiatingApp.agreed_rate || 0).toLocaleString()}</strong>. The brand can now select the creator and later pay this exact amount.</div>
             )}
           </div>
         </div>

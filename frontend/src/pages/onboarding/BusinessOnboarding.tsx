@@ -7,6 +7,7 @@ import {
   CheckCircle2,
   Info,
   Save,
+  MapPin,
 } from 'lucide-react';
 
 import {
@@ -22,22 +23,19 @@ import { useAuth } from '../../context/AuthContext';
 // CONSTANTS
 // ============================================================
 
-// Navy accent — matches the business/brand color used across the rest
-// of the site (auth panels, role picker) instead of the old one-off violet.
 const NAVY = '#1E2A78';
 const NAVY_DARK = '#182262';
+const CORAL = '#FF6B5A';
 
-const BUSINESS_TYPES = [
-  'Retail', 'E-commerce', 'Agency', 'SaaS', 'Food & Beverage',
+// NOTE: "Business type" and "Industry" were two chip lists asking the
+// same underlying question, so they've been merged into one field:
+// `industry`. Anything downstream (validation, resume logic, payload,
+// recap) has been updated to only reference `industry`.
+const INDUSTRIES = [
+  'Retail & E-commerce', 'Agency', 'SaaS', 'Food & Beverage',
   'Beauty & Wellness', 'Fashion & Apparel', 'Tech & IT',
   'Travel & Hospitality', 'Education', 'Healthcare', 'Real Estate',
-  'Entertainment', 'Non-Profit', 'Other',
-];
-
-const INDUSTRIES = [
-  'Fashion & Beauty', 'Food & Beverage', 'Health & Fitness', 'Tech & SaaS',
-  'Travel & Hospitality', 'Retail & E-commerce', 'Education', 'Finance',
-  'Entertainment', 'Real Estate', 'Healthcare', 'Automotive', 'Other',
+  'Finance', 'Entertainment', 'Non-Profit', 'Automotive', 'Other',
 ];
 
 const INTERESTED_CATEGORIES = [
@@ -52,17 +50,23 @@ const CONTENT_TYPES = [
 
 const TEAM_SIZES = ['Just me', '2–10', '11–50', '51–200', '200+'];
 
-// Figures out which step to land on when resuming: checks each step's
-// required fields against the saved profile and stops at the first
-// incomplete one — same approach as CreatorOnboarding's
-// resolveCreatorStep. Business field names match the backend column
-// names 1:1 (no niches->categories style remapping needed here).
+// Static suggestion list for the location autocomplete. Swap this out
+// for a real places API later if you want broader / live results —
+// this keeps it dependency-free for now.
+const LOCATION_SUGGESTIONS = [
+  'Kathmandu, Nepal', 'Lalitpur, Nepal', 'Bhaktapur, Nepal', 'Pokhara, Nepal',
+  'Biratnagar, Nepal', 'Birgunj, Nepal', 'Dharan, Nepal', 'Bharatpur, Nepal',
+  'Butwal, Nepal', 'Hetauda, Nepal', 'Nepalgunj, Nepal', 'Itahari, Nepal',
+  'Janakpur, Nepal', 'Dhangadhi, Nepal', 'Tulsipur, Nepal', 'Ghorahi, Nepal',
+  'Birendranagar, Nepal', 'Kalaiya, Nepal', 'Damak, Nepal', 'Dhulikhel, Nepal',
+];
+
+// Figures out which step to land on when resuming.
 function resolveBusinessStep(profile: Record<string, any> | null | undefined): number {
   if (!profile) return 1;
 
   const step1Done =
     Boolean(profile.company_name?.trim?.()) &&
-    Boolean(profile.business_type) &&
     Boolean(profile.industry) &&
     Boolean(profile.location?.trim?.());
   if (!step1Done) return 1;
@@ -83,12 +87,6 @@ function resolveBusinessStep(profile: Record<string, any> | null | undefined): n
 // LOGO
 // ============================================================
 
-// Universal brand mark — same navy + coral circles used on the
-// login/register pages, the role picker, and Creator onboarding, so
-// the logo itself always reads as "creatorhub" regardless of which
-// role's page it's sitting on. This page's own NAVY accent (buttons,
-// step dots, focus rings) is unaffected and still styles everything
-// else below.
 function LogoMark({ size = 26 }: { size?: number }) {
   return (
     <svg width={size} height={size} viewBox="0 0 26 26" aria-hidden="true" style={{ flexShrink: 0 }}>
@@ -99,7 +97,7 @@ function LogoMark({ size = 26 }: { size?: number }) {
 }
 
 // ============================================================
-// CHIP
+// CHIP + CHIP GROUP (with "show 7, then expand" behavior)
 // ============================================================
 
 interface ChipProps {
@@ -113,6 +111,88 @@ function Chip({ label, active, onClick }: ChipProps) {
     <button type="button" className={`co-chip ${active ? 'co-chip-active' : ''}`} onClick={onClick}>
       {label}
     </button>
+  );
+}
+
+interface ChipGroupProps {
+  items: string[];
+  isActive: (item: string) => boolean;
+  onToggle: (item: string) => void;
+  limit?: number;
+}
+
+// Shows up to `limit` chips by default; if there are more, a
+// "+N more" chip expands the full list (and can collapse back).
+function ChipGroup({ items, isActive, onToggle, limit = 7 }: ChipGroupProps) {
+  const [expanded, setExpanded] = useState(false);
+  const hasMore = items.length > limit;
+  const visible = expanded ? items : items.slice(0, limit);
+
+  return (
+    <div className="co-chips">
+      {visible.map((item) => (
+        <Chip key={item} label={item} active={isActive(item)} onClick={() => onToggle(item)} />
+      ))}
+      {hasMore && (
+        <button
+          type="button"
+          className="co-chip co-chip-more"
+          onClick={() => setExpanded((e) => !e)}
+        >
+          {expanded ? 'Show less' : `+${items.length - limit} more`}
+        </button>
+      )}
+    </div>
+  );
+}
+
+// ============================================================
+// LOCATION AUTOCOMPLETE
+// ============================================================
+
+interface LocationAutocompleteProps {
+  value: string;
+  onChange: (value: string) => void;
+}
+
+function LocationAutocomplete({ value, onChange }: LocationAutocompleteProps) {
+  const [open, setOpen] = useState(false);
+
+  const query = value.trim().toLowerCase();
+  const filtered = (
+    query
+      ? LOCATION_SUGGESTIONS.filter((loc) => loc.toLowerCase().includes(query))
+      : LOCATION_SUGGESTIONS
+  ).slice(0, 6);
+
+  return (
+    <div className="co-autocomplete">
+      <input
+        className="co-input"
+        value={value}
+        onChange={(e) => { onChange(e.target.value); setOpen(true); }}
+        onFocus={() => setOpen(true)}
+        onBlur={() => setTimeout(() => setOpen(false), 150)}
+        placeholder="City, Province, Country"
+        autoComplete="off"
+      />
+      {open && filtered.length > 0 && (
+        <div className="co-autocomplete-list">
+          {filtered.map((loc) => (
+            <button
+              type="button"
+              key={loc}
+              className="co-autocomplete-item"
+              // onMouseDown fires before the input's onBlur closes the list
+              onMouseDown={() => { onChange(loc); setOpen(false); }}
+            >
+              <MapPin size={13} style={{ flexShrink: 0, opacity: 0.6 }} />
+              {loc}
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
   );
 }
 
@@ -164,8 +244,7 @@ export function BusinessOnboarding() {
 
   const [logoUrl, setLogoUrl] = useState<string | null>(null);
   const [companyName, setCompanyName] = useState(user?.profile?.company_name ?? '');
-  const [businessType, setBusinessType] = useState('');
-  const [industry, setIndustry] = useState('');
+  const [industry, setIndustry] = useState(''); // replaces old businessType + industry pair
   const [location, setLocation] = useState('');
 
   // ----------------------------------------------------------
@@ -210,8 +289,7 @@ export function BusinessOnboarding() {
         if (!cancelled && profile) {
           setLogoUrl(profile.logo_url ?? null);
           setCompanyName(profile.company_name ?? '');
-          setBusinessType(profile.business_type ?? '');
-          setIndustry(profile.industry ?? '');
+          setIndustry(profile.industry ?? profile.business_type ?? '');
           setLocation(profile.location ?? '');
 
           setDescription(profile.description ?? '');
@@ -270,7 +348,6 @@ export function BusinessOnboarding() {
     const payload = {
       logo_url: logoUrl,
       company_name: companyName.trim(),
-      business_type: businessType,
       industry,
       location: location.trim(),
     };
@@ -331,7 +408,6 @@ export function BusinessOnboarding() {
 
   const canContinueStep1 =
     companyName.trim().length > 0 &&
-    businessType !== '' &&
     industry !== '' &&
     location.trim().length > 0;
 
@@ -354,7 +430,6 @@ export function BusinessOnboarding() {
 
     const payload: BusinessOnboardingData = {
       company_name: companyName.trim(),
-      business_type: businessType,
       industry,
       location: location.trim(),
       website: website.trim(),
@@ -521,6 +596,21 @@ export function BusinessOnboarding() {
         .co-chips { display: flex; flex-wrap: wrap; gap: 8px; }
         .co-chip { font-size: 12.5px; font-weight: 500; color: var(--ink); background: var(--surface); border: 1.5px solid var(--line); padding: 7px 13px; border-radius: 100px; }
         .co-chip-active { background: var(--accent); color: #fff; border-color: var(--accent); }
+        .co-chip-more { background: #fff; border-style: dashed; color: var(--accent); font-weight: 600; }
+
+        .co-autocomplete { position: relative; }
+        .co-autocomplete-list {
+          position: absolute; top: calc(100% + 6px); left: 0; right: 0; z-index: 20;
+          background: #fff; border: 1.5px solid var(--line); border-radius: 9px;
+          box-shadow: 0 8px 20px rgba(17,18,23,0.08); overflow: hidden;
+          max-height: 210px; overflow-y: auto;
+        }
+        .co-autocomplete-item {
+          width: 100%; display: flex; align-items: center; gap: 8px;
+          text-align: left; font-size: 13px; color: var(--ink);
+          background: #fff; border: none; padding: 10px 13px;
+        }
+        .co-autocomplete-item:hover { background: var(--surface); }
 
         .co-price-row { display: flex; align-items: center; border: 1.5px solid var(--line); border-radius: 9px; overflow: hidden; }
         .co-price-prefix { background: var(--surface); padding: 11px 13px; font-size: 13px; font-weight: 600; color: var(--ink-soft); border-right: 1px solid var(--line); }
@@ -563,10 +653,6 @@ export function BusinessOnboarding() {
           <LogoMark size={34} />
           <span>creatorhub</span>
         </Link>
-
-        {/* ==================================================
-            HEADER — Back to Dashboard / Save Draft
-        ================================================== */}
 
         <div className="co-header">
           <button type="button" className="co-back-link" onClick={handleBackToDashboard}>
@@ -662,23 +748,18 @@ export function BusinessOnboarding() {
                     <input className="co-input" value={companyName} onChange={(e) => setCompanyName(e.target.value)} placeholder="Your company's name" />
                   </div>
 
-                  <p className="co-section-label">Business type *</p>
-                  <div className="co-chips" style={{ marginBottom: 22 }}>
-                    {BUSINESS_TYPES.map((t) => (
-                      <Chip key={t} label={t} active={businessType === t} onClick={() => toggleSingle(businessType, setBusinessType, t)} />
-                    ))}
-                  </div>
-
                   <p className="co-section-label">Industry *</p>
-                  <div className="co-chips" style={{ marginBottom: 22 }}>
-                    {INDUSTRIES.map((i) => (
-                      <Chip key={i} label={i} active={industry === i} onClick={() => toggleSingle(industry, setIndustry, i)} />
-                    ))}
+                  <div style={{ marginBottom: 22 }}>
+                    <ChipGroup
+                      items={INDUSTRIES}
+                      isActive={(item) => industry === item}
+                      onToggle={(item) => toggleSingle(industry, setIndustry, item)}
+                    />
                   </div>
 
                   <div className="co-field">
                     <label className="co-label">Location *</label>
-                    <input className="co-input" value={location} onChange={(e) => setLocation(e.target.value)} placeholder="City, Province, Country" />
+                    <LocationAutocomplete value={location} onChange={setLocation} />
                   </div>
                 </>
               )}
@@ -720,17 +801,21 @@ export function BusinessOnboarding() {
                   <p className="co-sub">What kind of creators and content are you looking for?</p>
 
                   <p className="co-section-label">Interested categories *</p>
-                  <div className="co-chips" style={{ marginBottom: 22 }}>
-                    {INTERESTED_CATEGORIES.map((c) => (
-                      <Chip key={c} label={c} active={interestedCategories.includes(c)} onClick={() => toggle(interestedCategories, setInterestedCategories, c)} />
-                    ))}
+                  <div style={{ marginBottom: 22 }}>
+                    <ChipGroup
+                      items={INTERESTED_CATEGORIES}
+                      isActive={(item) => interestedCategories.includes(item)}
+                      onToggle={(item) => toggle(interestedCategories, setInterestedCategories, item)}
+                    />
                   </div>
 
                   <p className="co-section-label">Preferred content types *</p>
-                  <div className="co-chips" style={{ marginBottom: 22 }}>
-                    {CONTENT_TYPES.map((c) => (
-                      <Chip key={c} label={c} active={preferredContentTypes.includes(c)} onClick={() => toggle(preferredContentTypes, setPreferredContentTypes, c)} />
-                    ))}
+                  <div style={{ marginBottom: 22 }}>
+                    <ChipGroup
+                      items={CONTENT_TYPES}
+                      isActive={(item) => preferredContentTypes.includes(item)}
+                      onToggle={(item) => toggle(preferredContentTypes, setPreferredContentTypes, item)}
+                    />
                   </div>
 
                   <p className="co-section-label">Team size *</p>
@@ -773,7 +858,7 @@ export function BusinessOnboarding() {
                         </div>
                         <span>
                           <p className="co-recap-name">{companyName || 'Unnamed company'}</p>
-                          <p className="co-recap-sub">{businessType || 'No business type'} · {location || 'No location'}</p>
+                          <p className="co-recap-sub">{industry || 'No industry'} · {location || 'No location'}</p>
                         </span>
                       </div>
                     </div>
