@@ -91,6 +91,11 @@ class Campaign(Base):
     creators_needed = Column(Integer, nullable=False, default=1)
     application_questions = Column(JSON, nullable=True)
     
+    # Funding (paid campaigns are not open for applications until funded)
+    funding_status = Column(String(30), nullable=False, default="unfunded")
+    funded_amount = Column(DECIMAL(10,2), nullable=True)
+    funded_at = Column(DateTime(timezone=True), nullable=True)
+
     # Status
     status = Column(Enum(CampaignStatus), default=CampaignStatus.DRAFT)
     is_active = Column(Boolean, default=True)

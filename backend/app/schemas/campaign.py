@@ -130,6 +130,9 @@ class CampaignResponse(CampaignBase):
     business_id: int
     status: CampaignStatus
     is_active: bool
+    funding_status: str = "unfunded"
+    funded_amount: Optional[float] = None
+    funded_at: Optional[datetime] = None
     created_at: datetime
     updated_at: Optional[datetime] = None
     application_count: int = 0

@@ -5,14 +5,12 @@ import {
   getCollabs,
   getDeliverables,
   getMessages,
-  initiatePayment,
   releasePayment,
   reviewDeliverable,
   reviewAllDeliverables,
   sendMessage,
   submitDeliverable,
   uploadMedia,
-  verifyCollaboration,
   type Collab,
   type WorkspaceDeliverable,
   type WorkspaceMessage,
@@ -36,9 +34,9 @@ const C = {
   warnSoft: '#FFF4DE',
   bad: '#DC2626',
   badSoft: '#FDECEC',
-  creator: '#1E2A78',
+  creator: '#7661A1',
   creatorSoft: '#EDEFF7',
-  brand: '#1E2A78',
+  brand: '#7661A1',
   brandSoft: '#EDEFF7',
 };
 
@@ -67,7 +65,7 @@ function nextState(c: Collab, isBusiness: boolean) {
       turn: 'COMPLETE',
       title: 'Collaboration complete',
       body: 'Everything is finished. The collaboration is ready for history.',
-      action: null as null | 'confirm' | 'pay' | 'submit' | 'verify' | 'release',
+      action: null as null | 'confirm' | 'pay' | 'submit' | 'release',
     };
   }
 
@@ -89,10 +87,10 @@ function nextState(c: Collab, isBusiness: boolean) {
 
   if (isBusiness && isPaid(c) && !['funded', 'released'].includes(c.payment_status || '')) {
     return {
-      turn: 'YOUR TURN',
-      title: 'Secure the payment',
-      body: `Secure Rs. ${(c.agreed_rate || 0).toLocaleString()} once. The money stays secured until you verify the creator's final completion.`,
-      action: 'pay' as const,
+      turn: 'WAITING',
+      title: 'Campaign funding required',
+      body: 'This paid campaign must be funded before work can begin. Open the campaign to fund its budget.',
+      action: null,
     };
   }
 
@@ -131,34 +129,17 @@ function nextState(c: Collab, isBusiness: boolean) {
     };
   }
 
-  if (!c.creator_verified) {
-    return isBusiness
-      ? {
-          turn: 'WAITING',
-          title: 'Waiting for creator confirmation',
-          body: 'All deliverables are approved. The creator needs to confirm final completion before you can release payment.',
-          action: null,
-        }
-      : {
-          turn: 'YOUR TURN',
-          title: 'Final verification',
-          body: 'All your deliverables are approved. Confirm that you completed the collaboration as agreed.',
-          action: 'verify' as const,
-        };
-  }
-
-  // creator_verified is true from here on — it's the brand's turn to release payment.
   return isBusiness
     ? {
         turn: 'YOUR TURN',
-        title: 'Verify completion & release payment',
-        body: 'The creator confirmed the work is complete. Check it over, then release the secured payment.',
+        title: 'Release payment',
+        body: 'All deliverables are approved. Release the secured payment to complete this collaboration.',
         action: 'release' as const,
       }
     : {
         turn: 'WAITING',
-        title: 'Waiting for brand verification',
-        body: 'The brand needs to verify your final completion before payment is released.',
+        title: 'Work approved',
+        body: 'The brand approved all deliverables. Your secured payment will be released once the brand completes the release step.',
         action: null,
       };
 }
@@ -180,7 +161,6 @@ export function WorkspaceActive() {
   const [loading, setLoading] = useState(true);
   const [detailLoading, setDetailLoading] = useState(false);
   const [error, setError] = useState('');
-  const [verificationOpen, setVerificationOpen] = useState(false);
   const [paymentModal, setPaymentModal] = useState<{ amount: number; campaign: string } | null>(null);
   const [seenCompletion, setSeenCompletion] = useState<number | null>(null);
 
@@ -281,33 +261,6 @@ export function WorkspaceActive() {
     }
   };
 
-  const doVerify = async () => {
-    if (!selected) return;
-    setBusy('verify');
-    setError('');
-    try {
-      patchCollab(await verifyCollaboration(selected.id));
-      setVerificationOpen(false);
-    } catch (e: any) {
-      setError(e?.response?.data?.detail || 'Could not submit final verification.');
-    } finally {
-      setBusy(null);
-    }
-  };
-
-  const doPay = async () => {
-    if (!selected) return;
-    setBusy('pay');
-    setError('');
-    try {
-      const result = await initiatePayment(selected.id);
-      window.location.href = result.payment_url;
-    } catch (e: any) {
-      setError(e?.response?.data?.detail || 'Could not start payment.');
-      setBusy(null);
-    }
-  };
-
   const doRelease = async () => {
     if (!selected) return;
     setBusy('release');
@@ -323,7 +276,7 @@ export function WorkspaceActive() {
       patchCollab(updated);
       setError('Payment released successfully. The collaboration is complete.');
     } catch (e: any) {
-      setError(e?.response?.data?.detail || 'Could not verify completion and release payment.');
+      setError(e?.response?.data?.detail || 'Could not release the payment.');
     } finally {
       setBusy(null);
     }
@@ -506,8 +459,6 @@ export function WorkspaceActive() {
                         isBusiness={isBusiness}
                         busy={busy}
                         onConfirm={doConfirm}
-                        onPay={doPay}
-                        onVerify={() => setVerificationOpen(true)}
                         onRelease={doRelease}
                         onOpenDeliverables={() => setSelectedTab('deliverables')}
                       />
@@ -540,32 +491,6 @@ export function WorkspaceActive() {
         )}
       </div>
 
-      {verificationOpen && selected && (
-        <div className="cw-modal-backdrop" onMouseDown={() => setVerificationOpen(false)}>
-          <div
-            className="cw-modal"
-            style={{ ['--cw-accent' as any]: accent }}
-            onMouseDown={(e) => e.stopPropagation()}
-          >
-            <div className="cw-modal-kicker">FINAL VERIFICATION</div>
-            <h3>Confirm the collaboration is complete</h3>
-            <p>
-              All of your deliverables have been approved. Confirm that you completed the work as agreed. The brand will review this before payment is released.
-            </p>
-            <div className="cw-modal-summary">
-              <span>Approved deliverables</span>
-              <strong>{selected.approved_deliverables} / {selected.total_deliverables}</strong>
-            </div>
-            <div className="cw-modal-actions">
-              <button className="cw-secondary" onClick={() => setVerificationOpen(false)}>Not yet</button>
-              <button className="cw-primary" onClick={doVerify} disabled={busy === 'verify'}>
-                {busy === 'verify' ? 'Submitting…' : 'Confirm & submit verification'}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
       {paymentModal && (
         <div className="cw-modal-backdrop">
           <div className="cw-payment-modal" style={{ ['--cw-accent' as any]: accent }}>
@@ -573,7 +498,7 @@ export function WorkspaceActive() {
             <div className="cw-money">Rs. {paymentModal.amount.toLocaleString()}</div>
             <h3>Your payment has been released</h3>
             <p>{paymentModal.campaign}</p>
-            <div className="cw-payment-line">The brand verified your final completion and the collaboration is now complete.</div>
+            <div className="cw-payment-line">The brand approved your work and released the secured payment. The collaboration is now complete.</div>
             <button className="cw-primary cw-wide" onClick={() => setPaymentModal(null)}>View collaboration</button>
           </div>
         </div>
@@ -587,8 +512,6 @@ function Overview({
   isBusiness,
   busy,
   onConfirm,
-  onPay,
-  onVerify,
   onRelease,
   onOpenDeliverables,
 }: {
@@ -596,8 +519,6 @@ function Overview({
   isBusiness: boolean;
   busy: string | null;
   onConfirm: () => void;
-  onPay: () => void;
-  onVerify: () => void;
   onRelease: () => void;
   onOpenDeliverables: () => void;
 }) {
@@ -612,7 +533,6 @@ function Overview({
     true,
     Boolean(c.creator_confirmed),
     Boolean(total && approved === total),
-    Boolean(c.creator_verified),
     c.status === 'completed' || c.payment_status === 'released',
   ];
   const currentIndex = flags.findIndex((f) => !f);
@@ -639,20 +559,12 @@ function Overview({
               {busy === 'confirm' ? 'Confirming…' : 'Confirm collaboration'}
             </button>
           )}
-          {state.action === 'pay' && (
-            <button className="cw-primary" onClick={onPay} disabled={busy === 'pay'}>
-              {busy === 'pay' ? 'Opening payment…' : `Secure Rs. ${(c.agreed_rate || 0).toLocaleString()}`}
-            </button>
-          )}
           {state.action === 'submit' && (
             <button className="cw-primary" onClick={onOpenDeliverables}>Open Deliverables →</button>
           )}
-          {state.action === 'verify' && (
-            <button className="cw-primary" onClick={onVerify}>Final verification</button>
-          )}
           {state.action === 'release' && (
             <button className="cw-primary" onClick={onRelease} disabled={busy === 'release'}>
-              {busy === 'release' ? 'Verifying…' : 'Verify & release payment'}
+              {busy === 'release' ? 'Releasing…' : 'Release payment'}
             </button>
           )}
         </div>
@@ -679,6 +591,9 @@ function Overview({
           <div className="cw-card-head"><strong>Agreement</strong><span>What was agreed</span></div>
           <div className="cw-detail"><span>Campaign</span><strong>{c.campaign_title}</strong></div>
           <div className="cw-detail"><span>Payment</span><strong>{c.campaign_type === 'gifted' ? 'Gifted collaboration' : `Rs. ${(c.agreed_rate || 0).toLocaleString()}`}</strong></div>
+          {c.campaign_type !== 'gifted' && c.payment_status === 'funded' && (
+            <div className="cw-detail"><span>Campaign funding</span><strong>Rs. {(c.funded_amount || 0).toLocaleString()} secured</strong></div>
+          )}
           <div className="cw-detail"><span>Deadline</span><strong>{c.deliverable_deadline ? new Date(c.deliverable_deadline).toLocaleDateString() : 'Not set'}</strong></div>
         </section>
 
@@ -883,10 +798,10 @@ function Deliverables({
         <div className="cw-empty"><strong>No deliverables yet.</strong><span>This collaboration has no required deliverables.</span></div>
       )}
 
-      {isBusiness && approved.length === c.total_deliverables && c.total_deliverables > 0 && !c.creator_verified && (
+      {isBusiness && approved.length === c.total_deliverables && c.total_deliverables > 0 && c.payment_status === 'funded' && (
         <div className="cw-ready">
           <strong>All deliverables are approved.</strong>
-          <span>The creator can now submit final verification. You do not need to message them manually.</span>
+          <span>The secured payment is ready. Release it from the collaboration overview to complete this collaboration.</span>
         </div>
       )}
     </div>

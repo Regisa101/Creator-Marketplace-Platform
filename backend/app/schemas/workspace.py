@@ -33,6 +33,7 @@ class CollabResponse(BaseModel):
     # (initiated, completed, failed, refunded) — lets the collab list
     # show a "Paid" badge without a separate request per row.
     payment_status: Optional[str] = None
+    funded_amount: Optional[float] = None
     amount_paid: Optional[float] = None
     rated: bool = False
     campaign_type: Optional[str] = None

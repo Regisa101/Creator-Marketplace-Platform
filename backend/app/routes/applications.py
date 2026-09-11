@@ -356,6 +356,10 @@ async def create_application(
             detail="Campaign is not accepting applications",
         )
 
+    campaign_type = getattr(campaign.campaign_type, "value", str(campaign.campaign_type))
+    if campaign_type == "paid" and getattr(campaign, "funding_status", "unfunded") != "funded":
+        raise HTTPException(status_code=400, detail="This paid campaign is not funded yet and is not accepting applications.")
+
     # Check deadline
     deadline = (
         campaign.application_deadline
@@ -762,6 +766,12 @@ async def update_application_status(
             "value",
             str(campaign.campaign_type),
         ) == "paid":
+
+            if getattr(campaign, "funding_status", "unfunded") != "funded":
+                raise HTTPException(
+                    status_code=400,
+                    detail="Fund the campaign budget before accepting a creator.",
+                )
 
             if (
                 not application.agreed_rate

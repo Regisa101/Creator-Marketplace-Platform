@@ -86,6 +86,11 @@ def ensure_schema() -> None:
         "ALTER TABLE campaigns ADD COLUMN IF NOT EXISTS creator_requirements JSON",
         "ALTER TABLE campaigns ADD COLUMN IF NOT EXISTS extra_photos JSON",
 
+        # Funding (paid campaigns are not open for applications until funded)
+        "ALTER TABLE campaigns ADD COLUMN IF NOT EXISTS funding_status VARCHAR(30) NOT NULL DEFAULT 'unfunded'",
+        "ALTER TABLE campaigns ADD COLUMN IF NOT EXISTS funded_amount NUMERIC(10,2)",
+        "ALTER TABLE campaigns ADD COLUMN IF NOT EXISTS funded_at TIMESTAMPTZ",
+
         # Campaign completion/publication rules
         "ALTER TABLE campaigns ADD COLUMN IF NOT EXISTS completion_mode VARCHAR(30) NOT NULL DEFAULT 'approval_only'",
         "ALTER TABLE campaigns ADD COLUMN IF NOT EXISTS required_platform VARCHAR(50)",

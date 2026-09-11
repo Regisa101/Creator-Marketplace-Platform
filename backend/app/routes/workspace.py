@@ -87,6 +87,30 @@ def _collab_to_response(db: Session, application: Application, viewer_id: int | 
         .order_by(Payment.created_at.desc())
         .first()
     )
+    if not latest_payment and campaign and getattr(campaign, "funding_status", "unfunded") == "funded":
+        latest_payment = db.query(Payment).filter(
+            Payment.campaign_id == campaign.id,
+            Payment.payment_type == "campaign_funding",
+            Payment.status.in_(["funded", "completed", "released"]),
+        ).order_by(Payment.created_at.desc()).first()
+    campaign_funding = None
+    if campaign and getattr(campaign, "funding_status", "unfunded") == "funded":
+        campaign_funding = db.query(Payment).filter(
+            Payment.campaign_id == campaign.id,
+            Payment.payment_type == "campaign_funding",
+            Payment.status.in_(["funded", "completed", "released"]),
+        ).order_by(Payment.created_at.desc()).first()
+
+    # Campaign-level funding is the source of truth before the creator payout exists.
+    effective_payment_status = (
+        "released" if latest_payment and latest_payment.status == "released"
+        else ("funded" if campaign_funding else (latest_payment.status if latest_payment else None))
+    )
+    funded_amount = (
+        float(getattr(campaign, "funded_amount", None))
+        if campaign and getattr(campaign, "funded_amount", None) is not None
+        else (float(campaign_funding.amount) if campaign_funding else None)
+    )
     already_rated = (
         db.query(Rating).filter(Rating.application_id == application.id).first() is not None
     )
@@ -110,8 +134,9 @@ def _collab_to_response(db: Session, application: Application, viewer_id: int | 
         creator_verified=bool(getattr(application, "creator_verified", False)),
         pending_deliverables=pending_deliverables,
         unread_messages=unread_messages,
-        payment_status=latest_payment.status if latest_payment else None,
+        payment_status=effective_payment_status,
         amount_paid=float(latest_payment.amount) if latest_payment and latest_payment.status == "released" else None,
+        funded_amount=funded_amount,
         rated=already_rated,
         campaign_type=campaign.campaign_type.value if campaign and hasattr(campaign.campaign_type, "value") else (str(campaign.campaign_type) if campaign else None),
         completion_mode=getattr(campaign, "completion_mode", "approval_only") if campaign else None,
@@ -137,6 +162,15 @@ def _maybe_complete_campaign(db: Session, campaign: Campaign):
     if len(selected) >= required and len(completed) >= required:
         campaign.status = "completed"
         campaign.is_active = False
+        create_notification(
+            db,
+            user_id=campaign.business_id,
+            type="campaign_completed",
+            title="Campaign completed",
+            message=f"All creator collaborations for {campaign.title} are complete.",
+            link="/workspace/history",
+            event_key=f"campaign-completed:{campaign.id}",
+        )
         db.commit()
 
 
@@ -599,9 +633,13 @@ async def submit_deliverable(
     campaign = db.query(Campaign).filter(Campaign.id == application.campaign_id).first()
     campaign_type = getattr(campaign.campaign_type, "value", str(campaign.campaign_type)) if campaign else None
     if campaign_type == "paid":
-        secured = db.query(Payment).filter(Payment.application_id == application.id, Payment.status.in_(["funded", "released", "completed"])).first()
+        secured = db.query(Payment).filter(
+            Payment.campaign_id == campaign.id,
+            Payment.payment_type == "campaign_funding",
+            Payment.status.in_(["funded", "released", "completed"]),
+        ).first()
         if not secured:
-            raise HTTPException(status_code=400, detail="The brand must secure the agreed payment before you can start this deliverable.")
+            raise HTTPException(status_code=400, detail="The brand must fund the campaign before you can start this deliverable.")
     if campaign_type == "gifted":
         from app.models import GiftFulfillment
         fulfillment = db.query(GiftFulfillment).filter(GiftFulfillment.application_id == application.id).first()

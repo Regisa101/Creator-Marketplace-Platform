@@ -191,6 +191,9 @@ export interface Campaign {
   required_mentions?: string[] | null;
   status: CampaignStatus;
   is_active: boolean;
+  funding_status?: 'unfunded' | 'pending' | 'funded' | 'refunded' | string;
+  funded_amount?: number | null;
+  funded_at?: string | null;
   created_at: string;
   updated_at?: string | null;
   application_count: number;
@@ -261,6 +264,29 @@ export interface CampaignCreateData {
   required_post_type?: string;
   publication_deadline?: string;
   required_mentions?: string[];
+}
+
+// ============================================
+// PUBLIC CAMPAIGN TYPES
+// ============================================
+// Used by the public/logged-out landing + campaign browse pages. Extends the
+// authenticated Campaign shape with fields the public serializer adds
+// (e.g. the brand's logo) that aren't part of the internal Campaign type.
+
+export interface PublicCampaign extends Campaign {
+  brand_logo?: string | null;
+}
+
+export interface PublicCampaignListResponse {
+  campaigns: PublicCampaign[];
+  total?: number;
+}
+
+export interface PublicCampaignListParams {
+  limit?: number;
+  page?: number;
+  category?: string;
+  search?: string;
 }
 
 export interface PublicBusinessCampaign {
@@ -443,7 +469,6 @@ export interface Notification {
   created_at: string;
 }
 
-
 export interface CampaignPerformance {
   id?: number | null;
   campaign_id: number;
@@ -494,6 +519,7 @@ export interface Collab {
   pending_deliverables: number;
   unread_messages: number;
   payment_status?: 'initiated' | 'funded' | 'released' | 'completed' | 'failed' | 'refunded' | null;
+  funded_amount?: number | null;
   completion_mode?: 'approval_only' | 'publication_required' | string | null;
   required_platforms?: string[] | null;
   required_post_types?: string[] | null;
@@ -511,11 +537,15 @@ export interface Collab {
 
 export interface Payment {
   id: number;
-  application_id: number;
+  application_id?: number | null;
+  campaign_id?: number | null;
+  payment_type: string;
   purchase_order_id: string;
   pidx?: string | null;
   transaction_id?: string | null;
   amount: number;
+  platform_fee?: number | null;
+  creator_payout?: number | null;
   currency: string;
   status: 'initiated' | 'funded' | 'released' | 'completed' | 'failed' | 'refunded';
   method: string;
@@ -693,7 +723,6 @@ export const saveCampaignDefaults = async (data: CampaignDefaults): Promise<Camp
   return response.data;
 };
 
-
 // ============================================
 // API FUNCTIONS - CAMPAIGNS
 // ============================================
@@ -707,6 +736,22 @@ export const getCampaigns = async (
   params?: CampaignListParams
 ): Promise<CampaignListResponse> => {
   const response = await api.get<CampaignListResponse>('/campaigns', { params });
+  return response.data;
+};
+
+// Public, unauthenticated campaign feed used by the logged-out landing page
+// and public campaign browse view. Only "published"/"in_progress" campaigns
+// should ever come back from this endpoint — draft/cancelled campaigns must
+// stay hidden server-side.
+//
+// NOTE: adjust the path below to match whatever your backend actually
+// exposes (e.g. it may be `/campaigns/public`, `/public/campaigns`, or
+// `/campaigns?public=true`) and confirm the response is shaped as
+// `{ campaigns: [...] }`.
+export const getPublicCampaigns = async (
+  params?: PublicCampaignListParams
+): Promise<PublicCampaignListResponse> => {
+  const response = await api.get<PublicCampaignListResponse>('/campaigns/public', { params });
   return response.data;
 };
 
@@ -780,7 +825,6 @@ export const updateApplicationStatus = async (
   return response.data;
 };
 
-// 🔥 NEW: DELETE /api/applications/{id} - creator withdraws their pending application
 export const withdrawApplication = async (id: number): Promise<{ message: string }> => {
   const response = await api.delete<{ message: string }>(`/applications/${id}`);
   return response.data;
@@ -803,10 +847,6 @@ export const getSavedCampaigns = async (): Promise<SavedCampaignEntry[]> => {
   const response = await api.get<SavedCampaignEntry[]>('/saved-campaigns');
   return response.data;
 };
-
-// ============================================
-// API FUNCTIONS - FILE UPLOADS
-// ============================================
 
 // ============================================
 // API FUNCTIONS - CREATOR DISCOVERY (Increment 5)
@@ -861,7 +901,6 @@ export const respondToInvite = async (
 // API FUNCTIONS - WORKSPACE (Increment 5)
 // ============================================
 
-
 export const confirmCollaboration = async (collabId: number): Promise<Collab> => {
   const response = await api.post<Collab>(`/workspace/collabs/${collabId}/confirm`);
   return response.data;
@@ -893,6 +932,18 @@ export const getCollabHistory = async (): Promise<Collab[]> => {
 // API FUNCTIONS - PAYMENTS (Khalti)
 // ============================================
 
+export const initiateCampaignFunding = async (
+  campaignId: number
+): Promise<{ payment_url: string; pidx: string; purchase_order_id: string }> => {
+  const response = await api.post(`/payments/campaign/${campaignId}/initiate`);
+  return response.data;
+};
+
+export const getCampaignPayments = async (campaignId: number): Promise<Payment[]> => {
+  const response = await api.get<Payment[]>(`/payments/campaign/${campaignId}`);
+  return response.data;
+};
+
 export const initiatePayment = async (
   collabId: number
 ): Promise<{ payment_url: string; pidx: string; purchase_order_id: string }> => {
@@ -900,8 +951,8 @@ export const initiatePayment = async (
   return response.data;
 };
 
-
-export const releasePayment = async (collabId: number): Promise<Payment> => (await api.post<Payment>(`/payments/release/${collabId}`)).data;
+export const releasePayment = async (collabId: number): Promise<Payment> =>
+  (await api.post<Payment>(`/payments/release/${collabId}`)).data;
 
 export interface NegotiationOffer {
   id: number;
@@ -941,8 +992,13 @@ export const verifyPayment = async (pidx: string): Promise<Payment> => {
   return response.data;
 };
 
-export const completeDemoPayment = async (pidx: string): Promise<Payment> => {
-  const response = await api.post<Payment>('/payments/demo/complete', null, { params: { pidx } });
+export const completeDemoPayment = async (
+  pidx: string,
+  options?: { method?: string; account_name?: string; reference_note?: string },
+): Promise<Payment> => {
+  const response = await api.post<Payment>('/payments/demo/complete', null, {
+    params: { pidx, ...(options || {}) },
+  });
   return response.data;
 };
 
@@ -955,7 +1011,6 @@ export const getPaymentSummary = async (): Promise<PaymentSummary> => {
   const response = await api.get<PaymentSummary>('/payments/summary');
   return response.data;
 };
-
 
 export const getCampaignPerformances = async (): Promise<CampaignPerformance[]> => {
   const response = await api.get<CampaignPerformance[]>('/campaign-performance');
@@ -1069,9 +1124,21 @@ export const submitDeliverable = async (
   return response.data;
 };
 
-export const getPublicationProofs = async (collabId: number): Promise<PublicationProof[]> => (await api.get<PublicationProof[]>(`/publication/${collabId}`)).data;
-export const submitPublicationProof = async (collabId: number, data: { deliverable_id?: number; platform: string; post_type?: string; post_url: string; screenshot_url?: string }): Promise<PublicationProof> => (await api.post<PublicationProof>(`/publication/${collabId}`, data)).data;
-export const reviewPublicationProof = async (collabId: number, proofId: number, data: { status: string; feedback?: string }): Promise<PublicationProof> => (await api.post<PublicationProof>(`/publication/${collabId}/${proofId}/review`, data)).data;
+export const getPublicationProofs = async (collabId: number): Promise<PublicationProof[]> =>
+  (await api.get<PublicationProof[]>(`/publication/${collabId}`)).data;
+
+export const submitPublicationProof = async (
+  collabId: number,
+  data: { deliverable_id?: number; platform: string; post_type?: string; post_url: string; screenshot_url?: string }
+): Promise<PublicationProof> =>
+  (await api.post<PublicationProof>(`/publication/${collabId}`, data)).data;
+
+export const reviewPublicationProof = async (
+  collabId: number,
+  proofId: number,
+  data: { status: string; feedback?: string }
+): Promise<PublicationProof> =>
+  (await api.post<PublicationProof>(`/publication/${collabId}/${proofId}/review`, data)).data;
 
 export const reviewDeliverable = async (
   id: number,
@@ -1160,13 +1227,52 @@ export const confirmGiftReceived = async (collabId: number): Promise<GiftFulfill
   return response.data;
 };
 
-export default api;
-export interface AdminOverview { users:number; brands:number; creators:number; active_campaigns:number; active_collaborations:number; open_cases:number; funded_payments:number; }
-export interface AdminCase { id:number; application_id?:number|null; reported_user_id:number; case_type:string; status:string; severity:string; description?:string|null; created_at?:string|null; resolved_at?:string|null; }
-export const getAdminOverview = async (): Promise<AdminOverview> => (await api.get<AdminOverview>('/admin/overview')).data;
-export const getAdminCases = async (): Promise<AdminCase[]> => (await api.get<AdminCase[]>('/admin/cases')).data;
-export const updateAdminCase = async (id:number,data:{status:string;severity?:string;resolution?:string}): Promise<AdminCase> => (await api.patch<AdminCase>(`/admin/cases/${id}`,data)).data;
-export const getAdminUsers = async (): Promise<any[]> => (await api.get<any[]>('/admin/users')).data;
-export const adminUserAction = async (id:number,action:'warn'|'suspend'|'activate'|'ban') => (await api.post(`/admin/users/${id}/action`,{action})).data;
+// ============================================
+// API FUNCTIONS - ADMIN
+// ============================================
 
-export const openDispute = async (collabId:number, reason:string): Promise<AdminCase> => (await api.post<AdminCase>(`/disputes/${collabId}`,{reason})).data;
+export interface AdminOverview {
+  users: number;
+  brands: number;
+  creators: number;
+  active_campaigns: number;
+  active_collaborations: number;
+  open_cases: number;
+  funded_payments: number;
+}
+
+export interface AdminCase {
+  id: number;
+  application_id?: number | null;
+  reported_user_id: number;
+  case_type: string;
+  status: string;
+  severity: string;
+  description?: string | null;
+  created_at?: string | null;
+  resolved_at?: string | null;
+}
+
+export const getAdminOverview = async (): Promise<AdminOverview> =>
+  (await api.get<AdminOverview>('/admin/overview')).data;
+
+export const getAdminCases = async (): Promise<AdminCase[]> =>
+  (await api.get<AdminCase[]>('/admin/cases')).data;
+
+export const updateAdminCase = async (
+  id: number,
+  data: { status: string; severity?: string; resolution?: string }
+): Promise<AdminCase> => (await api.patch<AdminCase>(`/admin/cases/${id}`, data)).data;
+
+export const getAdminUsers = async (): Promise<any[]> =>
+  (await api.get<any[]>('/admin/users')).data;
+
+export const adminUserAction = async (
+  id: number,
+  action: 'warn' | 'suspend' | 'activate' | 'ban'
+) => (await api.post(`/admin/users/${id}/action`, { action })).data;
+
+export const openDispute = async (collabId: number, reason: string): Promise<AdminCase> =>
+  (await api.post<AdminCase>(`/disputes/${collabId}`, { reason })).data;
+
+export default api;

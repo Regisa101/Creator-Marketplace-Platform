@@ -21,8 +21,8 @@ const C = {
   soft: '#6F6B7F',
   faint: '#A5A0B3',
   line: '#E7E4EE',
-  navy: '#1E2A78',
-  coral: '#FF6B5A',
+  navy: '#7661A1',
+  coral: '#F47C78',
   green: '#16834A',
   greenSoft: '#EAF8F0',
   red: '#D64545',
@@ -41,6 +41,7 @@ export function DemoPayment() {
   const [method, setMethod] = useState<'wallet' | 'bank'>('wallet');
   const [payerName, setPayerName] = useState(user?.full_name || '');
   const [reference, setReference] = useState('');
+  const [khaltiAccount, setKhaltiAccount] = useState('');
 
   useEffect(() => {
     if (!pidx) {
@@ -65,16 +66,22 @@ export function DemoPayment() {
     [payment?.created_at],
   );
 
+  const isCampaignFunding = payment?.payment_type === 'campaign_funding';
+
   const confirmPayment = async () => {
     if (!pidx) return;
     if (!payerName.trim()) {
       setError('Enter the payer name before confirming payment.');
       return;
     }
+    if (isCampaignFunding && !khaltiAccount.trim()) {
+      setError('Enter the Khalti account before confirming payment.');
+      return;
+    }
     setPaying(true);
     setError('');
     try {
-      const result = await completeDemoPayment(pidx);
+      const result = await completeDemoPayment(pidx, isCampaignFunding ? { method: 'demo_wallet', account_name: khaltiAccount.trim(), reference_note: reference.trim() } : undefined);
       setPayment(result);
       setDone(result.status === 'funded' || result.status === 'released');
     } catch (err: any) {
@@ -97,7 +104,7 @@ export function DemoPayment() {
         .dp-label{font-size:12px;color:${C.soft}}.dp-value{font-size:12.5px;font-weight:750;color:${C.ink};text-align:right;word-break:break-word}.dp-total{margin-top:8px;padding-top:18px;border-top:1px solid ${C.line};display:flex;align-items:end;justify-content:space-between;gap:16px}.dp-total-label{font-size:12px;color:${C.soft}}.dp-total-value{font-size:28px;font-weight:850;color:${C.navy}}
         .dp-notice{margin-top:16px;border-radius:11px;padding:12px 13px;background:#F7F6FA;color:${C.soft};font-size:11.5px;line-height:1.55;display:flex;gap:9px}.dp-notice svg{flex:none;color:${C.navy}}
         .dp-pay{padding:23px}.dp-brand{display:flex;align-items:center;gap:10px}.dp-brandmark{width:36px;height:36px;border-radius:10px;background:${C.navy};color:#fff;display:flex;align-items:center;justify-content:center;font-size:15px;font-weight:850}.dp-brandname{font-size:14px;font-weight:800;color:${C.ink}}.dp-brandsub{font-size:10.5px;color:${C.soft};margin-top:2px}.dp-pay-title{font-size:21px;font-weight:800;color:${C.ink};margin-top:22px}.dp-pay-copy{font-size:12px;line-height:1.6;color:${C.soft};margin-top:5px}
-        .dp-method-label{font-size:11px;font-weight:750;color:${C.ink};margin:19px 0 8px}.dp-methods{display:grid;grid-template-columns:1fr 1fr;gap:8px}.dp-method{border:1px solid ${C.line};background:#fff;border-radius:11px;min-height:44px;padding:0 11px;display:flex;align-items:center;gap:8px;color:${C.ink};font-size:11.5px;font-weight:750;cursor:pointer}.dp-method.active{border-color:${C.navy};background:#F3F5FF;box-shadow:0 0 0 1px ${C.navy} inset}.dp-method svg{color:${C.navy}}
+        .dp-method-label{font-size:11px;font-weight:750;color:${C.ink};margin:19px 0 8px}.dp-methods{display:grid;grid-template-columns:1fr 1fr;gap:8px}.dp-method{border:1px solid ${C.line};background:#fff;border-radius:11px;min-height:44px;padding:0 11px;display:flex;align-items:center;gap:8px;color:${C.ink};font-size:11.5px;font-weight:750;cursor:pointer}.dp-method.active{border-color:${C.navy};background:#F3F5FF;box-shadow:0 0 0 1px ${C.navy} inset}.dp-method svg{color:${C.navy}}.dp-methods-single{grid-template-columns:1fr}.dp-field-help{font-size:10px;line-height:1.5;color:${C.faint};margin-top:6px}
         .dp-field-label{font-size:11px;font-weight:750;color:${C.ink};display:block;margin:15px 0 7px}.dp-input{width:100%;height:43px;border:1px solid #DCD8E5;border-radius:10px;padding:0 12px;font-size:12px;color:${C.ink};outline:none;background:#fff}.dp-input:focus{border-color:${C.navy};box-shadow:0 0 0 3px rgba(30,42,120,.08)}.dp-paybox{margin-top:14px;border:1px solid ${C.line};border-radius:11px;background:#FBFAFD;padding:11px 12px;display:flex;justify-content:space-between;gap:14px}.dp-paybox span{font-size:10.5px;color:${C.soft}}.dp-paybox strong{font-size:12.5px;color:${C.ink}}
         .dp-primary{width:100%;height:46px;border:0;border-radius:11px;background:${C.navy};color:#fff;font-size:12.5px;font-weight:800;display:flex;align-items:center;justify-content:center;gap:7px;cursor:pointer;margin-top:15px;box-shadow:0 8px 20px rgba(30,42,120,.16)}.dp-primary:disabled{opacity:.58;cursor:not-allowed}.dp-cancel{display:flex;justify-content:center;margin-top:13px;color:${C.soft};font-size:11px;text-decoration:none}.dp-secure{display:flex;align-items:center;justify-content:center;gap:6px;margin-top:13px;color:${C.faint};font-size:10px}.dp-secure svg{color:${C.green}}
         .dp-error{margin-top:15px;padding:11px 12px;border-radius:10px;background:${C.redSoft};color:${C.red};font-size:11.5px;line-height:1.5;display:flex;gap:8px}.dp-error svg{flex:none}.dp-success{margin-top:18px;padding:12px;border-radius:10px;background:${C.greenSoft};color:${C.green};font-size:11.5px;line-height:1.5;display:flex;gap:8px}.dp-success svg{flex:none}.dp-success-title{font-size:25px;font-weight:850;color:${C.ink};margin-top:12px}.dp-success-amount{font-size:30px;font-weight:850;color:${C.navy};margin-top:8px}.dp-details{margin-top:18px;border:1px solid ${C.line};border-radius:12px;overflow:hidden}.dp-detail{display:flex;justify-content:space-between;gap:15px;padding:10px 12px;border-bottom:1px solid #EEEAF2;font-size:11px}.dp-detail:last-child{border-bottom:0}.dp-detail span{color:${C.soft}}.dp-detail strong{color:${C.ink};text-align:right}.dp-success-actions{display:flex;gap:8px;margin-top:18px}.dp-link{flex:1;height:42px;border-radius:10px;border:1px solid ${C.line};display:flex;align-items:center;justify-content:center;text-decoration:none;font-size:11.5px;font-weight:750}.dp-link.primary{background:${C.navy};border-color:${C.navy};color:#fff}.dp-link.secondary{background:#fff;color:${C.ink}}
@@ -120,7 +127,7 @@ export function DemoPayment() {
                 <div className="dp-detail"><span>Payment ID</span><strong>{payment.pidx || payment.purchase_order_id}</strong></div>
                 <div className="dp-detail"><span>Transaction ID</span><strong>{payment.transaction_id || 'Pending local reference'}</strong></div>
                 <div className="dp-detail"><span>Amount paid</span><strong>Rs. {payment.amount.toLocaleString()}</strong></div>
-                <div className="dp-detail"><span>Payment method</span><strong>{payment.method === 'demo' ? 'Demo ' + (method === 'wallet' ? 'Wallet' : 'Bank') : payment.method}</strong></div>
+                <div className="dp-detail"><span>Payment method</span><strong>{isCampaignFunding ? 'Khalti account' : (payment.method === 'demo' ? 'Demo ' + (method === 'wallet' ? 'Wallet' : 'Bank') : payment.method)}</strong></div>
                 <div className="dp-detail"><span>Date</span><strong>{formattedDate}</strong></div>
               </div>
               <div className="dp-success-actions"><Link className="dp-link primary" to="/workspace/active">Back to workspace</Link><Link className="dp-link secondary" to="/workspace/history">View collab history</Link></div>
@@ -128,27 +135,45 @@ export function DemoPayment() {
           ) : payment ? (
             <div className="dp-grid">
               <section className="dp-card dp-left">
-                <div className="dp-left-head"><div className="dp-eyebrow">Payment details</div><div className="dp-left-title">Creator payout</div></div>
+                <div className="dp-left-head"><div className="dp-eyebrow">Payment details</div><div className="dp-left-title">{isCampaignFunding ? 'Campaign funding' : 'Creator payout'}</div></div>
                 <div className="dp-left-body">
                   <div className="dp-row"><span className="dp-label">Purchase order</span><strong className="dp-value">{payment.purchase_order_id}</strong></div>
                   <div className="dp-row"><span className="dp-label">Status</span><strong className="dp-value">Awaiting payment</strong></div>
                   <div className="dp-row"><span className="dp-label">Currency</span><strong className="dp-value">NPR</strong></div>
-                  <div className="dp-row"><span className="dp-label">Payment type</span><strong className="dp-value">Creator collaboration</strong></div>
+                  <div className="dp-row"><span className="dp-label">Payment type</span><strong className="dp-value">{isCampaignFunding ? 'Campaign funding' : 'Creator collaboration'}</strong></div>
                   <div className="dp-total"><span className="dp-total-label">Total payable</span><strong className="dp-total-value">Rs. {payment.amount.toLocaleString()}</strong></div>
-                  <div className="dp-notice"><ShieldCheck size={16}/> This is a development checkout for your marketplace. Confirming it updates your local payment, earnings, notification, and collaboration records.</div>
+                  <div className="dp-notice"><ShieldCheck size={16}/> {isCampaignFunding ? 'Secure the full campaign budget before creators can apply. This is a development checkout — no real money is transferred.' : 'This is a development checkout for your marketplace. Confirming it updates your local payment, earnings, notification, and collaboration records.'}</div>
                 </div>
               </section>
 
               <section className="dp-card dp-pay">
                 <div className="dp-brand"><div className="dp-brandmark">N</div><div><div className="dp-brandname">Noodle Pay</div><div className="dp-brandsub">Marketplace payment</div></div></div>
-                <div className="dp-pay-title">Pay securely</div><div className="dp-pay-copy">Choose a demo payment method and confirm the amount below.</div>
-                <div className="dp-method-label">Payment method</div>
-                <div className="dp-methods">
-                  <button className={`dp-method ${method === 'wallet' ? 'active' : ''}`} onClick={() => setMethod('wallet')} type="button"><WalletCards size={16}/> Noodle Wallet</button>
-                  <button className={`dp-method ${method === 'bank' ? 'active' : ''}`} onClick={() => setMethod('bank')} type="button"><CreditCard size={16}/> Demo Bank</button>
-                </div>
-                <label className="dp-field-label" htmlFor="payer-name">Payer name</label><input id="payer-name" className="dp-input" value={payerName} onChange={(e)=>setPayerName(e.target.value)} placeholder="Enter payer name"/>
-                <label className="dp-field-label" htmlFor="payment-ref">Reference note (optional)</label><input id="payment-ref" className="dp-input" value={reference} onChange={(e)=>setReference(e.target.value)} placeholder="e.g. creator payout"/>
+                <div className="dp-pay-title">{isCampaignFunding ? 'Fund campaign' : 'Pay securely'}</div><div className="dp-pay-copy">{isCampaignFunding ? 'Secure the campaign budget using your Khalti account.' : 'Choose a demo payment method and confirm the amount below.'}</div>
+                {isCampaignFunding ? (
+                  <>
+                    <div className="dp-method-label">Payment method</div>
+                    <div className="dp-methods dp-methods-single">
+                      <div className="dp-method active"><WalletCards size={16}/> Khalti account</div>
+                    </div>
+                    <label className="dp-field-label" htmlFor="khalti-account">Khalti account</label>
+                    <input id="khalti-account" className="dp-input" value={khaltiAccount} onChange={(e)=>setKhaltiAccount(e.target.value)} placeholder="Khalti account / mobile number"/>
+                    <div className="dp-field-help">For now this is a demo account field. Real Khalti verification can be connected later.</div>
+                    <label className="dp-field-label" htmlFor="payer-name">Account holder name</label>
+                    <input id="payer-name" className="dp-input" value={payerName} onChange={(e)=>setPayerName(e.target.value)} placeholder="Enter account holder name"/>
+                    <label className="dp-field-label" htmlFor="payment-ref">Reference note (optional)</label>
+                    <input id="payment-ref" className="dp-input" value={reference} onChange={(e)=>setReference(e.target.value)} placeholder="e.g. campaign budget"/>
+                  </>
+                ) : (
+                  <>
+                    <div className="dp-method-label">Payment method</div>
+                    <div className="dp-methods">
+                      <button className={`dp-method ${method === 'wallet' ? 'active' : ''}`} onClick={() => setMethod('wallet')} type="button"><WalletCards size={16}/> Noodle Wallet</button>
+                      <button className={`dp-method ${method === 'bank' ? 'active' : ''}`} onClick={() => setMethod('bank')} type="button"><CreditCard size={16}/> Demo Bank</button>
+                    </div>
+                    <label className="dp-field-label" htmlFor="payer-name">Payer name</label><input id="payer-name" className="dp-input" value={payerName} onChange={(e)=>setPayerName(e.target.value)} placeholder="Enter payer name"/>
+                    <label className="dp-field-label" htmlFor="payment-ref">Reference note (optional)</label><input id="payment-ref" className="dp-input" value={reference} onChange={(e)=>setReference(e.target.value)} placeholder="e.g. creator payout"/>
+                  </>
+                )}
                 <div className="dp-paybox"><span>You are paying</span><strong>Rs. {payment.amount.toLocaleString()}</strong></div>
                 {error && <div className="dp-error"><XCircle size={17}/>{error}</div>}
                 <button className="dp-primary" onClick={confirmPayment} disabled={paying}><LockKeyhole size={15}/>{paying ? 'Processing payment…' : 'Confirm payment'}</button>

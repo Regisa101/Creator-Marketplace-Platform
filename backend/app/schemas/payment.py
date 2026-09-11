@@ -15,11 +15,15 @@ class PaymentInitiateResponse(BaseModel):
 
 class PaymentResponse(BaseModel):
     id: int
-    application_id: int
+    application_id: Optional[int] = None
+    campaign_id: Optional[int] = None
+    payment_type: str = "collaboration"
     purchase_order_id: str
     pidx: Optional[str] = None
     transaction_id: Optional[str] = None
     amount: float
+    platform_fee: Optional[float] = None
+    creator_payout: Optional[float] = None
     currency: str
     status: str
     method: str

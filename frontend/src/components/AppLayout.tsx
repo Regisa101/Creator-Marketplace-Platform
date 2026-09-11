@@ -20,7 +20,6 @@ import {
   MessageSquare,
   Calendar,
   PackageCheck,
-  Bookmark,
   X,
   Search,
   Bell,
@@ -40,10 +39,10 @@ const C = {
   inkSoft: "#6B6478",
   inkFaint: "#A39DB8",
   line: "#EAE7F2",
-  navy: "#1E2A78",
-  navySoft: "#F2F4FC",
-  coral: "#FF6B5A",
-  coralSoft: "#FFF4F2",
+  navy: "#7661A1",
+  navySoft: "#F0EBF6",
+  coral: "#F47C78",
+  coralSoft: "#FDEBE9",
 };
 
 const WORKSPACE_CHILDREN = [
@@ -57,27 +56,22 @@ const WORKSPACE_CHILDREN = [
     icon: Calendar,
     to: "/workspace/calendar",
   },
-  {
-    label: "Collab History",
-    icon: Briefcase,
-    to: "/workspace/history",
-  },
 ];
 
-// Kept in sync with the creator onboarding flow (Step 1: About You,
-// Step 2: Social Media, Step 3: Creator Profile). display_name is
-// intentionally excluded — it's pulled from the users table, not
-// asked again during onboarding, so it should never gate completion.
 const CREATOR_PROFILE_FIELDS: Array<string | string[]> = [
-  "profile_image",
+  "display_name",
+  "username",
   "bio",
   "location",
-  ["content_languages", "languages"],
-  ["audience_interests", "interests"],
+  "creator_type",
   ["niches", "categories"],
   "content_types",
-  "starting_price",
+  ["content_languages", "languages"],
+  ["audience_interests", "interests"],
+  "audience_age_range",
+  "audience_location",
   "socials",
+  "starting_price",
 ];
 
 const BUSINESS_PROFILE_FIELDS: Array<string | string[]> = [
@@ -213,7 +207,7 @@ export function AppLayout({
 
   const primaryDark =
     role === "creator"
-      ? "#E85440"
+      ? "#E86966"
       : "#141B52";
 
   const profileCompletion =
@@ -391,19 +385,9 @@ export function AppLayout({
             to: "/dashboard",
           },
           {
-            label: "Discover Collabs",
-            icon: Compass,
-            to: "/campaigns",
-          },
-          {
             label: "My Applications",
             icon: Inbox,
             to: "/applications",
-          },
-          {
-            label: "Saved Campaigns",
-            icon: Bookmark,
-            to: "/saved",
           },
           {
             label: "Analytics",
@@ -1229,13 +1213,13 @@ export function AppLayout({
 
       <aside className="app-sidebar">
 
-        <div className="app-brand">
+        <Link to="/" className="app-brand" aria-label="Go to creatorhub home">
           <LogoMark size={28} />
 
           <span className="app-brand-name">
             creatorhub
           </span>
-        </div>
+        </Link>
 
         <nav
           className="app-nav"
@@ -1342,6 +1326,14 @@ export function AppLayout({
             )}
 
           </div>
+
+          <Link
+            to="/workspace/history"
+            className={`app-nav-link ${isRouteActive(location.pathname, "/workspace/history") ? "active" : ""}`}
+          >
+            <Briefcase size={17} className="shrink-0" />
+            <span>Collab History</span>
+          </Link>
         </nav>
 
         {/* =================================================

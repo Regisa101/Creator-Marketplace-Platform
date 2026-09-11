@@ -14,7 +14,13 @@ class Payment(Base):
     __tablename__ = "payments"
 
     id = Column(Integer, primary_key=True, index=True)
-    application_id = Column(Integer, ForeignKey("applications.id"), nullable=False)
+    # Nullable because campaign funding happens before an application exists.
+    application_id = Column(Integer, ForeignKey("applications.id"), nullable=True)
+    campaign_id = Column(Integer, ForeignKey("campaigns.id"), nullable=True, index=True)
+    # campaign_funding = money secured by the brand for the campaign
+    # creator_payout = release ledger row for an accepted creator
+    # collaboration = legacy/application-level payment
+    payment_type = Column(String(30), nullable=False, default="collaboration")
 
     # Our own reference, sent to Khalti as purchase_order_id and used to
     # find the row again on the return redirect / lookup.
@@ -25,6 +31,8 @@ class Payment(Base):
     transaction_id = Column(String(100), nullable=True)
 
     amount = Column(DECIMAL(10, 2), nullable=False)  # NPR
+    platform_fee = Column(DECIMAL(10, 2), nullable=True)
+    creator_payout = Column(DECIMAL(10, 2), nullable=True)
     currency = Column(String(10), default="NPR")
 
     # initiated -> completed | failed | expired
@@ -41,3 +49,4 @@ class Payment(Base):
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())
 
     application = relationship("Application")
+    campaign = relationship("Campaign")

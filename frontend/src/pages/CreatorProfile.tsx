@@ -23,9 +23,9 @@ import {
 import { useAuth } from '../context/AuthContext';
 import { getCreatorProgress, getApplications } from '../api/client';
 
-const CORAL = '#FF6B5A';
-const CORAL_DARK = '#F0523F';
-const VIOLET = '#1E2A78';
+const CORAL = '#F47C78';
+const CORAL_DARK = '#E86966';
+const VIOLET = '#7661A1';
 
 function InstagramIcon({ size = 16 }: { size?: number }) {
   return (
@@ -91,8 +91,14 @@ export function CreatorProfile() {
   const [deletePassword, setDeletePassword] = useState('');
   const [deleteError, setDeleteError] = useState('');
   const [deleting, setDeleting] = useState(false);
+  const [khaltiAccount, setKhaltiAccount] = useState('');
+  const [khaltiSaved, setKhaltiSaved] = useState(false);
 
   useEffect(() => {
+    const storedKhalti = localStorage.getItem(`creatorhub:khalti-account:${user?.id ?? 'current'}`) || '';
+    setKhaltiAccount(storedKhalti);
+    setKhaltiSaved(Boolean(storedKhalti));
+
     let cancelled = false;
 
     (async () => {
@@ -118,7 +124,20 @@ export function CreatorProfile() {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [user?.id]);
+
+  const handleSaveKhalti = () => {
+    const value = khaltiAccount.trim();
+    if (!value) {
+      localStorage.removeItem(`creatorhub:khalti-account:${user?.id ?? 'current'}`);
+      setKhaltiAccount('');
+      setKhaltiSaved(false);
+      return;
+    }
+    localStorage.setItem(`creatorhub:khalti-account:${user?.id ?? 'current'}`, value);
+    setKhaltiAccount(value);
+    setKhaltiSaved(true);
+  };
 
   const handleDeleteAccount = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -680,6 +699,22 @@ export function CreatorProfile() {
           text-decoration: none;
         }
 
+        .cp-payment-card {
+          border: 1px solid var(--line);
+          border-radius: 16px;
+          background: #fff;
+          padding: 18px;
+        }
+        .cp-payment-copy { margin-bottom: 13px; }
+        .cp-payment-title { margin: 0; font-size: 14px; font-weight: 800; color: var(--ink); }
+        .cp-payment-desc { margin: 4px 0 0; color: var(--ink-soft); font-size: 11.5px; line-height: 1.55; max-width: 620px; }
+        .cp-payment-form { display: flex; gap: 9px; max-width: 620px; }
+        .cp-payment-input { flex: 1; min-width: 0; height: 42px; border: 1px solid #ddd9e6; border-radius: 10px; padding: 0 12px; background: #fff; color: var(--ink); font: inherit; font-size: 12px; outline: none; }
+        .cp-payment-input:focus { border-color: var(--violet); box-shadow: 0 0 0 3px rgba(118,97,161,.09); }
+        .cp-payment-save { min-width: 78px; height: 42px; border: 0; border-radius: 10px; background: var(--violet); color: #fff; font-size: 11.5px; font-weight: 750; cursor: pointer; }
+        .cp-payment-save:hover { background: #66518F; }
+        .cp-payment-note { margin: 9px 0 0; color: var(--ink-faint); font-size: 10px; line-height: 1.5; }
+
         .cp-danger-zone {
           border: 1px solid #f3caca;
           background: #fff8f8;
@@ -1226,6 +1261,33 @@ export function CreatorProfile() {
                       : 'Build your first collaboration'}
                   </p>
                 </div>
+              </div>
+            </section>
+
+            <section className="cp-section">
+              <div className="cp-section-heading">
+                <p className="cp-section-title">Payment</p>
+                <p className="cp-section-sub">For creator payouts</p>
+              </div>
+              <div className="cp-payment-card">
+                <div className="cp-payment-copy">
+                  <p className="cp-payment-title">Khalti account</p>
+                  <p className="cp-payment-desc">Add the Khalti account you want to use for payouts from completed collaborations.</p>
+                </div>
+                <div className="cp-payment-form">
+                  <input
+                    className="cp-payment-input"
+                    value={khaltiAccount}
+                    onChange={(e) => { setKhaltiAccount(e.target.value); setKhaltiSaved(false); }}
+                    placeholder="Khalti mobile number or account"
+                    inputMode="tel"
+                    aria-label="Khalti account"
+                  />
+                  <button type="button" className="cp-payment-save" onClick={handleSaveKhalti}>
+                    {khaltiSaved ? 'Saved' : 'Save'}
+                  </button>
+                </div>
+                <p className="cp-payment-note">This is currently stored as your payout account preference. Real Khalti verification can be connected later.</p>
               </div>
             </section>
 

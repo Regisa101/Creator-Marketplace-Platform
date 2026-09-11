@@ -1,4 +1,3 @@
-// frontend/src/App.tsx
 
 import {
   BrowserRouter,
@@ -9,11 +8,11 @@ import {
 
 import { AuthProvider, useAuth } from "./context/AuthContext";
 
-import { RoleSelect } from "./pages/auth/RoleSelect";
 import { LoginCreator } from "./pages/auth/LoginCreator";
 import { LoginBusiness } from "./pages/auth/LoginBusiness";
 import { RegisterCreator } from "./pages/auth/RegisterCreator";
 import { RegisterBusiness } from "./pages/auth/RegisterBusiness";
+import { RoleSelect } from "./pages/auth/RoleSelect";
 
 import { Dashboard } from "./pages/Dashboard";
 import { Landing } from "./pages/Landing";
@@ -106,6 +105,11 @@ function App() {
             element={<Landing />}
           />
 
+          {/*
+              The shared landing navbar sends users to these public auth
+              entry points. RoleSelect is intentionally kept: users choose
+              Creator or Brand before entering the role-specific form.
+          */}
           <Route
             path="/login"
             element={<RoleSelect />}
@@ -134,6 +138,11 @@ function App() {
           <Route
             path="/register/business"
             element={<RegisterBusiness />}
+          />
+
+          <Route
+            path="/about"
+            element={<Navigate to="/#why-we-exist" replace />}
           />
 
           <Route
@@ -404,3 +413,4 @@ function App() {
 }
 
 export default App;
+

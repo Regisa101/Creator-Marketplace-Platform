@@ -23,7 +23,7 @@ import {
 } from '../../api/client';
 import type { CreatorOnboardingData } from '../../api/client';
 import { useAuth } from '../../context/AuthContext';
-import { LogoMark } from '../../components/Logo';
+import { LogoMark, BRAND_NAME } from '../../components/Logo';
 
 // ============================================================
 // TYPES
@@ -48,8 +48,8 @@ interface PortfolioItem {
 // CONSTANTS
 // ============================================================
 
-const CORAL = '#FF6B5A';
-const CORAL_DARK = '#F0523F';
+const CORAL = '#F47C78';
+const CORAL_DARK = '#E86966';
 
 const LANGUAGES = ['English', 'Nepali', 'Hindi', 'Newari', 'Maithili'];
 
@@ -693,7 +693,7 @@ export function CreatorOnboarding() {
           --accent: ${CORAL};
           --accent-hover: ${CORAL_DARK};
           --accent-soft: #FFEDEA;
-          --coral: #FF6B5A;
+          --coral: #F47C78;
           --good: #16a34a;
 
           font-family: Inter, Poppins, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
@@ -785,7 +785,7 @@ export function CreatorOnboarding() {
           border: 1px solid var(--line);
           border-radius: 18px;
           padding: 36px 40px 40px;
-          box-shadow: 0 30px 60px -24px rgba(240,82,63,0.16), 0 4px 14px rgba(17,18,23,0.04);
+          box-shadow: 0 30px 60px -24px rgba(244,124,120,0.18), 0 4px 14px rgba(17,18,23,0.04);
         }
 
         .co-h2 { font-size: 22px; font-weight: 700; margin: 0 0 5px; }
@@ -873,7 +873,7 @@ export function CreatorOnboarding() {
         .co-footer { display: flex; align-items: center; justify-content: space-between; margin-top: 30px; padding-top: 22px; border-top: 1px solid var(--line); }
         .co-back { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; font-weight: 600; color: var(--ink-soft); background: none; border: none; padding: 8px 4px; }
         .co-continue { display: inline-flex; align-items: center; gap: 8px; font-size: 14px; font-weight: 600; color: #fff; background: var(--accent); border: none; padding: 12px 24px; border-radius: 8px; }
-        .co-continue:disabled { background: #ffd3bb; cursor: not-allowed; }
+        .co-continue:disabled { background: #F4D0CE; cursor: not-allowed; }
 
         .co-done { text-align: center; padding: 20px 0 10px; }
         .co-done-icon { width: 64px; height: 64px; border-radius: 50%; background: #E1F6EA; color: #16A34A; display: flex; align-items: center; justify-content: center; margin: 0 auto 20px; }
@@ -896,7 +896,7 @@ export function CreatorOnboarding() {
 
         <Link to="/" className="co-wordmark">
           <LogoMark size={34} />
-          <span>creatorhub</span>
+          <span>{BRAND_NAME}</span>
         </Link>
 
         <div className="co-header">

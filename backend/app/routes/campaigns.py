@@ -14,6 +14,108 @@ from app.dependencies.auth import get_current_user, get_current_business
 router = APIRouter(prefix="/api/campaigns", tags=["Campaigns"])
 
 
+@router.get("/public", response_model=dict)
+async def get_public_campaigns(
+    status: Optional[str] = None,
+    category: Optional[str] = None,
+    search: Optional[str] = None,
+    page: int = Query(1, ge=1),
+    limit: int = Query(50, ge=1, le=100),
+    db: Session = Depends(get_db),
+):
+    """Public marketplace feed used by the landing page.
+
+    Only campaigns that can still be considered in the marketplace are public.
+    Published campaigns are available for applications; in-progress campaigns
+    remain visible as Booked so creators can see the campaign lifecycle.
+    Draft, cancelled, completed and closed campaigns stay out of Explore.
+    """
+    query = db.query(Campaign).filter(
+        Campaign.status.in_([
+            CampaignStatus.PUBLISHED,
+            CampaignStatus.IN_PROGRESS,
+        ]),
+        Campaign.is_active == True,
+    )
+
+    if status:
+        query = query.filter(Campaign.status == status)
+    if category:
+        query = query.filter(Campaign.category == category)
+    if search:
+        query = query.filter(
+            Campaign.title.ilike(f"%{search}%") |
+            Campaign.description.ilike(f"%{search}%") |
+            Campaign.brand_name.ilike(f"%{search}%")
+        )
+
+    total = query.count()
+    offset = (page - 1) * limit
+    campaigns = query.order_by(Campaign.created_at.desc()).offset(offset).limit(limit).all()
+
+    result = []
+    for campaign in campaigns:
+        business = db.query(User).filter(User.id == campaign.business_id).first()
+        business_profile = business.business_profile if business else None
+        app_count = db.query(Application).filter(Application.campaign_id == campaign.id).count()
+
+        result.append({
+            "id": campaign.id,
+            "business_id": campaign.business_id,
+            "title": campaign.title,
+            "tagline": campaign.tagline,
+            "description": campaign.description,
+            "brief": campaign.brief,
+            "category": campaign.category,
+            "sub_category": campaign.sub_category,
+            "campaign_type": campaign.campaign_type,
+            "brand_name": campaign.brand_name or (business_profile.company_name if business_profile else None),
+            "brand_location": campaign.brand_location or (business_profile.location if business_profile else None),
+            "brand_logo": business_profile.logo_url if business_profile else None,
+            "budget": float(campaign.budget) if campaign.budget else None,
+            "compensation_description": campaign.compensation_description,
+            "requirements": campaign.requirements,
+            "creator_requirements": campaign.creator_requirements,
+            "deliverables": campaign.deliverables,
+            "before_you_apply": campaign.before_you_apply,
+            "checklist": campaign.checklist,
+            "required_scenes": campaign.required_scenes,
+            "video_specs": campaign.video_specs,
+            "dos": campaign.dos,
+            "donts": campaign.donts,
+            "suggested_caption": campaign.suggested_caption,
+            "hashtags": campaign.hashtags,
+            "guidelines_note": campaign.guidelines_note,
+            "deadline": campaign.application_deadline or campaign.deadline,
+            "application_deadline": campaign.application_deadline or campaign.deadline,
+            "deliverable_deadline": campaign.deliverable_deadline,
+            "creators_needed": campaign.creators_needed or 1,
+            "application_questions": campaign.application_questions or [],
+            "hero_image": campaign.hero_image,
+            "extra_photos": campaign.extra_photos,
+            "completion_mode": campaign.completion_mode,
+            "required_platforms": campaign.required_platforms,
+            "required_post_types": campaign.required_post_types,
+            "required_platform": campaign.required_platform,
+            "required_post_type": campaign.required_post_type,
+            "publication_deadline": campaign.publication_deadline,
+            "required_mentions": campaign.required_mentions,
+            "status": campaign.status,
+            "is_active": campaign.is_active,
+            "created_at": campaign.created_at,
+            "updated_at": campaign.updated_at,
+            "application_count": app_count,
+        })
+
+    return {
+        "campaigns": result,
+        "total": total,
+        "page": page,
+        "limit": limit,
+        "pages": (total + limit - 1) // limit,
+    }
+
+
 def _validate_campaign_dates(application_deadline, deliverable_deadline, publication_deadline=None):
     """Validate selected calendar dates, not a strict 24-hour window.
 
@@ -193,8 +295,6 @@ async def get_campaigns(
         query = query.filter(Campaign.status.in_([
             CampaignStatus.PUBLISHED,
             CampaignStatus.IN_PROGRESS,
-            CampaignStatus.COMPLETED,
-            CampaignStatus.CLOSED,
         ]))
     elif current_user.role == "business":
         query = query.filter(Campaign.business_id == current_user.id)
@@ -233,6 +333,7 @@ async def get_campaigns(
             "budget": float(campaign.budget) if campaign.budget else None,
             "compensation_description": campaign.compensation_description,
             "requirements": campaign.requirements,
+            "creator_requirements": campaign.creator_requirements,
             "deliverables": campaign.deliverables,
             "before_you_apply": campaign.before_you_apply,
             "checklist": campaign.checklist,
@@ -253,6 +354,8 @@ async def get_campaigns(
             "completion_mode": campaign.completion_mode,
             "required_platforms": campaign.required_platforms,
             "required_post_types": campaign.required_post_types,
+            "required_platform": campaign.required_platform,
+            "required_post_type": campaign.required_post_type,
             "publication_deadline": campaign.publication_deadline,
             "status": campaign.status,
             "is_active": campaign.is_active,

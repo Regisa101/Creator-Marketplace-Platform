@@ -18,14 +18,15 @@ import {
 } from '../../api/client';
 import type { BusinessOnboardingData } from '../../api/client';
 import { useAuth } from '../../context/AuthContext';
+import { LogoMark, BRAND_NAME, BRAND_PURPLE, BRAND_PURPLE_DARK, BRAND_PINK_CORAL } from '../../components/Logo';
 
 // ============================================================
 // CONSTANTS
 // ============================================================
 
-const NAVY = '#1E2A78';
-const NAVY_DARK = '#182262';
-const CORAL = '#FF6B5A';
+const BRAND_LAVENDER = BRAND_PURPLE;
+const BRAND_LAVENDER_DARK = BRAND_PURPLE_DARK;
+const BRAND_CORAL = BRAND_PINK_CORAL;
 
 // NOTE: "Business type" and "Industry" were two chip lists asking the
 // same underlying question, so they've been merged into one field:
@@ -81,19 +82,6 @@ function resolveBusinessStep(profile: Record<string, any> | null | undefined): n
   if (!step3Done) return 3;
 
   return 4;
-}
-
-// ============================================================
-// LOGO
-// ============================================================
-
-function LogoMark({ size = 26 }: { size?: number }) {
-  return (
-    <svg width={size} height={size} viewBox="0 0 26 26" aria-hidden="true" style={{ flexShrink: 0 }}>
-      <circle cx="10" cy="13" r="8" fill="#1E2A78" />
-      <circle cx="17" cy="9" r="6" fill="#FF6B5A" fillOpacity={0.9} />
-    </svg>
-  );
 }
 
 // ============================================================
@@ -470,10 +458,10 @@ export function BusinessOnboarding() {
           --ink-soft: #6c6d73;
           --line: #e6e6ea;
           --surface: #f7f7f9;
-          --accent: ${NAVY};
-          --accent-hover: ${NAVY_DARK};
-          --accent-soft: #EAEBF5;
-          --coral: #FF6B5A;
+          --accent: ${BRAND_LAVENDER};
+          --accent-hover: ${BRAND_LAVENDER_DARK};
+          --accent-soft: #F0EBF6;
+          --coral: ${BRAND_CORAL};
           --good: #16a34a;
 
           font-family: Inter, Poppins, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
@@ -651,7 +639,7 @@ export function BusinessOnboarding() {
 
         <Link to="/" className="co-wordmark">
           <LogoMark size={34} />
-          <span>creatorhub</span>
+          <span>{BRAND_NAME}</span>
         </Link>
 
         <div className="co-header">
