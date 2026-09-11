@@ -683,7 +683,7 @@ export function Dashboard() {
 
         .media{aspect-ratio:1.35/1;background:#F5F4FA;overflow:hidden;position:relative;flex:0 0 auto}
         .media img{width:100%;height:100%;object-fit:cover;display:block}
-        .placeholder{height:100%;display:grid;place-items:center;color:#A39DB8;font-size:11px}
+        .placeholder{height:100%;display:grid;place-items:center;color:#A39DB8;font-size:11px;font-weight:650;text-align:center;padding:6px;line-height:1.3}
         .tag{position:absolute;left:12px;top:12px;padding:6px 10px;border-radius:999px;background:rgba(255,255,255,.96);font-size:10px;font-weight:700;display:inline-flex;align-items:center;gap:5px}
         .tag.open{color:#16834a}.tag.booked{color:#1E2A78}.tag.completed{color:#6B6478}.tag.closed{color:#7b7582}
         .save-btn{position:absolute;right:12px;top:12px;width:34px;height:34px;border-radius:50%;border:0;background:rgba(255,255,255,.96);color:#8B8697;display:flex;align-items:center;justify-content:center;cursor:pointer;box-shadow:0 3px 10px rgba(20,20,30,.12)}
@@ -1005,7 +1005,7 @@ export function Dashboard() {
                     return (
                       <Link className="campaign-row" key={campaign.id} to={`/campaigns/${campaign.id}`}>
                         <div className="campaign-row-media">
-                          {img ? <img src={img} alt="" /> : <div className="placeholder">No image</div>}
+                          {img ? <img src={img} alt="" /> : <div className="placeholder">{campaign.brand_name || 'No image'}</div>}
                           <span className={`tag ${statusTone(campaign, completedCampaignIds)}`}>{formatStatus(campaign, completedCampaignIds)}</span>
                         </div>
                         <div className="campaign-row-body">

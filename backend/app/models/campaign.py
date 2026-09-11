@@ -28,7 +28,9 @@ class Campaign(Base):
     description = Column(Text, nullable=False)
     brief = Column(Text, nullable=True)
     category = Column(String(100), nullable=False)
-    sub_category = Column(String(100), nullable=True)
+    # Content types can be a comma-separated list selected in the campaign form.
+    # Keep this as TEXT so edits cannot fail when several content types are selected.
+    sub_category = Column(Text, nullable=True)
     
     # Campaign Type
     campaign_type = Column(Enum(CampaignType), default=CampaignType.GIFTED)

@@ -58,6 +58,14 @@ def _complete_local_payment(db: Session, payment: Payment, payment_method: str =
         create_notification(db,user_id=application.creator_id,type="payment_funded",title="Payment secured",message=f"Rs. {float(payment.amount):,.2f} is secured for {campaign.title} and will be released after verification.",link=f"/workspace/active?collab={application.id}",event_key=f"payment-funded:{payment.id}")
         create_notification(db,user_id=campaign.business_id,type="payment_funded",title="Payment secured",message=f"Rs. {float(payment.amount):,.2f} has been secured for {campaign.title}.",link=f"/workspace/active?collab={application.id}",event_key=f"payment-funded-business:{payment.id}")
 
+        deliverables = db.query(Deliverable).filter(Deliverable.application_id == application.id).all()
+        all_approved = bool(deliverables) and all(d.status == "approved" for d in deliverables)
+        if getattr(application, "creator_verified", False) and all_approved:
+            payment.status = "released"
+            application.status = "completed"
+            create_notification(db,user_id=application.creator_id,type="payment_released",title="Payment released",message=f"Rs. {float(payment.amount):,.2f} has been released for {campaign.title}.",link="/workspace/history",event_key=f"payment-released:{payment.id}")
+            create_notification(db,user_id=campaign.business_id,type="collaboration_completed",title="Collaboration completed",message=f"{campaign.title} is complete. The creator verified the approved work and payment was released.",link="/workspace/history",event_key=f"collaboration-completed:{application.id}")
+
     db.commit()
     db.refresh(payment)
     return payment
@@ -72,6 +80,8 @@ async def initiate(
     application = _get_authorized_collab(db, current_user, data.collab_id)
     if application.status != "accepted":
         raise HTTPException(status_code=400, detail="Only an active collaboration can be paid.")
+    if not getattr(application, "creator_confirmed", False):
+        raise HTTPException(status_code=400, detail="The creator must confirm the collaboration before payment can be secured.")
 
     campaign = db.query(Campaign).filter(Campaign.id == application.campaign_id).first()
     if campaign and getattr(campaign.campaign_type, "value", str(campaign.campaign_type)) == "gifted":
@@ -192,6 +202,7 @@ async def release_payment(collab_id:int, db:Session=Depends(get_db), current_use
     campaign=db.query(Campaign).filter(Campaign.id==application.campaign_id).first()
     ds=db.query(Deliverable).filter(Deliverable.application_id==application.id).all()
     if ds and not all(d.status=="approved" for d in ds): raise HTTPException(400,"All deliverables must be approved before payment release.")
+    if not getattr(application, "creator_verified", False): raise HTTPException(400,"The creator must submit final verification before payment release.")
     if getattr(campaign,"completion_mode","approval_only")=="publication_required":
         from app.models import PublicationProof
         ps=db.query(PublicationProof).filter(PublicationProof.application_id==application.id).all()

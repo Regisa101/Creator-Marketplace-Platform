@@ -20,5 +20,6 @@ class Message(Base):
     sender_id = Column(Integer, ForeignKey("users.id"), nullable=False)
 
     body = Column(Text, nullable=False)
+    read_at = Column(DateTime(timezone=True), nullable=True)
 
     created_at = Column(DateTime(timezone=True), server_default=func.now())

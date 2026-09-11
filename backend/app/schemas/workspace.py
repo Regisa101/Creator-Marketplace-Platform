@@ -23,6 +23,8 @@ class CollabResponse(BaseModel):
     negotiation_status: str = "not_started"
     status: str
     created_at: datetime
+    creator_confirmed: bool = False
+    creator_verified: bool = False
 
     pending_deliverables: int = 0
     unread_messages: int = 0

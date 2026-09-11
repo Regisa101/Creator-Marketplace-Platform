@@ -29,7 +29,7 @@ import {
 
 import { useAuth } from "../context/AuthContext";
 import { LogoMark } from "./Logo";
-import { getUnreadNotificationCount } from "../api/client";
+import { getUnreadNotificationCount, getUnreadWorkspaceMessageCount } from "../api/client";
 
 const C = {
   sidebar: "#FFFFFF",
@@ -53,19 +53,9 @@ const WORKSPACE_CHILDREN = [
     to: "/workspace/active",
   },
   {
-    label: "Messages",
-    icon: MessageSquare,
-    to: "/workspace/messages",
-  },
-  {
     label: "Calendar",
     icon: Calendar,
     to: "/workspace/calendar",
-  },
-  {
-    label: "Deliverables",
-    icon: PackageCheck,
-    to: "/workspace/deliverables",
   },
   {
     label: "Collab History",
@@ -74,20 +64,20 @@ const WORKSPACE_CHILDREN = [
   },
 ];
 
+// Kept in sync with the creator onboarding flow (Step 1: About You,
+// Step 2: Social Media, Step 3: Creator Profile). display_name is
+// intentionally excluded — it's pulled from the users table, not
+// asked again during onboarding, so it should never gate completion.
 const CREATOR_PROFILE_FIELDS: Array<string | string[]> = [
-  "display_name",
-  "username",
+  "profile_image",
   "bio",
   "location",
-  "creator_type",
-  ["niches", "categories"],
-  "content_types",
   ["content_languages", "languages"],
   ["audience_interests", "interests"],
-  "audience_age_range",
-  "audience_location",
-  "socials",
+  ["niches", "categories"],
+  "content_types",
   "starting_price",
+  "socials",
 ];
 
 const BUSINESS_PROFILE_FIELDS: Array<string | string[]> = [
@@ -276,6 +266,9 @@ export function AppLayout({
   const [unreadNotifications, setUnreadNotifications] =
     useState(0);
 
+  const [unreadWorkspaceMessages, setUnreadWorkspaceMessages] =
+    useState(0);
+
   useEffect(() => {
     let mounted = true;
 
@@ -337,6 +330,27 @@ export function AppLayout({
         loadUnreadNotifications,
         30000
       );
+
+    return () => {
+      mounted = false;
+      window.clearInterval(interval);
+    };
+  }, []);
+
+  useEffect(() => {
+    let mounted = true;
+
+    const loadUnreadWorkspaceMessages = async () => {
+      try {
+        const count = await getUnreadWorkspaceMessageCount();
+        if (mounted) setUnreadWorkspaceMessages(Math.max(0, Number(count) || 0));
+      } catch (error) {
+        console.error("Failed to load workspace message count:", error);
+      }
+    };
+
+    loadUnreadWorkspaceMessages();
+    const interval = window.setInterval(loadUnreadWorkspaceMessages, 30000);
 
     return () => {
       mounted = false;
@@ -871,6 +885,22 @@ export function AppLayout({
           background: #F7F6FA;
         }
 
+        .app-nav-badge {
+          min-width: 18px;
+          height: 18px;
+          padding: 0 5px;
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          border-radius: 999px;
+          background: ${C.coral};
+          color: #fff;
+          font-size: 9px;
+          line-height: 1;
+          font-weight: 800;
+          margin-left: auto;
+        }
+
         /* =================================================
            MAIN
            ================================================= */
@@ -1298,6 +1328,12 @@ export function AppLayout({
                         <span>
                           {child.label}
                         </span>
+
+                        {child.to === "/workspace/active" && unreadWorkspaceMessages > 0 && (
+                          <b className="app-nav-badge">
+                            {unreadWorkspaceMessages > 9 ? "9+" : unreadWorkspaceMessages}
+                          </b>
+                        )}
                       </Link>
                     );
                   }

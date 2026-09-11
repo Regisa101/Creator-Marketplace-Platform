@@ -51,8 +51,6 @@ const CONTENT_TYPES = [
   'YouTube Short', 'YouTube Video', 'UGC Video', 'Product Photos',
 ];
 const VIDEO_PLATFORMS = ['Instagram', 'TikTok', 'YouTube', 'Facebook', 'Pinterest'];
-const REQUIRED_PLATFORMS = ['Instagram', 'TikTok', 'YouTube', 'Facebook'];
-const REQUIRED_POST_TYPES = ['Reel / Short video', 'Post', 'Story', 'Video'];
 const VIDEO_DURATIONS = ['5-10 seconds', '10-15 seconds', '15-30 seconds', '30-60 seconds', '60-90 seconds', '90+ seconds'];
 const ASPECT_RATIOS = ['9:16', '1:1', '4:5', '16:9'];
 const RESOLUTIONS = ['720 x 1280', '1080 x 1920', '1080 x 1350', '1080 x 1080', '1920 x 1080', '4K'];
@@ -337,10 +335,7 @@ export function CampaignForm({ mode }: { mode: 'create' | 'edit' }) {
   const [deadline, setDeadline] = useState('');
   const [deliverableDeadline, setDeliverableDeadline] = useState('');
   const [creatorsNeeded, setCreatorsNeeded] = useState('1');
-  const [completionMode, setCompletionMode] = useState<'approval_only' | 'publication_required'>('approval_only');
-  const [requiredPlatforms, setRequiredPlatforms] = useState<string[]>(['instagram']);
-  const [requiredPostTypes, setRequiredPostTypes] = useState<string[]>(['reel']);
-  const [publicationDeadline, setPublicationDeadline] = useState('');
+  const completionMode = 'approval_only' as const;
 
   const [requirements, setRequirements] = useState('');
   const [creatorRequirements, setCreatorRequirements] = useState<CreatorRequirements>({ categories: [] });
@@ -412,10 +407,7 @@ export function CampaignForm({ mode }: { mode: 'create' | 'edit' }) {
         setDeadline(c.application_deadline ? c.application_deadline.slice(0, 10) : (c.deadline ? c.deadline.slice(0, 10) : ''));
         setDeliverableDeadline(c.deliverable_deadline ? c.deliverable_deadline.slice(0, 10) : '');
         setCreatorsNeeded(String(c.creators_needed || 1));
-        setCompletionMode(c.completion_mode === 'publication_required' ? 'publication_required' : 'approval_only');
-        setRequiredPlatforms(c.required_platforms?.length ? c.required_platforms : (c.required_platform ? [c.required_platform] : ['instagram']));
-        setRequiredPostTypes(c.required_post_types?.length ? c.required_post_types : (c.required_post_type ? [c.required_post_type] : ['reel']));
-        setPublicationDeadline(c.publication_deadline ? c.publication_deadline.slice(0, 10) : '');
+        // Completion mode is always 'approval_only' now — publication-proof requirement was removed.
         setApplicationQuestions(c.application_questions || []);
         setRequirements(c.requirements || '');
         const loadedRequirements: CreatorRequirements = c.creator_requirements || { categories: [] };
@@ -581,8 +573,6 @@ export function CampaignForm({ mode }: { mode: 'create' | 'edit' }) {
     if (deadline && deadline < tomorrowKey) return 'Application deadline must be tomorrow or later.';
     if (deliverableDeadline && deliverableDeadline < tomorrowKey) return 'Deliverable deadline must be tomorrow or later.';
     if (deadline && deliverableDeadline && deliverableDeadline <= deadline) return 'Deliverable deadline must be after the application deadline.';
-    if (completionMode === 'publication_required' && publicationDeadline && publicationDeadline < tomorrowKey) return 'Publication deadline must be tomorrow or later.';
-    if (completionMode === 'publication_required' && publicationDeadline && deliverableDeadline && publicationDeadline < deliverableDeadline) return 'Publication deadline must be on or after the deliverable deadline.';
     if (Number(creatorsNeeded) < 1) return 'Choose at least 1 creator.';
     return null;
   };
@@ -617,9 +607,9 @@ export function CampaignForm({ mode }: { mode: 'create' | 'edit' }) {
         deliverable_deadline: deliverableDeadline ? new Date(deliverableDeadline).toISOString() : undefined,
         creators_needed: Number(creatorsNeeded) || 1,
         completion_mode: completionMode,
-        required_platforms: completionMode === 'publication_required' ? requiredPlatforms : undefined,
-        required_post_types: completionMode === 'publication_required' ? requiredPostTypes : undefined,
-        publication_deadline: completionMode === 'publication_required' && publicationDeadline ? new Date(publicationDeadline).toISOString() : undefined,
+        required_platforms: undefined,
+        required_post_types: undefined,
+        publication_deadline: undefined,
         application_questions: applicationQuestions.filter((q) => q.trim()),
         requirements: requirements.trim() || undefined,
         creator_requirements: {
@@ -1116,17 +1106,9 @@ export function CampaignForm({ mode }: { mode: 'create' | 'edit' }) {
 
                         <div className="cc-field" style={{marginTop:12}}>
                           <label className="cc-label">Completion & payment protection</label>
-                          <select className="cc-input" value={completionMode} onChange={(e) => setCompletionMode(e.target.value as any)}>
-                            <option value="approval_only">Content approval is the final requirement</option>
-                            <option value="publication_required">Require social publication + proof</option>
-                          </select>
-                          <div className="cc-hint">Paid campaigns are funded at the agreed amount before work starts. Payment is released only after requirements are verified.</div>
+                          <div className="cc-input" style={{display:'flex',alignItems:'center',color:'#6B6478',background:'#F5F4FA',cursor:'default'}}>Content approval is the final requirement</div>
+                          <div className="cc-hint">Paid campaigns are funded at the agreed amount before work starts. Payment is released automatically once all deliverables are approved.</div>
                         </div>
-                        {completionMode === 'publication_required' && <>
-                          <MultiPickChips label="Required platform(s)" hint="Select every platform the creator must post on." options={REQUIRED_PLATFORMS} values={requiredPlatforms} onChange={setRequiredPlatforms} required />
-                          <MultiPickChips label="Post type(s)" hint="Select every post type that counts as fulfilling this campaign." options={REQUIRED_POST_TYPES} values={requiredPostTypes} onChange={setRequiredPostTypes} required />
-                          <div className="cc-field"><label className="cc-label">Publication deadline</label><input className="cc-input" type="date" min={deliverableDeadline || deadline || new Date(Date.now() + 86400000).toISOString().slice(0, 10)} value={publicationDeadline} onChange={(e)=>setPublicationDeadline(e.target.value)} /><div className="cc-hint">Must be on or after the deliverable deadline below (publishing happens after content is approved).</div></div>
-                        </>}
 
                         <div className="cc-row">
                           <div className="cc-field">

@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, Text, DateTime, DECIMAL, ForeignKey, JSON
+from sqlalchemy import Column, Integer, String, Text, DateTime, DECIMAL, ForeignKey, JSON, Boolean
 from sqlalchemy.sql import func
 from sqlalchemy.orm import relationship
 from app.database import Base
@@ -33,6 +33,11 @@ class Application(Base):
     
     # Status: pending, accepted, rejected, withdrawn
     status = Column(String(50), default="pending")
+
+    # Post-selection workflow gates. Creator confirmation happens after selection;
+    # final verification is only available after all deliverables are approved.
+    creator_confirmed = Column(Boolean, nullable=False, default=False)
+    creator_verified = Column(Boolean, nullable=False, default=False)
     
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())

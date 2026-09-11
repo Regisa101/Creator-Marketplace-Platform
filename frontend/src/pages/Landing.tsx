@@ -369,7 +369,6 @@ const FindCreatorsSection = memo(function FindCreatorsSection() {
     <section className="ch-section" id="features">
       <div className="find-split" onMouseEnter={stopTimer} onMouseLeave={startTimer}>
         <div className="find-copy">
-          <span className="find-dash" />
           <h2 className="find-h2">
             Find the right creators
             <br />
@@ -484,7 +483,6 @@ const GoalsSection = memo(function GoalsSection() {
     <section className="goals-section" id="goals">
       <div className="goals-container">
         <div className="goals-head">
-          <span className="find-dash" />
           <h2 className="goals-h2">
             Different goals. <span className="goals-h2-accent">Same platform.</span>
           </h2>
@@ -641,7 +639,6 @@ const FaqSection = memo(function FaqSection() {
   return (
     <section className="ch-section why-section" id="faq">
       <div className="ch-section-head">
-        <span className="find-dash" />
         <h2 className="ch-h2 why-h2">
           Everything you need <span className="why-h2-accent">to know</span>
         </h2>
@@ -1247,7 +1244,6 @@ export function Landing() {
 /* ===== Find the right creators instantly ===== */
 .find-split { display: grid; grid-template-columns: 0.85fr 1fr; gap: 64px; align-items: center; }
 .find-copy { max-width: 420px; }
-.find-dash { display: block; width: 40px; height: 4px; border-radius: 2px; background: #FF6B5A; margin-bottom: 18px; }
 .find-h2 {
   font-family: 'League Spartan', sans-serif; font-weight: 800; font-size: clamp(32px, 4vw, 42px);
   line-height: 1.15; letter-spacing: -0.01em; margin: 0; color: #1E2A78;
@@ -1833,7 +1829,6 @@ export function Landing() {
       <section className="ch-section" id="tool-merge">
         <div className="merge-card">
           <div className="merge-copy">
-            <span className="find-dash" />
             <h2 className="find-h2">
               Replace <span className="find-h2-accent">multiple</span> tools
               <br />
@@ -1885,7 +1880,6 @@ export function Landing() {
       {/* ===== WHY WE EXIST — before / after ===== */}
       <section className="ch-section why-section" id="why-we-exist">
         <div className="ch-section-head">
-          <span className="find-dash" />
           <h2 className="ch-h2 why-h2">
             Creator marketing in Nepal <span className="why-h2-accent">was broken</span>
           </h2>

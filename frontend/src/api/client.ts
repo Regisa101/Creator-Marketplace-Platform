@@ -489,6 +489,8 @@ export interface Collab {
   negotiation_status?: string;
   status: string;
   created_at: string;
+  creator_confirmed?: boolean;
+  creator_verified?: boolean;
   pending_deliverables: number;
   unread_messages: number;
   payment_status?: 'initiated' | 'funded' | 'released' | 'completed' | 'failed' | 'refunded' | null;
@@ -859,6 +861,24 @@ export const respondToInvite = async (
 // API FUNCTIONS - WORKSPACE (Increment 5)
 // ============================================
 
+
+export const confirmCollaboration = async (collabId: number): Promise<Collab> => {
+  const response = await api.post<Collab>(`/workspace/collabs/${collabId}/confirm`);
+  return response.data;
+};
+
+export const verifyCollaboration = async (collabId: number): Promise<Collab> => {
+  const response = await api.post<Collab>(`/workspace/collabs/${collabId}/verify`);
+  return response.data;
+};
+
+export const getUnreadWorkspaceMessageCount = async (): Promise<number> => {
+  const response = await api.get<{ count: number }>(
+    '/workspace/unread-messages-count'
+  );
+  return Number(response.data?.count || 0);
+};
+
 export const getCollabs = async (): Promise<Collab[]> => {
   const response = await api.get<Collab[]>('/workspace/collabs');
   return response.data;
@@ -1058,6 +1078,16 @@ export const reviewDeliverable = async (
   data: { status: 'approved' | 'revision_requested'; feedback?: string }
 ): Promise<WorkspaceDeliverable> => {
   const response = await api.put<WorkspaceDeliverable>(`/workspace/deliverables/${id}/review`, data);
+  return response.data;
+};
+
+export const reviewAllDeliverables = async (
+  collabId: number
+): Promise<WorkspaceDeliverable[]> => {
+  const response = await api.put<WorkspaceDeliverable[]>(
+    `/workspace/deliverables/review-all?collab_id=${collabId}`,
+    { status: 'approved' }
+  );
   return response.data;
 };
 

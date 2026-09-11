@@ -37,10 +37,14 @@ statements = [
     "ALTER TABLE business_profiles ADD COLUMN IF NOT EXISTS default_creator_requirements JSON",
     "ALTER TABLE business_profiles ADD COLUMN IF NOT EXISTS default_application_questions JSON",
     "ALTER TABLE applications ADD COLUMN IF NOT EXISTS application_answers JSON",
+    "ALTER TABLE applications ADD COLUMN IF NOT EXISTS creator_confirmed BOOLEAN NOT NULL DEFAULT FALSE",
+    "ALTER TABLE applications ADD COLUMN IF NOT EXISTS creator_verified BOOLEAN NOT NULL DEFAULT FALSE",
     "ALTER TABLE applications ADD COLUMN IF NOT EXISTS selected_portfolio JSON",
     "ALTER TABLE applications ADD COLUMN IF NOT EXISTS deliverable_deadline TIMESTAMPTZ",
     "ALTER TABLE payments ADD COLUMN IF NOT EXISTS payment_details JSON",
     "ALTER TABLE notifications ADD COLUMN IF NOT EXISTS event_key VARCHAR(255)",
+    "ALTER TABLE messages ADD COLUMN IF NOT EXISTS read_at TIMESTAMPTZ",
+    "UPDATE messages SET read_at = created_at WHERE read_at IS NULL",
 ]
 
 print("=" * 58)
