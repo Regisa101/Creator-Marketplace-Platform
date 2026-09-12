@@ -17,9 +17,9 @@ import { getPublicBusinessProfile, type PublicBusinessProfile } from '../api/cli
 import { OFF_WHITE } from '../components/Brand';
 import { PublicNavbar } from '../components/PublicNavbar';
 
-const CORAL = '#FF6B5A';
-const CORAL_DARK = '#F0523F';
-const VIOLET = '#1E2A78';
+const CORAL = '#F47C78';
+const CORAL_DARK = '#E86966';
+const VIOLET = '#7661A1';
 
 function normalizeWebsite(url: string): string {
   if (/^https?:\/\//i.test(url)) return url;

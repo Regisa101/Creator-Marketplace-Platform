@@ -10,7 +10,7 @@ const C = {
   ink: '#1A1625',
   inkSoft: '#6B6478',
   line: '#EAE7F2',
-  navy: '#1E2A78',
+  navy: '#7661A1',
   green: '#22C55E',
   greenSoft: '#EAFBF1',
   red: '#E23D3D',

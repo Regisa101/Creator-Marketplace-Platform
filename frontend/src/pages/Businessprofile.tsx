@@ -26,9 +26,9 @@ import {
 import { OFF_WHITE } from '../components/Brand';
 import { PublicNavbar } from '../components/PublicNavbar';
 
-const VIOLET = '#1E2A78';
-const VIOLET_DARK = '#182262';
-const CORAL = '#FF6B5A';
+const VIOLET = '#7661A1';
+const VIOLET_DARK = '#66518F';
+const CORAL = '#F47C78';
 
 export function BusinessProfile() {
   const { user, deleteAccount } = useAuth();

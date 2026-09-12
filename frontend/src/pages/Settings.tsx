@@ -22,8 +22,8 @@ import { useAuth } from '../context/AuthContext';
 import { LogoMark, BRAND_NAME, PAGE_GRADIENT_BG, OFF_WHITE } from '../components/Brand';
 import { PublicNavbar } from '../components/PublicNavbar';
 
-const VIOLET = '#1E2A78';
-const VIOLET_DARK = '#182262';
+const VIOLET = '#7661A1';
+const VIOLET_DARK = '#66518F';
 
 // Self-contained base styles for the BusinessSettings page (the "/settings"
 // route). This page is rendered on its own — not alongside CampaignForm —
@@ -1789,9 +1789,9 @@ function SettingsMultiSelect({ label, options, values, onChange }: { label: stri
             type="button"
             onClick={() => toggle(option)}
             style={{
-              border: `1px solid ${values.includes(option) ? '#1E2A78' : '#DDE2F6'}`,
-              background: values.includes(option) ? '#EEF0FF' : '#fff',
-              color: '#182262', borderRadius: 999, padding: '8px 12px',
+              border: `1px solid ${values.includes(option) ? '#7661A1' : '#DDE2F6'}`,
+              background: values.includes(option) ? '#F0EBF6' : '#fff',
+              color: '#1A1625', borderRadius: 999, padding: '8px 12px',
               cursor: 'pointer', fontSize: 12, fontWeight: values.includes(option) ? 700 : 500,
             }}
           >
@@ -1965,4 +1965,3 @@ export function BusinessSettings() {
     </div>
   );
 }
-

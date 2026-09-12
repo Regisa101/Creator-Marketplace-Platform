@@ -20,16 +20,16 @@ import { useAuth } from '../../context/AuthContext';
 import { AppLayout } from '../../components/AppLayout';
 
 const C = {
-  surface: '#F5F4FA',
+  surface: '#FBF8F4',
   card: '#FFFFFF',
   ink: '#1A1625',
   inkSoft: '#6B6478',
   inkFaint: '#A39DB8',
   line: '#EAE7F2',
-  navy: '#1E2A78',
-  navySoft: '#EEF1FF',
-  coral: '#FF6B5A',
-  coralSoft: '#FFF4F2',
+  navy: '#7661A1',
+  navySoft: '#F0EBF6',
+  coral: '#F47C78',
+  coralSoft: '#FDEBE9',
 };
 
 const STATUS_META: Record<string, { label: string; bg: string; color: string }> = {

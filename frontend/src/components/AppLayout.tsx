@@ -200,7 +200,7 @@ export function AppLayout({
   const primaryDark =
     role === "creator"
       ? "#E86966"
-      : "#141B52";
+      : "#66518F";
 
   const profileCompletion =
     calculateProfileCompletion(

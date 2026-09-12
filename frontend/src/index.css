@@ -1,3 +1,14 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+/* Clip horizontal overflow at the document level instead of on inner page
+   wrappers. Putting overflow-x: hidden on an inner wrapper forces the
+   browser to also give that wrapper an implicit overflow-y (per the CSS
+   overflow spec), which turns it into its own scroll container — and that
+   breaks/hides any `position: sticky` element nested inside it (e.g. the
+   landing page navbar) once you scroll past it. Keeping the clip on
+   html/body avoids creating that nested scroll context. */
+html, body {
+  overflow-x: hidden;
+}

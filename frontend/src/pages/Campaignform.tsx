@@ -31,8 +31,8 @@ import {
 import { useAuth } from '../context/AuthContext';
 import { AppLayout } from '../components/AppLayout';
 
-const NAVY = '#1E2A78';
-const CORAL = '#FF6B5A';
+const NAVY = '#7661A1';
+const CORAL = '#F47C78';
 
 // How many chip options show before a "+N more" toggle appears. This is the
 // fix for pickers with long option lists (18 creator categories, etc.)

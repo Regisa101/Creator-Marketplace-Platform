@@ -26,10 +26,12 @@ import { BusinessProfile } from "./pages/Businessprofile";
 import { BusinessSettings } from "./pages/Settings";
 
 import { CampaignDetail } from "./pages/Campaigndetail";
+
 import {
   CampaignCreate,
   CampaignEdit,
 } from "./pages/Campaignform";
+
 import { CampaignBrowse } from "./pages/Campaignbrowse";
 
 import { ApplicationsInbox } from "./pages/Applicationsinbox";
@@ -89,10 +91,14 @@ function App() {
               PUBLIC ROUTES
               ================================================= */}
 
+          {/* Landing Page */}
+
           <Route
             path="/"
             element={<Landing />}
           />
+
+          {/* Login */}
 
           <Route
             path="/login"
@@ -124,6 +130,8 @@ function App() {
             element={<RegisterBusiness />}
           />
 
+          {/* About */}
+
           <Route
             path="/about"
             element={
@@ -134,9 +142,41 @@ function App() {
             }
           />
 
+          {/* Public Brand Profile */}
+
           <Route
             path="/brands/:businessId"
             element={<BrandProfile />}
+          />
+
+          {/* =================================================
+              PUBLIC CAMPAIGN MARKETPLACE
+              ================================================= */}
+
+          {/*
+           * IMPORTANT:
+           *
+           * Campaign browsing is PUBLIC.
+           *
+           * Visitors can browse campaigns without logging in.
+           * Login is required only when they want to apply.
+           */}
+
+          <Route
+            path="/campaigns"
+            element={<CampaignBrowse />}
+          />
+
+          {/*
+           * Campaign details are also PUBLIC.
+           *
+           * A visitor can view the campaign before deciding
+           * whether to apply.
+           */}
+
+          <Route
+            path="/campaigns/:id"
+            element={<CampaignDetail />}
           />
 
           {/* =================================================
@@ -201,17 +241,13 @@ function App() {
           />
 
           {/* =================================================
-              CAMPAIGNS
+              CAMPAIGN MANAGEMENT
               ================================================= */}
 
-          <Route
-            path="/campaigns"
-            element={
-              <ProtectedRoute>
-                <CampaignBrowse />
-              </ProtectedRoute>
-            }
-          />
+          {/*
+           * Creating a campaign is protected.
+           * Only logged-in users should access this page.
+           */}
 
           <Route
             path="/campaigns/new"
@@ -222,6 +258,10 @@ function App() {
             }
           />
 
+          {/*
+           * Editing a campaign is protected.
+           */}
+
           <Route
             path="/campaigns/:id/edit"
             element={
@@ -231,14 +271,9 @@ function App() {
             }
           />
 
-          <Route
-            path="/campaigns/:id"
-            element={
-              <ProtectedRoute>
-                <CampaignDetail />
-              </ProtectedRoute>
-            }
-          />
+          {/* =================================================
+              SAVED CAMPAIGNS
+              ================================================= */}
 
           <Route
             path="/saved"

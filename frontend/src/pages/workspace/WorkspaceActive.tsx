@@ -21,12 +21,12 @@ import { AppLayout } from '../../components/AppLayout';
 // is resolved at render time and pushed into CSS as --cw-accent / --cw-accent-soft,
 // so the stylesheet below never hardcodes one role's color.
 const C = {
-  bg: '#F5F6FC',
+  bg: '#FBF8F4',
   card: '#FFFFFF',
-  ink: '#171923',
-  soft: '#6B7280',
-  faint: '#9CA3AF',
-  line: '#E8E9F3',
+  ink: '#1A1625',
+  soft: '#6B6478',
+  faint: '#A39DB8',
+  line: '#EAE7F2',
   good: '#16A34A',
   goodSoft: '#EAFBF1',
   warn: '#B45309',
@@ -34,9 +34,9 @@ const C = {
   bad: '#DC2626',
   badSoft: '#FDECEC',
   creator: '#7661A1',
-  creatorSoft: '#EDEFF7',
+  creatorSoft: '#F0EBF6',
   brand: '#7661A1',
-  brandSoft: '#EDEFF7',
+  brandSoft: '#F0EBF6',
 };
 
 function initials(name?: string | null) {

@@ -4,7 +4,7 @@ import { useNavigate } from 'react-router-dom';
 import { getNotifications, markAllNotificationsRead, markNotificationRead, type Notification as AppNotification } from '../api/client';
 import { AppLayout } from '../components/AppLayout';
 
-const C = { ink:'#1A1625', inkSoft:'#6B6478', faint:'#A39DB8', line:'#EAE7F2', coral:'#FF6B5A' };
+const C = { ink:'#1A1625', inkSoft:'#6B6478', faint:'#A39DB8', line:'#EAE7F2', coral:'#F47C78' };
 
 function iconFor(type: string) {
   if (type === 'payment_received') return <CreditCard size={17} />;

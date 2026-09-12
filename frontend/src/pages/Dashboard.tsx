@@ -431,7 +431,7 @@ export function Dashboard() {
         .tab-btn{height:32px;padding:0 14px;border-radius:999px;border:1px solid #EAE7F2;background:#fff;color:#6B6478;font:600 11px -apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;cursor:pointer}
         .tab-btn.active{background:var(--accent);border-color:var(--accent);color:#fff}
         .list{margin-top:10px}.item{display:flex;justify-content:space-between;gap:14px;align-items:center;padding:14px 0;border-bottom:1px solid #EAE7F2}.item:last-child{border-bottom:0}.item-title{font-size:12.5px;font-weight:650;color:#1A1625}.item-meta{font-size:10.5px;color:#A39DB8;margin-top:3px}.meter{height:5px;background:#F5F4FA;border-radius:99px;overflow:hidden;margin-top:7px}.meter span{display:block;height:100%;background:var(--accent)}.mini-link{color:var(--accent);font-size:10.5px;font-weight:700;text-decoration:none}
-        .mini-btn{color:#1E2A78;font-size:10.5px;font-weight:700;text-decoration:none;background:none;border:0;cursor:pointer;padding:0;font-family:inherit}
+        .mini-btn{color:#7661A1;font-size:10.5px;font-weight:700;text-decoration:none;background:none;border:0;cursor:pointer;padding:0;font-family:inherit}
         .summary{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-top:18px}.summary-card{padding:14px;border:0;border-radius:14px;background:var(--accent-tint)}.summary-label{font-size:10px;color:#A39DB8}.summary-value{font-size:18px;font-weight:700;margin-top:3px;color:#1A1625}.summary-note{font-size:9.5px;color:#A39DB8;margin-top:3px}
 
         .activity{display:grid;gap:0}.activity-item{display:flex;gap:11px;padding:14px 0;border-bottom:1px solid #EAE7F2;color:inherit;text-decoration:none}.activity-item:last-child{border-bottom:0}

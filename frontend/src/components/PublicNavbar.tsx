@@ -1,548 +1,409 @@
-import { useEffect, useRef, useState } from 'react';
-import { Link, useLocation, useNavigate } from 'react-router-dom';
-import { Heart, Menu, Trash2, X } from 'lucide-react';
-import { useAuth } from '../context/AuthContext';
-import { BRAND_NAME, BRAND_PURPLE, BRAND_PURPLE_DARK, LogoMark, OFF_WHITE } from './Logo';
-import { getSavedCampaigns, unsaveCampaign, type SavedCampaignEntry } from '../api/client';
+import { Link, useLocation } from "react-router-dom";
+import { useState } from "react";
+import { LogoMark } from "./Logo";
+import { Menu, X } from "lucide-react";
 
-const API_ORIGIN = 'http://localhost:8000';
+type PublicNavbarProps = {
+  sticky?: boolean;
+};
 
-function resolveMediaUrl(url?: string | null) {
-  if (!url) return '';
-  if (/^(https?:)?\/\//i.test(url) || url.startsWith('data:') || url.startsWith('blob:')) return url;
-  if (url.startsWith('/api/')) return `${API_ORIGIN}${url}`;
-  return `${API_ORIGIN}/${url.replace(/^\/+/, '')}`;
-}
-
-function initials(name: string) {
-  return name
-    .split(' ')
-    .filter(Boolean)
-    .slice(0, 2)
-    .map((word) => word[0])
-    .join('')
-    .toUpperCase() || 'U';
-}
-
-export function PublicNavbar({ sticky = true }: { sticky?: boolean }) {
-  const { user, logout, loading } = useAuth();
+export function PublicNavbar({ sticky = true }: PublicNavbarProps) {
   const location = useLocation();
-  const navigate = useNavigate();
   const [mobileOpen, setMobileOpen] = useState(false);
-  const [profileOpen, setProfileOpen] = useState(false);
-  const profileRef = useRef<HTMLDivElement>(null);
 
-  const [wishlistOpen, setWishlistOpen] = useState(false);
-  const [wishlist, setWishlist] = useState<SavedCampaignEntry[]>([]);
-  const [wishlistLoading, setWishlistLoading] = useState(false);
-  const [wishlistError, setWishlistError] = useState('');
-  const [removingId, setRemovingId] = useState<number | null>(null);
-  const [wishlistCount, setWishlistCount] = useState(0);
+  const isLandingPage = location.pathname === "/";
 
-  const authenticated = !loading && !!user;
-  const isCreator = authenticated && user?.role === 'creator';
-  const isHome = location.pathname === '/' && !location.hash;
-  // Only the actual "Explore Campaigns" list page lights up the Campaigns
-  // link — a single campaign's detail/edit page is not the campaigns list,
-  // so it should not show the active underline there.
-  const isCampaigns = location.pathname === '/campaigns';
-  const isBrands = location.hash === '#for-brands';
-  const isAbout = false;
-
-  useEffect(() => {
-    setMobileOpen(false);
-    setProfileOpen(false);
-    setWishlistOpen(false);
-  }, [location.pathname, location.hash]);
-
-  // Keep the heart badge's count in sync with the creator's wishlist,
-  // independent of whether the drawer itself has ever been opened, and
-  // refresh it whenever a campaign is saved/unsaved anywhere in the app.
-  useEffect(() => {
-    if (!isCreator) {
-      setWishlistCount(0);
-      return;
+  const navLink = (href: string) => {
+    if (href.startsWith("#")) {
+      return isLandingPage ? href : `/${href}`;
     }
-    let cancelled = false;
-    const refreshCount = () => {
-      getSavedCampaigns()
-        .then((data) => {
-          if (!cancelled) setWishlistCount(data.length);
-        })
-        .catch((err) => console.error('Could not load wishlist count:', err));
-    };
-    refreshCount();
-    window.addEventListener('ch:wishlist-changed', refreshCount);
-    return () => {
-      cancelled = true;
-      window.removeEventListener('ch:wishlist-changed', refreshCount);
-    };
-  }, [isCreator]);
 
-  // The drawer keeps its own copy of the list (fetched only while open);
-  // reflect its length into the badge immediately too, so removing an item
-  // from inside the open drawer updates the count without waiting on the
-  // event round-trip.
-  useEffect(() => {
-    if (wishlistOpen && !wishlistLoading && !wishlistError) {
-      setWishlistCount(wishlist.length);
-    }
-  }, [wishlist, wishlistOpen, wishlistLoading, wishlistError]);
-
-  useEffect(() => {
-    if (!wishlistOpen) return;
-    let cancelled = false;
-    setWishlistLoading(true);
-    setWishlistError('');
-    getSavedCampaigns()
-      .then((data) => {
-        if (!cancelled) setWishlist(data);
-      })
-      .catch((err) => {
-        console.error('Could not load wishlist:', err);
-        if (!cancelled) setWishlistError('Could not load your wishlist. Please try again.');
-      })
-      .finally(() => {
-        if (!cancelled) setWishlistLoading(false);
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [wishlistOpen]);
-
-  // Lock page scroll while the wishlist drawer is open.
-  useEffect(() => {
-    if (!wishlistOpen) return;
-    const previousOverflow = document.body.style.overflow;
-    document.body.style.overflow = 'hidden';
-    return () => {
-      document.body.style.overflow = previousOverflow;
-    };
-  }, [wishlistOpen]);
-
-  const handleRemoveFromWishlist = async (entry: SavedCampaignEntry) => {
-    setRemovingId(entry.id);
-    const previous = wishlist;
-    setWishlist(wishlist.filter((item) => item.id !== entry.id));
-    try {
-      await unsaveCampaign(entry.campaign_id);
-    } catch (err) {
-      console.error('Could not remove saved campaign:', err);
-      setWishlist(previous);
-    } finally {
-      setRemovingId(null);
-    }
+    return href;
   };
 
-  useEffect(() => {
-    const handlePointerDown = (event: MouseEvent) => {
-      if (profileRef.current && !profileRef.current.contains(event.target as Node)) {
-        setProfileOpen(false);
-      }
-    };
-    document.addEventListener('mousedown', handlePointerDown);
-    return () => document.removeEventListener('mousedown', handlePointerDown);
-  }, []);
+  const isActive = (href: string) => {
+    if (href === "#home") {
+      return isLandingPage && !location.hash;
+    }
 
-  const closeMobile = () => setMobileOpen(false);
+    if (href === "#campaigns") {
+      return isLandingPage && location.hash === "#campaigns";
+    }
 
-  const handleLogout = () => {
-    setProfileOpen(false);
-    setMobileOpen(false);
-    logout();
-    navigate('/');
+    if (href === "#for-brands") {
+      return isLandingPage && location.hash === "#for-brands";
+    }
+
+    return location.pathname === href;
   };
-
-  const avatarUrl = resolveMediaUrl(user?.profile?.profile_image || user?.profile?.logo_url || null);
-  const avatarName = user?.role === 'business'
-    ? (user?.profile?.company_name || user?.full_name || 'Brand')
-    : (user?.profile?.display_name || user?.full_name || 'User');
 
   return (
     <>
       <style>{`
         .ch-public-nav {
-          position: ${sticky ? 'sticky' : 'relative'};
+          position: ${sticky ? "fixed" : "relative"};
           top: 0;
-          z-index: 1000;
+          left: 0;
+          right: 0;
           width: 100%;
-          background: ${OFF_WHITE};
+          z-index: 9999;
+          background: rgba(255, 253, 250, 0.96);
+          backdrop-filter: blur(12px);
+          -webkit-backdrop-filter: blur(12px);
           border-bottom: 1px solid #EEE8E2;
           box-sizing: border-box;
         }
-        .ch-public-nav *,
-        .ch-public-nav *::before,
-        .ch-public-nav *::after { box-sizing: border-box; }
+
         .ch-public-nav-inner {
-          width: min(1240px, 100%);
-          min-height: 72px;
+          max-width: 1240px;
+          height: 72px;
           margin: 0 auto;
-          padding: 16px 32px;
-          display: grid;
-          grid-template-columns: 1fr auto 1fr;
+          padding: 0 32px;
+          display: flex;
           align-items: center;
+          justify-content: space-between;
           gap: 24px;
         }
+
         .ch-public-logo {
-          justify-self: start;
-          display: inline-flex;
+          display: flex;
           align-items: center;
           gap: 9px;
-          color: #17171A;
           text-decoration: none;
+          flex-shrink: 0;
+        }
+
+        .ch-public-logo-text {
+          color: #17171A;
           font-family: 'League Spartan', sans-serif;
           font-size: 21px;
           font-weight: 700;
           line-height: 1;
         }
-        .ch-public-links { display: flex; align-items: center; justify-content: center; gap: 30px; }
-        .ch-public-navitem { position: relative; display: inline-flex; align-items: center; }
-        .ch-public-link {
-          position: relative;
-          display: inline-flex;
+
+        .ch-public-nav-links {
+          display: flex;
           align-items: center;
-          min-height: 40px;
-          color: #55545A;
-          text-decoration: none;
+          gap: 30px;
+        }
+
+        .ch-public-nav-link {
+          position: relative;
+          padding: 7px 0;
+          color: #6F6A7C;
           font-family: 'Poppins', sans-serif;
           font-size: 14px;
           font-weight: 500;
-          white-space: nowrap;
+          text-decoration: none;
+          transition: color 0.18s ease;
         }
-        .ch-public-link::after {
-          content: '';
+
+        .ch-public-nav-link:hover {
+          color: #7661A1;
+        }
+
+        .ch-public-nav-link.active {
+          color: #7661A1;
+          font-weight: 600;
+        }
+
+        .ch-public-nav-link::after {
+          content: "";
           position: absolute;
           left: 0;
-          right: 100%;
-          bottom: -3px;
+          bottom: 0;
+          width: 0;
           height: 2px;
           border-radius: 999px;
-          background: ${BRAND_PURPLE};
-          transition: right .18s ease;
+          background: #7661A1;
+          transition: width 0.18s ease;
         }
-        .ch-public-link:hover, .ch-public-link.is-active { color: ${BRAND_PURPLE}; }
-        .ch-public-link:hover::after, .ch-public-link.is-active::after { right: 0; }
-        .ch-public-navitem-dropdown {
-          position: absolute;
-          top: 100%;
-          left: 50%;
-          transform: translateX(-50%) translateY(4px);
-          min-width: 200px;
-          padding: 7px;
-          background: #fff;
-          border: 1px solid #E7E0F3;
-          border-radius: 13px;
-          box-shadow: 0 16px 40px rgba(36,31,46,.14);
-          opacity: 0;
-          visibility: hidden;
-          transition: opacity .15s ease, transform .15s ease, visibility .15s ease;
-          z-index: 1100;
+
+        .ch-public-nav-link:hover::after,
+        .ch-public-nav-link.active::after {
+          width: 100%;
         }
-        .ch-public-navitem:hover .ch-public-navitem-dropdown,
-        .ch-public-navitem:focus-within .ch-public-navitem-dropdown {
-          opacity: 1;
-          visibility: visible;
-          transform: translateX(-50%) translateY(0);
-        }
-        /* Invisible bridge so the dropdown doesn't close on the small gap
-           between the link and the panel while moving the mouse down. */
-        .ch-public-navitem-dropdown::before {
-          content: '';
-          position: absolute;
-          top: -8px;
-          left: 0;
-          right: 0;
-          height: 8px;
-        }
-        .ch-public-navitem-dropdown a {
+
+        .ch-public-nav-actions {
           display: flex;
           align-items: center;
-          padding: 10px;
-          border-radius: 8px;
-          color: #4B4654;
-          text-decoration: none;
-          font: 500 12.5px 'Poppins', sans-serif;
-          white-space: nowrap;
+          gap: 10px;
+          flex-shrink: 0;
         }
-        .ch-public-navitem-dropdown a:hover { background: #F5F1F9; color: ${BRAND_PURPLE}; }
-        .ch-public-actions { justify-self: end; display: flex; align-items: center; gap: 10px; }
-        .ch-public-auth-link {
+
+        .ch-public-login {
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
           min-width: 68px;
-          padding: 9px 15px;
+          padding: 8px 15px;
+          border: 1px solid #7661A1;
           border-radius: 8px;
-          text-decoration: none;
-          text-align: center;
+          background: #7661A1;
+          color: #fff;
           font-family: 'Poppins', sans-serif;
           font-size: 13px;
           font-weight: 600;
-        }
-        .ch-public-login { color: #55545A; border: 1px solid transparent; background: transparent; }
-        .ch-public-login:hover { color: ${BRAND_PURPLE}; }
-        .ch-public-register { color: #fff; background: ${BRAND_PURPLE}; border: 1px solid ${BRAND_PURPLE}; }
-        .ch-public-register:hover { background: ${BRAND_PURPLE_DARK}; border-color: ${BRAND_PURPLE_DARK}; }
-        .ch-public-wishlist-btn {
-          position: relative;
-          width: 38px; height: 38px; border: none; background: transparent; padding: 0;
-          display: inline-flex; align-items: center; justify-content: center;
-          color: #55545A; cursor: pointer;
-        }
-        .ch-public-wishlist-btn:hover, .ch-public-wishlist-btn.is-active { color: ${BRAND_PURPLE}; }
-        .ch-public-wishlist-count {
-          position: absolute; top: 2px; right: 2px; min-width: 16px; height: 16px; padding: 0 4px;
-          border-radius: 999px; background: ${BRAND_PURPLE}; color: #fff; border: 2px solid ${OFF_WHITE};
-          font: 700 10px 'Poppins', sans-serif; display: inline-flex; align-items: center; justify-content: center;
-          line-height: 1;
-        }
-        .ch-public-profile { position: relative; }
-        .ch-public-avatar {
-          width: 38px; height: 38px; padding: 0; border-radius: 50%; border: 1px solid #E5DFDA;
-          overflow: hidden; display: inline-flex; align-items: center; justify-content: center;
-          background: #F0EBF6; color: ${BRAND_PURPLE}; cursor: pointer; font-size: 11px; font-weight: 700;
-        }
-        .ch-public-avatar img { width: 100%; height: 100%; object-fit: cover; display: block; }
-        .ch-public-avatar:hover { border-color: #CFC1E4; }
-        .ch-public-profile-menu {
-          position: absolute; top: calc(100% + 10px); right: 0; width: 190px; padding: 7px;
-          background: #fff; border: 1px solid #E7E0F3; border-radius: 13px;
-          box-shadow: 0 16px 40px rgba(36,31,46,.14); z-index: 1100;
-        }
-        .ch-public-profile-name { padding: 9px 10px 8px; border-bottom: 1px solid #EEE8E2; margin-bottom: 4px; }
-        .ch-public-profile-name strong { display: block; color: #241F2E; font-size: 12px; line-height: 1.35; }
-        .ch-public-profile-name span { display: block; margin-top: 2px; color: #8A8394; font-size: 10.5px; }
-        .ch-public-profile-menu a, .ch-public-profile-menu button {
-          width: 100%; display: flex; align-items: center; padding: 10px; border: 0; border-radius: 8px;
-          background: transparent; color: #4B4654; text-decoration: none; text-align: left;
-          font: 500 12.5px 'Poppins', sans-serif; cursor: pointer;
-        }
-        .ch-public-profile-menu a:hover, .ch-public-profile-menu button:hover { background: #F5F1F9; color: ${BRAND_PURPLE}; }
-        .ch-public-profile-menu button.logout { color: #C84642; }
-        .ch-public-profile-menu button.logout:hover { background: #FFF0EF; color: #C84642; }
-        .ch-public-burger { display: none; width: 38px; height: 38px; border: 1px solid #E5DFDA; border-radius: 9px; background: #fff; color: #55545A; align-items: center; justify-content: center; cursor: pointer; }
-        .ch-public-mobile { display: none; border-top: 1px solid #EEE8E2; background: #FBF8F4; padding: 8px 20px 16px; }
-        .ch-public-mobile a, .ch-public-mobile button {
-          width: 100%; display: block; padding: 11px 4px; border: 0; border-bottom: 1px solid #EEE8E2;
-          background: transparent; color: #241F2E; text-align: left; text-decoration: none;
-          font: 500 14px 'Poppins', sans-serif; cursor: pointer;
-        }
-        .ch-public-mobile a.is-active { color: ${BRAND_PURPLE}; font-weight: 650; }
-        .ch-public-mobile button.logout { color: #C84642; }
-        @media (max-width: 760px) {
-          .ch-public-nav-inner { min-height: 66px; padding: 14px 18px; grid-template-columns: 1fr auto; }
-          .ch-public-links { display: none; }
-          .ch-public-actions > .ch-public-auth-link, .ch-public-actions > .ch-public-profile, .ch-public-actions > .ch-public-wishlist-btn { display: none; }
-          .ch-public-burger { display: inline-flex; }
-          .ch-public-logo { font-size: 20px; }
-          .ch-public-mobile { display: block; }
+          text-decoration: none;
+          transition: all 0.18s ease;
         }
 
-        .ch-wishlist-overlay {
-          position: fixed; inset: 0; background: rgba(23, 23, 26, 0.32);
-          z-index: 1400; animation: ch-fade-in .15s ease;
+        .ch-public-login:hover {
+          background: #66518F;
+          border-color: #66518F;
+          transform: translateY(-1px);
         }
-        @keyframes ch-fade-in { from { opacity: 0; } to { opacity: 1; } }
-        .ch-wishlist-drawer {
-          position: fixed; top: 0; right: 0; bottom: 0; width: min(400px, 100%);
-          background: ${OFF_WHITE}; z-index: 1401; display: flex; flex-direction: column;
-          box-shadow: -18px 0 48px rgba(36,31,46,.18);
-          animation: ch-slide-in .22s ease;
+
+        .ch-public-register {
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          min-width: 68px;
+          padding: 8px 15px;
+          border: 1px solid #7661A1;
+          border-radius: 8px;
+          background: #fff;
+          color: #7661A1;
+          font-family: 'Poppins', sans-serif;
+          font-size: 13px;
+          font-weight: 600;
+          text-decoration: none;
+          transition: all 0.18s ease;
         }
-        @keyframes ch-slide-in { from { transform: translateX(100%); } to { transform: translateX(0); } }
-        .ch-wishlist-head {
-          display: flex; align-items: center; justify-content: space-between;
-          padding: 20px 22px; border-bottom: 1px solid #EEE8E2; flex-shrink: 0;
+
+        .ch-public-register:hover {
+          background: #F0EBF6;
+          transform: translateY(-1px);
         }
-        .ch-wishlist-title { display: flex; align-items: center; gap: 8px; font: 700 16px 'Poppins', sans-serif; color: #241F2E; }
-        .ch-wishlist-close {
-          width: 34px; height: 34px; border-radius: 9px; border: 1px solid #E5DFDA; background: #fff;
-          color: #55545A; display: inline-flex; align-items: center; justify-content: center; cursor: pointer;
+
+        .ch-public-avatar {
+          width: 38px;
+          height: 38px;
+          border-radius: 50%;
+          border: 1px solid #E7E0F3;
+          background: #F0EBF6;
+          color: #7661A1;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          font-family: 'Poppins', sans-serif;
+          font-size: 12px;
+          font-weight: 700;
+          overflow: hidden;
+          text-decoration: none;
         }
-        .ch-wishlist-close:hover { color: ${BRAND_PURPLE}; border-color: #D7CDE4; }
-        .ch-wishlist-body { flex: 1; overflow-y: auto; padding: 14px 18px 24px; }
-        .ch-wishlist-state { padding: 60px 18px; text-align: center; color: #8A8394; font: 500 13px 'Poppins', sans-serif; }
-        .ch-wishlist-empty-title { color: #241F2E; font-weight: 700; font-size: 14.5px; margin-bottom: 6px; }
-        .ch-wishlist-item {
-          display: flex; align-items: flex-start; gap: 10px; background: #fff; border: 1px solid #EEE8E2;
-          border-radius: 14px; padding: 14px; margin-bottom: 10px;
+
+        .ch-public-avatar img {
+          width: 100%;
+          height: 100%;
+          object-fit: cover;
+          display: block;
         }
-        .ch-wishlist-item-link { flex: 1; min-width: 0; text-decoration: none; color: inherit; }
-        .ch-wishlist-item-title {
-          font: 650 13.5px 'Poppins', sans-serif; color: #241F2E; margin: 0 0 5px; line-height: 1.35;
-          display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
+
+        .ch-public-burger {
+          display: none;
+          width: 38px;
+          height: 38px;
+          align-items: center;
+          justify-content: center;
+          border: 1px solid #E7E0F3;
+          border-radius: 8px;
+          background: #fff;
+          color: #7661A1;
+          cursor: pointer;
         }
-        .ch-wishlist-item-meta { display: flex; align-items: center; gap: 5px; font: 500 11.5px 'Poppins', sans-serif; color: #8A8394; flex-wrap: wrap; }
-        .ch-wishlist-remove {
-          flex-shrink: 0; width: 30px; height: 30px; border-radius: 8px; border: 1px solid #EEE8E2; background: #fff;
-          color: #8A8394; display: inline-flex; align-items: center; justify-content: center; cursor: pointer;
+
+        .ch-public-mobile-panel {
+          display: none;
         }
-        .ch-wishlist-remove:hover { background: #FFF0EF; border-color: #F6C8C8; color: #C84642; }
-        .ch-wishlist-remove:disabled { opacity: .5; cursor: not-allowed; }
+
+        /*
+         * IMPORTANT:
+         * Because the navbar is fixed, the page needs top spacing.
+         * This prevents the hero section from hiding underneath it.
+         */
+        .ch-public-nav-spacer {
+          height: ${sticky ? "72px" : "0px"};
+          width: 100%;
+        }
+
+        @media (max-width: 760px) {
+          .ch-public-nav-inner {
+            height: 64px;
+            padding: 0 18px;
+          }
+
+          .ch-public-nav-spacer {
+            height: ${sticky ? "64px" : "0px"};
+          }
+
+          .ch-public-nav-links,
+          .ch-public-nav-actions {
+            display: none;
+          }
+
+          .ch-public-burger {
+            display: flex;
+          }
+
+          .ch-public-mobile-panel {
+            display: flex;
+            flex-direction: column;
+            gap: 3px;
+            padding: 10px 18px 18px;
+            background: rgba(255, 253, 250, 0.98);
+            border-top: 1px solid #EEE8E2;
+          }
+
+          .ch-public-mobile-panel a {
+            display: block;
+            padding: 11px 4px;
+            color: #241F2E;
+            font-family: 'Poppins', sans-serif;
+            font-size: 14px;
+            font-weight: 500;
+            text-decoration: none;
+          }
+
+          .ch-public-mobile-panel a:hover {
+            color: #7661A1;
+          }
+
+          .ch-public-mobile-actions {
+            display: flex;
+            gap: 8px;
+            padding-top: 8px;
+          }
+
+          .ch-public-mobile-actions a {
+            flex: 1;
+            text-align: center;
+            border-radius: 8px;
+          }
+        }
       `}</style>
 
       <nav className="ch-public-nav" aria-label="Main navigation">
         <div className="ch-public-nav-inner">
-          <Link to="/" className="ch-public-logo" aria-label={`${BRAND_NAME} home`}>
-            <LogoMark size={26} />
-            <span>{BRAND_NAME}</span>
+
+          {/* LOGO */}
+          <Link
+            to={navLink("#home")}
+            className="ch-public-logo"
+            onClick={() => setMobileOpen(false)}
+          >
+            <LogoMark size={24} />
+            <span className="ch-public-logo-text">
+              creatorhub
+            </span>
           </Link>
 
-          <div className="ch-public-links">
-            <div className="ch-public-navitem">
-              <Link to="/" className={`ch-public-link${isHome ? ' is-active' : ''}`}>Home</Link>
-            </div>
-
-            <div className="ch-public-navitem">
-              <Link to="/campaigns" className={`ch-public-link${isCampaigns ? ' is-active' : ''}`}>Campaigns</Link>
-              <div className="ch-public-navitem-dropdown" role="menu">
-                <Link to="/campaigns" role="menuitem">Explore Campaigns</Link>
-                <Link to="/#campaigns" role="menuitem">Featured on Home</Link>
-                {isCreator && <Link to="/saved" role="menuitem">My Wishlist</Link>}
-              </div>
-            </div>
-
-            <div className="ch-public-navitem">
-              <Link to="/#for-brands" className={`ch-public-link${isBrands ? ' is-active' : ''}`}>For Brands</Link>
-              <div className="ch-public-navitem-dropdown" role="menu">
-                <Link to="/#for-brands" role="menuitem">Why Brands Choose Us</Link>
-                {!authenticated && <Link to="/register/business" role="menuitem">Register Your Brand</Link>}
-                {authenticated && user?.role === 'business' && <Link to="/campaigns/new" role="menuitem">Launch a Campaign</Link>}
-              </div>
-            </div>
-
-            <div className="ch-public-navitem">
-              <Link to="/#for-brands" className={`ch-public-link${isAbout ? ' is-active' : ''}`}>About</Link>
-            </div>
-          </div>
-
-          <div className="ch-public-actions">
-            {!authenticated ? (
-              <>
-                <Link to="/login" className="ch-public-auth-link ch-public-login">Login</Link>
-                <Link to="/register" className="ch-public-auth-link ch-public-register">Register</Link>
-              </>
-            ) : (
-              <>
-                {user?.role === 'creator' && (
-                  <button
-                    type="button"
-                    className={`ch-public-wishlist-btn${wishlistOpen ? ' is-active' : ''}`}
-                    aria-label="Open wishlist"
-                    title="Wishlist"
-                    onClick={() => setWishlistOpen(true)}
-                  >
-                    <Heart size={19} fill={wishlistOpen ? 'currentColor' : 'none'} />
-                    {wishlistCount > 0 && (
-                      <span className="ch-public-wishlist-count">{wishlistCount > 99 ? '99+' : wishlistCount}</span>
-                    )}
-                  </button>
-                )}
-                <div className="ch-public-profile" ref={profileRef}>
-                  <button
-                    type="button"
-                    className="ch-public-avatar"
-                    aria-label="Open profile menu"
-                    aria-expanded={profileOpen}
-                    onClick={() => setProfileOpen((value) => !value)}
-                  >
-                    {avatarUrl ? <img src={avatarUrl} alt="" /> : initials(avatarName)}
-                  </button>
-                  {profileOpen && (
-                    <div className="ch-public-profile-menu" role="menu">
-                      <div className="ch-public-profile-name">
-                        <strong>{avatarName}</strong>
-                        <span>{user?.role === 'business' ? 'Brand account' : 'Creator account'}</span>
-                      </div>
-                      <Link to="/dashboard" role="menuitem" onClick={() => setProfileOpen(false)}>Dashboard</Link>
-                      <button type="button" className="logout" role="menuitem" onClick={handleLogout}>Log out</button>
-                    </div>
-                  )}
-                </div>
-              </>
-            )}
-            <button
-              type="button"
-              className="ch-public-burger"
-              onClick={() => setMobileOpen((value) => !value)}
-              aria-label={mobileOpen ? 'Close menu' : 'Open menu'}
-              aria-expanded={mobileOpen}
+          {/* DESKTOP NAVIGATION */}
+          <div className="ch-public-nav-links">
+            <Link
+              to={navLink("#home")}
+              className={`ch-public-nav-link ${
+                isActive("#home") ? "active" : ""
+              }`}
             >
-              {mobileOpen ? <X size={21} /> : <Menu size={21} />}
-            </button>
+              Home
+            </Link>
+
+            <Link
+              to={navLink("#campaigns")}
+              className={`ch-public-nav-link ${
+                isActive("#campaigns") ? "active" : ""
+              }`}
+            >
+              Campaigns
+            </Link>
+
+            <Link
+              to={navLink("#for-brands")}
+              className={`ch-public-nav-link ${
+                isActive("#for-brands") ? "active" : ""
+              }`}
+            >
+              For Brands
+            </Link>
           </div>
+
+          {/* DESKTOP ACTIONS */}
+          <div className="ch-public-nav-actions">
+            <Link to="/login" className="ch-public-login">
+              Login
+            </Link>
+
+            <Link to="/register" className="ch-public-register">
+              Register
+            </Link>
+          </div>
+
+          {/* MOBILE MENU BUTTON */}
+          <button
+            type="button"
+            className="ch-public-burger"
+            aria-label={mobileOpen ? "Close menu" : "Open menu"}
+            aria-expanded={mobileOpen}
+            onClick={() => setMobileOpen((open) => !open)}
+          >
+            {mobileOpen ? <X size={20} /> : <Menu size={20} />}
+          </button>
         </div>
 
+        {/* MOBILE MENU */}
         {mobileOpen && (
-          <div className="ch-public-mobile">
-            <Link to="/" className={isHome ? 'is-active' : ''} onClick={closeMobile}>Home</Link>
-            <Link to="/campaigns" className={isCampaigns ? 'is-active' : ''} onClick={closeMobile}>Campaigns</Link>
-            <Link to="/#for-brands" className={isBrands ? 'is-active' : ''} onClick={closeMobile}>For Brands</Link>
-            <Link to="/#for-brands" className={isAbout ? 'is-active' : ''} onClick={closeMobile}>About</Link>
-            {authenticated ? (
-              <>
-                {user?.role === 'creator' && (
-                  <button type="button" className="ch-public-mobile-wishlist" onClick={() => { closeMobile(); setWishlistOpen(true); }}>
-                    Wishlist
-                  </button>
-                )}
-                <Link to="/dashboard" onClick={closeMobile}>Dashboard</Link>
-                <button type="button" className="logout" onClick={handleLogout}>Log out</button>
-              </>
-            ) : (
-              <>
-                <Link to="/login" onClick={closeMobile}>Login</Link>
-                <Link to="/register" onClick={closeMobile}>Register</Link>
-              </>
-            )}
+          <div className="ch-public-mobile-panel">
+            <Link
+              to={navLink("#home")}
+              onClick={() => setMobileOpen(false)}
+            >
+              Home
+            </Link>
+
+            <Link
+              to={navLink("#campaigns")}
+              onClick={() => setMobileOpen(false)}
+            >
+              Campaigns
+            </Link>
+
+            <Link
+              to={navLink("#for-brands")}
+              onClick={() => setMobileOpen(false)}
+            >
+              For Brands
+            </Link>
+
+            <div className="ch-public-mobile-actions">
+              <Link
+                to="/login"
+                onClick={() => setMobileOpen(false)}
+                style={{
+                  background: "#7661A1",
+                  color: "#fff",
+                }}
+              >
+                Login
+              </Link>
+
+              <Link
+                to="/register"
+                onClick={() => setMobileOpen(false)}
+                style={{
+                  background: "#F0EBF6",
+                  color: "#7661A1",
+                }}
+              >
+                Register
+              </Link>
+            </div>
           </div>
         )}
       </nav>
 
-      {wishlistOpen && (
-        <>
-          <div className="ch-wishlist-overlay" onClick={() => setWishlistOpen(false)} />
-          <aside className="ch-wishlist-drawer" role="dialog" aria-label="Wishlist">
-            <div className="ch-wishlist-head">
-              <span className="ch-wishlist-title"><Heart size={17} /> Wishlist</span>
-              <button type="button" className="ch-wishlist-close" aria-label="Close wishlist" onClick={() => setWishlistOpen(false)}>
-                <X size={17} />
-              </button>
-            </div>
-            <div className="ch-wishlist-body">
-              {wishlistLoading && <div className="ch-wishlist-state">Loading your wishlist…</div>}
-              {!wishlistLoading && wishlistError && <div className="ch-wishlist-state">{wishlistError}</div>}
-              {!wishlistLoading && !wishlistError && wishlist.length === 0 && (
-                <div className="ch-wishlist-state">
-                  <div className="ch-wishlist-empty-title">Nothing saved yet</div>
-                  Tap the heart on any campaign to bookmark it here.
-                </div>
-              )}
-              {!wishlistLoading && !wishlistError && wishlist.map((entry) => {
-                const c = entry.campaign;
-                return (
-                  <div className="ch-wishlist-item" key={entry.id}>
-                    <Link to={`/campaigns/${c.id}`} className="ch-wishlist-item-link" onClick={() => setWishlistOpen(false)}>
-                      <p className="ch-wishlist-item-title">{c.title}</p>
-                      <div className="ch-wishlist-item-meta">
-                        <span>{c.brand_name || 'Business'}</span>
-                        {c.category && <span>· {c.category}</span>}
-                      </div>
-                    </Link>
-                    <button
-                      type="button"
-                      className="ch-wishlist-remove"
-                      aria-label="Remove from wishlist"
-                      title="Remove from wishlist"
-                      disabled={removingId === entry.id}
-                      onClick={() => handleRemoveFromWishlist(entry)}
-                    >
-                      <Trash2 size={14} />
-                    </button>
-                  </div>
-                );
-              })}
-            </div>
-          </aside>
-        </>
-      )}
+      {/* Keeps Landing content from going underneath the fixed navbar */}
+      <div className="ch-public-nav-spacer" />
     </>
   );
 }

@@ -5,8 +5,8 @@ import { getSavedCampaigns, unsaveCampaign, type SavedCampaignEntry } from '../a
 import { PAGE_GRADIENT_BG } from '../components/Brand';
 import { PublicNavbar } from '../components/PublicNavbar';
 
-const CORAL = '#FF6B5A';
-const CORAL_DARK = '#F0523F';
+const CORAL = '#F47C78';
+const CORAL_DARK = '#E86966';
 
 export function SavedCampaigns() {
   const [saved, setSaved] = useState<SavedCampaignEntry[]>([]);

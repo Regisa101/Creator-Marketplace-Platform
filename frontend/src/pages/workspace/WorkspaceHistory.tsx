@@ -26,7 +26,7 @@ export function WorkspaceHistory() {
         .wh-content { padding: 28px 24px 40px; max-width: 900px; margin: 0 auto; }
         .wh-state { text-align:center; padding:60px 20px; color:#6B6478; font-size:13px; }
         .wh-card { background:#fff; border:1px solid #EAE7F2; border-radius:16px; padding:18px 20px; margin-bottom:12px; display:flex; gap:15px; align-items:center; }
-        .wh-avatar { width:44px; height:44px; border-radius:50%; object-fit:cover; background:#1E2A78; color:#fff; display:flex; align-items:center; justify-content:center; font-weight:800; flex:none; }
+        .wh-avatar { width:44px; height:44px; border-radius:50%; object-fit:cover; background:#7661A1; color:#fff; display:flex; align-items:center; justify-content:center; font-weight:800; flex:none; }
         .wh-main { flex:1; min-width:0; }
         .wh-title { font-size:14.5px; font-weight:750; color:#1A1625; }
         .wh-sub { font-size:12px; color:#6B6478; margin-top:3px; }
