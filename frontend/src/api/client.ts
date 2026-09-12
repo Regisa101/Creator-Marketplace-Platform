@@ -97,6 +97,12 @@ export interface CreatorOnboardingData {
   socials: CreatorSocialData[];
   portfolio?: CreatorPortfolioItemData[];
   starting_price: number;
+  payout_account_holder_name: string;
+  payout_provider: string;
+  payout_account_number: string;
+  payout_branch?: string;
+  payout_routing?: string;
+  payout_method?: string;
 }
 
 export interface BusinessOnboardingData {
@@ -551,6 +557,8 @@ export interface Payment {
   method: string;
   paid_at?: string | null;
   created_at: string;
+  funding_account_name?: string | null;
+  funding_account_masked?: string | null;
 }
 
 export interface Rating {
@@ -730,6 +738,11 @@ export const getPublicCampaigns = async (
   params?: PublicCampaignListParams
 ): Promise<PublicCampaignListResponse> => {
   const response = await api.get<PublicCampaignListResponse>('/campaigns/public', { params });
+  return response.data;
+};
+
+export const getPublicCampaign = async (id: number | string): Promise<PublicCampaign> => {
+  const response = await api.get<PublicCampaign>(`/campaigns/public/${id}`);
   return response.data;
 };
 
@@ -984,7 +997,7 @@ export const verifyPayment = async (pidx: string): Promise<Payment> => {
 
 export const completeDemoPayment = async (
   pidx: string,
-  options?: { method?: string; account_name?: string; reference_note?: string },
+  options?: { method?: string; funding_account_number?: string; reference_note?: string },
 ): Promise<Payment> => {
   const response = await api.post<Payment>('/payments/demo/complete', null, {
     params: { pidx, ...(options || {}) },

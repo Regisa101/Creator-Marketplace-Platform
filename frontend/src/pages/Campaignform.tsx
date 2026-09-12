@@ -22,6 +22,7 @@ import {
   getBusinessProgress,
   getCampaignDefaults,
   saveCampaignDefaults,
+  initiateCampaignFunding,
   type Campaign,
   type CampaignType,
   type CreatorRequirements,
@@ -639,11 +640,29 @@ export function CampaignForm({ mode }: { mode: 'create' | 'edit' }) {
       if (mode === 'edit' && id) {
         const updated = await updateCampaign(id, payload);
         campaignId = updated.id;
-        if (action === 'publish' && originalStatus === 'draft') await publishCampaign(campaignId);
+
+        if (action === 'publish') {
+          // Paid campaigns must be funded before they can be published.
+          // If this draft is not funded yet, open the same funding checkout
+          // used by the campaign detail page.
+          if (updated.campaign_type === 'paid' && updated.funding_status !== 'funded') {
+            const funding = await initiateCampaignFunding(campaignId);
+            window.location.href = funding.payment_url;
+            return;
+          }
+          await publishCampaign(campaignId);
+        }
       } else {
         const created = await createCampaign(payload);
         campaignId = created.id;
-        if (action === 'publish') await publishCampaign(campaignId);
+
+        if (action === 'publish') {
+          // New paid campaigns go directly to the funding checkout.
+          // Publishing remains blocked until the budget is funded.
+          const funding = await initiateCampaignFunding(campaignId);
+          window.location.href = funding.payment_url;
+          return;
+        }
       }
 
       navigate(`/campaigns/${campaignId}`);

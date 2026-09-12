@@ -8,7 +8,7 @@ from app.database import get_db
 from app.models import User, Campaign, Application, Deliverable, Payment
 from app.models.campaign import CampaignStatus
 from app.schemas.campaign import CampaignCreate, CampaignUpdate, CampaignResponse
-from app.dependencies.auth import get_current_user, get_current_business
+from app.dependencies.auth import get_current_user, get_current_user_optional, get_current_business
 
 router = APIRouter(prefix="/api/campaigns", tags=["Campaigns"])
 
@@ -380,25 +380,62 @@ async def get_campaigns(
     }
 
 
+@router.get("/public/{campaign_id}", response_model=CampaignResponse)
+async def get_public_campaign(
+    campaign_id: int,
+    db: Session = Depends(get_db),
+):
+    """Return one marketplace-visible campaign without requiring login."""
+    campaign = db.query(Campaign).filter(Campaign.id == campaign_id).first()
+    if not campaign:
+        raise HTTPException(status_code=404, detail="Campaign not found")
+
+    if (
+        campaign.status not in (CampaignStatus.PUBLISHED, CampaignStatus.IN_PROGRESS)
+        or not campaign.is_active
+        or campaign.funding_status != "funded"
+    ):
+        raise HTTPException(status_code=404, detail="Campaign not found")
+
+    campaign.application_count = db.query(Application).filter(
+        Application.campaign_id == campaign.id
+    ).count()
+    return campaign
+
+
 @router.get("/{campaign_id}", response_model=CampaignResponse)
 async def get_campaign(
     campaign_id: int,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user)
+    current_user: User | None = Depends(get_current_user_optional)
 ):
+    """Return campaign details for public visitors and authenticated users.
+
+    Public visitors may view only active, funded marketplace campaigns.
+    Businesses may still view their own drafts/private campaigns.
+    Creators may view published/in-progress campaigns.
+    """
     campaign = db.query(Campaign).filter(Campaign.id == campaign_id).first()
     if not campaign:
         raise HTTPException(status_code=404, detail="Campaign not found")
-    
-    if current_user.role == "creator" and campaign.status == CampaignStatus.DRAFT:
-        raise HTTPException(status_code=403, detail="Campaign not available")
-    
-    if current_user.role == "business" and campaign.business_id != current_user.id:
-        raise HTTPException(status_code=403, detail="Access denied")
-    
+
+    if current_user is None:
+        if campaign.status not in (CampaignStatus.PUBLISHED, CampaignStatus.IN_PROGRESS):
+            raise HTTPException(status_code=404, detail="Campaign not found")
+        if not campaign.is_active or campaign.funding_status != "funded":
+            raise HTTPException(status_code=404, detail="Campaign not found")
+    elif current_user.role == "business":
+        if campaign.business_id != current_user.id:
+            raise HTTPException(status_code=403, detail="Access denied")
+    elif current_user.role == "creator":
+        if campaign.status not in (CampaignStatus.PUBLISHED, CampaignStatus.IN_PROGRESS):
+            raise HTTPException(status_code=403, detail="Campaign not available")
+        if not campaign.is_active or campaign.funding_status != "funded":
+            raise HTTPException(status_code=403, detail="Campaign not available")
+
     app_count = db.query(Application).filter(Application.campaign_id == campaign.id).count()
     campaign.application_count = app_count
-    
+
     return campaign
 
 

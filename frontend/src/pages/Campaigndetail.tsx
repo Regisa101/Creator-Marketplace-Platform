@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom';
+import { Link, useLocation, useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import {
   ArrowLeft,
   ArrowUpRight,
@@ -27,19 +27,21 @@ import {
   duplicateCampaign,
   getApplications,
   getCampaign,
-  getCampaigns,
-  getPublicBusinessProfile,
+  getPublicCampaigns,
+  getPublicCampaign,
   initiateCampaignFunding,
+  getCampaignPayments,
   getSavedCampaigns,
   publishCampaign,
   saveCampaign,
   unsaveCampaign,
   type Application,
   type Campaign,
-  type PublicBusinessProfile,
+  type PublicCampaign,
 } from '../api/client';
 import { useAuth } from '../context/AuthContext';
 import { PublicNavbar } from '../components/PublicNavbar';
+import { AppLayout } from '../components/AppLayout';
 import { BRAND_PURPLE, BRAND_PURPLE_DARK, BRAND_PINK_CORAL, OFF_WHITE } from '../components/Logo';
 
 const CORAL = BRAND_PINK_CORAL;
@@ -162,18 +164,22 @@ const DEMO_CAMPAIGNS: Campaign[] = [
 
 export function CampaignDetail() {
   const { id } = useParams<{ id: string }>();
+  const location = useLocation();
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const { user } = useAuth();
 
-  // Campaign detail can be entered from either the public landing page or
-  // the authenticated dashboard. Regardless of where someone came from, the
-  // page always uses the same top navbar as the landing page (PublicNavbar)
-  // so the experience is consistent everywhere — no more switching to the
-  // dashboard sidebar layout depending on entry point.
+  // Navigation is chosen from the actual entry context.
+  // Landing/public -> PublicNavbar. Business dashboard -> AppLayout/sidebar.
+  // Creators always keep the public navbar, even if they open a campaign from
+  // their dashboard.
+  const stateSource = (location.state as { source?: string } | null)?.source;
+  const requestedDashboardContext =
+    searchParams.get('source') === 'dashboard' || stateSource === 'dashboard';
+  const fromDashboard =
+    user?.role === 'business' && requestedDashboardContext;
 
   const [campaign, setCampaign] = useState<Campaign | null>(null);
-  const [brandProfile, setBrandProfile] = useState<PublicBusinessProfile | null>(null);
   const [related, setRelated] = useState<Campaign[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -197,6 +203,8 @@ export function CampaignDetail() {
 
   const [fundingCampaign, setFundingCampaign] = useState(false);
   const [fundingError, setFundingError] = useState('');
+  const [fundingAccountMasked, setFundingAccountMasked] = useState('••••••••');
+  const [fundingAccountName, setFundingAccountName] = useState('');
 
   useEffect(() => {
     if (!id) return;
@@ -207,10 +215,11 @@ export function CampaignDetail() {
     (async () => {
       setLoading(true);
       setError('');
-      setBrandProfile(null);
       setRelated([]);
       setMyApplication(null);
       setIsSaved(false);
+      setFundingAccountName(user?.profile?.company_name || '');
+      setFundingAccountMasked('••••••••');
 
       try {
         let data: Campaign;
@@ -220,11 +229,39 @@ export function CampaignDetail() {
           if (!demo) throw new Error('Demo campaign not found');
           data = demo;
         } else {
-          data = await getCampaign(id);
+          // Business dashboard -> authenticated endpoint (also permits drafts).
+          // Landing/public/creator -> public endpoint (never hits the protected
+          // /api/campaigns/{id} endpoint, so visitors and creators don't get 403).
+          data = fromDashboard
+            ? await getCampaign(id)
+            : await getPublicCampaign(id);
         }
 
         if (cancelled) return;
         setCampaign(data);
+        if (user?.role === 'business' && data.business_id === user.id && data.id > 0) {
+          try {
+            const payments = await getCampaignPayments(data.id);
+            const funding = payments.find(
+              (payment) =>
+                payment.payment_type === 'campaign_funding' &&
+                ['funded', 'completed', 'released'].includes(payment.status)
+            );
+            setFundingAccountName(
+              funding?.funding_account_name || user.profile?.company_name || 'Registered business'
+            );
+            setFundingAccountMasked(
+              funding?.funding_account_masked || '••••••••'
+            );
+          } catch (err) {
+            console.error('Could not load campaign funding details:', err);
+            setFundingAccountName(user.profile?.company_name || 'Registered business');
+            setFundingAccountMasked('••••••••');
+          }
+        } else {
+          setFundingAccountName(user?.profile?.company_name || '');
+          setFundingAccountMasked('••••••••');
+        }
 
         // Demo campaigns are presentation-only. Never call protected APIs with
         // their negative placeholder IDs.
@@ -233,12 +270,10 @@ export function CampaignDetail() {
           return;
         }
 
-        try {
-          const profile = await getPublicBusinessProfile(data.business_id);
-          if (!cancelled) setBrandProfile(profile);
-        } catch (err) {
-          console.error('Could not load brand profile:', err);
-        }
+        // The public campaign response already contains the brand name, location,
+        // and (for public campaigns) logo. Do not call the old /businesses/...
+        // public-profile endpoint here because it is not available in every backend
+        // version and otherwise causes an unnecessary 404 on campaign detail.
 
         if (user?.role === 'creator') {
           try {
@@ -257,8 +292,18 @@ export function CampaignDetail() {
         }
 
         try {
-          const list = await getCampaigns({ category: data.category, status: 'published', limit: 6 });
-          if (!cancelled) setRelated(list.campaigns.filter((item) => item.id !== data.id).slice(0, 3));
+          // Related campaigns are public content, so use the public endpoint.
+          const list = await getPublicCampaigns({
+            category: data.category,
+            limit: 100,
+          });
+          if (!cancelled) {
+            setRelated(
+              list.campaigns
+                .filter((item) => item.id !== data.id)
+                .slice(0, 3)
+            );
+          }
         } catch (err) {
           console.error('Could not load related campaigns:', err);
         }
@@ -273,7 +318,7 @@ export function CampaignDetail() {
     return () => {
       cancelled = true;
     };
-  }, [id, user?.role]);
+  }, [id, user?.role, fromDashboard]);
 
   const deadline = useMemo(() => formatDeadline(campaign?.deadline), [campaign?.deadline]);
 
@@ -301,10 +346,11 @@ export function CampaignDetail() {
       return next;
     }, { replace: true });
   }, [searchParams, loading, campaign, user?.role, myApplication, deadline?.closed, applicationAnswers.length, setSearchParams]);
-  const brandName = brandProfile?.company_name || campaign?.brand_name || 'Business';
-  const brandLocation = brandProfile?.location || campaign?.brand_location || '';
-  const brandIndustry = brandProfile?.industry || campaign?.category || '';
-  const brandLogo = resolveMediaUrl(brandProfile?.logo_url);
+  const publicCampaign = campaign as PublicCampaign | null;
+  const brandName = campaign?.brand_name || 'Business';
+  const brandLocation = campaign?.brand_location || '';
+  const brandIndustry = campaign?.category || '';
+  const brandLogo = resolveMediaUrl(publicCampaign?.brand_logo);
   const productImages = useMemo(() => {
     const extraPhotos = Array.isArray((campaign as (Campaign & { extra_photos?: string[] }) | null)?.extra_photos)
       ? ((campaign as (Campaign & { extra_photos?: string[] }) | null)?.extra_photos || [])
@@ -784,7 +830,7 @@ export function CampaignDetail() {
         @keyframes cd-spin { to { transform: rotate(360deg); } }
 
         /* Reference-style campaign layout */
-        .cd-page { background: #F5F4FA; }
+        .cd-page { background: #FBF8F4; }
         .cd-shell { max-width: 1240px; padding: 24px 28px 90px; }
         .cd-layout { grid-template-columns: minmax(0, 1fr) 306px; gap: 28px; }
         .cd-main { min-width: 0; }
@@ -912,7 +958,7 @@ export function CampaignDetail() {
         .cd-public-mobile { display: none; }
 
         /* Shared dashboard visual language */
-        .cd-page { background: #F5F4FA; }
+        .cd-page { background: #FBF8F4; }
         .cd-shell { color: #1A1625; }
         .cd-back { color: #6B6478; }
         .cd-back:hover { color: #7661A1; }
@@ -1199,9 +1245,13 @@ export function CampaignDetail() {
                     <Link className="cd-owner-button" to={`/campaigns/${campaign.id}/edit`}>Edit campaign</Link>
                     {campaign.campaign_type === 'paid' && campaign.funding_status !== 'funded' && (
                       <div className="cd-funding-box">
-                        <div className="cd-funding-title">Campaign budget</div>
+                        <div className="cd-funding-title">Funding account</div>
                         <div className="cd-funding-amount">Rs. {Number(campaign.budget || 0).toLocaleString()}</div>
-                        <div className="cd-funding-copy">Fund the full campaign budget before creators can apply.</div>
+                        <div className="cd-funding-copy">
+                          Account name: <strong>{fundingAccountName || user?.profile?.company_name || 'Registered business'}</strong><br />
+                          Account number: <strong>{fundingAccountMasked}</strong><br />
+                          The registered company name cannot be changed during funding.
+                        </div>
                         <button type="button" className="cd-owner-button cd-fund-campaign" onClick={handleFundCampaign} disabled={fundingCampaign || campaign.status === 'completed' || campaign.status === 'cancelled'}>
                           {fundingCampaign ? <Loader2 size={14} className="cd-spin" /> : null}
                           {fundingCampaign ? 'Starting checkout…' : 'Fund campaign'}
@@ -1213,7 +1263,11 @@ export function CampaignDetail() {
                       <div className="cd-funding-box cd-funding-box--funded">
                         <div className="cd-funding-title">Campaign funded</div>
                         <div className="cd-funding-amount">Rs. {Number(campaign.funded_amount || campaign.budget || 0).toLocaleString()}</div>
-                        <div className="cd-funding-copy">Budget secured. Creators can now apply.</div>
+                        <div className="cd-funding-copy">
+                          Account name: <strong>{fundingAccountName || user?.profile?.company_name || 'Registered business'}</strong><br />
+                          Account number: <strong>{fundingAccountMasked}</strong><br />
+                          Budget secured. Creators can now apply.
+                        </div>
                       </div>
                     )}
 
@@ -1331,7 +1385,15 @@ export function CampaignDetail() {
     </div>
   );
 
-  return (
+  return fromDashboard ? (
+    <AppLayout
+      title="Campaign details"
+      subtitle={campaign?.title || 'Campaign details'}
+      showSearch={false}
+    >
+      {pageContent}
+    </AppLayout>
+  ) : (
     <>
       <PublicNavbar />
       {pageContent}

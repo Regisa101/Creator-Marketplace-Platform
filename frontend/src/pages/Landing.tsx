@@ -498,6 +498,7 @@ function CampaignCard({
 
         {/* ACTIONS */}
         <div className="lp-card-actions">
+          {/* Left action: creators/visitors can apply; brands only see details. */}
           {booked ? (
             <span
               className="lp-card-apply lp-card-apply-disabled"
@@ -512,20 +513,7 @@ function CampaignCard({
             >
               Not accepting applications
             </span>
-          ) : isCreator ? (
-            <Link
-              to={`/campaigns/${c.id}?apply=true&source=landing`}
-              className="lp-card-apply"
-            >
-              Apply Campaign
-              <ArrowRight
-                size={14}
-                style={{
-                  flexShrink: 0,
-                }}
-              />
-            </Link>
-          ) : !isAuthenticated ? (
+          ) : isCreator || !isAuthenticated ? (
             <Link
               to={`/campaigns/${c.id}?apply=true&source=landing`}
               className="lp-card-apply"
@@ -533,26 +521,12 @@ function CampaignCard({
               Apply Now
               <ArrowRight
                 size={14}
-                style={{
-                  flexShrink: 0,
-                }}
+                style={{ flexShrink: 0 }}
               />
             </Link>
-          ) : (
-            <Link
-              to={`/campaigns/${c.id}?source=landing`}
-              className="lp-card-apply"
-            >
-              View Campaign
-              <ArrowRight
-                size={14}
-                style={{
-                  flexShrink: 0,
-                }}
-              />
-            </Link>
-          )}
+          ) : null}
 
+          {/* Everyone can open the campaign details from Landing. */}
           <Link
             to={`/campaigns/${c.id}?source=landing`}
             className="lp-card-view"
@@ -2218,7 +2192,7 @@ export function Landing() {
         .lp-card-actions {
           margin-top: auto;
           display: grid;
-          grid-template-columns: minmax(0, 1.25fr) minmax(0, 0.85fr);
+          grid-template-columns: minmax(0, 1.15fr) minmax(0, 0.85fr);
           gap: 8px;
           padding-top: 4px;
         }

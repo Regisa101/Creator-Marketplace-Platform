@@ -569,7 +569,7 @@ export function Dashboard() {
                           </>
                         );
                         return noteCampaignId ? (
-                          <Link className="activity-item activity-item--clickable" key={note.id} to={`/campaigns/${noteCampaignId}`} state={{ source: 'dashboard' }}>
+                          <Link className="activity-item activity-item--clickable" key={note.id} to={`/campaigns/${noteCampaignId}?source=dashboard`} state={{ source: 'dashboard' }}>
                             {content}
                           </Link>
                         ) : (
@@ -578,7 +578,7 @@ export function Dashboard() {
                       })
                     ) : (
                       derivedActivity.slice(0, activityVisibleCount).map((item) => (
-                        <Link className="activity-item activity-item--clickable" key={item.id} to={`/campaigns/${item.campaignId}`} state={{ source: 'dashboard' }}>
+                        <Link className="activity-item activity-item--clickable" key={item.id} to={`/campaigns/${item.campaignId}?source=dashboard`} state={{ source: 'dashboard' }}>
                           <span className={`activity-dot activity-dot--${item.kind}`} />
                           <div>
                             <div className="activity-title">{item.title}</div>
@@ -630,7 +630,7 @@ export function Dashboard() {
                     const img = imageFor(campaign);
                     const createdLabel = campaign.created_at ? timeAgo(campaign.created_at) : '';
                     return (
-                      <Link className="campaign-row" key={campaign.id} to={`/campaigns/${campaign.id}`} state={{ source: 'dashboard' }}>
+                      <Link className="campaign-row" key={campaign.id} to={`/campaigns/${campaign.id}?source=dashboard`} state={{ source: 'dashboard' }}>
                         <div className="campaign-row-media">
                           {img ? <img src={img} alt="" /> : <div className="placeholder">{campaign.brand_name || 'No image'}</div>}
                           <span className={`tag ${statusTone(campaign, completedCampaignIds)}`}>{formatStatus(campaign, completedCampaignIds)}</span>

@@ -25,7 +25,7 @@ import { CreatorProfile } from "./pages/CreatorProfile";
 import { BusinessProfile } from "./pages/Businessprofile";
 import { BusinessSettings } from "./pages/Settings";
 
-import { CampaignDetail } from "./pages/Campaigndetail";
+import CampaignDetail from "./pages/Campaigndetail";
 
 import {
   CampaignCreate,

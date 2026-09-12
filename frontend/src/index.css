@@ -12,3 +12,13 @@
 html, body {
   overflow-x: hidden;
 }
+
+/* CreatorHub global page background */
+html, body, #root {
+  min-height: 100%;
+  background: #FBF8F4;
+}
+
+body {
+  margin: 0;
+}

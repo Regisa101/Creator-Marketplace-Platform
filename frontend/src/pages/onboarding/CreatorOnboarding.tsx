@@ -263,7 +263,7 @@ function LocationAutocomplete({ value, onChange }: LocationAutocompleteProps) {
 // STEP HEADER
 // ============================================================
 
-const STEP_LABELS = ['Basic Info', 'Type & Niche', 'Socials', 'Portfolio', 'Publish'];
+const STEP_LABELS = ['Basic Info', 'Type & Niche', 'Socials', 'Portfolio', 'Payout & Publish'];
 
 function StepHeader({ step }: { step: number }) {
   return (
@@ -366,6 +366,12 @@ export function CreatorOnboarding() {
   // ----------------------------------------------------------
 
   const [startingPrice, setStartingPrice] = useState('');
+  const [payoutAccountHolderName, setPayoutAccountHolderName] = useState('');
+  const [payoutProvider, setPayoutProvider] = useState('');
+  const [payoutAccountNumber, setPayoutAccountNumber] = useState('');
+  const [payoutBranch, setPayoutBranch] = useState('');
+  const [payoutRouting, setPayoutRouting] = useState('');
+  const [payoutMethod, setPayoutMethod] = useState('');
 
   // ----------------------------------------------------------
   // RESUME PROGRESS / PHOTO UPLOAD / SAVE DRAFT STATE
@@ -434,6 +440,12 @@ export function CreatorOnboarding() {
               ? String(profile.starting_price)
               : ''
           );
+          setPayoutAccountHolderName(profile.payout_account_holder_name ?? '');
+          setPayoutProvider(profile.payout_provider ?? '');
+          setPayoutAccountNumber(profile.payout_account_number ?? '');
+          setPayoutBranch(profile.payout_branch ?? '');
+          setPayoutRouting(profile.payout_routing ?? '');
+          setPayoutMethod(profile.payout_method ?? '');
 
           setStep(resolveCreatorStep(profile, socialsData));
         }
@@ -509,7 +521,15 @@ export function CreatorOnboarding() {
   };
 
   const saveStep5Progress = () => {
-    const payload = { starting_price: Number(startingPrice) || 0 };
+    const payload = {
+      starting_price: Number(startingPrice) || 0,
+      payout_account_holder_name: payoutAccountHolderName.trim(),
+      payout_provider: payoutProvider.trim(),
+      payout_account_number: payoutAccountNumber.trim(),
+      payout_branch: payoutBranch.trim() || undefined,
+      payout_routing: payoutRouting.trim() || undefined,
+      payout_method: payoutMethod.trim() || undefined,
+    };
     updateProfile?.(payload);
     return saveCreatorProgress(payload);
   };
@@ -635,7 +655,12 @@ export function CreatorOnboarding() {
   // Portfolio is optional — always fine to move on.
   const canContinueStep4 = true;
 
-  const canFinish = startingPrice !== '' && Number(startingPrice) >= 0;
+  const canFinish =
+    startingPrice !== '' &&
+    Number(startingPrice) >= 0 &&
+    payoutAccountHolderName.trim().length > 0 &&
+    payoutProvider.trim().length > 0 &&
+    payoutAccountNumber.trim().length > 0;
 
   // ==========================================================
   // SUBMIT
@@ -661,6 +686,12 @@ export function CreatorOnboarding() {
       socials,
       portfolio,
       starting_price: Number(startingPrice) || 0,
+      payout_account_holder_name: payoutAccountHolderName.trim(),
+      payout_provider: payoutProvider.trim(),
+      payout_account_number: payoutAccountNumber.trim(),
+      payout_branch: payoutBranch.trim() || undefined,
+      payout_routing: payoutRouting.trim() || undefined,
+      payout_method: payoutMethod.trim() || undefined,
     };
 
     try {
@@ -1241,6 +1272,21 @@ export function CreatorOnboarding() {
                       <p className="co-recap-empty">
                         {portfolio.length === 0 ? 'No items yet' : `${portfolio.length} item${portfolio.length > 1 ? 's' : ''} added`}
                       </p>
+                    </div>
+                  </div>
+
+                  <div className="co-field">
+                    <label className="co-label">Payout account *</label>
+                    <p className="co-sub" style={{ marginBottom: 10 }}>
+                      Add your payout account once. Approved campaign payments will be sent here automatically.
+                    </p>
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+                      <input className="co-input" value={payoutAccountHolderName} onChange={(e) => setPayoutAccountHolderName(e.target.value)} placeholder="Account holder name" autoComplete="name" />
+                      <input className="co-input" value={payoutProvider} onChange={(e) => setPayoutProvider(e.target.value)} placeholder="Bank / payment provider" />
+                      <input className="co-input" value={payoutAccountNumber} onChange={(e) => setPayoutAccountNumber(e.target.value)} placeholder="Account number" inputMode="numeric" autoComplete="off" />
+                      <input className="co-input" value={payoutMethod} onChange={(e) => setPayoutMethod(e.target.value)} placeholder="Payout method (optional)" />
+                      <input className="co-input" value={payoutBranch} onChange={(e) => setPayoutBranch(e.target.value)} placeholder="Branch (optional)" />
+                      <input className="co-input" value={payoutRouting} onChange={(e) => setPayoutRouting(e.target.value)} placeholder="Routing information (optional)" />
                     </div>
                   </div>
 
