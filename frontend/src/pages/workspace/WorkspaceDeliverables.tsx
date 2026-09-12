@@ -16,8 +16,6 @@ import {
   submitPublicationProof,
   reviewPublicationProof,
   releasePayment,
-  getGiftFulfillment,
-  type GiftFulfillment,
 } from '../../api/client';
 import { useAuth } from '../../context/AuthContext';
 import { AppLayout } from '../../components/AppLayout';
@@ -58,7 +56,6 @@ export function WorkspaceDeliverables() {
   const [actingId, setActingId] = useState<number | null>(null);
   const [payingId, setPayingId] = useState<number | null>(null);
   const [paymentError, setPaymentError] = useState('');
-  const [giftFulfillment, setGiftFulfillment] = useState<GiftFulfillment | null>(null);
   const [proofs, setProofs] = useState<any[]>([]);
   const [proofError, setProofError] = useState('');
   const [proofBusy, setProofBusy] = useState(false);
@@ -89,13 +86,7 @@ export function WorkspaceDeliverables() {
   useEffect(() => {
     setProofs([]); setProofError('');
     if (selectedId) getPublicationProofs(Number(selectedId)).then(setProofs).catch(() => setProofs([]));
-    setGiftFulfillment(null);
-    if (selectedCollab?.campaign_type === 'gifted') {
-      getGiftFulfillment(selectedCollab.id).then(setGiftFulfillment).catch((err) => {
-        console.error('Could not load gift fulfillment:', err);
-      });
-    }
-  }, [selectedCollab?.id, selectedCollab?.campaign_type]);
+  }, [selectedId]);
   const selectedDeliverables = selectedId
     ? deliverables.filter((d) => d.application_id === Number(selectedId))
     : [];
@@ -169,10 +160,6 @@ export function WorkspaceDeliverables() {
         .wd-payment-note { margin-bottom: 14px; padding: 10px 12px; border-radius: 9px; background: #EAF8F0; color: #16834A; font-size: 12px; font-weight: 650; }
         .wd-payment-error { margin-bottom: 14px; padding: 10px 12px; border-radius: 9px; background: #fdecec; color: #d64545; font-size: 12px; }
 
-        .wd-gift-gate { margin-bottom: 18px; padding: 14px 16px; border: 1px solid #f2d6a1; background: #fff9ec; border-radius: 12px; display: flex; flex-direction: column; gap: 4px; color: ${C.ink}; font-size: 12.5px; }
-        .wd-gift-gate span { color: ${C.inkSoft}; }
-        .wd-gift-gate a { color: ${C.navy}; font-weight: 700; text-decoration: none; margin-top: 4px; }
-        .wd-gift-ready { margin-bottom: 18px; padding: 11px 14px; border-radius: 10px; background: #eafbf1; color: #16834a; font-size: 12px; font-weight: 700; }
         .wd-state { text-align: center; padding: 40px 20px; color: ${C.inkSoft}; font-size: 13px; }
         .wd-spin { animation: wd-spin 0.8s linear infinite; }
         @keyframes wd-spin { to { transform: rotate(360deg); } }
@@ -203,7 +190,7 @@ export function WorkspaceDeliverables() {
               {c.campaign_title || `Campaign #${c.campaign_id}`}
             </button>
           ))}
-          {isBusiness && selectedCollab && selectedCollab.campaign_type !== 'gifted' && !['funded','released','completed'].includes(selectedCollab.payment_status || '') && (
+          {isBusiness && selectedCollab && !['funded','released','completed'].includes(selectedCollab.payment_status || '') && (
             <button className="wd-pay" disabled={payingId === selectedCollab.id} onClick={handlePaySelected}>
               <CreditCard size={14} /> {payingId === selectedCollab.id ? 'Opening payment…' : `Secure Rs. ${selectedCollab.agreed_rate?.toLocaleString() || '—'}`}
             </button>
@@ -221,22 +208,10 @@ export function WorkspaceDeliverables() {
         </div>
 
         {paymentError && <div className="wd-payment-error">{paymentError}</div>}
-        {isBusiness && selectedCollab && selectedCollab.campaign_type !== 'gifted' && (
+        {isBusiness && selectedCollab && (
           <div className="wd-payment-note">
             {selectedCollab.payment_status === 'funded' ? `🔒 Rs. ${(selectedCollab.agreed_rate || 0).toLocaleString()} secured. It will be released after the campaign requirements are verified.` : selectedCollab.payment_status === 'released' ? '✓ Payment released.' : `Secure the locked agreed amount (Rs. ${(selectedCollab.agreed_rate || 0).toLocaleString()}) before the creator starts work.`}
           </div>
-        )}
-
-        {selectedCollab?.campaign_type === 'gifted' && giftFulfillment && !isBusiness && giftFulfillment.status !== 'received' && (
-          <div className="wd-gift-gate">
-            <strong>Product receipt required</strong>
-            <span>For this gifted campaign, confirm that you received the product in Messages before you can submit a deliverable.</span>
-            <a href={`/workspace/messages?collab=${selectedCollab.id}`}>Open gift conversation →</a>
-          </div>
-        )}
-
-        {selectedCollab?.campaign_type === 'gifted' && giftFulfillment?.status === 'received' && !isBusiness && (
-          <div className="wd-gift-ready">✓ Product received — you can now submit your authentic image/video deliverables.</div>
         )}
 
         {selectedCollab?.completion_mode === 'publication_required' && selectedId && <PublicationProofPanel collabId={Number(selectedId)} isBusiness={isBusiness} proofs={proofs} setProofs={setProofs} error={proofError} setError={setProofError} busy={proofBusy} setBusy={setProofBusy} platforms={selectedCollab.required_platforms?.length ? selectedCollab.required_platforms : (selectedCollab.required_platform ? [selectedCollab.required_platform] : undefined)} postTypes={selectedCollab.required_post_types?.length ? selectedCollab.required_post_types : (selectedCollab.required_post_type ? [selectedCollab.required_post_type] : undefined)} />}
@@ -257,8 +232,6 @@ export function WorkspaceDeliverables() {
             busy={actingId === d.id}
             setBusy={setActingId}
             onUpdate={(updated) => setDeliverables((prev) => prev.map((x) => (x.id === updated.id ? updated : x)))}
-            giftReceived={giftFulfillment?.status === 'received'}
-            campaignType={selectedCollab?.campaign_type}
           />
         ))}
       </div>
@@ -284,16 +257,12 @@ function DeliverableCard({
   busy,
   setBusy,
   onUpdate,
-  giftReceived,
-  campaignType,
 }: {
   deliverable: WorkspaceDeliverable;
   isBusiness: boolean;
   busy: boolean;
   setBusy: (id: number | null) => void;
   onUpdate: (d: WorkspaceDeliverable) => void;
-  giftReceived: boolean;
-  campaignType?: string | null;
 }) {
   const [submitOpen, setSubmitOpen] = useState(false);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
@@ -308,10 +277,6 @@ function DeliverableCard({
   const handleSubmit = async () => {
     if (!selectedFile) {
       setSubmitError('Upload the actual image or video file before submitting.');
-      return;
-    }
-    if (campaignType === 'gifted' && !giftReceived) {
-      setSubmitError('Confirm product receipt in Messages before submitting.');
       return;
     }
     setBusy(deliverable.id);
@@ -397,7 +362,7 @@ function DeliverableCard({
             <textarea rows={2} placeholder="Note (optional)" value={note} onChange={(e) => setNote(e.target.value)} />
             {submitError && <div className="wd-form-error">{submitError}</div>}
             <div className="wd-inline-actions">
-              <button className="wd-btn wd-btn--primary" disabled={busy || uploading || !selectedFile || (campaignType === 'gifted' && !giftReceived)} onClick={handleSubmit}>
+              <button className="wd-btn wd-btn--primary" disabled={busy || uploading || !selectedFile} onClick={handleSubmit}>
                 {busy ? <Loader2 size={13} className="wd-spin" /> : <Upload size={13} />} {uploading ? 'Uploading…' : 'Submit'}
               </button>
               <button className="wd-btn wd-btn--ghost" onClick={() => { setSubmitOpen(false); setSubmitError(''); }}>Cancel</button>
@@ -405,7 +370,7 @@ function DeliverableCard({
           </div>
         ) : (
           <div className="wd-inline-actions">
-            <button className="wd-btn wd-btn--primary" disabled={campaignType === 'gifted' && !giftReceived} onClick={() => { setSubmitOpen(true); setSubmitError(''); }}>
+            <button className="wd-btn wd-btn--primary" onClick={() => { setSubmitOpen(true); setSubmitError(''); }}>
               <Upload size={13} /> Submit content
             </button>
           </div>

@@ -18,7 +18,6 @@ from app.routes import (
     businesses,
     campaigns,
     creators,
-    gift_fulfillment,
     notifications,
     negotiations,
     publication,
@@ -228,7 +227,6 @@ app.include_router(saved_campaigns.router)
 app.include_router(businesses.router)
 app.include_router(creators.router)
 app.include_router(workspace.router)
-app.include_router(gift_fulfillment.router)
 app.include_router(payments.router)
 app.include_router(ratings.router)
 app.include_router(notifications.router)

@@ -140,7 +140,7 @@ export interface VideoSpec {
   subtitles_required: boolean;
 }
 
-export type CampaignType = 'paid' | 'gifted';
+export type CampaignType = 'paid';
 export type CampaignStatus =
   | 'draft'
   | 'published'
@@ -528,7 +528,7 @@ export interface Collab {
   publication_deadline?: string | null;
   amount_paid?: number | null;
   rated?: boolean;
-  campaign_type?: 'paid' | 'gifted' | string | null;
+  campaign_type?: 'paid' | string | null;
   deliverable_deadline?: string | null;
   total_deliverables: number;
   submitted_deliverables: number;
@@ -571,31 +571,6 @@ export interface CreatorRatingSummary {
   ratings: Rating[];
 }
 
-export interface WorkspaceMessage {
-  id: number;
-  application_id: number;
-  sender_id: number;
-  sender_name?: string | null;
-  sender_role?: string | null;
-  body: string;
-  created_at: string;
-}
-
-export type CalendarEventType = 'milestone' | 'deadline' | 'call' | 'posting_date' | 'other';
-
-export interface CalendarEvent {
-  id: number;
-  application_id?: number | null;
-  campaign_id?: number | null;
-  campaign_title?: string | null;
-  other_party_name?: string | null;
-  title: string;
-  description?: string | null;
-  event_date: string;
-  event_type: CalendarEventType | string;
-  created_by: number;
-  created_at: string;
-}
 
 export type DeliverableStatus = 'pending' | 'submitted' | 'approved' | 'revision_requested';
 
@@ -911,13 +886,6 @@ export const verifyCollaboration = async (collabId: number): Promise<Collab> => 
   return response.data;
 };
 
-export const getUnreadWorkspaceMessageCount = async (): Promise<number> => {
-  const response = await api.get<{ count: number }>(
-    '/workspace/unread-messages-count'
-  );
-  return Number(response.data?.count || 0);
-};
-
 export const getCollabs = async (): Promise<Collab[]> => {
   const response = await api.get<Collab[]>('/workspace/collabs');
   return response.data;
@@ -1067,38 +1035,6 @@ export const getCreatorRatings = async (creatorId: number | string): Promise<Cre
   return response.data;
 };
 
-export const getMessages = async (collabId: number): Promise<WorkspaceMessage[]> => {
-  const response = await api.get<WorkspaceMessage[]>('/workspace/messages', { params: { collab_id: collabId } });
-  return response.data;
-};
-
-export const sendMessage = async (collabId: number, body: string): Promise<WorkspaceMessage> => {
-  const response = await api.post<WorkspaceMessage>('/workspace/messages', { collab_id: collabId, body });
-  return response.data;
-};
-
-export const getCalendarEvents = async (collabId?: number): Promise<CalendarEvent[]> => {
-  const response = await api.get<CalendarEvent[]>('/workspace/calendar', {
-    params: collabId ? { collab_id: collabId } : undefined,
-  });
-  return response.data;
-};
-
-export const createCalendarEvent = async (data: {
-  collab_id: number;
-  title: string;
-  description?: string;
-  event_date: string;
-  event_type?: string;
-}): Promise<CalendarEvent> => {
-  const response = await api.post<CalendarEvent>('/workspace/calendar', data);
-  return response.data;
-};
-
-export const deleteCalendarEvent = async (id: number): Promise<void> => {
-  await api.delete(`/workspace/calendar/${id}`);
-};
-
 export const getDeliverables = async (collabId?: number): Promise<WorkspaceDeliverable[]> => {
   const response = await api.get<WorkspaceDeliverable[]>('/workspace/deliverables', {
     params: collabId ? { collab_id: collabId } : undefined,
@@ -1187,43 +1123,6 @@ export const uploadMedia = async (file: File): Promise<{ url: string; media_type
     `${API_BASE_URL}/uploads/media`, formData,
     { headers: token ? { Authorization: `Bearer ${token}` } : undefined }
   );
-  return response.data;
-};
-
-export interface GiftFulfillment {
-  id: number;
-  application_id: number;
-  method: 'pickup' | 'shipping' | null;
-  status: 'pending' | 'preparing' | 'ready_for_pickup' | 'shipped' | 'received';
-  recipient_name?: string | null;
-  shipping_address?: string | null;
-  phone?: string | null;
-  pickup_location?: string | null;
-  pickup_available_from?: string | null;
-  pickup_code?: string | null;
-  courier?: string | null;
-  tracking_number?: string | null;
-  notes?: string | null;
-  received_at?: string | null;
-  created_at: string;
-  updated_at?: string | null;
-}
-
-export const getGiftFulfillment = async (collabId: number): Promise<GiftFulfillment> => {
-  const response = await api.get<GiftFulfillment>(`/workspace/fulfillment/${collabId}`);
-  return response.data;
-};
-
-export const updateGiftFulfillment = async (
-  collabId: number,
-  data: Partial<Omit<GiftFulfillment, 'id' | 'application_id' | 'created_at' | 'updated_at'>>
-): Promise<GiftFulfillment> => {
-  const response = await api.patch<GiftFulfillment>(`/workspace/fulfillment/${collabId}`, data);
-  return response.data;
-};
-
-export const confirmGiftReceived = async (collabId: number): Promise<GiftFulfillment> => {
-  const response = await api.post<GiftFulfillment>(`/workspace/fulfillment/${collabId}/received`);
   return response.data;
 };
 

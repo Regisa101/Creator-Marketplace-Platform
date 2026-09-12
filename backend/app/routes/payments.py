@@ -260,10 +260,8 @@ async def complete_demo_payment(
         campaign.funding_status = "funded"
         campaign.funded_amount = float(campaign.budget or payment.amount)
         campaign.funded_at = payment.paid_at
-        # Funding makes a paid draft ready to go live. Keep an already-live
-        # campaign in its current lifecycle state.
-        if campaign.status == "draft":
-            campaign.status = "published"
+        # Funding does NOT publish the campaign automatically.
+        # Publishing is a separate business action available only after funding.
         create_notification(db, user_id=campaign.business_id, type="campaign_funded", title="Campaign funded", message=f"Rs. {float(payment.amount):,.2f} is secured for {campaign.title}. Creators can now apply.", link=f"/campaigns/{campaign.id}", event_key=f"campaign-funded:{campaign.id}:{payment.id}")
         db.commit()
         db.refresh(payment)
@@ -313,8 +311,7 @@ async def verify(
             campaign.funding_status = "funded"
             campaign.funded_amount = float(payment.amount)
             campaign.funded_at = payment.paid_at
-            if campaign.status == "draft":
-                campaign.status = "published"
+            # Keep the campaign in draft until the business explicitly publishes it.
     db.commit()
     db.refresh(payment)
     return _payment_to_response(payment)

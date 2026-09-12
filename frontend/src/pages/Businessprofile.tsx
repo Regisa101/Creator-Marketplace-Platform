@@ -6,7 +6,6 @@ import {
   Globe,
   Pencil,
   Phone,
-  ExternalLink,
   Building2,
   Users,
   Trash2,

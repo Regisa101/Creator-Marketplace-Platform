@@ -39,11 +39,10 @@ function money(value?: number | null) {
 
 function fundingStatus(campaign: Campaign) {
   const status = String((campaign as Campaign & { funding_status?: string }).funding_status || '').toLowerCase();
-  return status || (campaign.campaign_type === 'paid' ? 'unfunded' : 'not_required');
+  return status || 'unfunded';
 }
 
 function fundingLabel(campaign: Campaign) {
-  if (campaign.campaign_type !== 'paid') return 'Gifted campaign';
   const status = fundingStatus(campaign);
   if (status === 'funded') return 'Payment secured';
   if (status === 'pending') return 'Payment pending';
@@ -190,6 +189,43 @@ export function Dashboard() {
     })();
     return () => { cancelled = true; };
   }, [user?.role]);
+
+  // Keep campaign funding information in sync after a payment is completed.
+  // This refreshes when the dashboard becomes active and periodically while it
+  // is open, so "Funding required" changes to "Payment secured" without
+  // needing a full page reload.
+  useEffect(() => {
+    if (!isBusiness) return;
+
+    let cancelled = false;
+
+    const refreshCampaignFunding = async () => {
+      try {
+        const campaignData = await getCampaigns({ limit: 50 });
+        if (cancelled) return;
+
+        setCampaigns((previous) => {
+          const latestById = new Map(campaignData.campaigns.map((campaign) => [campaign.id, campaign]));
+          return previous.map((campaign) => latestById.get(campaign.id) || campaign);
+        });
+      } catch (err) {
+        console.error('Could not refresh campaign funding:', err);
+      }
+    };
+
+    const handleFocus = () => {
+      void refreshCampaignFunding();
+    };
+
+    window.addEventListener('focus', handleFocus);
+    const intervalId = window.setInterval(refreshCampaignFunding, 10000);
+
+    return () => {
+      cancelled = true;
+      window.removeEventListener('focus', handleFocus);
+      window.clearInterval(intervalId);
+    };
+  }, [isBusiness]);
 
   const completedCampaignIds = useMemo(
     () => new Set(history.filter((collab) => collab.status === 'completed').map((collab) => collab.campaign_id)),
@@ -602,17 +638,15 @@ export function Dashboard() {
                         <div className="campaign-row-body">
                           <div className="cat-pill"><IconLeaf size={11} /> {campaign.category}</div>
                           <div className="campaign-row-title">{campaign.title}</div>
-                          <div className="campaign-row-price">{campaign.campaign_type === 'paid' ? money(campaign.budget) : 'Gifted product'}</div>
-                          {campaign.campaign_type === 'paid' && (
-                            <div className="campaign-funding">
-                              <span className={`funding-badge funding-badge--${fundingStatus(campaign) === 'funded' ? 'funded' : fundingStatus(campaign) === 'pending' ? 'pending' : 'needed'}`}>
-                                {fundingLabel(campaign)}
-                              </span>
-                              {fundingStatus(campaign) === 'funded' && (
-                                <span className="funding-amount">{money(Number((campaign as Campaign & { funded_amount?: number }).funded_amount) || Number(campaign.budget) || 0)} secured</span>
-                              )}
-                            </div>
-                          )}
+                          <div className="campaign-row-price">{money(campaign.budget)}</div>
+                          <div className="campaign-funding">
+                            <span className={`funding-badge funding-badge--${fundingStatus(campaign) === 'funded' ? 'funded' : fundingStatus(campaign) === 'pending' ? 'pending' : 'needed'}`}>
+                              {fundingLabel(campaign)}
+                            </span>
+                            {fundingStatus(campaign) === 'funded' && (
+                              <span className="funding-amount">{money(Number((campaign as Campaign & { funded_amount?: number }).funded_amount) || Number(campaign.budget) || 0)} secured</span>
+                            )}
+                          </div>
                           <div className="campaign-row-meta">
                             <span><IconUsers size={12} /> {campaign.creators_needed || 1} creator{(campaign.creators_needed || 1) === 1 ? '' : 's'}</span>
                             <span><IconFileCheck size={12} /> {campaign.application_count} application{campaign.application_count === 1 ? '' : 's'}</span>

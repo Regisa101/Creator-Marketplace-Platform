@@ -1,4 +1,3 @@
-
 import {
   BrowserRouter,
   Routes,
@@ -41,8 +40,6 @@ import { CreatorDiscovery } from "./pages/CreatorDiscovery";
 import { CreatorPublicProfile } from "./pages/CreatorPublicProfile";
 
 import { WorkspaceActive } from "./pages/workspace/WorkspaceActive";
-import { WorkspaceMessages } from "./pages/workspace/WorkspaceMessages";
-import { WorkspaceCalendar } from "./pages/workspace/WorkspaceCalendar";
 import { WorkspaceDeliverables } from "./pages/workspace/WorkspaceDeliverables";
 import { WorkspaceHistory } from "./pages/workspace/WorkspaceHistory";
 
@@ -51,27 +48,19 @@ import { DemoPayment } from "./pages/workspace/DemoPayment";
 
 import { Notifications } from "./pages/Notifications";
 
-/*
- * IMPORTANT:
- * Analytics.tsx has a default export:
- *
- * export default Analytics;
- *
- * Therefore this import is correct.
- */
 import Analytics from "./pages/Analytics";
 
 /*
- * ---------------------------------------------------------
+ * =========================================================
  * PROFILE ROUTER
- * ---------------------------------------------------------
+ * =========================================================
  *
  * Both creators and businesses use:
  *
  * /profile
  *
- * The correct profile page is selected based on the
- * currently logged-in user's role.
+ * The correct profile page is selected according
+ * to the currently logged-in user's role.
  */
 
 function ProfileRouter() {
@@ -85,9 +74,9 @@ function ProfileRouter() {
 }
 
 /*
- * ---------------------------------------------------------
+ * =========================================================
  * APP
- * ---------------------------------------------------------
+ * =========================================================
  */
 
 function App() {
@@ -105,11 +94,6 @@ function App() {
             element={<Landing />}
           />
 
-          {/*
-              The shared landing navbar sends users to these public auth
-              entry points. RoleSelect is intentionally kept: users choose
-              Creator or Brand before entering the role-specific form.
-          */}
           <Route
             path="/login"
             element={<RoleSelect />}
@@ -142,7 +126,12 @@ function App() {
 
           <Route
             path="/about"
-            element={<Navigate to="/#why-we-exist" replace />}
+            element={
+              <Navigate
+                to="/#why-we-exist"
+                replace
+              />
+            }
           />
 
           <Route
@@ -297,6 +286,8 @@ function App() {
 
           {/* =================================================
               WORKSPACE
+              
+              Calendar has been completely removed.
               ================================================= */}
 
           <Route
@@ -304,24 +295,6 @@ function App() {
             element={
               <ProtectedRoute>
                 <WorkspaceActive />
-              </ProtectedRoute>
-            }
-          />
-
-          <Route
-            path="/workspace/messages"
-            element={
-              <ProtectedRoute>
-                <WorkspaceMessages />
-              </ProtectedRoute>
-            }
-          />
-
-          <Route
-            path="/workspace/calendar"
-            element={
-              <ProtectedRoute>
-                <WorkspaceCalendar />
               </ProtectedRoute>
             }
           />
@@ -358,7 +331,7 @@ function App() {
           />
 
           {/* =================================================
-              CAMPAIGN ANALYTICS
+              ANALYTICS
               ================================================= */}
 
           <Route
@@ -413,4 +386,3 @@ function App() {
 }
 
 export default App;
-

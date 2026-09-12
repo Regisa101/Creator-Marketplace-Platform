@@ -9,8 +9,6 @@ from app.models import (
     Campaign,
     Application,
     Deliverable,
-    GiftFulfillment,
-    CalendarEvent,
     NegotiationOffer,
 )
 from app.schemas.application import (
@@ -869,91 +867,6 @@ async def update_application_status(
                             status="pending",
                         )
                     )
-
-        # Deliverable calendar event
-        collab_due = (
-            application.deliverable_deadline
-            or campaign.deliverable_deadline
-        )
-
-        if collab_due:
-
-            db.add(
-                CalendarEvent(
-                    application_id=application.id,
-                    created_by=campaign.business_id,
-                    title="Deliverables due",
-                    description=(
-                        "Complete the approved campaign "
-                        f"deliverables for {campaign.title}."
-                    ),
-                    event_date=collab_due,
-                    event_type="deadline",
-                )
-            )
-
-        # Publication deadline
-        if (
-            getattr(
-                campaign,
-                "completion_mode",
-                "approval_only",
-            )
-            == "publication_required"
-            and campaign.publication_deadline
-        ):
-
-            _platforms_label = (
-                ", ".join(
-                    campaign.required_platforms
-                )
-                if getattr(
-                    campaign,
-                    "required_platforms",
-                    None,
-                )
-                else (
-                    campaign.required_platform
-                    or "the required platform"
-                )
-            )
-
-            db.add(
-                CalendarEvent(
-                    application_id=application.id,
-                    created_by=campaign.business_id,
-                    title="Publication deadline",
-                    description=(
-                        "Publish the approved content "
-                        f"on {_platforms_label}."
-                    ),
-                    event_date=(
-                        campaign.publication_deadline
-                    ),
-                    event_type="posting_date",
-                )
-            )
-
-        # Gift fulfillment
-        if getattr(
-            campaign.campaign_type,
-            "value",
-            str(campaign.campaign_type),
-        ) == "gifted":
-
-            if not db.query(
-                GiftFulfillment
-            ).filter(
-                GiftFulfillment.application_id
-                == application.id
-            ).first():
-
-                db.add(
-                    GiftFulfillment(
-                        application_id=application.id,
-                        status="pending",
-                    )
-                )
 
         db.commit()
 

@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom';
+import { Link, useLocation, useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import {
   ArrowLeft,
   ArrowUpRight,
@@ -140,8 +140,8 @@ const DEMO_CAMPAIGNS: Campaign[] = [
   {
     id: -5, business_id: -5, title: "Sunday Brunch", tagline: "A simple brunch story with personality.",
     description: "Capture a relaxed brunch experience with your own visual style.", brief: "Tell a casual Sunday brunch story that feels warm and personal.",
-    category: "Food", sub_category: "Lifestyle", campaign_type: "gifted", brand_name: "The Brunch House", brand_location: "Kathmandu", budget: null,
-    compensation_description: "Gifted experience", requirements: "Create a relaxed food/lifestyle story around the brunch experience.",
+    category: "Food", sub_category: "Lifestyle", campaign_type: "paid", brand_name: "The Brunch House", brand_location: "Kathmandu", budget: 3000,
+    compensation_description: "Rs. 3,000", requirements: "Create a relaxed food/lifestyle story around the brunch experience.",
     deliverables: ["1 Instagram Reel"], before_you_apply: [], dos: ["Keep the experience natural."], donts: ["Do not misrepresent the menu."],
     creators_needed: 2, application_deadline: "2026-10-26", deadline: "2026-10-26",
     hero_image: "https://images.unsplash.com/photo-1533089860892-a7c6f0a88666?q=80&w=900&auto=format&fit=crop",
@@ -164,15 +164,19 @@ const DEMO_CAMPAIGNS: Campaign[] = [
 export function CampaignDetail() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const location = useLocation();
   const [searchParams, setSearchParams] = useSearchParams();
   const { user } = useAuth();
 
   // Campaign detail can be entered from either the public landing page or
-  // the authenticated dashboard. The source is explicit in the URL so it also
-  // survives a refresh. Anything explicitly opened from the dashboard uses
-  // AppLayout; everything else is treated as a public/landing visit.
-  const navigationSource = searchParams.get('source');
-  const useDashboardNav = navigationSource === 'dashboard';
+  // the authenticated dashboard. The source can arrive either as a URL query
+  // param (survives a refresh/shared link) or as router state (set when
+  // navigating internally from within the dashboard). Anything identified as
+  // coming from the dashboard uses AppLayout (dashboard nav); everything
+  // else is treated as a public/landing visit and uses the landing navbar.
+  const navigationSourceParam = searchParams.get('source');
+  const navigationSourceState = (location.state as { source?: string } | null)?.source;
+  const useDashboardNav = navigationSourceParam === 'dashboard' || navigationSourceState === 'dashboard';
   const usePublicNav = !useDashboardNav;
 
   const [campaign, setCampaign] = useState<Campaign | null>(null);
@@ -400,6 +404,14 @@ export function CampaignDetail() {
 
   const handlePublish = async () => {
     if (!campaign) return;
+
+    // A paid campaign must be fully funded before the owner can publish it.
+    // Funding and publishing are intentionally separate steps.
+    if (campaign.campaign_type === 'paid' && campaign.funding_status !== 'funded') {
+      setManageError('Fund the campaign budget before publishing.');
+      return;
+    }
+
     setManaging('publish');
     setManageError('');
     try {
@@ -979,7 +991,7 @@ export function CampaignDetail() {
                   <div className="cd-pill-row">
                     {brandLocation && <span className="cd-pill"><MapPin size={13} /> {brandLocation}</span>}
                     <span className="cd-pill"><Film size={13} /> {campaign.sub_category || campaign.category}</span>
-                    <span className="cd-pill">{campaign.campaign_type === 'paid' ? 'Paid Campaign' : 'Gifted Campaign'}</span>
+                    <span className="cd-pill">Paid Campaign</span>
                     {deadline && <span className="cd-pill"><Calendar size={13} /> Apply by {deadline.label}</span>}
                   </div>
 
@@ -1207,7 +1219,12 @@ export function CampaignDetail() {
                       </div>
                     )}
 
-                    {campaign.status === 'draft' && <button className="cd-owner-button" onClick={handlePublish} disabled={managing !== null}>{managing === 'publish' ? <Loader2 size={14} className="cd-spin" /> : <Rocket size={14} />}{managing === 'publish' ? 'Publishing…' : 'Publish campaign'}</button>}
+                    {campaign.status === 'draft' && campaign.campaign_type === 'paid' && campaign.funding_status === 'funded' && (
+                      <button className="cd-owner-button" onClick={handlePublish} disabled={managing !== null}>
+                        {managing === 'publish' ? <Loader2 size={14} className="cd-spin" /> : <Rocket size={14} />}
+                        {managing === 'publish' ? 'Publishing…' : 'Publish campaign'}
+                      </button>
+                    )}
                     <button className="cd-owner-button" onClick={handleDuplicate} disabled={managing !== null}>{managing === 'duplicate' ? <Loader2 size={14} className="cd-spin" /> : <Copy size={14} />}{managing === 'duplicate' ? 'Duplicating…' : 'Duplicate campaign'}</button>
                     <button className="cd-owner-button cd-owner-button--danger" onClick={handleDelete} disabled={managing !== null}>{managing === 'delete' ? <Loader2 size={14} className="cd-spin" /> : <Trash2 size={14} />}{managing === 'delete' ? 'Deleting…' : 'Delete campaign'}</button>
                   </div>

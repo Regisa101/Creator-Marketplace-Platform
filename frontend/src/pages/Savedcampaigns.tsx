@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { ArrowLeft, MapPin, Building2, BookmarkX, DollarSign, Gift } from 'lucide-react';
+import { ArrowLeft, MapPin, Building2, BookmarkX, DollarSign } from 'lucide-react';
 import { getSavedCampaigns, unsaveCampaign, type SavedCampaignEntry } from '../api/client';
 import { LogoMark, BRAND_NAME, PAGE_GRADIENT_BG } from '../components/Brand';
 
@@ -211,11 +211,7 @@ export function SavedCampaigns() {
                   <Link to={`/campaigns/${c.id}`} className="sc-card-link">
                     <div className="sc-card-top">
                       <span className="sc-card-type">
-                        {c.campaign_type === 'paid' ? (
-                          <><DollarSign size={11} style={{ verticalAlign: -2 }} /> paid</>
-                        ) : (
-                          <><Gift size={11} style={{ verticalAlign: -2 }} /> gifted</>
-                        )}
+                        <DollarSign size={11} style={{ verticalAlign: -2 }} /> paid
                       </span>
                     </div>
                     <h3 className="sc-card-title">{c.title}</h3>

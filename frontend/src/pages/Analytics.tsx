@@ -18,7 +18,6 @@ const rs = (v:number) => `Rs. ${Math.round(v || 0).toLocaleString()}`;
 export function Analytics() {
   const { user } = useAuth();
   const isBusiness = user?.role === 'business';
-  const primary = isBusiness ? C.navy : C.coral;
   const [applications,setApplications] = useState<Application[]>([]);
   const [campaigns,setCampaigns] = useState<Campaign[]>([]);
   const [collabs,setCollabs] = useState<Collab[]>([]);

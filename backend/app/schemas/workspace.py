@@ -1,103 +1,84 @@
-from pydantic import BaseModel
-from typing import Optional
 from datetime import datetime
+from typing import List, Optional
+
+from pydantic import BaseModel
 
 
 # ============================================
-# COLLABORATION (an accepted Application, viewed from Workspace)
+# COLLABORATION
+# An accepted Application viewed from Workspace
 # ============================================
 
 class CollabResponse(BaseModel):
     id: int  # application id
+
     campaign_id: int
     campaign_title: Optional[str] = None
+
     business_id: int
     business_name: Optional[str] = None
     business_logo: Optional[str] = None
+
     creator_id: int
     creator_name: Optional[str] = None
     creator_avatar: Optional[str] = None
+
+    # Pricing
     rate: Optional[float] = None
     agreed_rate: Optional[float] = None
     rate_locked: bool = False
     negotiation_status: str = "not_started"
+
+    # Application / collaboration status
     status: str
     created_at: datetime
+
     creator_confirmed: bool = False
     creator_verified: bool = False
 
+    # Deliverable summary
     pending_deliverables: int = 0
-    unread_messages: int = 0
-
-    # Status of the most recent Payment attempt for this collab, if any
-    # (initiated, completed, failed, refunded) — lets the collab list
-    # show a "Paid" badge without a separate request per row.
-    payment_status: Optional[str] = None
-    funded_amount: Optional[float] = None
-    amount_paid: Optional[float] = None
-    rated: bool = False
-    campaign_type: Optional[str] = None
-    completion_mode: Optional[str] = None
-    required_platforms: Optional[list] = None
-    required_post_types: Optional[list] = None
-    required_platform: Optional[str] = None  # deprecated
-    required_post_type: Optional[str] = None  # deprecated
-    publication_deadline: Optional[datetime] = None
-    deliverable_deadline: Optional[datetime] = None
     total_deliverables: int = 0
     submitted_deliverables: int = 0
     approved_deliverables: int = 0
 
-    class Config:
-        from_attributes = True
+    # Payment summary
+    # Latest payment attempt/status for this collaboration.
+    payment_status: Optional[str] = None
+    funded_amount: Optional[float] = None
+    amount_paid: Optional[float] = None
 
+    # Rating
+    rated: bool = False
 
-# ============================================
-# MESSAGES
-# ============================================
+    # Campaign information
+    campaign_type: Optional[str] = None
+    completion_mode: Optional[str] = None
 
-class MessageCreate(BaseModel):
-    collab_id: int
-    body: str
+    # --------------------------------------------------
+    # MULTI-PLATFORM CAMPAIGN REQUIREMENTS
+    # --------------------------------------------------
 
+    # Example:
+    # ["instagram", "tiktok", "youtube"]
+    required_platforms: Optional[List[str]] = None
 
-class MessageResponse(BaseModel):
-    id: int
-    application_id: int
-    sender_id: int
-    sender_name: Optional[str] = None
-    sender_role: Optional[str] = None
-    body: str
-    created_at: datetime
+    # Example:
+    # ["reel", "short", "story"]
+    required_post_types: Optional[List[str]] = None
 
-    class Config:
-        from_attributes = True
+    # --------------------------------------------------
+    # Deprecated single-platform fields
+    # Keep temporarily only if old frontend/backend code
+    # still references them.
+    # --------------------------------------------------
 
+    required_platform: Optional[str] = None
+    required_post_type: Optional[str] = None
 
-# ============================================
-# CALENDAR
-# ============================================
-
-class CalendarEventCreate(BaseModel):
-    collab_id: int
-    title: str
-    description: Optional[str] = None
-    event_date: datetime
-    event_type: Optional[str] = "milestone"
-
-
-class CalendarEventResponse(BaseModel):
-    id: int
-    application_id: Optional[int] = None
-    campaign_id: Optional[int] = None
-    campaign_title: Optional[str] = None
-    other_party_name: Optional[str] = None
-    title: str
-    description: Optional[str] = None
-    event_date: datetime
-    event_type: str
-    created_by: int
-    created_at: datetime
+    # Deadlines
+    publication_deadline: Optional[datetime] = None
+    deliverable_deadline: Optional[datetime] = None
 
     class Config:
         from_attributes = True
@@ -121,24 +102,33 @@ class DeliverableSubmit(BaseModel):
 
 
 class DeliverableReview(BaseModel):
-    status: str  # approved, revision_requested
+    status: str  # approved | revision_requested
     feedback: Optional[str] = None
 
 
 class DeliverableResponse(BaseModel):
     id: int
+
     application_id: int
+
     campaign_title: Optional[str] = None
     other_party_name: Optional[str] = None
+
     title: str
     description: Optional[str] = None
+
     due_date: Optional[datetime] = None
+
     status: str
+
     file_url: Optional[str] = None
     media_type: Optional[str] = None
+
     submission_note: Optional[str] = None
     feedback: Optional[str] = None
+
     submitted_at: Optional[datetime] = None
+
     created_at: datetime
     updated_at: Optional[datetime] = None
 

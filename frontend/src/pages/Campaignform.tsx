@@ -20,7 +20,6 @@ import {
   uploadImage,
   getCampaign,
   getBusinessProgress,
-  saveBusinessProgress,
   getCampaignDefaults,
   saveCampaignDefaults,
   type Campaign,
@@ -287,7 +286,7 @@ const STEP_TIPS: string[][] = [
     "Use a clear, specific title so creators instantly understand what you're looking for.",
     'Highlight key details — mention your product, audience, goals and deliverables.',
     'Add high-quality product photos. Better images mean more applications and better matches.',
-    'Set a realistic budget or gift value to attract the right creators.',
+    'Set a realistic budget to attract the right creators.',
   ],
   [
     "Leave a filter blank if it doesn't matter — it's treated as \"Any\" and won't hurt a creator's match score.",
@@ -327,7 +326,7 @@ export function CampaignForm({ mode }: { mode: 'create' | 'edit' }) {
   const [brandName, setBrandName] = useState('');
   const [category, setCategory] = useState('');
   const [subCategory, setSubCategory] = useState('');
-  const [campaignType, setCampaignType] = useState<CampaignType>('gifted');
+  const [campaignType, setCampaignType] = useState<CampaignType>('paid');
   const [description, setDescription] = useState('');
   const [budget, setBudget] = useState('');
   const [compensationDescription, setCompensationDescription] = useState('');
@@ -566,8 +565,8 @@ export function CampaignForm({ mode }: { mode: 'create' | 'edit' }) {
     if (description.trim().length < 10) return 'Description needs to be at least 10 characters.';
     if (!deadline) return 'Add an application deadline.';
     if (deliverables.length < 1) return 'Add at least one deliverable.';
-    if (campaignType === 'paid' && !budget) return 'Add a budget for a paid campaign.';
-    if (campaignType === 'paid' && budget && Number(budget) <= 0) return 'Budget must be greater than 0, or left blank.';
+    if (!budget) return 'Add a budget for a paid campaign.';
+    if (budget && Number(budget) <= 0) return 'Budget must be greater than 0, or left blank.';
     const tomorrow = new Date(); tomorrow.setHours(0, 0, 0, 0); tomorrow.setDate(tomorrow.getDate() + 1);
     const tomorrowKey = `${tomorrow.getFullYear()}-${String(tomorrow.getMonth() + 1).padStart(2, '0')}-${String(tomorrow.getDate()).padStart(2, '0')}`;
     if (deadline && deadline < tomorrowKey) return 'Application deadline must be tomorrow or later.';
@@ -1059,8 +1058,6 @@ export function CampaignForm({ mode }: { mode: 'create' | 'edit' }) {
                           </div>
                         )}
 
-                        <PickChips label="Campaign Type" required options={['paid', 'gifted']} value={campaignType} onChange={(v) => setCampaignType((v || 'gifted') as CampaignType)} />
-
                         <div className="cc-requirement-block">
                           <div className="cc-requirement-heading">
                             <div>Who are you looking for? <span className="cc-required-star">*</span></div>
@@ -1092,11 +1089,7 @@ export function CampaignForm({ mode }: { mode: 'create' | 'edit' }) {
                         <div className="cc-row">
                           <div className="cc-field">
                             <label className="cc-label">Compensation</label>
-                            {campaignType === 'paid' ? (
-                              <input className="cc-input" type="number" min="0" value={budget} onChange={(e) => setBudget(e.target.value)} placeholder="e.g. 2000" />
-                            ) : (
-                              <input className="cc-input" value={compensationDescription} onChange={(e) => setCompensationDescription(e.target.value)} placeholder="e.g. Product worth Rs. 2,000" />
-                            )}
+                            <input className="cc-input" type="number" min="0" value={budget} onChange={(e) => setBudget(e.target.value)} placeholder="e.g. 2000" />
                           </div>
                           <div className="cc-field">
                             <label className="cc-label">Creators Needed</label>
@@ -1291,8 +1284,8 @@ export function CampaignForm({ mode }: { mode: 'create' | 'edit' }) {
                           <div className="cc-review-item"><div className="cc-review-label">Category</div><div className="cc-review-value">{category || 'Not selected'}</div></div>
                           <div className="cc-review-item"><div className="cc-review-label">Brand</div><div className="cc-review-value">{brandName || 'Not added'}</div></div>
                           <div className="cc-review-item"><div className="cc-review-label">Content type</div><div className="cc-review-value">{subCategory || 'Not specified'}</div></div>
-                          <div className="cc-review-item"><div className="cc-review-label">Campaign type</div><div className="cc-review-value">{campaignType === 'paid' ? 'Paid' : 'Gifted'}</div></div>
-                          <div className="cc-review-item"><div className="cc-review-label">Compensation</div><div className="cc-review-value">{campaignType === 'paid' ? (budget ? `Rs. ${budget}` : 'Budget not specified') : (compensationDescription || 'Compensation details not specified')}</div></div>
+                          <div className="cc-review-item"><div className="cc-review-label">Campaign type</div><div className="cc-review-value">Paid</div></div>
+                          <div className="cc-review-item"><div className="cc-review-label">Compensation</div><div className="cc-review-value">{budget ? `Rs. ${budget}` : 'Budget not specified'}</div></div>
                           <div className="cc-review-item"><div className="cc-review-label">Application deadline</div><div className="cc-review-value">{deadline || 'Not specified'}</div></div>
                           <div className="cc-review-item"><div className="cc-review-label">Location</div><div className="cc-review-value">{brandLocation || 'Not specified'}</div></div>
                         </div>

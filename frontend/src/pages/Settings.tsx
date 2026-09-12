@@ -1,7 +1,7 @@
 // frontend/src/pages/Settings.tsx
 import { useEffect, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
-import { ArrowLeft, ArrowRight, Loader2, Plus, X, Trash2, Camera, Info, Settings, Sparkles, CheckCircle2, Gift, DollarSign } from 'lucide-react';
+import { ArrowLeft, ArrowRight, Loader2, Plus, X, Trash2, Camera, Info, Settings, Sparkles, CheckCircle2 } from 'lucide-react';
 import {
   createCampaign,
   updateCampaign,
@@ -342,7 +342,7 @@ export function CampaignForm({ mode }: { mode: 'create' | 'edit' }) {
   const [heroError, setHeroError] = useState('');
   const [brandName, setBrandName] = useState('');
   const [category, setCategory] = useState('');
-  const [campaignType, setCampaignType] = useState<CampaignType>('gifted');
+  const [campaignType, setCampaignType] = useState<CampaignType>('paid');
   const [description, setDescription] = useState('');
   const [budget, setBudget] = useState('');
   const [compensationDescription, setCompensationDescription] = useState('');
@@ -560,7 +560,7 @@ export function CampaignForm({ mode }: { mode: 'create' | 'edit' }) {
     if (title.trim().length < 3) return 'Title needs to be at least 3 characters.';
     if (!category) return 'Pick a category.';
     if (description.trim().length < 10) return 'Description needs to be at least 10 characters.';
-    if (campaignType === 'paid' && budget && Number(budget) <= 0) {
+    if (budget && Number(budget) <= 0) {
       return 'Budget must be greater than 0, or left blank.';
     }
     return null;
@@ -1392,28 +1392,6 @@ export function CampaignForm({ mode }: { mode: 'create' | 'edit' }) {
               )}
 
               <div className="cc-field">
-                <label className="cc-label">Campaign Type *</label>
-                <div className="cc-type-toggle">
-                  <button
-                    type="button"
-                    className={`cc-type-btn ${campaignType === 'gifted' ? 'cc-type-btn--active' : ''}`}
-                    onClick={() => setCampaignType('gifted')}
-                  >
-                    <Gift size={14} style={{ verticalAlign: -2, marginRight: 6 }} />
-                    Gifted
-                  </button>
-                  <button
-                    type="button"
-                    className={`cc-type-btn ${campaignType === 'paid' ? 'cc-type-btn--active' : ''}`}
-                    onClick={() => setCampaignType('paid')}
-                  >
-                    <DollarSign size={14} style={{ verticalAlign: -2, marginRight: 4 }} />
-                    Paid
-                  </button>
-                </div>
-              </div>
-
-              <div className="cc-field">
                 <label className="cc-label">About This Campaign *</label>
                 <textarea
                   className="cc-textarea"
@@ -1424,29 +1402,17 @@ export function CampaignForm({ mode }: { mode: 'create' | 'edit' }) {
                 <div className="cc-hint">Shown as the main description on the campaign page. Minimum 10 characters.</div>
               </div>
 
-              {campaignType === 'paid' ? (
-                <div className="cc-field">
-                  <label className="cc-label">Budget (Rs.)</label>
-                  <input
-                    className="cc-input"
-                    type="number"
-                    min="0"
-                    value={budget}
-                    onChange={(e) => setBudget(e.target.value)}
-                    placeholder="e.g. 2000"
-                  />
-                </div>
-              ) : (
-                <div className="cc-field">
-                  <label className="cc-label">Compensation Details</label>
-                  <textarea
-                    className="cc-textarea"
-                    value={compensationDescription}
-                    onChange={(e) => setCompensationDescription(e.target.value)}
-                    placeholder="What are you gifting, and what's it worth?"
-                  />
-                </div>
-              )}
+              <div className="cc-field">
+                <label className="cc-label">Budget (Rs.)</label>
+                <input
+                  className="cc-input"
+                  type="number"
+                  min="0"
+                  value={budget}
+                  onChange={(e) => setBudget(e.target.value)}
+                  placeholder="e.g. 2000"
+                />
+              </div>
 
               <div className="cc-field">
                 <label className="cc-label">Application Deadline</label>

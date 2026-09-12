@@ -17,9 +17,6 @@ import {
   Settings,
   ArrowRight,
   CheckCircle2,
-  MessageSquare,
-  Calendar,
-  PackageCheck,
   X,
   Search,
   Bell,
@@ -28,12 +25,12 @@ import {
 
 import { useAuth } from "../context/AuthContext";
 import { LogoMark } from "./Logo";
-import { getUnreadNotificationCount, getUnreadWorkspaceMessageCount } from "../api/client";
+import { getUnreadNotificationCount } from "../api/client";
 
 const C = {
-  sidebar: "#FFFFFF",
-  sidebarBorder: "#EAE7F2",
-  surface: "#F5F4FA",
+  sidebar: "#FBF8F4",
+  sidebarBorder: "#EEE8E2",
+  surface: "#FBF8F4",
   card: "#FFFFFF",
   ink: "#1A1625",
   inkSoft: "#6B6478",
@@ -50,11 +47,6 @@ const WORKSPACE_CHILDREN = [
     label: "Active Collab",
     icon: CheckCircle2,
     to: "/workspace/active",
-  },
-  {
-    label: "Calendar",
-    icon: Calendar,
-    to: "/workspace/calendar",
   },
 ];
 
@@ -260,9 +252,6 @@ export function AppLayout({
   const [unreadNotifications, setUnreadNotifications] =
     useState(0);
 
-  const [unreadWorkspaceMessages, setUnreadWorkspaceMessages] =
-    useState(0);
-
   useEffect(() => {
     let mounted = true;
 
@@ -331,26 +320,6 @@ export function AppLayout({
     };
   }, []);
 
-  useEffect(() => {
-    let mounted = true;
-
-    const loadUnreadWorkspaceMessages = async () => {
-      try {
-        const count = await getUnreadWorkspaceMessageCount();
-        if (mounted) setUnreadWorkspaceMessages(Math.max(0, Number(count) || 0));
-      } catch (error) {
-        console.error("Failed to load workspace message count:", error);
-      }
-    };
-
-    loadUnreadWorkspaceMessages();
-    const interval = window.setInterval(loadUnreadWorkspaceMessages, 30000);
-
-    return () => {
-      mounted = false;
-      window.clearInterval(interval);
-    };
-  }, []);
 
   /*
    * =====================================================
@@ -1313,11 +1282,6 @@ export function AppLayout({
                           {child.label}
                         </span>
 
-                        {child.to === "/workspace/active" && unreadWorkspaceMessages > 0 && (
-                          <b className="app-nav-badge">
-                            {unreadWorkspaceMessages > 9 ? "9+" : unreadWorkspaceMessages}
-                          </b>
-                        )}
                       </Link>
                     );
                   }

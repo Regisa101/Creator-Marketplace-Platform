@@ -44,8 +44,9 @@ const PAGE_BG = "#F8F4F1";
 // ============================================
 // LIVE CAMPAIGN DATA
 // ============================================
-// The landing page now reads published campaigns from the backend. Draft and
-// cancelled campaigns are never returned by the public endpoint.
+// The landing page reads real campaigns from the backend.
+// Only campaigns whose funding has been secured are allowed to appear publicly.
+// Unfunded and pending-funding campaigns stay hidden until payment is complete.
 
 const DEADLINE_FILTERS = ["All Deadlines", "Due this week", "Due this month", "Later"];
 const CREATOR_TYPE_FILTERS = [
@@ -57,58 +58,29 @@ const CREATOR_TYPE_FILTERS = [
   { label: "1M+ followers", value: "1M+ followers" },
 ];
 
-const DUMMY_CAMPAIGNS: PublicCampaign[] = [
-  {
-    id: -1, business_id: -1, title: "Weekend Coffee Stories", tagline: "A cosy creator-led coffee moment.",
-    description: "Create a short lifestyle reel around a weekend coffee routine.", category: "Food", sub_category: "Lifestyle",
-    campaign_type: "paid", brand_name: "Brew & Bean", brand_location: "Kathmandu", budget: 3500,
-    creators_needed: 2, application_deadline: "2026-10-05", deadline: "2026-10-05", hero_image: "https://images.unsplash.com/photo-1495474472287-4d71bcdd2085?q=80&w=900&auto=format&fit=crop",
-    status: "published", required_platform: "Instagram", required_platforms: ["Instagram"], application_count: 0, is_active: true, created_at: "2026-09-01T00:00:00Z",
-  },
-  {
-    id: -2, business_id: -2, title: "Everyday Skincare Routine", tagline: "Make self-care feel real.",
-    description: "Show your honest everyday skincare routine in a clean, natural format.", category: "Beauty", sub_category: "Skincare",
-    campaign_type: "paid", brand_name: "PureGlow", brand_location: "Lalitpur", budget: 5000,
-    creators_needed: 3, application_deadline: "2026-10-12", deadline: "2026-10-12", hero_image: "https://images.unsplash.com/photo-1556228578-8c89e6adf883?q=80&w=900&auto=format&fit=crop",
-    status: "published", required_platform: "TikTok", required_platforms: ["TikTok"], application_count: 0, is_active: true, created_at: "2026-09-01T00:00:00Z",
-  },
-  {
-    id: -3, business_id: -3, title: "City Style Edit", tagline: "Your take on everyday street style.",
-    description: "Create a stylish short-form fashion edit featuring your favourite everyday look.", category: "Fashion", sub_category: "Style",
-    campaign_type: "paid", brand_name: "Mode Studio", brand_location: "Kathmandu", budget: 4500,
-    creators_needed: 1, application_deadline: "2026-10-18", deadline: "2026-10-18", hero_image: "https://images.unsplash.com/photo-1483985988355-763728e1935b?q=80&w=900&auto=format&fit=crop",
-    status: "published", required_platform: "Instagram", required_platforms: ["Instagram"], application_count: 0, is_active: true, created_at: "2026-09-01T00:00:00Z",
-  },
-  {
-    id: -4, business_id: -4, title: "Mountain Escape", tagline: "Tell the story of a quick escape.",
-    description: "Create a travel-focused reel highlighting a memorable Nepal getaway.", category: "Travel", sub_category: "Travel",
-    campaign_type: "paid", brand_name: "Himalayan Trails", brand_location: "Pokhara", budget: 7000,
-    creators_needed: 2, application_deadline: "2026-10-22", deadline: "2026-10-22", hero_image: "https://images.unsplash.com/photo-1464822759023-fed622ff2c3b?q=80&w=900&auto=format&fit=crop",
-    status: "published", required_platform: "Instagram", required_platforms: ["Instagram"], application_count: 0, is_active: true, created_at: "2026-09-01T00:00:00Z",
-  },
-  {
-    id: -5, business_id: -5, title: "Sunday Brunch", tagline: "A simple brunch story with personality.",
-    description: "Capture a relaxed brunch experience with your own visual style.", category: "Food", sub_category: "Lifestyle",
-    campaign_type: "gifted", brand_name: "The Brunch House", brand_location: "Kathmandu", budget: null,
-    creators_needed: 2, application_deadline: "2026-10-26", deadline: "2026-10-26", hero_image: "https://images.unsplash.com/photo-1533089860892-a7c6f0a88666?q=80&w=900&auto=format&fit=crop",
-    status: "in_progress", required_platform: "Instagram", required_platforms: ["Instagram"], application_count: 0, is_active: true, created_at: "2026-09-01T00:00:00Z",
-  },
-  {
-    id: -6, business_id: -6, title: "Glow Night", tagline: "A night-time beauty story.",
-    description: "Create a polished evening beauty routine with a strong visual hook.", category: "Beauty", sub_category: "Makeup",
-    campaign_type: "paid", brand_name: "Luna Beauty", brand_location: "Lalitpur", budget: 5500,
-    creators_needed: 1, application_deadline: "2026-11-01", deadline: "2026-11-01", hero_image: "https://images.unsplash.com/photo-1522335789203-aabd1fc54bc9?q=80&w=900&auto=format&fit=crop",
-    status: "in_progress", required_platform: "TikTok", required_platforms: ["TikTok"], application_count: 0, is_active: true, created_at: "2026-09-01T00:00:00Z",
-  },
-];
+// ============================================
+// HELPERS / FILTER UI
+// ============================================
+const API_ORIGIN = "http://localhost:8000";
 
+function mediaUrl(url?: string | null) {
+  if (!url) return "";
+  if (/^(https?:)?\/\//i.test(url) || url.startsWith("data:") || url.startsWith("blob:")) {
+    return url;
+  }
+  if (url.startsWith("/api/")) return `${API_ORIGIN}${url}`;
+  return `${API_ORIGIN}/${url.replace(/^\/+/, "")}`;
+}
 
-const BRAND_FEATURES = [
-  { icon: Users, title: "Access Genuine", subtitle: "Creators" },
-  { icon: Target, title: "Targeted", subtitle: "Campaigns" },
-  { icon: BarChart3, title: "Track Results", subtitle: "& Performance" },
-  { icon: Handshake, title: "Build Long-Term", subtitle: "Partnerships" },
-];
+function initials(name: string) {
+  return name
+    .split(" ")
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((word) => word[0])
+    .join("")
+    .toUpperCase();
+}
 
 type FilterDropdownProps = {
   label: string;
@@ -119,7 +91,14 @@ type FilterDropdownProps = {
   onChange: (value: string) => void;
 };
 
-function FilterDropdown({ label, value, options, open, onToggle, onChange }: FilterDropdownProps) {
+function FilterDropdown({
+  label,
+  value,
+  options,
+  open,
+  onToggle,
+  onChange,
+}: FilterDropdownProps) {
   const displayValue = value === options[0] ? label : value;
 
   return (
@@ -134,6 +113,7 @@ function FilterDropdown({ label, value, options, open, onToggle, onChange }: Fil
         <span>{displayValue}</span>
         <ChevronDown size={14} />
       </button>
+
       {open && (
         <div className="lp-filter-menu" role="listbox" aria-label={label}>
           {options.map((option) => (
@@ -154,24 +134,12 @@ function FilterDropdown({ label, value, options, open, onToggle, onChange }: Fil
   );
 }
 
-const API_ORIGIN = "http://localhost:8000";
-
-function mediaUrl(url?: string | null) {
-  if (!url) return "";
-  if (/^(https?:)?\/\//i.test(url) || url.startsWith("data:") || url.startsWith("blob:")) return url;
-  if (url.startsWith("/api/")) return `${API_ORIGIN}${url}`;
-  return `${API_ORIGIN}/${url.replace(/^\/+/, "")}`;
-}
-
-function initials(name: string) {
-  return name
-    .split(" ")
-    .filter(Boolean)
-    .slice(0, 2)
-    .map((w) => w[0])
-    .join("")
-    .toUpperCase();
-}
+const BRAND_FEATURES = [
+  { icon: Users, title: "Access Genuine", subtitle: "Creators" },
+  { icon: Target, title: "Targeted", subtitle: "Campaigns" },
+  { icon: BarChart3, title: "Track Results", subtitle: "& Performance" },
+  { icon: Handshake, title: "Build Long-Term", subtitle: "Partnerships" },
+];
 
 // ============================================
 // CAMPAIGN CARD
@@ -204,7 +172,7 @@ function CampaignCard({ c, isCreator, isAuthenticated, isSaved, onToggleSave }: 
   isSaved: boolean;
   onToggleSave: (campaignId: number) => void;
 }) {
-  const isDummy = c.id < 0;
+  const isDummy = false;
   const image = campaignImage(c);
   const booked = isBooked(c);
   const unavailable = isUnavailable(c);
@@ -215,7 +183,7 @@ function CampaignCard({ c, isCreator, isAuthenticated, isSaved, onToggleSave }: 
       <div className="lp-card-media">
         {image ? <img src={image} alt={c.title} loading="lazy" /> : <div className="lp-card-image-placeholder">Campaign image</div>}
         <span className={`lp-badge ${booked ? "lp-badge-booked" : "lp-badge-paid"}`}>
-          {booked ? "Booked" : c.campaign_type === "paid" ? "Paid" : "Gifted"}
+          {booked ? "Booked" : "Paid"}
         </span>
         {isCreator && !unavailable && !isDummy && (
           <button
@@ -240,7 +208,7 @@ function CampaignCard({ c, isCreator, isAuthenticated, isSaved, onToggleSave }: 
         <p className="lp-card-description">{c.tagline || c.description || "View the brief to see the full campaign details."}</p>
         <span className="lp-card-category">{c.category}</span>
         <div className="lp-card-meta">
-          <span className="lp-card-comp">{c.campaign_type === "paid" ? `NRs ${(c.budget || 0).toLocaleString()}` : "Gifted product"}</span>
+          <span className="lp-card-comp">NRs {(c.budget || 0).toLocaleString()}</span>
           <span>{c.brand_location ? <><MapPin size={13} /> {c.brand_location}</> : null}</span>
         </div>
         <div className="lp-card-secondary-meta">
@@ -367,15 +335,52 @@ export function Landing() {
     return suggestions.slice(0, 7);
   }, [search, campaigns]);
 
-  const categories = useMemo(() => ["All Categories", ...Array.from(new Set(campaigns.map((c) => c.category).filter(Boolean)))], [campaigns]);
+  const ALL_CAMPAIGN_CATEGORIES = [
+    "All Categories",
+    "Food",
+    "Beauty",
+    "Fashion",
+    "Travel",
+    "Technology",
+    "Fitness",
+    "Education",
+    "Lifestyle",
+    "Finance",
+    "Gaming",
+    "Health",
+    "Home & Living",
+    "Sports",
+    "Entertainment",
+    "Business",
+    "Automotive",
+    "Pets",
+    "Photography",
+    "Music",
+    "Parenting",
+  ];
+
+  const categories = useMemo(() => {
+    // Keep the full marketplace category list visible even when there are
+    // currently no funded campaigns in some categories. Add any custom
+    // category returned by the backend after the standard categories.
+    const backendCategories = Array.from(
+      new Set(campaigns.map((c) => String(c.category || "").trim()).filter(Boolean))
+    );
+    const extras = backendCategories.filter(
+      (item) => !ALL_CAMPAIGN_CATEGORIES.includes(item)
+    );
+    return [...ALL_CAMPAIGN_CATEGORIES, ...extras];
+  }, [campaigns]);
   const locations = useMemo(() => ["Location", ...Array.from(new Set(campaigns.map((c) => c.brand_location).filter(Boolean) as string[]))], [campaigns]);
   const platforms = useMemo(() => ["Platform", ...Array.from(new Set(campaigns.map(campaignPlatform).filter(Boolean) as string[]))], [campaigns]);
 
   const filtered = useMemo(() => {
     const matches = campaigns.filter((c) => {
-      // Explore is for campaigns that are currently accepting applications
-      // plus booked campaigns. Completed/closed/cancelled/draft campaigns stay hidden.
+      // Public Explore only shows campaigns that are live AND fully funded.
+      // A campaign can have applications already, but it must not be visible
+      // on the public landing page until its campaign budget is secured.
       if (!["published", "in_progress"].includes(String(c.status))) return false;
+      if (String(c.funding_status || "").toLowerCase() !== "funded") return false;
       const matchesSearch = !search.trim() ||
         c.title.toLowerCase().includes(search.toLowerCase()) ||
         (c.brand_name || "").toLowerCase().includes(search.toLowerCase()) ||
@@ -413,30 +418,18 @@ export function Landing() {
   }, [campaigns, search, category, location, platform, deadlineFilter, creatorType]);
 
   const displayCampaigns = useMemo(() => {
-    const realCampaigns = filtered;
-    const withDummies = [...realCampaigns, ...DUMMY_CAMPAIGNS].filter((campaign) => {
-      if (!["published", "in_progress"].includes(String(campaign.status))) return false;
-      if (campaign.id > 0) return true;
-      const matchesSearch = !search.trim() ||
-        campaign.title.toLowerCase().includes(search.toLowerCase()) ||
-        (campaign.brand_name || "").toLowerCase().includes(search.toLowerCase()) ||
-        (campaign.category || "").toLowerCase().includes(search.toLowerCase());
-      const matchesCategory = category === "All Categories" || campaign.category === category;
-      const matchesLocation = location === "Location" || campaign.brand_location === location;
-      const matchesPlatform = platform === "Platform" || campaignPlatform(campaign) === platform;
-      const audience = creatorAudienceLabel(campaign);
-      const matchesCreatorType = creatorType === "All Creator Types" || audience === creatorType;
-      return matchesSearch && matchesCategory && matchesLocation && matchesPlatform && matchesCreatorType;
-    });
-    return withDummies.sort((a, b) => {
+    // Do not append demo/placeholder campaigns here. Public cards must come
+    // from real, funded campaigns returned by the backend.
+    return [...filtered].sort((a, b) => {
       const bookedA = a.status === "in_progress" ? 1 : 0;
       const bookedB = b.status === "in_progress" ? 1 : 0;
       if (bookedA !== bookedB) return bookedA - bookedB;
-      const dummyA = a.id < 0 ? 1 : 0;
-      const dummyB = b.id < 0 ? 1 : 0;
-      return dummyA - dummyB;
+
+      const dateA = new Date(a.created_at || a.updated_at || 0).getTime() || 0;
+      const dateB = new Date(b.created_at || b.updated_at || 0).getTime() || 0;
+      return dateB - dateA;
     });
-  }, [filtered, search, category, location, platform, creatorType]);
+  }, [filtered]);
 
   useEffect(() => {
     setVisibleCount(7);
@@ -1065,7 +1058,7 @@ export function Landing() {
           </>
         ) : (
           <p style={{ color: "var(--ink-soft)", fontSize: 14.5 }}>
-            No campaigns match those filters yet — try a different category or search term.
+            No funded campaigns match those filters yet — try a different category or search term.
           </p>
         )}
       </section>

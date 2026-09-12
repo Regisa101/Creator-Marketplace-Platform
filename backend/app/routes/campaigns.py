@@ -1,12 +1,11 @@
 from fastapi import APIRouter, Depends, HTTPException, status, Query
 from sqlalchemy.orm import Session
 from sqlalchemy.exc import IntegrityError
-from sqlalchemy import select
 from typing import Optional
 from datetime import datetime, timezone, timedelta
 
 from app.database import get_db
-from app.models import User, Campaign, Application, Deliverable, Payment, CalendarEvent
+from app.models import User, Campaign, Application, Deliverable, Payment
 from app.models.campaign import CampaignStatus
 from app.schemas.campaign import CampaignCreate, CampaignUpdate, CampaignResponse
 from app.dependencies.auth import get_current_user, get_current_business
@@ -165,7 +164,7 @@ async def create_campaign(
         brief=data.brief,
         category=data.category,
         sub_category=data.sub_category,
-        campaign_type=data.campaign_type.value if data.campaign_type else "gifted",
+        campaign_type=data.campaign_type.value if data.campaign_type else "paid",
         brand_name=data.brand_name,
         brand_location=data.brand_location,
         budget=data.budget,
@@ -434,36 +433,6 @@ async def update_campaign(
     if "required_post_types" in update_data:
         campaign.required_post_type = (campaign.required_post_types or [None])[0]
 
-    # Calendar events for "Deliverables due" / "Publication deadline" are
-    # created once, when a creator is accepted — editing the campaign's
-    # dates afterward didn't used to touch them, so accepted creators kept
-    # seeing the old date on their calendar. Sync them here instead.
-    # This covers both per-collaboration events (application_id) and the
-    # campaign-level events created at publish time (campaign_id).
-    if "application_deadline" in update_data and campaign.application_deadline:
-        db.query(CalendarEvent).filter(
-            CalendarEvent.campaign_id == campaign.id,
-            CalendarEvent.title == "Application deadline",
-        ).update({"event_date": campaign.application_deadline}, synchronize_session=False)
-    if "deliverable_deadline" in update_data and campaign.deliverable_deadline:
-        db.query(CalendarEvent).filter(
-            CalendarEvent.application_id.in_(select(Application.id).where(Application.campaign_id == campaign.id)),
-            CalendarEvent.title == "Deliverables due",
-        ).update({"event_date": campaign.deliverable_deadline}, synchronize_session=False)
-        db.query(CalendarEvent).filter(
-            CalendarEvent.campaign_id == campaign.id,
-            CalendarEvent.title == "Deliverables due",
-        ).update({"event_date": campaign.deliverable_deadline}, synchronize_session=False)
-    if "publication_deadline" in update_data and campaign.publication_deadline:
-        db.query(CalendarEvent).filter(
-            CalendarEvent.application_id.in_(select(Application.id).where(Application.campaign_id == campaign.id)),
-            CalendarEvent.title == "Publication deadline",
-        ).update({"event_date": campaign.publication_deadline}, synchronize_session=False)
-        db.query(CalendarEvent).filter(
-            CalendarEvent.campaign_id == campaign.id,
-            CalendarEvent.title == "Publication deadline",
-        ).update({"event_date": campaign.publication_deadline}, synchronize_session=False)
-
     db.commit()
     db.refresh(campaign)
     return campaign
@@ -490,17 +459,6 @@ async def publish_campaign(
     campaign.deadline = campaign.application_deadline
     campaign.status = "published"
     db.flush()
-
-    # Put the campaign's own deadlines on the business's calendar as soon as
-    # it goes live — don't wait for a creator to be accepted, so the brand
-    # can track what's coming up on their own campaign.
-    if not db.query(CalendarEvent).filter(CalendarEvent.campaign_id == campaign.id, CalendarEvent.title == "Application deadline").first():
-        db.add(CalendarEvent(campaign_id=campaign.id, created_by=campaign.business_id, title="Application deadline", description=f"Last day creators can apply to {campaign.title}.", event_date=campaign.application_deadline, event_type="deadline"))
-    if campaign.deliverable_deadline and not db.query(CalendarEvent).filter(CalendarEvent.campaign_id == campaign.id, CalendarEvent.title == "Deliverables due").first():
-        db.add(CalendarEvent(campaign_id=campaign.id, created_by=campaign.business_id, title="Deliverables due", description=f"Deliverables are due for {campaign.title}.", event_date=campaign.deliverable_deadline, event_type="deadline"))
-    if campaign.completion_mode == "publication_required" and campaign.publication_deadline and not db.query(CalendarEvent).filter(CalendarEvent.campaign_id == campaign.id, CalendarEvent.title == "Publication deadline").first():
-        _platforms_label = ", ".join(campaign.required_platforms) if campaign.required_platforms else (campaign.required_platform or "the required platform")
-        db.add(CalendarEvent(campaign_id=campaign.id, created_by=campaign.business_id, title="Publication deadline", description=f"Publish approved content on {_platforms_label} for {campaign.title}.", event_date=campaign.publication_deadline, event_type="posting_date"))
 
     db.commit()
     db.refresh(campaign)

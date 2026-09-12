@@ -4,16 +4,13 @@ import {
   confirmCollaboration,
   getCollabs,
   getDeliverables,
-  getMessages,
   releasePayment,
   reviewDeliverable,
   reviewAllDeliverables,
-  sendMessage,
   submitDeliverable,
   uploadMedia,
   type Collab,
   type WorkspaceDeliverable,
-  type WorkspaceMessage,
 } from '../../api/client';
 import { useAuth } from '../../context/AuthContext';
 import { AppLayout } from '../../components/AppLayout';
@@ -55,10 +52,6 @@ function allApproved(c: Collab) {
   return c.total_deliverables > 0 && c.approved_deliverables === c.total_deliverables;
 }
 
-function isPaid(c: Collab) {
-  return c.campaign_type !== 'gifted';
-}
-
 function nextState(c: Collab, isBusiness: boolean) {
   if (c.status === 'completed' || c.payment_status === 'released') {
     return {
@@ -85,7 +78,7 @@ function nextState(c: Collab, isBusiness: boolean) {
         };
   }
 
-  if (isBusiness && isPaid(c) && !['funded', 'released'].includes(c.payment_status || '')) {
+  if (isBusiness && !['funded', 'released'].includes(c.payment_status || '')) {
     return {
       turn: 'WAITING',
       title: 'Campaign funding required',
@@ -107,7 +100,7 @@ function nextState(c: Collab, isBusiness: boolean) {
       return {
         turn: 'WAITING',
         title: 'Waiting for the creator',
-        body: 'The creator can work without needing to message you at every step.',
+        body: 'The creator can work without needing to contact you at every step.',
         action: null,
       };
     }
@@ -153,10 +146,8 @@ export function WorkspaceActive() {
   const requestedId = Number(params.get('collab') || 0);
 
   const [collabs, setCollabs] = useState<Collab[]>([]);
-  const [messages, setMessages] = useState<WorkspaceMessage[]>([]);
   const [deliverables, setDeliverables] = useState<WorkspaceDeliverable[]>([]);
-  const [selectedTab, setSelectedTab] = useState<'overview' | 'deliverables' | 'messages'>('overview');
-  const [message, setMessage] = useState('');
+  const [selectedTab, setSelectedTab] = useState<'overview' | 'deliverables'>('overview');
   const [busy, setBusy] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [detailLoading, setDetailLoading] = useState(false);
@@ -204,12 +195,8 @@ export function WorkspaceActive() {
     const load = async (initial = false) => {
       if (initial) setDetailLoading(true);
       try {
-        const [m, d] = await Promise.all([
-          getMessages(selected.id),
-          getDeliverables(selected.id),
-        ]);
+        const d = await getDeliverables(selected.id);
         if (cancelled) return;
-        setMessages(m);
         setDeliverables(d);
       } catch (e: any) {
         if (!cancelled) setError(e?.response?.data?.detail || 'Could not load this collaboration.');
@@ -282,20 +269,6 @@ export function WorkspaceActive() {
     }
   };
 
-  const doSend = async () => {
-    if (!selected || !message.trim()) return;
-    setBusy('message');
-    setError('');
-    try {
-      const created = await sendMessage(selected.id, message.trim());
-      setMessages((previous) => [...previous, created]);
-      setMessage('');
-    } catch (e: any) {
-      setError(e?.response?.data?.detail || 'Could not send message.');
-    } finally {
-      setBusy(null);
-    }
-  };
 
   const updateDeliverable = (updated: WorkspaceDeliverable) => {
     setDeliverables((previous) => {
@@ -402,7 +375,6 @@ export function WorkspaceActive() {
                       <em>{state.turn === 'YOUR TURN' ? 'Action needed' : state.title}</em>
                     </span>
                     <span className="cw-counts">
-                      {c.unread_messages > 0 && <b>{c.unread_messages}</b>}
                       {c.pending_deliverables > 0 && <b className="work-count">{c.pending_deliverables}</b>}
                     </span>
                   </button>
@@ -441,10 +413,6 @@ export function WorkspaceActive() {
                     Deliverables
                     {selected.pending_deliverables > 0 && <b>{selected.pending_deliverables}</b>}
                   </button>
-                  <button className={selectedTab === 'messages' ? 'is-active' : ''} onClick={() => setSelectedTab('messages')}>
-                    Messages
-                    {selected.unread_messages > 0 && <b>{selected.unread_messages}</b>}
-                  </button>
                 </div>
 
                 {error && <div className="cw-error">{error}</div>}
@@ -468,19 +436,8 @@ export function WorkspaceActive() {
                         c={selected}
                         deliverables={deliverables}
                         isBusiness={isBusiness}
-                        busy={busy}
                         onUpdate={updateDeliverable}
                         onBulkUpdate={updateDeliverables}
-                      />
-                    )}
-                    {selectedTab === 'messages' && (
-                      <Messages
-                        messages={messages}
-                        currentUserId={user?.id}
-                        value={message}
-                        setValue={setMessage}
-                        onSend={doSend}
-                        busy={busy === 'message'}
                       />
                     )}
                   </div>
@@ -590,8 +547,8 @@ function Overview({
         <section className="cw-card">
           <div className="cw-card-head"><strong>Agreement</strong><span>What was agreed</span></div>
           <div className="cw-detail"><span>Campaign</span><strong>{c.campaign_title}</strong></div>
-          <div className="cw-detail"><span>Payment</span><strong>{c.campaign_type === 'gifted' ? 'Gifted collaboration' : `Rs. ${(c.agreed_rate || 0).toLocaleString()}`}</strong></div>
-          {c.campaign_type !== 'gifted' && c.payment_status === 'funded' && (
+          <div className="cw-detail"><span>Payment</span><strong>Rs. {(c.agreed_rate || 0).toLocaleString()}</strong></div>
+          {c.payment_status === 'funded' && (
             <div className="cw-detail"><span>Campaign funding</span><strong>Rs. {(c.funded_amount || 0).toLocaleString()} secured</strong></div>
           )}
           <div className="cw-detail"><span>Deadline</span><strong>{c.deliverable_deadline ? new Date(c.deliverable_deadline).toLocaleDateString() : 'Not set'}</strong></div>
@@ -621,14 +578,12 @@ function Deliverables({
   c,
   deliverables,
   isBusiness,
-  busy,
   onUpdate,
   onBulkUpdate,
 }: {
   c: Collab;
   deliverables: WorkspaceDeliverable[];
   isBusiness: boolean;
-  busy: string | null;
   onUpdate: (d: WorkspaceDeliverable) => void;
   onBulkUpdate: (deliverables: WorkspaceDeliverable[]) => void;
 }) {
@@ -808,52 +763,6 @@ function Deliverables({
   );
 }
 
-function Messages({
-  messages,
-  currentUserId,
-  value,
-  setValue,
-  onSend,
-  busy,
-}: {
-  messages: WorkspaceMessage[];
-  currentUserId?: number;
-  value: string;
-  setValue: (value: string) => void;
-  onSend: () => void;
-  busy: boolean;
-}) {
-  return (
-    <div className="cw-chat">
-      <div className="cw-chat-list">
-        {messages.length ? messages.map((m) => (
-          <div key={m.id} className={`cw-msg ${m.sender_id === currentUserId ? 'mine' : ''}`}>
-            <div className="cw-msg-name">{m.sender_name || (m.sender_id === currentUserId ? 'You' : 'Collaborator')}</div>
-            <div className="cw-bubble">{m.body}</div>
-            <time>{new Date(m.created_at).toLocaleString([], { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })}</time>
-          </div>
-        )) : (
-          <div className="cw-chat-empty"><strong>Messages are optional</strong><span>The workflow does not depend on messaging. Use this only when you actually need to talk.</span></div>
-        )}
-      </div>
-      <div className="cw-composer">
-        <textarea
-          value={value}
-          onChange={(e) => setValue(e.target.value)}
-          placeholder="Write a message…"
-          onKeyDown={(e) => {
-            if (e.key === 'Enter' && !e.shiftKey) {
-              e.preventDefault();
-              onSend();
-            }
-          }}
-        />
-        <button onClick={onSend} disabled={busy || !value.trim()}>{busy ? 'Sending…' : 'Send'}</button>
-      </div>
-    </div>
-  );
-}
-
 // All accent-dependent colors below use var(--cw-accent) / var(--cw-accent-soft),
 // set inline on .cw-shell (and on each modal) from the role-based `accent` value
 // computed in WorkspaceActive — indigo/violet for creators, navy for brands.
@@ -870,7 +779,6 @@ const styles = `
 .cw-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px}.cw-card{padding:16px}.cw-card-head{display:flex;flex-direction:column;margin-bottom:13px}.cw-card-head strong{font-size:12px;color:${C.ink}}.cw-card-head span{font-size:9.5px;color:${C.soft};margin-top:2px}.cw-detail{display:flex;justify-content:space-between;border-top:1px solid ${C.line};padding-top:9px;margin-top:9px;gap:10px}.cw-detail span{font-size:10px;color:${C.soft}}.cw-detail strong{font-size:10.5px;color:${C.ink};text-align:right}.cw-link-button{border:0;background:none;padding:10px 0 0;color:var(--cw-accent);font-size:10px;font-weight:750;cursor:pointer}
 .cw-work{display:flex;flex-direction:column;gap:11px}.cw-work-head{display:flex;align-items:center;justify-content:space-between;gap:15px;margin-bottom:2px}.cw-work-head h3{font-size:15px;margin:0;color:${C.ink}}.cw-work-head p{font-size:10px;color:${C.soft};margin:3px 0 0;max-width:650px}.cw-deliverable{padding:16px}.cw-deliverable-head{display:flex;justify-content:space-between;gap:12px}.cw-deliverable h4{font-size:12px;margin:0;color:${C.ink}}.cw-deliverable p{font-size:9.5px;color:${C.soft};margin:4px 0 0}.cw-del-status{font-size:8.5px;font-weight:750;padding:5px 8px;border-radius:99px;background:#eee;color:${C.soft};height:max-content}.cw-del-status.approved{background:${C.goodSoft};color:${C.good}}.cw-del-status.submitted{background:var(--cw-accent-soft);color:var(--cw-accent)}.cw-del-status.revision_requested{background:${C.badSoft};color:${C.bad}}.cw-file{margin-top:11px}.cw-file a{font-size:10px;color:var(--cw-accent)}.cw-file img{display:block;width:100%;max-height:340px;object-fit:contain;background:#f5f5f5;border-radius:9px;margin-top:8px}.cw-feedback,.cw-error,.cw-ready{padding:9px 11px;border-radius:9px;font-size:10px}.cw-feedback{background:${C.badSoft};color:${C.bad};margin-top:9px}.cw-error{background:${C.badSoft};color:${C.bad};margin-bottom:11px}.cw-ready{background:${C.goodSoft};color:${C.good};display:flex;flex-direction:column;gap:3px}.cw-ready strong{font-size:11px}
 .cw-submit,.cw-review{display:flex;gap:7px;align-items:center;margin-top:12px}.cw-file-picker{flex:1;border:1px dashed #d5d5d7;border-radius:8px;padding:8px 9px;cursor:pointer;font-size:9.5px;color:${C.soft};min-width:0}.cw-file-picker strong{display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.cw-file-picker input{display:none}.cw-submit textarea,.cw-review textarea{flex:1;min-height:38px;border:1px solid ${C.line};border-radius:8px;padding:8px;font:10px/1.4 -apple-system,sans-serif;resize:vertical;outline:none}.cw-review{align-items:stretch}.cw-review textarea{min-width:0}
-.cw-chat{display:flex;flex-direction:column;height:calc(100vh - 260px);min-height:440px;background:#fff;border:1px solid ${C.line};border-radius:16px;overflow:hidden}.cw-chat-list{flex:1;overflow:auto;padding:19px}.cw-msg{max-width:72%;margin-bottom:13px}.cw-msg.mine{margin-left:auto;text-align:right}.cw-msg-name{font-size:8.5px;color:${C.faint};margin-bottom:4px}.cw-bubble{display:inline-block;padding:9px 11px;border-radius:11px;background:#f1f1f3;color:${C.ink};font-size:10.5px;line-height:1.5;text-align:left}.cw-msg.mine .cw-bubble{background:var(--cw-accent);color:#fff}.cw-msg time{display:block;font-size:8px;color:${C.faint};margin-top:3px}.cw-chat-empty{height:100%;display:flex;flex-direction:column;align-items:center;justify-content:center;color:${C.soft};gap:5px;text-align:center}.cw-chat-empty strong{font-size:12px;color:${C.ink}}.cw-chat-empty span{font-size:10px;max-width:350px;line-height:1.5}.cw-composer{border-top:1px solid ${C.line};display:flex;gap:8px;padding:10px}.cw-composer textarea{flex:1;resize:none;border:0;outline:0;font:11px/1.5 -apple-system,sans-serif;min-height:40px}.cw-composer button{height:36px;border:0;border-radius:8px;background:var(--cw-accent);color:#fff;padding:0 13px;font-size:10px;font-weight:750;cursor:pointer}
 .cw-empty,.cw-loading{padding:65px 20px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:5px;color:${C.soft};font-size:10.5px}.cw-empty strong{font-size:13px;color:${C.ink}}
 .cw-modal-backdrop{position:fixed;inset:0;background:rgba(0,0,0,.35);display:flex;align-items:center;justify-content:center;padding:20px;z-index:1000}.cw-modal,.cw-payment-modal{width:min(500px,100%);background:#fff;border-radius:18px;padding:24px;box-shadow:0 20px 70px rgba(0,0,0,.2)}.cw-modal-kicker,.cw-payment-kicker{font-size:8px;font-weight:900;letter-spacing:.12em;color:var(--cw-accent)}.cw-modal h3,.cw-payment-modal h3{font-size:17px;margin:7px 0 6px;color:${C.ink}}.cw-modal p,.cw-payment-modal p{font-size:11px;line-height:1.55;color:${C.soft};margin:0}.cw-modal-summary{display:flex;justify-content:space-between;margin-top:18px;padding:11px 12px;background:${C.bg};border-radius:10px;font-size:10px;color:${C.soft}}.cw-modal-summary strong{color:${C.ink}}.cw-modal-actions{display:flex;justify-content:flex-end;gap:8px;margin-top:18px}.cw-payment-modal{text-align:center;padding:30px}.cw-money{font-size:30px;font-weight:850;color:${C.good};margin:10px 0 3px}.cw-payment-line{margin:16px 0 20px;padding:11px;background:${C.goodSoft};color:${C.good};font-size:10px;line-height:1.5;border-radius:10px}.cw-wide{width:100%}
 @media(max-width:850px){.cw-shell{grid-template-columns:1fr}.cw-list{border-right:0;border-bottom:1px solid ${C.line};display:flex;overflow:auto;gap:5px}.cw-list-head{display:none}.cw-person{min-width:210px}.cw-grid{grid-template-columns:1fr}.cw-next{flex-direction:column;align-items:flex-start}.cw-next-actions{width:100%}.cw-next-actions button{width:100%}.cw-steps{overflow:auto;padding-bottom:4px}.cw-body{padding:14px}.cw-header,.cw-tabs{padding-left:14px;padding-right:14px}.cw-work-head{align-items:flex-start;flex-direction:column}.cw-work-head button{width:100%}.cw-submit,.cw-review{flex-wrap:wrap}.cw-submit>*{min-width:100%}.cw-review>*{min-width:100%}}

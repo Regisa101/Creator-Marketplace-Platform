@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
-import { Heart, Menu, X, ChevronDown } from 'lucide-react';
+import { Heart, Menu, X } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { BRAND_NAME, BRAND_PURPLE, BRAND_PURPLE_DARK, LogoMark } from './Logo';
 

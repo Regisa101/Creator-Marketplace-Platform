@@ -6,7 +6,6 @@ import enum
 
 class CampaignType(str, enum.Enum):
     PAID = "paid"
-    GIFTED = "gifted"
 
 class CampaignStatus(str, enum.Enum):
     DRAFT = "draft"
@@ -33,7 +32,7 @@ class Campaign(Base):
     sub_category = Column(Text, nullable=True)
     
     # Campaign Type
-    campaign_type = Column(Enum(CampaignType), default=CampaignType.GIFTED)
+    campaign_type = Column(Enum(CampaignType), default=CampaignType.PAID)
     
     # Brand/Company
     brand_name = Column(String(255), nullable=True)

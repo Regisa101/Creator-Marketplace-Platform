@@ -62,3 +62,24 @@ def get_current_admin(current_user: User = Depends(get_current_user)) -> User:
             detail="Admin access required"
         )
     return current_user
+
+async def get_current_user_optional(
+    token: str | None = Depends(OAuth2PasswordBearer(tokenUrl="/api/auth/login", auto_error=False)),
+    db: Session = Depends(get_db),
+) -> User | None:
+    """Same as get_current_user, but returns None instead of raising when
+    there's no/invalid token. Used by public endpoints that want to
+    personalize the response for a logged-in viewer without requiring
+    login."""
+    if not token:
+        return None
+    payload = decode_token(token)
+    if not payload:
+        return None
+    user_id = payload.get("user_id")
+    if not user_id:
+        return None
+    user = db.query(User).filter(User.id == user_id).first()
+    if not user or not user.is_active:
+        return None
+    return user

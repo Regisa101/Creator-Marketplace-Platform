@@ -44,7 +44,7 @@ export function PaymentReturn() {
       .finally(() => setLoading(false));
   }, [pidx]);
 
-  const collabHref = payment ? `/workspace/messages?collab=${payment.application_id}` : '/workspace/active';
+  const collabHref = payment ? `/workspace/active?collab=${payment.application_id}` : '/workspace/active';
 
   return (
     <AppLayout title="Payment" subtitle="" showSearch={false} showNotifications={false}>
