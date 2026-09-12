@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Link, useLocation, useNavigate, useParams, useSearchParams } from 'react-router-dom';
+import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import {
   ArrowLeft,
   ArrowUpRight,
@@ -39,7 +39,6 @@ import {
   type PublicBusinessProfile,
 } from '../api/client';
 import { useAuth } from '../context/AuthContext';
-import { AppLayout } from '../components/AppLayout';
 import { PublicNavbar } from '../components/PublicNavbar';
 import { BRAND_PURPLE, BRAND_PURPLE_DARK, BRAND_PINK_CORAL, OFF_WHITE } from '../components/Logo';
 
@@ -164,20 +163,14 @@ const DEMO_CAMPAIGNS: Campaign[] = [
 export function CampaignDetail() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const location = useLocation();
   const [searchParams, setSearchParams] = useSearchParams();
   const { user } = useAuth();
 
   // Campaign detail can be entered from either the public landing page or
-  // the authenticated dashboard. The source can arrive either as a URL query
-  // param (survives a refresh/shared link) or as router state (set when
-  // navigating internally from within the dashboard). Anything identified as
-  // coming from the dashboard uses AppLayout (dashboard nav); everything
-  // else is treated as a public/landing visit and uses the landing navbar.
-  const navigationSourceParam = searchParams.get('source');
-  const navigationSourceState = (location.state as { source?: string } | null)?.source;
-  const useDashboardNav = navigationSourceParam === 'dashboard' || navigationSourceState === 'dashboard';
-  const usePublicNav = !useDashboardNav;
+  // the authenticated dashboard. Regardless of where someone came from, the
+  // page always uses the same top navbar as the landing page (PublicNavbar)
+  // so the experience is consistent everywhere — no more switching to the
+  // dashboard sidebar layout depending on entry point.
 
   const [campaign, setCampaign] = useState<Campaign | null>(null);
   const [brandProfile, setBrandProfile] = useState<PublicBusinessProfile | null>(null);
@@ -325,8 +318,13 @@ export function CampaignDetail() {
     setSavingBookmark(true);
     setIsSaved(!previous);
     try {
-      if (previous) await unsaveCampaign(campaign.id);
-      else await saveCampaign(campaign.id);
+      if (previous) {
+        await unsaveCampaign(campaign.id);
+      } else {
+        await saveCampaign(campaign.id);
+      }
+
+      window.dispatchEvent(new Event('ch:wishlist-changed'));
     } catch (err) {
       console.error('Could not update saved status:', err);
       setIsSaved(previous);
@@ -1274,7 +1272,7 @@ export function CampaignDetail() {
 
               {related.length > 0 && <div className="cd-side-card cd-related">
                 <div className="cd-side-heading">More campaigns</div>
-                {related.map((item) => <Link key={item.id} to={`/campaigns/${item.id}?source=${useDashboardNav ? 'dashboard' : 'landing'}`} className="cd-related-item"><div className="cd-related-title">{item.title}</div><div className="cd-related-meta">{item.brand_name || 'Business'} · {item.category}</div></Link>)}
+                {related.map((item) => <Link key={item.id} to={`/campaigns/${item.id}`} className="cd-related-item"><div className="cd-related-title">{item.title}</div><div className="cd-related-meta">{item.brand_name || 'Business'} · {item.category}</div></Link>)}
               </div>}
             </aside>
           </div>
@@ -1333,23 +1331,11 @@ export function CampaignDetail() {
     </div>
   );
 
-  if (usePublicNav) {
-    return (
-      <>
-        <PublicNavbar sticky />
-        {pageContent}
-      </>
-    );
-  }
-
   return (
-    <AppLayout
-      title={campaign?.title || 'Campaign'}
-      subtitle={brandName ? `${brandName}${brandLocation ? ` · ${brandLocation}` : ''}` : undefined}
-      showSearch={false}
-    >
+    <>
+      <PublicNavbar />
       {pageContent}
-    </AppLayout>
+    </>
   );
 }
 

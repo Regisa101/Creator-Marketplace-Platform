@@ -37,10 +37,15 @@ export function PublicNavbar({ sticky = true }: { sticky?: boolean }) {
   const [wishlistLoading, setWishlistLoading] = useState(false);
   const [wishlistError, setWishlistError] = useState('');
   const [removingId, setRemovingId] = useState<number | null>(null);
+  const [wishlistCount, setWishlistCount] = useState(0);
 
   const authenticated = !loading && !!user;
+  const isCreator = authenticated && user?.role === 'creator';
   const isHome = location.pathname === '/' && !location.hash;
-  const isCampaigns = location.pathname.startsWith('/campaigns');
+  // Only the actual "Explore Campaigns" list page lights up the Campaigns
+  // link — a single campaign's detail/edit page is not the campaigns list,
+  // so it should not show the active underline there.
+  const isCampaigns = location.pathname === '/campaigns';
   const isBrands = location.hash === '#for-brands';
   const isAbout = false;
 
@@ -49,6 +54,40 @@ export function PublicNavbar({ sticky = true }: { sticky?: boolean }) {
     setProfileOpen(false);
     setWishlistOpen(false);
   }, [location.pathname, location.hash]);
+
+  // Keep the heart badge's count in sync with the creator's wishlist,
+  // independent of whether the drawer itself has ever been opened, and
+  // refresh it whenever a campaign is saved/unsaved anywhere in the app.
+  useEffect(() => {
+    if (!isCreator) {
+      setWishlistCount(0);
+      return;
+    }
+    let cancelled = false;
+    const refreshCount = () => {
+      getSavedCampaigns()
+        .then((data) => {
+          if (!cancelled) setWishlistCount(data.length);
+        })
+        .catch((err) => console.error('Could not load wishlist count:', err));
+    };
+    refreshCount();
+    window.addEventListener('ch:wishlist-changed', refreshCount);
+    return () => {
+      cancelled = true;
+      window.removeEventListener('ch:wishlist-changed', refreshCount);
+    };
+  }, [isCreator]);
+
+  // The drawer keeps its own copy of the list (fetched only while open);
+  // reflect its length into the badge immediately too, so removing an item
+  // from inside the open drawer updates the count without waiting on the
+  // event round-trip.
+  useEffect(() => {
+    if (wishlistOpen && !wishlistLoading && !wishlistError) {
+      setWishlistCount(wishlist.length);
+    }
+  }, [wishlist, wishlistOpen, wishlistLoading, wishlistError]);
 
   useEffect(() => {
     if (!wishlistOpen) return;
@@ -157,6 +196,7 @@ export function PublicNavbar({ sticky = true }: { sticky?: boolean }) {
           line-height: 1;
         }
         .ch-public-links { display: flex; align-items: center; justify-content: center; gap: 30px; }
+        .ch-public-navitem { position: relative; display: inline-flex; align-items: center; }
         .ch-public-link {
           position: relative;
           display: inline-flex;
@@ -182,6 +222,49 @@ export function PublicNavbar({ sticky = true }: { sticky?: boolean }) {
         }
         .ch-public-link:hover, .ch-public-link.is-active { color: ${BRAND_PURPLE}; }
         .ch-public-link:hover::after, .ch-public-link.is-active::after { right: 0; }
+        .ch-public-navitem-dropdown {
+          position: absolute;
+          top: 100%;
+          left: 50%;
+          transform: translateX(-50%) translateY(4px);
+          min-width: 200px;
+          padding: 7px;
+          background: #fff;
+          border: 1px solid #E7E0F3;
+          border-radius: 13px;
+          box-shadow: 0 16px 40px rgba(36,31,46,.14);
+          opacity: 0;
+          visibility: hidden;
+          transition: opacity .15s ease, transform .15s ease, visibility .15s ease;
+          z-index: 1100;
+        }
+        .ch-public-navitem:hover .ch-public-navitem-dropdown,
+        .ch-public-navitem:focus-within .ch-public-navitem-dropdown {
+          opacity: 1;
+          visibility: visible;
+          transform: translateX(-50%) translateY(0);
+        }
+        /* Invisible bridge so the dropdown doesn't close on the small gap
+           between the link and the panel while moving the mouse down. */
+        .ch-public-navitem-dropdown::before {
+          content: '';
+          position: absolute;
+          top: -8px;
+          left: 0;
+          right: 0;
+          height: 8px;
+        }
+        .ch-public-navitem-dropdown a {
+          display: flex;
+          align-items: center;
+          padding: 10px;
+          border-radius: 8px;
+          color: #4B4654;
+          text-decoration: none;
+          font: 500 12.5px 'Poppins', sans-serif;
+          white-space: nowrap;
+        }
+        .ch-public-navitem-dropdown a:hover { background: #F5F1F9; color: ${BRAND_PURPLE}; }
         .ch-public-actions { justify-self: end; display: flex; align-items: center; gap: 10px; }
         .ch-public-auth-link {
           min-width: 68px;
@@ -198,11 +281,18 @@ export function PublicNavbar({ sticky = true }: { sticky?: boolean }) {
         .ch-public-register { color: #fff; background: ${BRAND_PURPLE}; border: 1px solid ${BRAND_PURPLE}; }
         .ch-public-register:hover { background: ${BRAND_PURPLE_DARK}; border-color: ${BRAND_PURPLE_DARK}; }
         .ch-public-wishlist-btn {
+          position: relative;
           width: 38px; height: 38px; border: none; background: transparent; padding: 0;
           display: inline-flex; align-items: center; justify-content: center;
           color: #55545A; cursor: pointer;
         }
         .ch-public-wishlist-btn:hover, .ch-public-wishlist-btn.is-active { color: ${BRAND_PURPLE}; }
+        .ch-public-wishlist-count {
+          position: absolute; top: 2px; right: 2px; min-width: 16px; height: 16px; padding: 0 4px;
+          border-radius: 999px; background: ${BRAND_PURPLE}; color: #fff; border: 2px solid ${OFF_WHITE};
+          font: 700 10px 'Poppins', sans-serif; display: inline-flex; align-items: center; justify-content: center;
+          line-height: 1;
+        }
         .ch-public-profile { position: relative; }
         .ch-public-avatar {
           width: 38px; height: 38px; padding: 0; border-radius: 50%; border: 1px solid #E5DFDA;
@@ -296,10 +386,31 @@ export function PublicNavbar({ sticky = true }: { sticky?: boolean }) {
           </Link>
 
           <div className="ch-public-links">
-            <Link to="/#home" className={`ch-public-link${isHome ? ' is-active' : ''}`}>Home</Link>
-            <Link to="/#campaigns" className={`ch-public-link${isCampaigns ? ' is-active' : ''}`}>Campaigns</Link>
-            <Link to="/#for-brands" className={`ch-public-link${isBrands ? ' is-active' : ''}`}>For Brands</Link>
-            <Link to="/#for-brands" className={`ch-public-link${isAbout ? ' is-active' : ''}`}>About</Link>
+            <div className="ch-public-navitem">
+              <Link to="/" className={`ch-public-link${isHome ? ' is-active' : ''}`}>Home</Link>
+            </div>
+
+            <div className="ch-public-navitem">
+              <Link to="/campaigns" className={`ch-public-link${isCampaigns ? ' is-active' : ''}`}>Campaigns</Link>
+              <div className="ch-public-navitem-dropdown" role="menu">
+                <Link to="/campaigns" role="menuitem">Explore Campaigns</Link>
+                <Link to="/#campaigns" role="menuitem">Featured on Home</Link>
+                {isCreator && <Link to="/saved" role="menuitem">My Wishlist</Link>}
+              </div>
+            </div>
+
+            <div className="ch-public-navitem">
+              <Link to="/#for-brands" className={`ch-public-link${isBrands ? ' is-active' : ''}`}>For Brands</Link>
+              <div className="ch-public-navitem-dropdown" role="menu">
+                <Link to="/#for-brands" role="menuitem">Why Brands Choose Us</Link>
+                {!authenticated && <Link to="/register/business" role="menuitem">Register Your Brand</Link>}
+                {authenticated && user?.role === 'business' && <Link to="/campaigns/new" role="menuitem">Launch a Campaign</Link>}
+              </div>
+            </div>
+
+            <div className="ch-public-navitem">
+              <Link to="/#for-brands" className={`ch-public-link${isAbout ? ' is-active' : ''}`}>About</Link>
+            </div>
           </div>
 
           <div className="ch-public-actions">
@@ -319,6 +430,9 @@ export function PublicNavbar({ sticky = true }: { sticky?: boolean }) {
                     onClick={() => setWishlistOpen(true)}
                   >
                     <Heart size={19} fill={wishlistOpen ? 'currentColor' : 'none'} />
+                    {wishlistCount > 0 && (
+                      <span className="ch-public-wishlist-count">{wishlistCount > 99 ? '99+' : wishlistCount}</span>
+                    )}
                   </button>
                 )}
                 <div className="ch-public-profile" ref={profileRef}>
@@ -358,8 +472,8 @@ export function PublicNavbar({ sticky = true }: { sticky?: boolean }) {
 
         {mobileOpen && (
           <div className="ch-public-mobile">
-            <Link to="/#home" className={isHome ? 'is-active' : ''} onClick={closeMobile}>Home</Link>
-            <Link to="/#campaigns" className={isCampaigns ? 'is-active' : ''} onClick={closeMobile}>Campaigns</Link>
+            <Link to="/" className={isHome ? 'is-active' : ''} onClick={closeMobile}>Home</Link>
+            <Link to="/campaigns" className={isCampaigns ? 'is-active' : ''} onClick={closeMobile}>Campaigns</Link>
             <Link to="/#for-brands" className={isBrands ? 'is-active' : ''} onClick={closeMobile}>For Brands</Link>
             <Link to="/#for-brands" className={isAbout ? 'is-active' : ''} onClick={closeMobile}>About</Link>
             {authenticated ? (

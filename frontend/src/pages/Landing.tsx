@@ -10,7 +10,7 @@
 // campaigns posted by brands appear here without hard-coded placeholder data.
 
 import { useEffect, useMemo, useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useLocation } from "react-router-dom";
 import { LogoMark, OFF_WHITE } from "../components/Logo";
 import { PublicNavbar } from "../components/PublicNavbar";
 import { useAuth } from "../context/AuthContext";
@@ -49,6 +49,7 @@ const PAGE_BG = OFF_WHITE;
 // Unfunded and pending-funding campaigns stay hidden until payment is complete.
 
 const DEADLINE_FILTERS = ["All Deadlines", "Due this week", "Due this month", "Later"];
+const AVAILABILITY_FILTERS = ["All Campaigns", "Available", "Booked"];
 const CREATOR_TYPE_FILTERS = [
   { label: "Creator Audience Size", value: "All Creator Types" },
   { label: "Under 10K followers", value: "Under 10K followers" },
@@ -240,6 +241,7 @@ function CampaignCard({ c, isCreator, isAuthenticated, isSaved, onToggleSave }: 
 export function Landing() {
   const { user } = useAuth();
   const isCreator = user?.role === "creator";
+  const routerLocation = useLocation();
   const [saved, setSaved] = useState<SavedCampaignEntry[]>([]);
   const [search, setSearch] = useState("");
   const [searchOpen, setSearchOpen] = useState(false);
@@ -248,7 +250,23 @@ export function Landing() {
   const [platform, setPlatform] = useState("Platform");
   const [deadlineFilter, setDeadlineFilter] = useState("All Deadlines");
   const [creatorType, setCreatorType] = useState("All Creator Types");
+  const [availability, setAvailability] = useState("All Campaigns");
   const [openFilter, setOpenFilter] = useState<string | null>(null);
+
+  // The navbar's Home / Campaigns / For Brands links use hash anchors
+  // (e.g. "/#for-brands") so they work as functional redirects from any
+  // page, not just while already on the landing page. Client-side routing
+  // doesn't trigger the browser's native scroll-to-anchor behaviour, so we
+  // do it ourselves whenever the hash changes (including on first load).
+  useEffect(() => {
+    const hash = routerLocation.hash?.replace("#", "");
+    if (!hash) return;
+    // Give the section time to mount before measuring its position.
+    const timer = window.setTimeout(() => {
+      document.getElementById(hash)?.scrollIntoView({ behavior: "smooth", block: "start" });
+    }, 50);
+    return () => window.clearTimeout(timer);
+  }, [routerLocation.pathname, routerLocation.hash]);
   const [campaigns, setCampaigns] = useState<PublicCampaign[]>([]);
   const [campaignLoading, setCampaignLoading] = useState(true);
   const [campaignError, setCampaignError] = useState("");
@@ -292,6 +310,8 @@ export function Landing() {
         const entry = await saveCampaign(campaignId);
         setSaved((items) => [...items, entry]);
       }
+
+      window.dispatchEvent(new Event("ch:wishlist-changed"));
     } catch (error) {
       console.error("Could not update wishlist:", error);
     }
@@ -399,7 +419,11 @@ export function Landing() {
         (deadlineFilter === "Later" && deadlineDate > monthEnd);
       const audience = creatorAudienceLabel(c);
       const matchesCreatorType = creatorType === "All Creator Types" || audience === creatorType;
-      return matchesSearch && matchesCategory && matchesLocation && matchesPlatform && matchesDeadline && matchesCreatorType;
+      const matchesAvailability =
+        availability === "All Campaigns" ||
+        (availability === "Booked" && isBooked(c)) ||
+        (availability === "Available" && !isBooked(c));
+      return matchesSearch && matchesCategory && matchesLocation && matchesPlatform && matchesDeadline && matchesCreatorType && matchesAvailability;
     });
 
     // Available campaigns first. Booked campaigns always go to the very end.
@@ -415,7 +439,7 @@ export function Landing() {
       const dateB = new Date(b.created_at || b.updated_at || 0).getTime() || 0;
       return dateB - dateA;
     });
-  }, [campaigns, search, category, location, platform, deadlineFilter, creatorType]);
+  }, [campaigns, search, category, location, platform, deadlineFilter, creatorType, availability]);
 
   const displayCampaigns = useMemo(() => {
     // Do not append demo/placeholder campaigns here. Public cards must come
@@ -433,7 +457,7 @@ export function Landing() {
 
   useEffect(() => {
     setVisibleCount(7);
-  }, [search, category, location, platform, deadlineFilter, creatorType]);
+  }, [search, category, location, platform, deadlineFilter, creatorType, availability]);
 
   return (
     <div className="lp">
@@ -507,7 +531,7 @@ export function Landing() {
 .lp-card-apply-disabled { background:#ECE9EF; border-color:#ECE9EF; color:#8B8593; cursor:not-allowed; box-shadow:none; }
 .lp-card-apply-disabled:hover { transform:none; background:#ECE9EF; border-color:#ECE9EF; color:#8B8593; }
 
-.lp-campaign-save { position:absolute; top:12px; right:12px; width:36px; height:36px; border:1px solid rgba(255,255,255,.7); border-radius:50%; background:rgba(255,255,255,.96); color:#77727F; display:flex; align-items:center; justify-content:center; box-shadow:0 4px 12px rgba(30,25,40,.12); z-index:2; }
+.lp-campaign-save { position:absolute; top:12px; left:12px; width:36px; height:36px; border:1px solid rgba(255,255,255,.7); border-radius:50%; background:rgba(255,255,255,.96); color:#77727F; display:flex; align-items:center; justify-content:center; box-shadow:0 4px 12px rgba(30,25,40,.12); z-index:2; }
 .lp-campaign-save:hover { color:var(--coral); transform:translateY(-1px); }
 .lp-campaign-save.is-saved { color:var(--coral); border-color:#F6C9C6; }
 
@@ -1034,6 +1058,12 @@ export function Landing() {
             open={openFilter === "creator"}
             onToggle={() => setOpenFilter(openFilter === "creator" ? null : "creator")}
             onChange={(value) => { setCreatorType(value); setOpenFilter(null); }}
+          />
+          <FilterDropdown
+            label="All Campaigns" value={availability} options={AVAILABILITY_FILTERS}
+            open={openFilter === "availability"}
+            onToggle={() => setOpenFilter(openFilter === "availability" ? null : "availability")}
+            onChange={(value) => { setAvailability(value); setOpenFilter(null); }}
           />
         </div>
 

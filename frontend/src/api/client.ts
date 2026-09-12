@@ -812,13 +812,24 @@ export const withdrawApplication = async (id: number): Promise<{ message: string
 // API FUNCTIONS - SAVED CAMPAIGNS
 // ============================================
 
+// Notify anything listening (e.g. the navbar's wishlist heart badge) that
+// the saved-campaigns list changed, so counts can update instantly without
+// every caller having to remember to do it themselves.
+function notifyWishlistChanged() {
+  if (typeof window !== 'undefined') {
+    window.dispatchEvent(new Event('ch:wishlist-changed'));
+  }
+}
+
 export const saveCampaign = async (campaignId: number): Promise<SavedCampaignEntry> => {
   const response = await api.post<SavedCampaignEntry>('/saved-campaigns', { campaign_id: campaignId });
+  notifyWishlistChanged();
   return response.data;
 };
 
 export const unsaveCampaign = async (campaignId: number): Promise<void> => {
   await api.delete(`/saved-campaigns/${campaignId}`);
+  notifyWishlistChanged();
 };
 
 export const getSavedCampaigns = async (): Promise<SavedCampaignEntry[]> => {
