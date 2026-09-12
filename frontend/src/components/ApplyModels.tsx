@@ -41,7 +41,6 @@ function getErrorMessage(error: unknown, fallback: string): string {
 export function ApplyModal({ isOpen, onClose, campaign, onSuccess }: ApplyModalProps) {
   const [profile, setProfile] = useState<CreatorApplyProfile | null>(null);
   const [proposal, setProposal] = useState('');
-  const [rate, setRate] = useState('');
   const [message, setMessage] = useState('');
   const [answers, setAnswers] = useState<Record<number, string>>({});
   const [portfolio, setPortfolio] = useState<CreatorPortfolioItemData[]>([]);
@@ -62,7 +61,6 @@ export function ApplyModal({ isOpen, onClose, campaign, onSuccess }: ApplyModalP
     let cancelled = false;
     setProfile(null);
     setProposal('');
-    setRate('');
     setMessage('');
     setAnswers({});
     setPortfolio([]);
@@ -182,7 +180,6 @@ export function ApplyModal({ isOpen, onClose, campaign, onSuccess }: ApplyModalP
       await createApplication({
         campaign_id: campaign.id,
         proposal: proposal.trim(),
-        rate: rate.trim() ? Number(rate) : undefined,
         message: message.trim() || undefined,
         application_answers: questions.map((question, index) => ({
           question,
@@ -450,24 +447,6 @@ export function ApplyModal({ isOpen, onClose, campaign, onSuccess }: ApplyModalP
                   }}
                 />
               </label>
-            </section>
-
-            <section className="am-section">
-              <div className="am-section-heading">
-                <h3 className="am-section-title">Your rate</h3>
-                <span className="am-section-help">Optional</span>
-              </div>
-              <input
-                className="am-input"
-                type="number"
-                min="0"
-                step="100"
-                inputMode="numeric"
-                value={rate}
-                onChange={(event) => setRate(event.target.value)}
-                placeholder="e.g. 5000"
-              />
-              <span className="am-hint">For paid campaigns, enter the rate you would like the brand to consider.</span>
             </section>
 
             <section className="am-section">

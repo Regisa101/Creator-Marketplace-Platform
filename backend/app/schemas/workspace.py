@@ -35,14 +35,12 @@ class CollabResponse(BaseModel):
     rate: Optional[float] = None
     agreed_rate: Optional[float] = None
     rate_locked: bool = False
-    negotiation_status: str = "not_started"
 
     # Application / collaboration status
     status: str
     created_at: datetime
 
     creator_confirmed: bool = False
-    creator_verified: bool = False
 
     # Deliverable summary
     pending_deliverables: int = 0

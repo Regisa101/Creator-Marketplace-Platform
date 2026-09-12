@@ -13,12 +13,10 @@ class Application(Base):
     proposal = Column(Text, nullable=False)
     rate = Column(DECIMAL(10,2), nullable=True)
 
-    # Negotiation / final deal terms. `rate` remains the creator's requested
-    # rate. Once both parties accept an offer, `agreed_rate` is locked and
-    # becomes the only amount a payment may use.
+    # Fixed campaign compensation. `agreed_rate` mirrors the locked amount
+    # that was established from the campaign budget before work begins.
     agreed_rate = Column(DECIMAL(10,2), nullable=True)
     rate_locked = Column(Integer, nullable=False, default=0)
-    negotiation_status = Column(String(30), nullable=False, default="not_started")
     message = Column(Text, nullable=True)
 
     # Answers to campaign-specific application questions and the portfolio

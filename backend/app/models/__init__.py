@@ -19,7 +19,6 @@ from app.models.payment import Payment                          # ← Payments (
 from app.models.rating import Rating                            # ← Ratings (brand rates creator)
 from app.models.notification import Notification
 
-from app.models.negotiation_offer import NegotiationOffer
 from app.models.publication_proof import PublicationProof
 
 from app.models.campaign_performance import CampaignPerformance

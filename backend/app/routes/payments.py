@@ -401,12 +401,15 @@ async def payment_summary(db: Session = Depends(get_db), current_user: User = De
         db.query(Payment)
         .join(Application, Payment.application_id == Application.id)
         .join(Campaign, Application.campaign_id == Campaign.id)
-        .filter(Payment.status == "released")
+        .filter(Payment.status.in_(["released", "completed"]))
     )
     if current_user.role == "creator":
         base_query = base_query.filter(Application.creator_id == current_user.id)
     else:
-        base_query = base_query.filter(Campaign.business_id == current_user.id)
+        base_query = base_query.filter(
+            Campaign.business_id == current_user.id,
+            Payment.payment_type != "campaign_funding",
+        )
 
     lifetime_total = float(base_query.with_entities(func.coalesce(func.sum(Payment.amount), 0)).scalar() or 0)
 

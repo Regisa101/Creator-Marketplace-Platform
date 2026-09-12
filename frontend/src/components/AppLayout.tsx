@@ -326,14 +326,12 @@ export function AppLayout({
   /*
    * PAYMENT SUCCESS POPUP
    *
-   * Businesses receive a collaboration_completed notification when the
-   * platform automatically releases a creator payout after the final
-   * deliverable is submitted. Show that notification as a popup anywhere
-   * in the app so the brand sees payment success without needing to open
-   * the notifications page.
+   * Show payment-success notifications as a popup for both sides.
+   * The brand receives collaboration_completed; the creator receives
+   * payment_released after the brand approves all deliverables.
    */
   useEffect(() => {
-    if (role !== "business") return;
+    if (!role) return;
 
     let mounted = true;
 
@@ -343,7 +341,7 @@ export function AppLayout({
         if (!mounted) return;
 
         const notice = notifications.find(
-          (item) => item.type === "collaboration_completed"
+          (item) => item.type === (role === "business" ? "collaboration_completed" : "payment_released")
         );
         if (!notice) return;
 

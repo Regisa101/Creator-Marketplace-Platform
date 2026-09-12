@@ -16,7 +16,6 @@ from app.models import (
     Rating,
 )
 from app.schemas.workspace import (
-    CollabRateFix,
     CollabResponse,
     DeliverableCreate,
     DeliverableSubmit,
@@ -613,15 +612,6 @@ def _collab_to_response(
             )
         ),
 
-        negotiation_status=(
-            getattr(
-                application,
-                "negotiation_status",
-                None,
-            )
-            or "not_started"
-        ),
-
         status=application.status,
 
         created_at=application.created_at,
@@ -634,13 +624,6 @@ def _collab_to_response(
             )
         ),
 
-        creator_verified=bool(
-            getattr(
-                application,
-                "creator_verified",
-                False,
-            )
-        ),
 
         pending_deliverables=(
             pending_deliverables
@@ -727,12 +710,12 @@ def _collab_to_response(
 # AUTOMATIC CREATOR PAYOUT
 # ============================================================
 
-def _auto_release_creator_payout(
+def _release_creator_payout_after_approval(
     db: Session,
     application: Application,
     campaign: Campaign,
 ) -> Optional[Payment]:
-    """Pay the creator automatically after the final required deliverable is submitted."""
+    """Release the creator payout immediately after the brand approves all deliverables."""
     if not application or not campaign:
         return None
 
@@ -743,7 +726,7 @@ def _auto_release_creator_payout(
     deliverables = db.query(Deliverable).filter(
         Deliverable.application_id == application.id
     ).all()
-    if not deliverables or not all(d.status in ("submitted", "approved") for d in deliverables):
+    if not deliverables or not all(d.status == "approved" for d in deliverables):
         return None
 
     existing = db.query(Payment).filter(
@@ -762,9 +745,9 @@ def _auto_release_creator_payout(
     if not funding:
         raise HTTPException(status_code=400, detail="The campaign budget must be funded before payment can be released.")
 
-    agreed = float(application.agreed_rate or application.rate or 0)
+    agreed = float(application.agreed_rate or application.rate or campaign.budget or 0)
     if agreed <= 0:
-        raise HTTPException(status_code=400, detail="A valid agreed creator rate is required before payment can be released.")
+        raise HTTPException(status_code=400, detail="A valid campaign payment amount is required before payment can be released.")
 
     already_allocated = float(
         db.query(func.coalesce(func.sum(Payment.amount), 0)).filter(
@@ -798,14 +781,6 @@ def _auto_release_creator_payout(
         paid_at=now,
     )
     db.add(payout)
-
-    # Payment happens when the final required deliverable is submitted.
-    # The submitted work therefore completes the collaboration without a
-    # second manual approval/payment step.
-    for item in deliverables:
-        item.status = "approved"
-        item.feedback = None
-
     application.status = "completed"
 
     create_notification(
@@ -813,7 +788,7 @@ def _auto_release_creator_payout(
         user_id=application.creator_id,
         type="payment_released",
         title="Payment successful",
-        message=f"Rs. {creator_amount:,.2f} has been paid to you for {campaign.title}. Your deliverables were submitted successfully.",
+        message=f"Rs. {creator_amount:,.2f} has been paid to you for {campaign.title} after the brand approved your deliverables.",
         link=f"/workspace/active?collab={application.id}",
         reference_id=application.id,
         event_key=f"payment-released:{application.id}",
@@ -823,7 +798,7 @@ def _auto_release_creator_payout(
         user_id=campaign.business_id,
         type="collaboration_completed",
         title="Payment successful",
-        message=f"Rs. {creator_amount:,.2f} was paid to the creator for {campaign.title}. The collaboration is now complete.",
+        message=f"Rs. {creator_amount:,.2f} was paid to the creator for {campaign.title}. The approved collaboration is now complete.",
         link=f"/workspace/active?collab={application.id}",
         reference_id=application.id,
         event_key=f"collaboration-completed:{application.id}",
@@ -1023,200 +998,6 @@ async def confirm_collaboration(
             reference_id=application.id,
             event_key=(
                 f"creator-confirmed:"
-                f"{application.id}"
-            ),
-        )
-
-    db.commit()
-    db.refresh(application)
-
-    return _collab_to_response(
-        db,
-        application,
-        current_user.id,
-    )
-
-
-@router.put(
-    "/collabs/{collab_id}/rate",
-    response_model=CollabResponse,
-)
-async def fix_collaboration_rate(
-    collab_id: int,
-    data: CollabRateFix,
-    db: Session = Depends(get_db),
-    current_user: User = Depends(
-        get_current_business
-    ),
-):
-    """
-    Repairs a collaboration that has no agreed rate on record.
-
-    This is NOT a way to renegotiate an already-agreed price — normal
-    negotiation happens before acceptance via /api/negotiations and
-    locks `agreed_rate` there. This endpoint only fills in the amount
-    when a collaboration somehow reached "accepted" without one ever
-    being set (e.g. legacy data, or a campaign whose type changed after
-    acceptance), which otherwise leaves payment release permanently
-    stuck with no way to recover.
-    """
-
-    application = _get_authorized_collab(
-        db,
-        current_user,
-        collab_id,
-    )
-
-    if application.agreed_rate:
-        raise HTTPException(
-            status_code=400,
-            detail=(
-                "This collaboration already has an "
-                "agreed rate and cannot be changed here."
-            ),
-        )
-
-    application.agreed_rate = data.amount
-    application.rate_locked = 1
-    application.negotiation_status = "agreed"
-
-    db.commit()
-    db.refresh(application)
-
-    return _collab_to_response(
-        db,
-        application,
-        current_user.id,
-    )
-
-
-@router.post(
-    "/collabs/{collab_id}/verify",
-    response_model=CollabResponse,
-)
-async def verify_collaboration(
-    collab_id: int,
-    db: Session = Depends(get_db),
-    current_user: User = Depends(
-        get_current_creator
-    ),
-):
-    """
-    Creator's final verification.
-
-    Payment is NOT released here.
-    """
-
-    application = _get_authorized_collab(
-        db,
-        current_user,
-        collab_id,
-    )
-
-    if application.status != "accepted":
-        raise HTTPException(
-            status_code=400,
-            detail=(
-                "This collaboration is "
-                "no longer active."
-            ),
-        )
-
-    if not getattr(
-        application,
-        "creator_confirmed",
-        False,
-    ):
-        raise HTTPException(
-            status_code=400,
-            detail=(
-                "Confirm the collaboration "
-                "before submitting final "
-                "verification."
-            ),
-        )
-
-    deliverables = (
-        db.query(Deliverable)
-        .filter(
-            Deliverable.application_id
-            == application.id
-        )
-        .all()
-    )
-
-    if not deliverables:
-        raise HTTPException(
-            status_code=400,
-            detail=(
-                "Final verification is "
-                "available only after all "
-                "deliverables are approved."
-            ),
-        )
-
-    if not all(
-        deliverable.status == "approved"
-        for deliverable in deliverables
-    ):
-        raise HTTPException(
-            status_code=400,
-            detail=(
-                "Final verification is "
-                "available only after all "
-                "deliverables are approved."
-            ),
-        )
-
-    if getattr(
-        application,
-        "creator_verified",
-        False,
-    ):
-        return _collab_to_response(
-            db,
-            application,
-            current_user.id,
-        )
-
-    application.creator_verified = True
-
-    campaign = (
-        db.query(Campaign)
-        .filter(
-            Campaign.id
-            == application.campaign_id
-        )
-        .first()
-    )
-
-    if campaign:
-
-        creator_name = (
-            _creator_display_name(
-                current_user
-            )
-            or "The creator"
-        )
-
-        create_notification(
-            db,
-            user_id=campaign.business_id,
-            type="creator_verified",
-            title="Final verification is ready",
-            message=(
-                f"{creator_name} submitted "
-                f"final verification for "
-                f"{campaign.title}. Review it "
-                "to release payment."
-            ),
-            link=(
-                "/workspace/active?"
-                f"collab={application.id}"
-            ),
-            reference_id=application.id,
-            event_key=(
-                f"creator-verified:"
                 f"{application.id}"
             ),
         )
@@ -1651,20 +1432,6 @@ async def submit_deliverable(
             ),
         )
 
-    if not getattr(
-        application,
-        "creator_confirmed",
-        False,
-    ):
-
-        raise HTTPException(
-            status_code=400,
-            detail=(
-                "Confirm the collaboration "
-                "before submitting work."
-            ),
-        )
-
     if data.media_type not in (
         "image",
         "video",
@@ -1821,19 +1588,10 @@ async def submit_deliverable(
             ),
         )
 
-    payout = _auto_release_creator_payout(db, application, campaign) if campaign else None
-
     db.commit()
     db.refresh(deliverable)
 
-    response = _deliverable_to_response(
-        db,
-        deliverable,
-    )
-    response.payment_released = payout is not None
-    response.payment_amount = float(payout.amount) if payout else None
-    response.payment_id = payout.id if payout else None
-    return response
+    return _deliverable_to_response(db, deliverable)
 
 
 # ============================================================
@@ -1988,67 +1746,27 @@ async def review_deliverable(
             )
 
     # --------------------------------------------------------
-    # All deliverables approved?
-    #
-    # Do NOT complete collaboration here.
-    # Do NOT release payment here.
-    # Creator must verify first.
+    # Final brand approval releases payment immediately.
     # --------------------------------------------------------
-
+    payout = None
     all_deliverables = (
         db.query(Deliverable)
-        .filter(
-            Deliverable.application_id
-            == application.id
-        )
+        .filter(Deliverable.application_id == application.id)
         .all()
     )
-
-    if (
-        data.status == "approved"
-        and all_deliverables
-        and all(
-            item.status == "approved"
-            for item in all_deliverables
-        )
-        and not getattr(
-            application,
-            "creator_verified",
-            False,
-        )
-        and campaign
+    if data.status == "approved" and all_deliverables and all(
+        item.status == "approved" for item in all_deliverables
     ):
-
-        create_notification(
-            db,
-            user_id=application.creator_id,
-            type="verification_ready",
-            title=(
-                "All work approved — "
-                "final verification"
-            ),
-            message=(
-                f"All deliverables for "
-                f"{campaign.title} are approved. "
-                "Submit your final verification."
-            ),
-            link=(
-                "/workspace/active?"
-                f"collab={application.id}"
-            ),
-            event_key=(
-                f"verification-ready:"
-                f"{application.id}"
-            ),
-        )
+        payout = _release_creator_payout_after_approval(db, application, campaign)
 
     db.commit()
     db.refresh(deliverable)
 
-    return _deliverable_to_response(
-        db,
-        deliverable,
-    )
+    response = _deliverable_to_response(db, deliverable)
+    response.payment_released = payout is not None
+    response.payment_amount = float(payout.amount) if payout else None
+    response.payment_id = payout.id if payout else None
+    return response
 
 
 # ============================================================
@@ -2167,55 +1885,9 @@ async def review_all_deliverables(
             ),
         )
 
-    # --------------------------------------------------------
-    # Verification notification
-    # --------------------------------------------------------
-
-    campaign = (
-        db.query(Campaign)
-        .filter(
-            Campaign.id
-            == application.campaign_id
-        )
-        .first()
-    )
-
-    if (
-        campaign
-        and deliverables
-        and all(
-            deliverable.status == "approved"
-            for deliverable in deliverables
-        )
-        and not getattr(
-            application,
-            "creator_verified",
-            False,
-        )
-    ):
-
-        create_notification(
-            db,
-            user_id=application.creator_id,
-            type="verification_ready",
-            title=(
-                "All work approved — "
-                "final verification"
-            ),
-            message=(
-                f"All deliverables for "
-                f"{campaign.title} are approved. "
-                "Submit your final verification."
-            ),
-            link=(
-                "/workspace/active?"
-                f"collab={application.id}"
-            ),
-            event_key=(
-                f"verification-ready:"
-                f"{application.id}"
-            ),
-        )
+    # Final approval of the collaboration releases the secured payment.
+    campaign = db.query(Campaign).filter(Campaign.id == application.campaign_id).first()
+    payout = _release_creator_payout_after_approval(db, application, campaign)
 
     db.commit()
 

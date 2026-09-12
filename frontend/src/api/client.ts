@@ -354,8 +354,6 @@ export interface Application {
   match_configured_count?: number;
   status: ApplicationStatus;
   agreed_rate?: number | null;
-  rate_locked?: boolean;
-  negotiation_status?: string;
   created_at: string;
   updated_at?: string | null;
 }
@@ -516,12 +514,9 @@ export interface Collab {
   creator_avatar?: string | null;
   rate?: number | null;
   agreed_rate?: number | null;
-  rate_locked?: boolean;
-  negotiation_status?: string;
   status: string;
   created_at: string;
   creator_confirmed?: boolean;
-  creator_verified?: boolean;
   pending_deliverables: number;
   unread_messages: number;
   payment_status?: 'initiated' | 'funded' | 'released' | 'completed' | 'failed' | 'refunded' | null;
@@ -957,38 +952,6 @@ export const initiatePayment = async (
 export const releasePayment = async (collabId: number): Promise<Payment> =>
   (await api.post<Payment>(`/payments/release/${collabId}`)).data;
 
-export interface NegotiationOffer {
-  id: number;
-  application_id: number;
-  sender_id: number;
-  sender_name?: string | null;
-  sender_role?: string | null;
-  amount: number;
-  message?: string | null;
-  status: 'pending' | 'accepted' | 'rejected' | 'superseded';
-  created_at: string;
-  responded_at?: string | null;
-}
-
-export const getNegotiation = async (applicationId: number): Promise<NegotiationOffer[]> => {
-  const response = await api.get<NegotiationOffer[]>(`/negotiations/${applicationId}`);
-  return response.data;
-};
-
-export const makeNegotiationOffer = async (applicationId: number, amount: number, message?: string): Promise<NegotiationOffer> => {
-  const response = await api.post<NegotiationOffer>(`/negotiations/${applicationId}/offers`, { amount, message });
-  return response.data;
-};
-
-export const acceptNegotiationOffer = async (applicationId: number, offerId: number): Promise<NegotiationOffer> => {
-  const response = await api.post<NegotiationOffer>(`/negotiations/${applicationId}/offers/${offerId}/accept`);
-  return response.data;
-};
-
-export const rejectNegotiationOffer = async (applicationId: number, offerId: number): Promise<NegotiationOffer> => {
-  const response = await api.post<NegotiationOffer>(`/negotiations/${applicationId}/offers/${offerId}/reject`);
-  return response.data;
-};
 
 export const verifyPayment = async (pidx: string): Promise<Payment> => {
   const response = await api.get<Payment>('/payments/verify', { params: { pidx } });

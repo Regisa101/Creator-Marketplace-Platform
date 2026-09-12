@@ -152,13 +152,28 @@ export function Dashboard() {
       setLoading(true);
       try {
         if (!business) {
-          const [apps, active, finished, paymentSummary] = await Promise.all([
-            getApplications(), getCollabs(), getCollabHistory(), getPaymentSummary(),
+          // Do not let one dashboard endpoint failing make every card show 0.
+          // Each section keeps whatever data its own endpoint successfully returns.
+          const [appsResult, activeResult, historyResult, paymentResult, notesResult] = await Promise.allSettled([
+            getApplications(), getCollabs(), getCollabHistory(), getPaymentSummary(), getNotifications(),
           ]);
           if (cancelled) return;
-          setCampaigns([]); setApplications(apps); setCollabs(active); setHistory(finished);
+
+          const apps = appsResult.status === 'fulfilled' ? appsResult.value : [];
+          const active = activeResult.status === 'fulfilled' ? activeResult.value : [];
+          const finished = historyResult.status === 'fulfilled' ? historyResult.value : [];
+          const paymentSummary = paymentResult.status === 'fulfilled'
+            ? paymentResult.value
+            : { this_month: 0, lifetime: 0, completed_payment_count: 0 };
+          const notes = notesResult.status === 'fulfilled' ? notesResult.value : [];
+
+          setCampaigns([]);
+          setApplications(apps);
+          setCollabs(active);
+          setHistory(finished);
           setPayments({ this_month: paymentSummary.this_month, lifetime: paymentSummary.lifetime });
-          setActivity([]); setSuggestedCreators([]);
+          setActivity(notes);
+          setSuggestedCreators([]);
           return;
         }
 
@@ -303,7 +318,46 @@ export function Dashboard() {
     return items.sort((a, b) => new Date(b.time).getTime() - new Date(a.time).getTime());
   }, [campaigns, completedCampaignIds]);
 
-  const activitySource = activity.length > 0 ? activity : derivedActivity;
+  const creatorActivity = useMemo(() => {
+    if (isBusiness) return [] as Array<{ id: string; title: string; time: string; link: string; kind: 'created' | 'completed' | 'applications' }>;
+    type Item = { id: string; title: string; time: string; link: string; kind: 'created' | 'completed' | 'applications' };
+    const items: Item[] = [];
+
+    applications.forEach((application) => {
+      const title = application.campaign_title || `Campaign #${application.campaign_id}`;
+      const status = String(application.status || '').toLowerCase();
+      const label = status === 'accepted'
+        ? `Your application for "${title}" was accepted`
+        : status === 'rejected'
+          ? `Your application for "${title}" was declined`
+          : `You applied to "${title}"`;
+      items.push({
+        id: `application-${application.id}`,
+        title: label,
+        time: application.updated_at || application.created_at,
+        link: `/campaigns/${application.campaign_id}?source=dashboard`,
+        kind: 'applications',
+      });
+    });
+
+    [...collabs, ...history].forEach((collab) => {
+      const title = collab.campaign_title || `Campaign #${collab.campaign_id}`;
+      const completed = collab.status === 'completed' || history.some((item) => item.id === collab.id);
+      items.push({
+        id: `collab-${collab.id}-${completed ? 'completed' : 'active'}`,
+        title: completed ? `Collaboration "${title}" was completed` : `You are collaborating on "${title}"`,
+        time: collab.created_at,
+        link: completed ? '/workspace/history' : `/workspace/active?collab=${collab.id}`,
+        kind: completed ? 'completed' : 'created',
+      });
+    });
+
+    return items.sort((a, b) => new Date(b.time).getTime() - new Date(a.time).getTime());
+  }, [isBusiness, applications, collabs, history]);
+
+  const activitySource = isBusiness
+    ? (activity.length > 0 ? activity : derivedActivity)
+    : (activity.length > 0 ? activity : creatorActivity);
 
   const businessTabCounts = useMemo(() => ({
     all: campaigns.length,
@@ -509,6 +563,25 @@ export function Dashboard() {
               <div className="stat"><div className="stat-body"><small>Applications sent</small><strong>{applications.length}</strong></div></div>
               <div className="stat"><div className="stat-body"><small>Lifetime earnings</small><strong>{money(payments.lifetime)}</strong></div></div>
             </div>
+
+            <section className="panel" style={{ marginBottom: 24 }}>
+              <div className="panel-head">
+                <div className="panel-head-title">Recent activity</div>
+                {creatorActivity.length > 3 && <Link className="mini-link" to="/notifications">See all →</Link>}
+              </div>
+              <div className="activity" style={{ marginTop: 6 }}>
+                {(activity.length > 0 ? activity.slice(0, 5) : creatorActivity.slice(0, 5)).map((item) => {
+                  if ('message' in item) {
+                    const note = item as Notification;
+                    const content = <><span className={`activity-dot activity-dot--${activityKindFromTitle(note.title)} ${note.is_read ? '' : 'unread'}`} /><div><div className="activity-title">{note.title}{note.message ? ` — ${note.message}` : ''}</div><div className="activity-time">{timeAgo(note.created_at)}</div></div></>;
+                    return note.link ? <Link className="activity-item activity-item--clickable" key={`note-${note.id}`} to={note.link}>{content}</Link> : <div className="activity-item" key={`note-${note.id}`}>{content}</div>;
+                  }
+                  const creatorItem = item as { id: string; title: string; time: string; link: string; kind: 'created' | 'completed' | 'applications' };
+                  return <Link className="activity-item activity-item--clickable" key={creatorItem.id} to={creatorItem.link}><span className={`activity-dot activity-dot--${creatorItem.kind}`} /><div><div className="activity-title">{creatorItem.title}</div><div className="activity-time">{timeAgo(creatorItem.time)}</div></div></Link>;
+                })}
+                {!loading && activitySource.length === 0 && <div className="empty" style={{ marginTop: 8 }}>No activity yet.</div>}
+              </div>
+            </section>
 
             <div className="section-head">
               <div><h2>People you've worked with</h2><p>Active and completed collaborations are kept here.</p></div>

@@ -9,7 +9,6 @@ from app.models import (
     Campaign,
     Application,
     Deliverable,
-    NegotiationOffer,
 )
 from app.schemas.application import (
     ApplicationCreate,
@@ -415,11 +414,22 @@ async def create_application(
         )
 
     # Create application
+    # Paid campaigns use the campaign budget as the fixed compensation.
+    # There is no creator-side counter-offer or post-selection negotiation.
+    fixed_rate = (
+        round(float(campaign.budget) / max(int(campaign.creators_needed or 1), 1), 2)
+        if getattr(campaign.campaign_type, "value", str(campaign.campaign_type)) == "paid"
+        and campaign.budget is not None
+        else data.rate
+    )
+
     application = Application(
         campaign_id=data.campaign_id,
         creator_id=current_user.id,
         proposal=data.proposal,
-        rate=data.rate,
+        rate=fixed_rate,
+        agreed_rate=fixed_rate if fixed_rate is not None else None,
+        rate_locked=1 if fixed_rate is not None else 0,
         message=data.message,
         application_answers=data.application_answers,
         selected_portfolio=data.selected_portfolio,
@@ -427,35 +437,6 @@ async def create_application(
 
     db.add(application)
     db.flush()
-
-    # Paid campaign opening negotiation offer
-    if getattr(
-        campaign.campaign_type,
-        "value",
-        str(campaign.campaign_type),
-    ) == "paid":
-
-        opening_amount = (
-            data.rate
-            if data.rate is not None
-            else campaign.budget
-        )
-
-        if (
-            opening_amount is not None
-            and float(opening_amount) > 0
-        ):
-            db.add(
-                NegotiationOffer(
-                    application_id=application.id,
-                    sender_id=current_user.id,
-                    amount=float(opening_amount),
-                    message=data.message,
-                    status="pending",
-                )
-            )
-
-            application.negotiation_status = "pending"
 
     db.commit()
     db.refresh(application)
@@ -771,20 +752,14 @@ async def update_application_status(
                     detail="Fund the campaign budget before accepting a creator.",
                 )
 
-            if (
-                not application.agreed_rate
-                or not application.rate_locked
-                or application.negotiation_status
-                != "agreed"
-            ):
-                raise HTTPException(
-                    status_code=400,
-                    detail=(
-                        "Agree on the payment amount "
-                        "with the creator before "
-                        "selecting them."
-                    ),
-                )
+            # Compensation is fixed by the campaign budget.
+            if not application.agreed_rate:
+                if campaign.budget is None or float(campaign.budget) <= 0:
+                    raise HTTPException(status_code=400, detail="This paid campaign does not have a valid fixed budget.")
+                fixed_rate = round(float(campaign.budget) / max(int(campaign.creators_needed or 1), 1), 2)
+                application.agreed_rate = fixed_rate
+                application.rate = fixed_rate
+                application.rate_locked = 1
 
         now = datetime.now(timezone.utc)
 
@@ -933,8 +908,6 @@ async def withdraw_application(
 
     Pending:
         Mark the application as withdrawn instead of deleting it.
-        This prevents foreign-key errors because negotiation offers
-        can already reference the application.
 
     Accepted:
         Mark the application as withdrawn and, if this was the
@@ -971,8 +944,6 @@ async def withdraw_application(
     #
     #     db.delete(application)
     #
-    # because paid applications can already have a
-    # NegotiationOffer referencing this application.
     #
     # Instead, preserve the application and change its status.
     # ========================================================
@@ -984,19 +955,6 @@ async def withdraw_application(
         ).first()
 
         application.status = "withdrawn"
-
-        # If negotiation exists, mark it closed/cancelled
-        # rather than deleting the application.
-        offers = db.query(
-            NegotiationOffer
-        ).filter(
-            NegotiationOffer.application_id
-            == application.id
-        ).all()
-
-        for offer in offers:
-            if offer.status == "pending":
-                offer.status = "cancelled"
 
         db.commit()
 

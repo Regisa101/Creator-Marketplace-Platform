@@ -35,7 +35,8 @@ async def get_public_campaigns(
             CampaignStatus.IN_PROGRESS,
         ]),
         Campaign.is_active == True,
-        Campaign.funding_status == "funded",
+        # Free campaigns can be public without funding; paid campaigns must be funded first.
+        ((Campaign.campaign_type != "paid") | (Campaign.funding_status == "funded")),
     )
 
     if status:
@@ -300,6 +301,10 @@ async def get_campaigns(
             CampaignStatus.IN_PROGRESS,
         ]))
     elif current_user.role == "business":
+        # A business dashboard must see the complete lifecycle of its own
+        # campaigns, including drafts, active/in-progress, completed, closed,
+        # and cancelled campaigns. Creators still only receive marketplace
+        # campaigns in the branch above.
         query = query.filter(Campaign.business_id == current_user.id)
     
     if status:
@@ -393,7 +398,7 @@ async def get_public_campaign(
     if (
         campaign.status not in (CampaignStatus.PUBLISHED, CampaignStatus.IN_PROGRESS)
         or not campaign.is_active
-        or campaign.funding_status != "funded"
+        or (getattr(campaign.campaign_type, "value", str(campaign.campaign_type)) == "paid" and campaign.funding_status != "funded")
     ):
         raise HTTPException(status_code=404, detail="Campaign not found")
 
@@ -422,7 +427,7 @@ async def get_campaign(
     if current_user is None:
         if campaign.status not in (CampaignStatus.PUBLISHED, CampaignStatus.IN_PROGRESS):
             raise HTTPException(status_code=404, detail="Campaign not found")
-        if not campaign.is_active or campaign.funding_status != "funded":
+        if not campaign.is_active or (getattr(campaign.campaign_type, "value", str(campaign.campaign_type)) == "paid" and campaign.funding_status != "funded"):
             raise HTTPException(status_code=404, detail="Campaign not found")
     elif current_user.role == "business":
         if campaign.business_id != current_user.id:
@@ -430,7 +435,7 @@ async def get_campaign(
     elif current_user.role == "creator":
         if campaign.status not in (CampaignStatus.PUBLISHED, CampaignStatus.IN_PROGRESS):
             raise HTTPException(status_code=403, detail="Campaign not available")
-        if not campaign.is_active or campaign.funding_status != "funded":
+        if not campaign.is_active or (getattr(campaign.campaign_type, "value", str(campaign.campaign_type)) == "paid" and campaign.funding_status != "funded"):
             raise HTTPException(status_code=403, detail="Campaign not available")
 
     app_count = db.query(Application).filter(Application.campaign_id == campaign.id).count()

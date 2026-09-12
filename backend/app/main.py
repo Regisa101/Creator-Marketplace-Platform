@@ -19,7 +19,6 @@ from app.routes import (
     campaigns,
     creators,
     notifications,
-    negotiations,
     publication,
     onboarding,
     payments,
@@ -111,7 +110,7 @@ def ensure_schema() -> None:
         "ALTER TABLE applications ADD COLUMN IF NOT EXISTS selected_portfolio JSON",
         "ALTER TABLE applications ADD COLUMN IF NOT EXISTS deliverable_deadline TIMESTAMPTZ",
 
-        # Negotiation
+        # Legacy pricing columns retained for database compatibility.
         "ALTER TABLE applications ADD COLUMN IF NOT EXISTS agreed_rate NUMERIC(10,2)",
         "ALTER TABLE applications ADD COLUMN IF NOT EXISTS rate_locked INTEGER NOT NULL DEFAULT 0",
         "ALTER TABLE applications ADD COLUMN IF NOT EXISTS negotiation_status VARCHAR(30) NOT NULL DEFAULT 'not_started'",
@@ -230,7 +229,6 @@ app.include_router(workspace.router)
 app.include_router(payments.router)
 app.include_router(ratings.router)
 app.include_router(notifications.router)
-app.include_router(negotiations.router)
 app.include_router(publication.router)
 app.include_router(campaign_performance.router)
 

@@ -33,7 +33,6 @@ class ApplicationResponse(ApplicationBase):
     campaign_title: Optional[str] = None
     agreed_rate: Optional[float] = None
     rate_locked: bool = False
-    negotiation_status: str = "not_started"
     campaign_budget: Optional[float] = None
     campaign_type: Optional[str] = None
     match_score: Optional[int] = None

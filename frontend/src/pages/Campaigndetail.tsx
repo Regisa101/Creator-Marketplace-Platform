@@ -190,7 +190,6 @@ export function CampaignDetail() {
   const [myApplication, setMyApplication] = useState<Application | null>(null);
   const [showApplyForm, setShowApplyForm] = useState(false);
   const [proposal, setProposal] = useState('');
-  const [rate, setRate] = useState('');
   const [applying, setApplying] = useState(false);
   const [applyError, setApplyError] = useState('');
 
@@ -402,13 +401,11 @@ export function CampaignDetail() {
       const created = await createApplication({
         campaign_id: campaign.id,
         proposal: proposal.trim(),
-        rate: rate ? Number(rate) : null,
         application_answers: applicationAnswers.filter((item) => item.answer.trim()),
       });
       setMyApplication(created);
       setShowApplyForm(false);
       setProposal('');
-      setRate('');
       setApplicationAnswers([]);
     } catch (err: any) {
       setApplyError(err?.response?.data?.detail || 'Could not submit your application. Please try again.');
@@ -817,9 +814,8 @@ export function CampaignDetail() {
         .cd-modal-questions { display:grid; gap:14px; margin-top:15px; }
         .cd-modal-question-input { min-height:74px; }
         .cd-modal-field { margin-top:15px; }
-        .cd-rate-wrap { display:flex; align-items:center; border:1px solid #DED7E9; border-radius:12px; background:#fff; overflow:hidden; }
-        .cd-rate-wrap > span { padding-left:12px; color:#7661A1; font-size:12px; font-weight:700; }
-        .cd-rate-input { border:0; border-radius:0; box-shadow:none !important; }
+        .cd-fixed-compensation { margin-top:14px; padding:12px 14px; border-radius:10px; background:#F4F1F8; color:#5F566D; font-size:12px; line-height:1.5; }
+        .cd-fixed-compensation strong { color:#7661A1; }
         .cd-modal-actions { display:grid; grid-template-columns:1fr 1.6fr; gap:9px; margin-top:20px; }
         .cd-modal-actions--gate { grid-template-columns:1fr 1.6fr; }
         .cd-modal-error { margin:0 0 13px; }
@@ -1368,10 +1364,7 @@ export function CampaignDetail() {
                     </div>
                   ) : null}
                   {campaign.campaign_type === 'paid' && (
-                    <div className="cd-modal-field">
-                      <label className="cd-modal-label">Your rate <span>(optional)</span></label>
-                      <div className="cd-rate-wrap"><span>Rs.</span><input className="cd-modal-input cd-rate-input" type="number" min="0" value={rate} onChange={(e) => setRate(e.target.value)} placeholder="Your rate" /></div>
-                    </div>
+                    <div className="cd-fixed-compensation">The fixed compensation is <strong>Rs. {Math.round(Number(campaign.budget || 0) / Math.max(Number(campaign.creators_needed || 1), 1)).toLocaleString()}</strong> per creator. No price negotiation is required.</div>
                   )}
                   <div className="cd-modal-actions">
                     <button type="button" className="cd-secondary-button" onClick={() => { setShowApplyForm(false); setApplyError(''); }} disabled={applying}>Cancel</button>
