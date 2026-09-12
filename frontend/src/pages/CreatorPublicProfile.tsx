@@ -10,7 +10,8 @@ import {
   type PublicCreatorProfile as PublicCreatorProfileType,
   type Campaign,
 } from '../api/client';
-import { AppLayout } from '../components/AppLayout';
+
+import { PublicNavbar } from '../components/PublicNavbar';
 
 const C = {
   surface: '#FBF8F4',
@@ -75,7 +76,16 @@ export function CreatorPublicProfile() {
   };
 
   return (
-    <AppLayout title="Creator Profile" showSearch={false} showNotifications={false}>
+  <>
+    <PublicNavbar />
+
+    <div
+      style={{
+        minHeight: '100vh',
+        background: C.surface,
+        paddingTop: 72,
+      }}
+    >
       <style>{`
         .cp-content { padding: 28px 24px 40px; max-width: 780px; margin: 0 auto; }
         .cp-state { text-align: center; padding: 60px 20px; color: ${C.inkSoft}; font-size: 13px; }
@@ -235,8 +245,9 @@ export function CreatorPublicProfile() {
       {inviteOpen && profile && (
         <InviteModal profile={profile} onClose={() => setInviteOpen(false)} />
       )}
-    </AppLayout>
-  );
+        </div>
+  </>
+);
 }
 
 function InviteModal({ profile, onClose }: { profile: PublicCreatorProfileType; onClose: () => void }) {

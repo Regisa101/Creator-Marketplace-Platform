@@ -38,8 +38,8 @@ const CORAL = "#F47C78";
 // Nav and hero are intentionally close, but not white, so they read as
 // two separate sections without introducing another purple background.
 const NAV_BG = "#FBF8F4";
-const HERO_BG = "#F8F4F1";
-const PAGE_BG = "#F8F4F1";
+const HERO_BG = "#F8F4F4";
+const PAGE_BG = "#F8F4F4";
 
 // ============================================
 // LIVE CAMPAIGN DATA
@@ -996,11 +996,29 @@ export function Landing() {
       {/* ===== EXPLORE CAMPAIGNS ===== */}
       <section className="lp-section lp-container" id="campaigns">
         <div className="lp-section-head">
-          <h2 className="lp-h2">Explore Campaigns</h2>
-          <Link to="/campaigns" className="lp-view-all">
-            View All Campaigns <ArrowRight size={14} />
-          </Link>
-        </div>
+  <h2 className="lp-h2">Explore Campaigns</h2>
+
+  {displayCampaigns.length > visibleCount && (
+    <button
+      type="button"
+      className="lp-view-all"
+      onClick={() => {
+        setVisibleCount((count) => count + 8);
+
+        setTimeout(() => {
+          document
+            .getElementById("campaigns")
+            ?.scrollIntoView({
+              behavior: "smooth",
+              block: "start",
+            });
+        }, 50);
+      }}
+    >
+      Explore More Campaigns <ArrowRight size={14} />
+    </button>
+  )}
+</div>
 
         <div className="lp-filters lp-filters-section">
           <FilterDropdown

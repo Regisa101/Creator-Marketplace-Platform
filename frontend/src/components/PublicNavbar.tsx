@@ -303,7 +303,7 @@ export function PublicNavbar({ sticky = true }: PublicNavbarProps) {
           z-index: 9999;
           /* Set --ch-hero-bg to match your Hero section's exact background
              (color or gradient) so the navbar blends seamlessly into it. */
-          background: var(--ch-hero-bg, rgba(255,253,250,.96));
+          background: #FBF8F4;
           backdrop-filter: blur(12px);
           border-bottom: 1px solid #EEE8E2;
           box-sizing: border-box;

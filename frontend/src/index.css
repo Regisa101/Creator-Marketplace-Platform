@@ -1,24 +1,31 @@
+/* frontend/src/index.css */
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
-/* Clip horizontal overflow at the document level instead of on inner page
-   wrappers. Putting overflow-x: hidden on an inner wrapper forces the
-   browser to also give that wrapper an implicit overflow-y (per the CSS
-   overflow spec), which turns it into its own scroll container — and that
-   breaks/hides any `position: sticky` element nested inside it (e.g. the
-   landing page navbar) once you scroll past it. Keeping the clip on
-   html/body avoids creating that nested scroll context. */
-html, body {
+html,
+body {
   overflow-x: hidden;
 }
 
-/* CreatorHub global page background */
-html, body, #root {
+html,
+body,
+#root {
   min-height: 100%;
   background: #FBF8F4;
 }
 
 body {
   margin: 0;
+  background: #FBF8F4;
+}
+
+/* Keep every main page surface off-white */
+main,
+section,
+.app-layout,
+.app-main,
+.app-page-content {
+  background-color: #FBF8F4;
 }
