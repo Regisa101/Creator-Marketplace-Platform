@@ -1,5 +1,5 @@
 import { Link, useLocation, useNavigate, useSearchParams } from "react-router-dom";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { MouseEvent } from "react";
 import {
   Heart,
@@ -20,6 +20,17 @@ import {
 type PublicNavbarProps = {
   sticky?: boolean;
 };
+
+// The 3 sections this navbar can scroll to. Update these ids to match
+// whatever section ids actually exist on your landing page.
+type SectionKey = "home" | "campaigns" | "for-brands";
+const SECTION_HASHES: Record<SectionKey, string> = {
+  home: "#home",
+  campaigns: "#campaigns",
+  "for-brands": "#for-brands",
+};
+
+const SCROLL_TARGET_KEY = "ch-scroll-target";
 
 const API_ORIGIN = "http://localhost:8000";
 
@@ -66,6 +77,11 @@ export function PublicNavbar({ sticky = true }: PublicNavbarProps) {
   const [wishlistOpen, setWishlistOpen] = useState(false);
   const [wishlistLoading, setWishlistLoading] = useState(false);
   const [saved, setSaved] = useState<SavedCampaignEntry[]>([]);
+  // Which nav link is "lit up". Fixed on whatever was last clicked/landed on
+  // (does not track scroll position), per your "static" requirement.
+  const [activeSection, setActiveSection] = useState<SectionKey>("home");
+
+  const profileWrapRef = useRef<HTMLDivElement>(null);
 
   const isLandingPage = location.pathname === "/";
   // Campaign Detail opened from Landing keeps the exact same public-navbar
@@ -149,25 +165,102 @@ export function PublicNavbar({ sticky = true }: PublicNavbarProps) {
     };
   }, [wishlistOpen]);
 
+  // Close the profile dropdown on outside click or Escape.
+  useEffect(() => {
+    if (!profileOpen) return;
+
+    const handleClickOutside = (event: PointerEvent) => {
+      if (
+        profileWrapRef.current &&
+        !profileWrapRef.current.contains(event.target as Node)
+      ) {
+        setProfileOpen(false);
+      }
+    };
+
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        setProfileOpen(false);
+      }
+    };
+
+    document.addEventListener("pointerdown", handleClickOutside);
+    document.addEventListener("keydown", handleKeyDown);
+
+    return () => {
+      document.removeEventListener("pointerdown", handleClickOutside);
+      document.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [profileOpen]);
+
+  // On landing, either (a) honor a scroll target left behind by a
+  // cross-page nav click, or (b) honor a hash already in the URL
+  // (e.g. someone opened /#campaigns directly), and set the matching
+  // nav link active.
+  useEffect(() => {
+    if (!isLandingPage) return;
+
+    const pendingTarget = sessionStorage.getItem(SCROLL_TARGET_KEY);
+    const targetId = pendingTarget || location.hash.replace("#", "");
+
+    if (pendingTarget) {
+      sessionStorage.removeItem(SCROLL_TARGET_KEY);
+    }
+
+    if (targetId) {
+      const sectionKey: SectionKey =
+        targetId === "campaigns" || targetId === "for-brands"
+          ? targetId
+          : "home";
+      setActiveSection(sectionKey);
+
+      requestAnimationFrame(() => {
+        document
+          .getElementById(targetId)
+          ?.scrollIntoView({ behavior: "smooth", block: "start" });
+      });
+    }
+    // Only run this on mount / when landing status changes, not on every
+    // hash change, since clicks below manage activeSection themselves.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isLandingPage]);
+
   const navLink = (href: string): string => {
     if (!href.startsWith("#")) return href;
     return isLandingContext ? href : `/${href}`;
   };
 
   const isActive = (href: string): boolean => {
-    if (href === "#home") {
-      return isLandingPage && !location.hash;
-    }
-
-    if (href === "#campaigns") {
-      return isLandingPage && location.hash === "#campaigns";
-    }
-
-    if (href === "#for-brands") {
-      return isLandingPage && location.hash === "#for-brands";
-    }
+    if (href === "#home") return activeSection === "home";
+    if (href === "#campaigns") return activeSection === "campaigns";
+    if (href === "#for-brands") return activeSection === "for-brands";
 
     return location.pathname === href;
+  };
+
+  // Handles clicks on Home / Campaigns / For Brands. If we're already on
+  // the landing page, scroll straight to the section instead of letting
+  // react-router treat it as a route change. If we're elsewhere, let the
+  // Link navigate to "/#section" and stash the target so the effect above
+  // can scroll to it once the landing page has mounted.
+  const handleSectionClick = (
+    event: MouseEvent<HTMLAnchorElement>,
+    section: SectionKey
+  ) => {
+    setActiveSection(section);
+    setMobileOpen(false);
+
+    const sectionId = section === "home" ? "home" : section;
+
+    if (isLandingPage) {
+      event.preventDefault();
+      document
+        .getElementById(sectionId)
+        ?.scrollIntoView({ behavior: "smooth", block: "start" });
+      window.history.replaceState(null, "", SECTION_HASHES[section]);
+    } else {
+      sessionStorage.setItem(SCROLL_TARGET_KEY, sectionId);
+    }
   };
 
   const handleLogout = () => {
@@ -208,7 +301,9 @@ export function PublicNavbar({ sticky = true }: PublicNavbarProps) {
           right: 0;
           width: 100%;
           z-index: 9999;
-          background: rgba(255,253,250,.96);
+          /* Set --ch-hero-bg to match your Hero section's exact background
+             (color or gradient) so the navbar blends seamlessly into it. */
+          background: var(--ch-hero-bg, rgba(255,253,250,.96));
           backdrop-filter: blur(12px);
           border-bottom: 1px solid #EEE8E2;
           box-sizing: border-box;
@@ -255,6 +350,9 @@ export function PublicNavbar({ sticky = true }: PublicNavbarProps) {
           font-size: 14px;
           font-weight: 500;
           text-decoration: none;
+          background: transparent;
+          border: 0;
+          cursor: pointer;
         }
 
         .ch-public-nav-link:hover,
@@ -354,6 +452,8 @@ export function PublicNavbar({ sticky = true }: PublicNavbarProps) {
           overflow: hidden;
           text-decoration: none;
           font: 700 12px 'Poppins', sans-serif;
+          padding: 0;
+          cursor: pointer;
         }
 
         .ch-public-avatar img {
@@ -611,12 +711,24 @@ export function PublicNavbar({ sticky = true }: PublicNavbarProps) {
             background: #fff;
           }
 
-          .ch-public-mobile-panel a {
+          .ch-public-mobile-panel a,
+          .ch-public-mobile-panel button.ch-public-mobile-link {
             display: block;
+            width: 100%;
             padding: 9px 0;
+            border: 0;
+            background: transparent;
             color: #6F6A7C;
             text-decoration: none;
             font: 500 14px 'Poppins', sans-serif;
+            text-align: left;
+            cursor: pointer;
+          }
+
+          .ch-public-mobile-panel a.active,
+          .ch-public-mobile-panel button.ch-public-mobile-link.active {
+            color: #7661A1;
+            font-weight: 600;
           }
 
           .ch-public-mobile-actions {
@@ -652,7 +764,7 @@ export function PublicNavbar({ sticky = true }: PublicNavbarProps) {
           <Link
             to={navLink("#home")}
             className="ch-public-logo"
-            onClick={() => setMobileOpen(false)}
+            onClick={(event) => handleSectionClick(event, "home")}
           >
             <LogoMark size={24} />
             <span className="ch-public-logo-text">creatorhub</span>
@@ -664,6 +776,7 @@ export function PublicNavbar({ sticky = true }: PublicNavbarProps) {
               className={`ch-public-nav-link ${
                 isActive("#home") ? "active" : ""
               }`}
+              onClick={(event) => handleSectionClick(event, "home")}
             >
               Home
             </Link>
@@ -672,6 +785,7 @@ export function PublicNavbar({ sticky = true }: PublicNavbarProps) {
               className={`ch-public-nav-link ${
                 isActive("#campaigns") ? "active" : ""
               }`}
+              onClick={(event) => handleSectionClick(event, "campaigns")}
             >
               Campaigns
             </Link>
@@ -680,6 +794,7 @@ export function PublicNavbar({ sticky = true }: PublicNavbarProps) {
               className={`ch-public-nav-link ${
                 isActive("#for-brands") ? "active" : ""
               }`}
+              onClick={(event) => handleSectionClick(event, "for-brands")}
             >
               For Brands
             </Link>
@@ -704,15 +819,14 @@ export function PublicNavbar({ sticky = true }: PublicNavbarProps) {
                   </button>
                 )}
 
-                <div
-                  className="ch-profile-wrap"
-                  onMouseEnter={() => setProfileOpen(true)}
-                  onMouseLeave={() => setProfileOpen(false)}
-                >
-                  <Link
-                    to="/profile"
+                <div className="ch-profile-wrap" ref={profileWrapRef}>
+                  <button
+                    type="button"
                     className="ch-public-avatar"
-                    aria-label="Open profile"
+                    aria-label="Open profile menu"
+                    aria-haspopup="menu"
+                    aria-expanded={profileOpen}
+                    onClick={() => setProfileOpen((value) => !value)}
                   >
                     {avatarUrl ? (
                       <img
@@ -725,17 +839,17 @@ export function PublicNavbar({ sticky = true }: PublicNavbarProps) {
                     ) : (
                       <span>{initials}</span>
                     )}
-                  </Link>
+                  </button>
 
                   {profileOpen && (
-                    <div className="ch-profile-menu">
-                      <Link to="/profile">
-                        <LayoutDashboard size={16} />
-                        Profile
-                      </Link>
-                      <Link to="/dashboard">
+                    <div className="ch-profile-menu" role="menu">
+                      <Link to="/dashboard" onClick={() => setProfileOpen(false)}>
                         <LayoutDashboard size={16} />
                         Dashboard
+                      </Link>
+                      <Link to="/profile" onClick={() => setProfileOpen(false)}>
+                        <LayoutDashboard size={16} />
+                        Profile
                       </Link>
                       <button type="button" onClick={handleLogout}>
                         <LogOut size={16} />
@@ -769,24 +883,37 @@ export function PublicNavbar({ sticky = true }: PublicNavbarProps) {
 
         {mobileOpen && (
           <div className="ch-public-mobile-panel">
-            <Link to={navLink("#home")} onClick={() => setMobileOpen(false)}>
+            <Link
+              to={navLink("#home")}
+              className={isActive("#home") ? "active" : ""}
+              onClick={(event) => handleSectionClick(event, "home")}
+            >
               Home
             </Link>
             <Link
               to={navLink("#campaigns")}
-              onClick={() => setMobileOpen(false)}
+              className={isActive("#campaigns") ? "active" : ""}
+              onClick={(event) => handleSectionClick(event, "campaigns")}
             >
               Campaigns
             </Link>
             <Link
               to={navLink("#for-brands")}
-              onClick={() => setMobileOpen(false)}
+              className={isActive("#for-brands") ? "active" : ""}
+              onClick={(event) => handleSectionClick(event, "for-brands")}
             >
               For Brands
             </Link>
 
             {!loading && isAuthenticated ? (
               <div className="ch-public-mobile-actions">
+                <Link
+                  to="/dashboard"
+                  className="ch-public-mobile-profile"
+                  onClick={() => setMobileOpen(false)}
+                >
+                  Dashboard
+                </Link>
                 <Link
                   to="/profile"
                   className="ch-public-mobile-profile"
@@ -807,6 +934,14 @@ export function PublicNavbar({ sticky = true }: PublicNavbarProps) {
                     Wishlist ({saved.length})
                   </button>
                 )}
+
+                <button
+                  type="button"
+                  className="ch-public-mobile-profile"
+                  onClick={handleLogout}
+                >
+                  Logout
+                </button>
               </div>
             ) : !loading ? (
               <div className="ch-public-mobile-actions">
