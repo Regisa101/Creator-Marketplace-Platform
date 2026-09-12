@@ -1,13 +1,21 @@
 from datetime import datetime
 from typing import List, Optional
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 
 # ============================================
 # COLLABORATION
 # An accepted Application viewed from Workspace
 # ============================================
+
+class CollabRateFix(BaseModel):
+    """Used to repair a collaboration that was accepted without ever
+    getting an agreed rate locked in (e.g. legacy data, or a campaign
+    whose type changed after acceptance). Only usable while the
+    collaboration has no agreed rate yet — see the route for the guard."""
+    amount: float = Field(..., gt=0)
+
 
 class CollabResponse(BaseModel):
     id: int  # application id
@@ -131,6 +139,10 @@ class DeliverableResponse(BaseModel):
 
     created_at: datetime
     updated_at: Optional[datetime] = None
+
+    payment_released: bool = False
+    payment_amount: Optional[float] = None
+    payment_id: Optional[int] = None
 
     class Config:
         from_attributes = True

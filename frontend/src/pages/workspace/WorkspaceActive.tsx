@@ -2,6 +2,7 @@ import { Fragment, useEffect, useMemo, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import {
   confirmCollaboration,
+  fixCollabRate,
   getCollabs,
   getDeliverables,
   releasePayment,
@@ -9,6 +10,7 @@ import {
   reviewAllDeliverables,
   submitDeliverable,
   uploadMedia,
+  verifyCollaboration,
   type Collab,
   type WorkspaceDeliverable,
 } from '../../api/client';
@@ -58,7 +60,7 @@ function nextState(c: Collab, isBusiness: boolean) {
       turn: 'COMPLETE',
       title: 'Collaboration complete',
       body: 'Everything is finished. The collaboration is ready for history.',
-      action: null as null | 'confirm' | 'pay' | 'submit' | 'release',
+      action: null as null | 'confirm' | 'submit' | 'verify' | 'release' | 'fix_rate',
     };
   }
 
@@ -122,19 +124,40 @@ function nextState(c: Collab, isBusiness: boolean) {
     };
   }
 
-  return isBusiness
-    ? {
+  // Every deliverable is approved from here on. The brand — not the platform —
+  // is the one who releases the secured payment, so this is their turn.
+  if (isBusiness) {
+    if (!c.agreed_rate) {
+      return {
         turn: 'YOUR TURN',
-        title: 'Release payment',
-        body: 'All deliverables are approved. Release the secured payment to complete this collaboration.',
-        action: 'release' as const,
-      }
-    : {
-        turn: 'WAITING',
-        title: 'Work approved',
-        body: 'The brand approved all deliverables. Your secured payment will be released once the brand completes the release step.',
-        action: null,
+        title: 'Set the agreed payment amount',
+        body: 'This collaboration was accepted without a payment amount on record, so there is nothing to release yet. Enter the amount you agreed with the creator to unlock release.',
+        action: 'fix_rate' as const,
       };
+    }
+    return {
+      turn: 'YOUR TURN',
+      title: 'Release payment',
+      body: 'All required deliverables are approved. Release the secured payment to complete this collaboration.',
+      action: 'release' as const,
+    };
+  }
+
+  if (!c.creator_verified) {
+    return {
+      turn: 'YOUR TURN',
+      title: 'Confirm your work is done',
+      body: 'All your deliverables were approved. Send final verification to let the brand know everything is ready — they will release your payment.',
+      action: 'verify' as const,
+    };
+  }
+
+  return {
+    turn: 'WAITING',
+    title: 'Payment processing',
+    body: 'You confirmed your work is complete. The brand will release your secured payment shortly.',
+    action: null,
+  };
 }
 
 export function WorkspaceActive() {
@@ -248,20 +271,31 @@ export function WorkspaceActive() {
     }
   };
 
+  const doVerify = async () => {
+    if (!selected) return;
+    setBusy('verify');
+    setError('');
+    try {
+      patchCollab(await verifyCollaboration(selected.id));
+    } catch (e: any) {
+      setError(e?.response?.data?.detail || 'Could not submit final verification.');
+    } finally {
+      setBusy(null);
+    }
+  };
+
   const doRelease = async () => {
     if (!selected) return;
     setBusy('release');
     setError('');
     try {
       const payment = await releasePayment(selected.id);
-      const updated = {
+      patchCollab({
         ...selected,
         status: 'completed',
-        payment_status: 'released' as const,
+        payment_status: 'released',
         amount_paid: payment.amount,
-      };
-      patchCollab(updated);
-      setError('Payment released successfully. The collaboration is complete.');
+      });
     } catch (e: any) {
       setError(e?.response?.data?.detail || 'Could not release the payment.');
     } finally {
@@ -269,6 +303,18 @@ export function WorkspaceActive() {
     }
   };
 
+  const doFixRate = async (amount: number) => {
+    if (!selected) return;
+    setBusy('fix_rate');
+    setError('');
+    try {
+      patchCollab(await fixCollabRate(selected.id, amount));
+    } catch (e: any) {
+      setError(e?.response?.data?.detail || 'Could not set the agreed amount.');
+    } finally {
+      setBusy(null);
+    }
+  };
 
   const updateDeliverable = (updated: WorkspaceDeliverable) => {
     setDeliverables((previous) => {
@@ -427,7 +473,9 @@ export function WorkspaceActive() {
                         isBusiness={isBusiness}
                         busy={busy}
                         onConfirm={doConfirm}
+                        onVerify={doVerify}
                         onRelease={doRelease}
+                        onFixRate={doFixRate}
                         onOpenDeliverables={() => setSelectedTab('deliverables')}
                       />
                     )}
@@ -455,7 +503,7 @@ export function WorkspaceActive() {
             <div className="cw-money">Rs. {paymentModal.amount.toLocaleString()}</div>
             <h3>Your payment has been released</h3>
             <p>{paymentModal.campaign}</p>
-            <div className="cw-payment-line">The brand approved your work and released the secured payment. The collaboration is now complete.</div>
+            <div className="cw-payment-line">The brand approved your work and released your secured payment. The collaboration is now complete.</div>
             <button className="cw-primary cw-wide" onClick={() => setPaymentModal(null)}>View collaboration</button>
           </div>
         </div>
@@ -469,16 +517,21 @@ function Overview({
   isBusiness,
   busy,
   onConfirm,
+  onVerify,
   onRelease,
+  onFixRate,
   onOpenDeliverables,
 }: {
   c: Collab;
   isBusiness: boolean;
   busy: string | null;
   onConfirm: () => void;
+  onVerify: () => void;
   onRelease: () => void;
+  onFixRate: (amount: number) => void;
   onOpenDeliverables: () => void;
 }) {
+  const [rateDraft, setRateDraft] = useState('');
   const state = nextState(c, isBusiness);
   const approved = c.approved_deliverables;
   const total = c.total_deliverables;
@@ -519,10 +572,35 @@ function Overview({
           {state.action === 'submit' && (
             <button className="cw-primary" onClick={onOpenDeliverables}>Open Deliverables →</button>
           )}
+          {state.action === 'verify' && (
+            <button className="cw-primary" onClick={onVerify} disabled={busy === 'verify'}>
+              {busy === 'verify' ? 'Sending…' : 'Send final verification'}
+            </button>
+          )}
           {state.action === 'release' && (
             <button className="cw-primary" onClick={onRelease} disabled={busy === 'release'}>
               {busy === 'release' ? 'Releasing…' : 'Release payment'}
             </button>
+          )}
+          {state.action === 'fix_rate' && (
+            <div className="cw-rate-fix">
+              <input
+                type="number"
+                min="1"
+                step="0.01"
+                className="cw-rate-fix-input"
+                placeholder="Agreed amount (Rs.)"
+                value={rateDraft}
+                onChange={(e) => setRateDraft(e.target.value)}
+              />
+              <button
+                className="cw-primary"
+                disabled={busy === 'fix_rate' || !Number(rateDraft) || Number(rateDraft) <= 0}
+                onClick={() => onFixRate(Number(rateDraft))}
+              >
+                {busy === 'fix_rate' ? 'Saving…' : 'Save amount'}
+              </button>
+            </div>
           )}
         </div>
       </section>
@@ -772,7 +850,7 @@ const styles = `
 .cw-person{width:100%;border:0;background:transparent;display:flex;gap:9px;align-items:center;padding:10px;border-radius:12px;text-align:left;cursor:pointer}.cw-person:hover{background:#f6f6fb}.cw-person.is-active{background:var(--cw-accent-soft)}.cw-person img,.cw-avatar{width:38px;height:38px;border-radius:50%;object-fit:cover;flex:none}.cw-avatar{display:flex;align-items:center;justify-content:center;background:var(--cw-accent-soft);color:var(--cw-accent);font-size:11px;font-weight:800}.cw-person-main{min-width:0;display:flex;flex-direction:column;gap:2px;flex:1}.cw-person-main strong{font-size:12px;color:${C.ink};white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.cw-person-main small{font-size:10px;color:${C.soft};white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.cw-person-main em{font-style:normal;font-size:9px;color:${C.faint};white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.cw-counts{display:flex;gap:4px}.cw-counts b{min-width:18px;height:18px;padding:0 5px;border-radius:99px;background:var(--cw-accent);color:#fff;font-size:8px;display:flex;align-items:center;justify-content:center}.cw-counts .work-count{background:#e8e8ea;color:${C.ink}}
 .cw-main{min-width:0;background:${C.bg}}.cw-header{background:#fff;border-bottom:1px solid ${C.line};padding:17px 24px;display:flex;align-items:center;justify-content:space-between;gap:14px}.cw-header-person{display:flex;gap:11px;align-items:center}.cw-header-person img,.cw-avatar-lg{width:44px;height:44px;box-shadow:0 0 0 3px var(--cw-accent-soft)}.cw-header h2{font-size:15px;margin:0;color:${C.ink}}.cw-header p{font-size:10.5px;margin:3px 0 0;color:${C.soft}}.cw-status{font-size:9.5px;font-weight:750;padding:5px 9px;border-radius:99px;background:${C.warnSoft};color:${C.warn}}.cw-status.good{background:${C.goodSoft};color:${C.good}}
 .cw-tabs{background:#fff;border-bottom:1px solid ${C.line};display:flex;padding:0 24px;gap:20px}.cw-tabs button{border:0;background:none;padding:12px 1px 10px;color:${C.soft};font-size:11px;font-weight:750;border-bottom:2px solid transparent;cursor:pointer}.cw-tabs button.is-active{color:${C.ink};border-bottom-color:var(--cw-accent)}.cw-tabs b{font-size:8px;background:var(--cw-accent);color:#fff;border-radius:99px;padding:2px 5px;margin-left:4px}.cw-body{padding:22px;max-width:1000px}.cw-overview{display:flex;flex-direction:column;gap:14px}
-.cw-next{padding:18px 20px;background:#fff;border:1px solid ${C.line};border-radius:16px;display:flex;justify-content:space-between;align-items:center;gap:20px}.cw-next-action{border-color:var(--cw-accent-soft);background:linear-gradient(180deg,#fff,var(--cw-accent-soft) 220%)}.cw-next-wait{background:#fafafa}.cw-next-copy{min-width:0;display:flex;gap:13px;align-items:flex-start}.cw-next-icon{flex:none;width:38px;height:38px;border-radius:12px;background:var(--cw-accent-soft);color:var(--cw-accent);display:flex;align-items:center;justify-content:center;font-size:15px}.cw-next small{font-size:8px;font-weight:850;letter-spacing:.1em;color:var(--cw-accent)}.cw-next-wait small{color:${C.faint}}.cw-next h3{font-size:14px;margin:4px 0;color:${C.ink}}.cw-next p{font-size:10.5px;color:${C.soft};margin:0;line-height:1.55;max-width:620px}.cw-next-actions{display:flex;flex:none}
+.cw-next{padding:18px 20px;background:#fff;border:1px solid ${C.line};border-radius:16px;display:flex;justify-content:space-between;align-items:center;gap:20px}.cw-next-action{border-color:var(--cw-accent-soft);background:linear-gradient(180deg,#fff,var(--cw-accent-soft) 220%)}.cw-next-wait{background:#fafafa}.cw-next-copy{min-width:0;display:flex;gap:13px;align-items:flex-start}.cw-next-icon{flex:none;width:38px;height:38px;border-radius:12px;background:var(--cw-accent-soft);color:var(--cw-accent);display:flex;align-items:center;justify-content:center;font-size:15px}.cw-next small{font-size:8px;font-weight:850;letter-spacing:.1em;color:var(--cw-accent)}.cw-next-wait small{color:${C.faint}}.cw-next h3{font-size:14px;margin:4px 0;color:${C.ink}}.cw-next p{font-size:10.5px;color:${C.soft};margin:0;line-height:1.55;max-width:620px}.cw-next-actions{display:flex;flex:none}.cw-rate-fix{display:flex;gap:8px;align-items:center}.cw-rate-fix-input{width:150px;height:36px;border:1px solid ${C.line};border-radius:9px;padding:0 10px;font-size:11px;outline:none}.cw-rate-fix-input:focus{border-color:var(--cw-accent)}
 .cw-primary,.cw-secondary{border-radius:10px;padding:9px 14px;font-size:10.5px;font-weight:750;cursor:pointer;white-space:nowrap}.cw-primary{border:1px solid var(--cw-accent);background:var(--cw-accent);color:#fff}.cw-secondary{border:1px solid ${C.line};background:#fff;color:${C.ink}}button:disabled{opacity:.55;cursor:not-allowed}
 .cw-progress-card,.cw-card,.cw-deliverable{background:#fff;border:1px solid ${C.line};border-radius:16px}.cw-progress-card{padding:18px}.cw-progress-title{display:flex;justify-content:space-between;font-size:10.5px;color:${C.soft}}.cw-progress-title strong{color:${C.ink}}.cw-progress-line{height:5px;background:#ededee;border-radius:99px;margin:11px 0 18px;overflow:hidden}.cw-progress-line i{display:block;height:100%;background:var(--cw-accent);border-radius:99px;transition:width .3s ease}
 .cw-steps{display:flex;align-items:flex-start}.cw-step{display:flex;flex-direction:column;align-items:center;gap:7px;flex:none;width:78px;text-align:center}.cw-step-dot{width:26px;height:26px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:800;background:#fff;border:2px solid #e2e2ea;color:${C.faint}}.cw-step small{font-size:8.5px;color:${C.faint};line-height:1.3}.cw-step-done .cw-step-dot{background:${C.good};border-color:${C.good};color:#fff}.cw-step-done small{color:${C.ink}}.cw-step-current .cw-step-dot{background:var(--cw-accent);border-color:var(--cw-accent);color:#fff}.cw-step-current small{color:var(--cw-accent);font-weight:750}.cw-step-line{flex:1;height:2px;background:#e2e2ea;margin:13px -4px 0;min-width:8px}.cw-step-line.done{background:${C.good}}
@@ -781,7 +859,7 @@ const styles = `
 .cw-submit,.cw-review{display:flex;gap:7px;align-items:center;margin-top:12px}.cw-file-picker{flex:1;border:1px dashed #d5d5d7;border-radius:8px;padding:8px 9px;cursor:pointer;font-size:9.5px;color:${C.soft};min-width:0}.cw-file-picker strong{display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.cw-file-picker input{display:none}.cw-submit textarea,.cw-review textarea{flex:1;min-height:38px;border:1px solid ${C.line};border-radius:8px;padding:8px;font:10px/1.4 -apple-system,sans-serif;resize:vertical;outline:none}.cw-review{align-items:stretch}.cw-review textarea{min-width:0}
 .cw-empty,.cw-loading{padding:65px 20px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:5px;color:${C.soft};font-size:10.5px}.cw-empty strong{font-size:13px;color:${C.ink}}
 .cw-modal-backdrop{position:fixed;inset:0;background:rgba(0,0,0,.35);display:flex;align-items:center;justify-content:center;padding:20px;z-index:1000}.cw-modal,.cw-payment-modal{width:min(500px,100%);background:#fff;border-radius:18px;padding:24px;box-shadow:0 20px 70px rgba(0,0,0,.2)}.cw-modal-kicker,.cw-payment-kicker{font-size:8px;font-weight:900;letter-spacing:.12em;color:var(--cw-accent)}.cw-modal h3,.cw-payment-modal h3{font-size:17px;margin:7px 0 6px;color:${C.ink}}.cw-modal p,.cw-payment-modal p{font-size:11px;line-height:1.55;color:${C.soft};margin:0}.cw-modal-summary{display:flex;justify-content:space-between;margin-top:18px;padding:11px 12px;background:${C.bg};border-radius:10px;font-size:10px;color:${C.soft}}.cw-modal-summary strong{color:${C.ink}}.cw-modal-actions{display:flex;justify-content:flex-end;gap:8px;margin-top:18px}.cw-payment-modal{text-align:center;padding:30px}.cw-money{font-size:30px;font-weight:850;color:${C.good};margin:10px 0 3px}.cw-payment-line{margin:16px 0 20px;padding:11px;background:${C.goodSoft};color:${C.good};font-size:10px;line-height:1.5;border-radius:10px}.cw-wide{width:100%}
-@media(max-width:850px){.cw-shell{grid-template-columns:1fr}.cw-list{border-right:0;border-bottom:1px solid ${C.line};display:flex;overflow:auto;gap:5px}.cw-list-head{display:none}.cw-person{min-width:210px}.cw-grid{grid-template-columns:1fr}.cw-next{flex-direction:column;align-items:flex-start}.cw-next-actions{width:100%}.cw-next-actions button{width:100%}.cw-steps{overflow:auto;padding-bottom:4px}.cw-body{padding:14px}.cw-header,.cw-tabs{padding-left:14px;padding-right:14px}.cw-work-head{align-items:flex-start;flex-direction:column}.cw-work-head button{width:100%}.cw-submit,.cw-review{flex-wrap:wrap}.cw-submit>*{min-width:100%}.cw-review>*{min-width:100%}}
+@media(max-width:850px){.cw-shell{grid-template-columns:1fr}.cw-list{border-right:0;border-bottom:1px solid ${C.line};display:flex;overflow:auto;gap:5px}.cw-list-head{display:none}.cw-person{min-width:210px}.cw-grid{grid-template-columns:1fr}.cw-next{flex-direction:column;align-items:flex-start}.cw-next-actions{width:100%}.cw-next-actions button{width:100%}.cw-rate-fix{flex-direction:column;align-items:stretch}.cw-rate-fix-input{width:100%}.cw-steps{overflow:auto;padding-bottom:4px}.cw-body{padding:14px}.cw-header,.cw-tabs{padding-left:14px;padding-right:14px}.cw-work-head{align-items:flex-start;flex-direction:column}.cw-work-head button{width:100%}.cw-submit,.cw-review{flex-wrap:wrap}.cw-submit>*{min-width:100%}.cw-review>*{min-width:100%}}
 `;
 
 export default WorkspaceActive;

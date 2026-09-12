@@ -15,7 +15,6 @@ import {
   getPublicationProofs,
   submitPublicationProof,
   reviewPublicationProof,
-  releasePayment,
 } from '../../api/client';
 import { useAuth } from '../../context/AuthContext';
 import { AppLayout } from '../../components/AppLayout';
@@ -59,6 +58,7 @@ export function WorkspaceDeliverables() {
   const [proofs, setProofs] = useState<any[]>([]);
   const [proofError, setProofError] = useState('');
   const [proofBusy, setProofBusy] = useState(false);
+  const [paymentModal, setPaymentModal] = useState<{ amount: number; campaign: string } | null>(null);
 
   useEffect(() => {
     getCollabs()
@@ -90,9 +90,6 @@ export function WorkspaceDeliverables() {
   const selectedDeliverables = selectedId
     ? deliverables.filter((d) => d.application_id === Number(selectedId))
     : [];
-  const selectedApprovedCount = selectedDeliverables.filter((d) => d.status === 'approved').length;
-  const selectedCount = selectedDeliverables.length;
-  const selectedAllApproved = Boolean(selectedCollab && (selectedCount === 0 || selectedApprovedCount === selectedCount));
 
   const handlePaySelected = async () => {
     if (!selectedCollab) return;
@@ -102,13 +99,6 @@ export function WorkspaceDeliverables() {
     finally { setPayingId(null); }
   };
 
-  const handleRelease = async () => {
-    if (!selectedCollab) return;
-    setPayingId(selectedCollab.id); setPaymentError('');
-    try { await releasePayment(selectedCollab.id); setCollabs(await getCollabs()); }
-    catch (err: any) { setPaymentError(err?.response?.data?.detail || 'Payment cannot be released yet.'); }
-    finally { setPayingId(null); }
-  };
 
   useEffect(() => {
     loadDeliverables();
@@ -174,6 +164,13 @@ export function WorkspaceDeliverables() {
         .wd-modal-submit { width: 100%; margin-top: 16px; background: ${primary}; color: #fff; border: none; border-radius: 8px; padding: 11px; font-size: 13.5px; font-weight: 700; cursor: pointer; }
         .wd-modal-submit:disabled { opacity: 0.6; cursor: not-allowed; }
         .wd-modal-error { font-size: 12px; color: #d64545; margin-top: 8px; }
+        .wd-payment-success-modal { text-align: center; padding: 30px 26px; }
+        .wd-payment-success-icon { width: 58px; height: 58px; margin: 0 auto 12px; border-radius: 50%; background: #EAF8F0; color: #16834A; display: flex; align-items: center; justify-content: center; }
+        .wd-payment-success-kicker { font-size: 10px; font-weight: 800; letter-spacing: .12em; color: #16834A; margin-bottom: 7px; }
+        .wd-payment-success-modal h3 { margin: 0; font-size: 20px; color: ${C.ink}; }
+        .wd-payment-success-amount { margin: 12px 0 4px; font-size: 28px; font-weight: 800; color: ${C.navy}; }
+        .wd-payment-success-modal p { margin: 0; font-size: 13px; color: ${C.inkSoft}; }
+        .wd-payment-success-copy { margin: 14px 0 18px; padding: 11px 12px; border-radius: 9px; background: #EAF8F0; color: #276749; font-size: 12px; line-height: 1.5; }
       `}</style>
 
       <div className="wd-content">
@@ -195,11 +192,6 @@ export function WorkspaceDeliverables() {
               <CreditCard size={14} /> {payingId === selectedCollab.id ? 'Opening payment…' : `Secure Rs. ${selectedCollab.agreed_rate?.toLocaleString() || '—'}`}
             </button>
           )}
-          {isBusiness && selectedCollab?.payment_status === 'funded' && selectedAllApproved && (selectedCollab.completion_mode !== 'publication_required' || proofs.length > 0 && proofs.every(p => p.status === 'verified')) && (
-            <button className="wd-pay" disabled={payingId === selectedCollab.id} onClick={handleRelease}>
-              <CreditCard size={14} /> Release payment
-            </button>
-          )}
           {isBusiness && (
             <button className="wd-add" disabled={collabs.length === 0} onClick={() => setShowForm(true)}>
               <Plus size={14} /> Request deliverable
@@ -210,7 +202,7 @@ export function WorkspaceDeliverables() {
         {paymentError && <div className="wd-payment-error">{paymentError}</div>}
         {isBusiness && selectedCollab && (
           <div className="wd-payment-note">
-            {selectedCollab.payment_status === 'funded' ? `🔒 Rs. ${(selectedCollab.agreed_rate || 0).toLocaleString()} secured. It will be released after the campaign requirements are verified.` : selectedCollab.payment_status === 'released' ? '✓ Payment released.' : `Secure the locked agreed amount (Rs. ${(selectedCollab.agreed_rate || 0).toLocaleString()}) before the creator starts work.`}
+            {selectedCollab.payment_status === 'funded' ? `🔒 Rs. ${(selectedCollab.agreed_rate || 0).toLocaleString()} secured. It will be paid automatically when all required deliverables are submitted.` : selectedCollab.payment_status === 'released' ? '✓ Payment released.' : `Secure the locked agreed amount (Rs. ${(selectedCollab.agreed_rate || 0).toLocaleString()}) before the creator starts work.`}
           </div>
         )}
 
@@ -231,10 +223,33 @@ export function WorkspaceDeliverables() {
             isBusiness={isBusiness}
             busy={actingId === d.id}
             setBusy={setActingId}
-            onUpdate={(updated) => setDeliverables((prev) => prev.map((x) => (x.id === updated.id ? updated : x)))}
+            onUpdate={(updated) => {
+              setDeliverables((prev) => prev.map((x) => (x.id === updated.id ? updated : x)));
+              if (updated.payment_released) {
+                setPaymentModal({
+                  amount: Number(updated.payment_amount || 0),
+                  campaign: updated.campaign_title || selectedCollab?.campaign_title || 'Collaboration',
+                });
+                getCollabs().then(setCollabs).catch(() => {});
+              }
+            }}
           />
         ))}
       </div>
+
+      {paymentModal && (
+        <div className="wd-modal-backdrop" role="dialog" aria-modal="true" aria-labelledby="wd-payment-success-title">
+          <div className="wd-modal wd-payment-success-modal">
+            <div className="wd-payment-success-icon"><Check size={28} /></div>
+            <div className="wd-payment-success-kicker">PAYMENT SUCCESSFUL</div>
+            <h3 id="wd-payment-success-title">Your payment has been released</h3>
+            <div className="wd-payment-success-amount">Rs. {paymentModal.amount.toLocaleString()}</div>
+            <p>{paymentModal.campaign}</p>
+            <div className="wd-payment-success-copy">Your final deliverable was submitted successfully and the agreed creator payment has been released automatically.</div>
+            <button className="wd-modal-submit" onClick={() => setPaymentModal(null)}>Continue</button>
+          </div>
+        </div>
+      )}
 
       {showForm && (
         <RequestModal

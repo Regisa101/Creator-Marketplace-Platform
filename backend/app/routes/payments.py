@@ -90,7 +90,7 @@ async def initiate_campaign_funding(
         raise HTTPException(status_code=403, detail="Access denied")
     campaign_type = getattr(campaign.campaign_type, "value", str(campaign.campaign_type))
     if campaign_type != "paid":
-        raise HTTPException(status_code=400, detail="Gifted campaigns do not require funding.")
+        raise HTTPException(status_code=400, detail="Only paid campaigns can be funded.")
     if not campaign.budget or float(campaign.budget) <= 0:
         raise HTTPException(status_code=400, detail="Set a valid campaign budget before funding the campaign.")
     if campaign.funding_status == "funded":
@@ -170,9 +170,6 @@ async def initiate(
         raise HTTPException(status_code=400, detail="The creator must confirm the collaboration before payment can be secured.")
 
     campaign = db.query(Campaign).filter(Campaign.id == application.campaign_id).first()
-    if campaign and getattr(campaign.campaign_type, "value", str(campaign.campaign_type)) == "gifted":
-        raise HTTPException(status_code=400, detail="Gifted collaborations do not require payment.")
-
     # Never accept a payment amount from the browser. The only payable amount
     # is the immutable, mutually agreed rate recorded on the application.
     if not application.rate_locked or application.agreed_rate is None:
@@ -324,8 +321,6 @@ async def release_payment(collab_id: int, db: Session = Depends(get_db), current
     if not campaign:
         raise HTTPException(status_code=404, detail="Campaign not found")
     campaign_type = getattr(campaign.campaign_type, "value", str(campaign.campaign_type))
-    if campaign_type == "gifted":
-        raise HTTPException(status_code=400, detail="Gifted collaborations do not have a cash payout.")
     funding = db.query(Payment).filter(
         Payment.campaign_id == campaign.id,
         Payment.payment_type == "campaign_funding",

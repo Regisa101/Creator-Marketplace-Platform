@@ -35,6 +35,7 @@ async def get_public_campaigns(
             CampaignStatus.IN_PROGRESS,
         ]),
         Campaign.is_active == True,
+        Campaign.funding_status == "funded",
     )
 
     if status:
@@ -104,6 +105,9 @@ async def get_public_campaigns(
             "created_at": campaign.created_at,
             "updated_at": campaign.updated_at,
             "application_count": app_count,
+            "funding_status": campaign.funding_status or "unfunded",
+            "funded_amount": float(campaign.funded_amount) if campaign.funded_amount else None,
+            "funded_at": campaign.funded_at,
         })
 
     return {
@@ -358,6 +362,9 @@ async def get_campaigns(
             "publication_deadline": campaign.publication_deadline,
             "status": campaign.status,
             "is_active": campaign.is_active,
+            "funding_status": campaign.funding_status or "unfunded",
+            "funded_amount": float(campaign.funded_amount) if campaign.funded_amount else None,
+            "funded_at": campaign.funded_at,
             "created_at": campaign.created_at,
             "updated_at": campaign.updated_at,
             "application_count": app_count
@@ -453,7 +460,11 @@ async def publish_campaign(
     
     if campaign.status != "draft":
         raise HTTPException(status_code=400, detail="Campaign is already published or in progress")
-    
+
+    campaign_type = getattr(campaign.campaign_type, "value", str(campaign.campaign_type))
+    if campaign_type == "paid" and getattr(campaign, "funding_status", "unfunded") != "funded":
+        raise HTTPException(status_code=400, detail="Fund the campaign budget before publishing it.")
+
     _validate_campaign_dates(campaign.application_deadline or campaign.deadline, campaign.deliverable_deadline)
     campaign.application_deadline = campaign.application_deadline or campaign.deadline
     campaign.deadline = campaign.application_deadline

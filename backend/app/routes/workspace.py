@@ -1,8 +1,9 @@
 from typing import Optional
 from datetime import datetime, timezone
+from uuid import uuid4
 
 from fastapi import APIRouter, Depends, HTTPException, Query
-from sqlalchemy import select
+from sqlalchemy import select, func
 from sqlalchemy.orm import Session
 
 from app.database import get_db
@@ -15,6 +16,7 @@ from app.models import (
     Rating,
 )
 from app.schemas.workspace import (
+    CollabRateFix,
     CollabResponse,
     DeliverableCreate,
     DeliverableSubmit,
@@ -722,6 +724,117 @@ def _collab_to_response(
 
 
 # ============================================================
+# AUTOMATIC CREATOR PAYOUT
+# ============================================================
+
+def _auto_release_creator_payout(
+    db: Session,
+    application: Application,
+    campaign: Campaign,
+) -> Optional[Payment]:
+    """Pay the creator automatically after the final required deliverable is submitted."""
+    if not application or not campaign:
+        return None
+
+    campaign_type = getattr(campaign.campaign_type, "value", str(campaign.campaign_type))
+    if campaign_type != "paid" or getattr(campaign, "funding_status", "unfunded") != "funded":
+        return None
+
+    deliverables = db.query(Deliverable).filter(
+        Deliverable.application_id == application.id
+    ).all()
+    if not deliverables or not all(d.status in ("submitted", "approved") for d in deliverables):
+        return None
+
+    existing = db.query(Payment).filter(
+        Payment.application_id == application.id,
+        Payment.payment_type == "creator_payout",
+        Payment.status == "released",
+    ).order_by(Payment.created_at.desc()).first()
+    if existing:
+        return existing
+
+    funding = db.query(Payment).filter(
+        Payment.campaign_id == campaign.id,
+        Payment.payment_type == "campaign_funding",
+        Payment.status.in_(["funded", "completed", "released"]),
+    ).order_by(Payment.created_at.desc()).first()
+    if not funding:
+        raise HTTPException(status_code=400, detail="The campaign budget must be funded before payment can be released.")
+
+    agreed = float(application.agreed_rate or application.rate or 0)
+    if agreed <= 0:
+        raise HTTPException(status_code=400, detail="A valid agreed creator rate is required before payment can be released.")
+
+    already_allocated = float(
+        db.query(func.coalesce(func.sum(Payment.amount), 0)).filter(
+            Payment.campaign_id == campaign.id,
+            Payment.payment_type == "creator_payout",
+            Payment.status == "released",
+        ).scalar() or 0
+    )
+    available = float(funding.amount) - already_allocated
+    if agreed > available + 0.01:
+        raise HTTPException(status_code=400, detail="The campaign does not have enough remaining funded budget for this creator payout.")
+
+    fee = round(agreed * 0.10, 2)
+    creator_amount = round(agreed - fee, 2)
+    if creator_amount <= 0:
+        raise HTTPException(status_code=400, detail="Creator payout must be greater than zero.")
+
+    now = datetime.now(timezone.utc)
+    payout = Payment(
+        application_id=application.id,
+        campaign_id=campaign.id,
+        payment_type="creator_payout",
+        purchase_order_id=f"PAYOUT{application.id}-{int(now.timestamp())}-{uuid4().hex[:6].upper()}",
+        amount=creator_amount,
+        platform_fee=fee,
+        creator_payout=creator_amount,
+        status="released",
+        method="platform_ledger",
+        initiated_by=campaign.business_id,
+        transaction_id=f"PAYOUT-{uuid4().hex[:12].upper()}",
+        paid_at=now,
+    )
+    db.add(payout)
+
+    # Payment happens when the final required deliverable is submitted.
+    # The submitted work therefore completes the collaboration without a
+    # second manual approval/payment step.
+    for item in deliverables:
+        item.status = "approved"
+        item.feedback = None
+
+    application.status = "completed"
+
+    create_notification(
+        db,
+        user_id=application.creator_id,
+        type="payment_released",
+        title="Payment successful",
+        message=f"Rs. {creator_amount:,.2f} has been paid to you for {campaign.title}. Your deliverables were submitted successfully.",
+        link=f"/workspace/active?collab={application.id}",
+        reference_id=application.id,
+        event_key=f"payment-released:{application.id}",
+    )
+    create_notification(
+        db,
+        user_id=campaign.business_id,
+        type="collaboration_completed",
+        title="Payment successful",
+        message=f"Rs. {creator_amount:,.2f} was paid to the creator for {campaign.title}. The collaboration is now complete.",
+        link=f"/workspace/active?collab={application.id}",
+        reference_id=application.id,
+        event_key=f"collaboration-completed:{application.id}",
+    )
+
+    db.flush()
+    _maybe_complete_campaign(db, campaign)
+    return payout
+
+
+# ============================================================
 # CAMPAIGN COMPLETION
 # ============================================================
 
@@ -913,6 +1026,59 @@ async def confirm_collaboration(
                 f"{application.id}"
             ),
         )
+
+    db.commit()
+    db.refresh(application)
+
+    return _collab_to_response(
+        db,
+        application,
+        current_user.id,
+    )
+
+
+@router.put(
+    "/collabs/{collab_id}/rate",
+    response_model=CollabResponse,
+)
+async def fix_collaboration_rate(
+    collab_id: int,
+    data: CollabRateFix,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(
+        get_current_business
+    ),
+):
+    """
+    Repairs a collaboration that has no agreed rate on record.
+
+    This is NOT a way to renegotiate an already-agreed price — normal
+    negotiation happens before acceptance via /api/negotiations and
+    locks `agreed_rate` there. This endpoint only fills in the amount
+    when a collaboration somehow reached "accepted" without one ever
+    being set (e.g. legacy data, or a campaign whose type changed after
+    acceptance), which otherwise leaves payment release permanently
+    stuck with no way to recover.
+    """
+
+    application = _get_authorized_collab(
+        db,
+        current_user,
+        collab_id,
+    )
+
+    if application.agreed_rate:
+        raise HTTPException(
+            status_code=400,
+            detail=(
+                "This collaboration already has an "
+                "agreed rate and cannot be changed here."
+            ),
+        )
+
+    application.agreed_rate = data.amount
+    application.rate_locked = 1
+    application.negotiation_status = "agreed"
 
     db.commit()
     db.refresh(application)
@@ -1655,13 +1821,19 @@ async def submit_deliverable(
             ),
         )
 
+    payout = _auto_release_creator_payout(db, application, campaign) if campaign else None
+
     db.commit()
     db.refresh(deliverable)
 
-    return _deliverable_to_response(
+    response = _deliverable_to_response(
         db,
         deliverable,
     )
+    response.payment_released = payout is not None
+    response.payment_amount = float(payout.amount) if payout else None
+    response.payment_id = payout.id if payout else None
+    return response
 
 
 # ============================================================

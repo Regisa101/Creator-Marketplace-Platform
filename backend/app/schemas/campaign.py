@@ -6,7 +6,6 @@ from enum import Enum
 # ===== ENUMS =====
 class CampaignType(str, Enum):
     PAID = "paid"
-    GIFTED = "gifted"
 
 class CampaignStatus(str, Enum):
     DRAFT = "draft"
@@ -40,7 +39,7 @@ class CampaignBase(BaseModel):
     brief: Optional[str] = None
     category: str = Field(..., min_length=2)
     sub_category: Optional[str] = None
-    campaign_type: CampaignType = CampaignType.GIFTED
+    campaign_type: CampaignType = CampaignType.PAID
     brand_name: Optional[str] = None
     brand_location: Optional[str] = None
     budget: Optional[float] = Field(None, gt=0)

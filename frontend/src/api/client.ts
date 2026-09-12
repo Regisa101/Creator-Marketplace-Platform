@@ -594,6 +594,9 @@ export interface WorkspaceDeliverable {
   submitted_at?: string | null;
   created_at: string;
   updated_at?: string | null;
+  payment_released?: boolean;
+  payment_amount?: number | null;
+  payment_id?: number | null;
 }
 
 // ============================================
@@ -883,6 +886,14 @@ export const confirmCollaboration = async (collabId: number): Promise<Collab> =>
 
 export const verifyCollaboration = async (collabId: number): Promise<Collab> => {
   const response = await api.post<Collab>(`/workspace/collabs/${collabId}/verify`);
+  return response.data;
+};
+
+// Repairs a collaboration that was somehow accepted without an agreed rate
+// (legacy data, or a campaign edited after acceptance). Fails with 400 if
+// the collaboration already has a rate — this is not a renegotiation path.
+export const fixCollabRate = async (collabId: number, amount: number): Promise<Collab> => {
+  const response = await api.put<Collab>(`/workspace/collabs/${collabId}/rate`, { amount });
   return response.data;
 };
 

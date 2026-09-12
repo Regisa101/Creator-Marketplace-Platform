@@ -25,7 +25,7 @@ import {
 
 import { useAuth } from "../context/AuthContext";
 import { LogoMark } from "./Logo";
-import { getUnreadNotificationCount } from "../api/client";
+import { getNotifications, getUnreadNotificationCount, markNotificationRead } from "../api/client";
 
 const C = {
   sidebar: "#FBF8F4",
@@ -251,6 +251,8 @@ export function AppLayout({
 
   const [unreadNotifications, setUnreadNotifications] =
     useState(0);
+  const [paymentSuccessNotice, setPaymentSuccessNotice] =
+    useState<{ id: number; title: string; message: string; link?: string | null } | null>(null);
 
   useEffect(() => {
     let mounted = true;
@@ -320,6 +322,54 @@ export function AppLayout({
     };
   }, []);
 
+
+  /*
+   * PAYMENT SUCCESS POPUP
+   *
+   * Businesses receive a collaboration_completed notification when the
+   * platform automatically releases a creator payout after the final
+   * deliverable is submitted. Show that notification as a popup anywhere
+   * in the app so the brand sees payment success without needing to open
+   * the notifications page.
+   */
+  useEffect(() => {
+    if (role !== "business") return;
+
+    let mounted = true;
+
+    const loadPaymentNotice = async () => {
+      try {
+        const notifications = await getNotifications(true);
+        if (!mounted) return;
+
+        const notice = notifications.find(
+          (item) => item.type === "collaboration_completed"
+        );
+        if (!notice) return;
+
+        const seenKey = `payment-success-popup:${notice.id}`;
+        if (sessionStorage.getItem(seenKey) === "1") return;
+
+        sessionStorage.setItem(seenKey, "1");
+        setPaymentSuccessNotice({
+          id: notice.id,
+          title: notice.title || "Payment successful",
+          message: notice.message,
+          link: notice.link,
+        });
+      } catch (error) {
+        console.error("Failed to load payment success notification:", error);
+      }
+    };
+
+    loadPaymentNotice();
+    const interval = window.setInterval(loadPaymentNotice, 5000);
+
+    return () => {
+      mounted = false;
+      window.clearInterval(interval);
+    };
+  }, [role]);
 
   /*
    * =====================================================
@@ -1173,7 +1223,14 @@ export function AppLayout({
             right: -6px;
           }
         }
-
+        .app-payment-modal-backdrop { position: fixed; inset: 0; z-index: 9999; background: rgba(20, 18, 30, .48); display: flex; align-items: center; justify-content: center; padding: 20px; }
+        .app-payment-modal { position: relative; width: min(430px, 100%); background: #fff; border-radius: 18px; padding: 30px 28px 26px; text-align: center; box-shadow: 0 24px 70px rgba(25, 20, 40, .22); }
+        .app-payment-modal-close { position: absolute; top: 12px; right: 12px; width: 34px; height: 34px; border: 0; border-radius: 50%; background: #F5F4FA; color: #6B6478; display: flex; align-items: center; justify-content: center; cursor: pointer; }
+        .app-payment-success-icon { width: 62px; height: 62px; margin: 0 auto 12px; border-radius: 50%; background: #EAF8F0; color: #16834A; display: flex; align-items: center; justify-content: center; }
+        .app-payment-success-kicker { color: #16834A; font-size: 10px; font-weight: 800; letter-spacing: .12em; margin-bottom: 7px; }
+        .app-payment-modal h2 { margin: 0 0 9px; color: #1A1625; font-size: 21px; }
+        .app-payment-modal p { margin: 0; color: #6B6478; font-size: 13px; line-height: 1.55; }
+        .app-payment-success-button { width: 100%; margin-top: 19px; border: 0; border-radius: 9px; padding: 11px 14px; background: #7661A1; color: #fff; font-size: 13px; font-weight: 700; cursor: pointer; }
       `}</style>
 
       {/* =================================================
@@ -1582,6 +1639,51 @@ export function AppLayout({
         </div>
 
       </div>
+
+      {paymentSuccessNotice && (
+        <div className="app-payment-modal-backdrop" role="dialog" aria-modal="true" aria-labelledby="app-payment-success-title">
+          <div className="app-payment-modal">
+            <button
+              type="button"
+              className="app-payment-modal-close"
+              aria-label="Close"
+              onClick={async () => {
+                const id = paymentSuccessNotice.id;
+                setPaymentSuccessNotice(null);
+                try {
+                  await markNotificationRead(id);
+                } catch (error) {
+                  console.error("Could not mark payment notification as read:", error);
+                }
+              }}
+            >
+              <X size={18} />
+            </button>
+            <div className="app-payment-success-icon">
+              <CheckCircle2 size={30} />
+            </div>
+            <div className="app-payment-success-kicker">PAYMENT SUCCESSFUL</div>
+            <h2 id="app-payment-success-title">{paymentSuccessNotice.title}</h2>
+            <p>{paymentSuccessNotice.message}</p>
+            <button
+              type="button"
+              className="app-payment-success-button"
+              onClick={async () => {
+                const notice = paymentSuccessNotice;
+                setPaymentSuccessNotice(null);
+                try {
+                  await markNotificationRead(notice.id);
+                } catch (error) {
+                  console.error("Could not mark payment notification as read:", error);
+                }
+                if (notice.link) navigate(notice.link);
+              }}
+            >
+              View collaboration
+            </button>
+          </div>
+        </div>
+      )}
 
     </div>
   );
