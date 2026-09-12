@@ -14,7 +14,8 @@ import {
   Users,
 } from 'lucide-react';
 import { getPublicBusinessProfile, type PublicBusinessProfile } from '../api/client';
-import { LogoMark, BRAND_NAME } from '../components/Brand';
+import { OFF_WHITE } from '../components/Brand';
+import { PublicNavbar } from '../components/PublicNavbar';
 
 const CORAL = '#FF6B5A';
 const CORAL_DARK = '#F0523F';
@@ -70,22 +71,28 @@ export function BrandProfile() {
 
   if (loading) {
     return (
-      <div className="bp bp-state">
+      <div className="bp">
         <style>{brandStyles}</style>
-        <div className="bp-loader">Loading brand profile…</div>
+        <PublicNavbar />
+        <div className="bp-state">
+          <div className="bp-loader">Loading brand profile…</div>
+        </div>
       </div>
     );
   }
 
   if (error || !brand) {
     return (
-      <div className="bp bp-state">
+      <div className="bp">
         <style>{brandStyles}</style>
-        <div className="bp-error-title">Brand profile unavailable</div>
-        <div className="bp-error-text">{error || 'This brand could not be found.'}</div>
-        <button className="bp-back" onClick={() => navigate(-1)}>
-          <ArrowLeft size={15} /> Go back
-        </button>
+        <PublicNavbar />
+        <div className="bp-state">
+          <div className="bp-error-title">Brand profile unavailable</div>
+          <div className="bp-error-text">{error || 'This brand could not be found.'}</div>
+          <button className="bp-back" onClick={() => navigate(-1)}>
+            <ArrowLeft size={15} /> Go back
+          </button>
+        </div>
       </div>
     );
   }
@@ -99,19 +106,7 @@ export function BrandProfile() {
     <div className="bp">
       <style>{brandStyles}</style>
 
-      <header className="bp-topbar">
-        <div className="bp-topbar-inner">
-          <Link to="/campaigns" className="bp-logo" aria-label={BRAND_NAME}>
-            <LogoMark size={25} />
-            <span>{BRAND_NAME}</span>
-          </Link>
-          <nav className="bp-nav" aria-label="Brand profile navigation">
-            <Link to="/campaigns" className="bp-nav-link">
-              Browse Campaigns
-            </Link>
-          </nav>
-        </div>
-      </header>
+      <PublicNavbar />
 
       <main className="bp-wrap">
         <div className="bp-breadcrumb">
@@ -373,7 +368,7 @@ const brandStyles = `
     --ink-soft: #6c6d73;
     --line: #e6e6ea;
     min-height: 100vh;
-    background: #f7f7f8;
+    background: ${OFF_WHITE};
     color: var(--ink);
     font-family: 'Poppins', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
   }
@@ -613,7 +608,7 @@ const brandStyles = `
   .bp-note-title { font-size: 13px; font-weight: 700; margin-bottom: 4px; }
   .bp-note-text { color: var(--ink-soft); font-size: 12.5px; line-height: 1.6; }
   .bp-empty { color: var(--ink-soft); font-size: 13px; line-height: 1.6; }
-  .bp-state { min-height: 100vh; display: flex; flex-direction: column; align-items: center; justify-content: center; color: var(--ink-soft); gap: 8px; padding: 24px; text-align: center; }
+  .bp-state { min-height: calc(100vh - 72px); display: flex; flex-direction: column; align-items: center; justify-content: center; color: var(--ink-soft); gap: 8px; padding: 24px; text-align: center; }
   .bp-error-title { color: var(--ink); font-size: 18px; font-weight: 700; }
   .bp-error-text { font-size: 13px; }
   .bp-loader { font-size: 14px; }

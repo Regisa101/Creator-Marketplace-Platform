@@ -23,7 +23,7 @@ import {
 } from '../../api/client';
 import type { CreatorOnboardingData } from '../../api/client';
 import { useAuth } from '../../context/AuthContext';
-import { LogoMark, BRAND_NAME } from '../../components/Logo';
+import { LogoMark, BRAND_NAME, OFF_WHITE } from '../../components/Logo';
 
 // ============================================================
 // TYPES
@@ -699,7 +699,7 @@ export function CreatorOnboarding() {
           font-family: Inter, Poppins, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
           color: var(--ink);
           min-height: 100vh;
-          background: #fbfaff;
+          background: ${OFF_WHITE};
           padding: 32px 20px 80px;
           -webkit-font-smoothing: antialiased;
         }

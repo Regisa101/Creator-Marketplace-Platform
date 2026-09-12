@@ -18,7 +18,7 @@ import {
 } from '../../api/client';
 import type { BusinessOnboardingData } from '../../api/client';
 import { useAuth } from '../../context/AuthContext';
-import { LogoMark, BRAND_NAME, BRAND_PURPLE, BRAND_PURPLE_DARK, BRAND_PINK_CORAL } from '../../components/Logo';
+import { LogoMark, BRAND_NAME, BRAND_PURPLE, BRAND_PURPLE_DARK, BRAND_PINK_CORAL, OFF_WHITE } from '../../components/Logo';
 
 // ============================================================
 // CONSTANTS
@@ -467,7 +467,7 @@ export function BusinessOnboarding() {
           font-family: Inter, Poppins, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
           color: var(--ink);
           min-height: 100vh;
-          background: #fbfaff;
+          background: ${OFF_WHITE};
           padding: 32px 20px 80px;
           -webkit-font-smoothing: antialiased;
         }

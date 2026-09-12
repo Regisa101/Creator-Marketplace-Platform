@@ -11,6 +11,10 @@ export const BRAND_PINK_CORAL = "#F47C78";
 
 export const BRAND_NAME = "creatorhub";
 
+// The one off-white background color used across every page and the
+// navbar, so the whole app reads as one consistent surface.
+export const OFF_WHITE = "#FBF8F4";
+
 export function LogoMark({ size = 24 }: { size?: number }) {
   return (
     <svg

@@ -1,7 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import {
-  ArrowLeft,
   MapPin,
   Globe,
   Pencil,
@@ -24,6 +23,8 @@ import {
   getCampaigns,
   getApplications,
 } from '../api/client';
+import { OFF_WHITE } from '../components/Brand';
+import { PublicNavbar } from '../components/PublicNavbar';
 
 const VIOLET = '#1E2A78';
 const VIOLET_DARK = '#182262';
@@ -166,7 +167,7 @@ export function BusinessProfile() {
           --ink-soft: #6c6d73;
           --ink-faint: #9b9ba3;
           --line: #e6e6ea;
-          --surface: #fbfaff;
+          --surface: ${OFF_WHITE};
           font-family: 'Poppins', -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
           min-height: 100vh;
           background: var(--surface);
@@ -753,12 +754,7 @@ export function BusinessProfile() {
         }
       `}</style>
 
-      <div className="bp-topbar">
-        <button className="bp-back" onClick={() => navigate('/dashboard')}>
-          <ArrowLeft size={15} />
-          Back to Dashboard
-        </button>
-      </div>
+      <PublicNavbar />
 
       <div className="bp-body">
         {loading ? (

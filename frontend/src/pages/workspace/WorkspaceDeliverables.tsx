@@ -87,9 +87,6 @@ export function WorkspaceDeliverables() {
     setProofs([]); setProofError('');
     if (selectedId) getPublicationProofs(Number(selectedId)).then(setProofs).catch(() => setProofs([]));
   }, [selectedId]);
-  const selectedDeliverables = selectedId
-    ? deliverables.filter((d) => d.application_id === Number(selectedId))
-    : [];
 
   const handlePaySelected = async () => {
     if (!selectedCollab) return;

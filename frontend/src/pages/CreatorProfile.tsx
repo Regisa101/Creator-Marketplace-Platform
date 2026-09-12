@@ -1,7 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import {
-  ArrowLeft,
   MapPin,
   Globe,
   Pencil,
@@ -20,6 +19,8 @@ import {
 
 import { useAuth } from '../context/AuthContext';
 import { getCreatorProgress, getApplications } from '../api/client';
+import { OFF_WHITE } from '../components/Brand';
+import { PublicNavbar } from '../components/PublicNavbar';
 
 const CORAL = '#F47C78';
 const CORAL_DARK = '#E86966';
@@ -224,7 +225,7 @@ export function CreatorProfile() {
           --ink-soft: #6c6d73;
           --ink-faint: #9b9ba3;
           --line: #e6e6ea;
-          --surface: #fbfaff;
+          --surface: ${OFF_WHITE};
           font-family: 'Poppins', -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
           min-height: 100vh;
           background: var(--surface);
@@ -872,12 +873,7 @@ export function CreatorProfile() {
         }
       `}</style>
 
-      <div className="cp-topbar">
-        <button className="cp-back" onClick={() => navigate('/dashboard')}>
-          <ArrowLeft size={15} />
-          Back to Dashboard
-        </button>
-      </div>
+      <PublicNavbar />
 
       <div className="cp-body">
         {loading ? (

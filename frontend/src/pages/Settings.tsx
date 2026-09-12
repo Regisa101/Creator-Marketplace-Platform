@@ -19,10 +19,54 @@ import {
   type VideoSpec,
 } from '../api/client';
 import { useAuth } from '../context/AuthContext';
-import { LogoMark, BRAND_NAME, PAGE_GRADIENT_BG } from '../components/Brand';
+import { LogoMark, BRAND_NAME, PAGE_GRADIENT_BG, OFF_WHITE } from '../components/Brand';
+import { PublicNavbar } from '../components/PublicNavbar';
 
 const VIOLET = '#1E2A78';
 const VIOLET_DARK = '#182262';
+
+// Self-contained base styles for the BusinessSettings page (the "/settings"
+// route). This page is rendered on its own — not alongside CampaignForm —
+// so it needs its own copy of the shell/typography/button styles rather
+// than relying on CampaignForm's <style> block being mounted too.
+const businessSettingsBaseStyles = `
+  .bs {
+    --violet: ${VIOLET};
+    --violet-dark: ${VIOLET_DARK};
+    --ink: #111217;
+    --ink-soft: #6c6d73;
+    --line: #e6e6ea;
+    font-family: 'Poppins', -apple-system, Helvetica, Arial, sans-serif;
+    min-height: 100vh;
+    background: ${OFF_WHITE};
+    color: var(--ink);
+  }
+  .bs * { box-sizing: border-box; }
+  .bs-main { max-width: 900px; margin: 0 auto; padding: 32px 24px 80px; }
+  .bs-card { background: #fff; border: 1px solid var(--line); border-radius: 16px; }
+  .bs-input {
+    width: 100%; padding: 10px 12px; border: 1px solid var(--line); border-radius: 8px;
+    font: 500 13.5px 'Poppins', sans-serif; color: var(--ink); background: #fff;
+  }
+  .bs-input:focus { outline: none; border-color: var(--violet); }
+  .bs-btn-draft {
+    padding: 10px 18px; border-radius: 9px; border: 1px solid var(--line); background: #fff;
+    color: var(--ink); font: 600 13px 'Poppins', sans-serif; cursor: pointer;
+  }
+  .bs-btn-draft:hover { border-color: var(--violet); color: var(--violet); }
+  .bs-btn-publish {
+    padding: 10px 20px; border-radius: 9px; border: 1px solid var(--violet); background: var(--violet);
+    color: #fff; font: 600 13px 'Poppins', sans-serif; cursor: pointer;
+  }
+  .bs-btn-publish:hover { background: var(--violet-dark); border-color: var(--violet-dark); }
+  .bs-btn-publish:disabled { opacity: .6; cursor: not-allowed; }
+  .bs-preset-chip {
+    padding: 7px 12px; border-radius: 999px; border: 1px solid var(--line); background: #fff;
+    color: var(--ink-soft); font: 600 12px 'Poppins', sans-serif; cursor: pointer;
+  }
+  .bs-preset-chip:hover { border-color: var(--violet); color: var(--violet); }
+  .bs-hint { font-size: 12.5px; color: var(--ink-soft); }
+`;
 
 // Same category list as CreatorProfile/BusinessOnboarding's
 // "interested categories" so campaign categories line up with what
@@ -1841,11 +1885,24 @@ export function BusinessSettings() {
   };
 
   if (user?.role !== 'business') {
-    return <div className="cc"><main className="cc-main" style={{ maxWidth: 600, margin: '0 auto', padding: 40 }}><div className="cc-card" style={{ padding: 48, textAlign: 'center' }}><h2>Access Denied</h2><p>Only business users can access this page.</p><button className="cc-btn-draft" onClick={() => navigate('/dashboard')}>Go to Dashboard</button></div></main></div>;
+    return (
+      <div className="bs">
+        <style>{businessSettingsBaseStyles}</style>
+        <PublicNavbar />
+        <main className="bs-main">
+          <div className="bs-card" style={{ padding: 48, textAlign: 'center' }}>
+            <h2>Access Denied</h2>
+            <p>Only business users can access this page.</p>
+            <button className="bs-btn-draft" onClick={() => navigate('/dashboard')}>Go to Dashboard</button>
+          </div>
+        </main>
+      </div>
+    );
   }
 
   return (
-    <div className="cc">
+    <div className="bs">
+      <style>{businessSettingsBaseStyles}</style>
       <style>{`
         .cc-settings { max-width: 820px; margin: 0 auto; padding: 36px 20px 60px; }
         .cc-settings h1 { font-size: 28px; font-weight: 700; margin: 0 0 8px; }
@@ -1857,8 +1914,8 @@ export function BusinessSettings() {
         .cc-settings-row input { flex:1; }
         .cc-settings-remove { border:1px solid var(--line); background:#fff; border-radius:8px; padding:8px 10px; cursor:pointer; }
       `}</style>
-      <div className="cc-shell"><main className="cc-main">
-        <button className="cc-back" onClick={() => navigate(-1)}><ArrowLeft size={15} /> Back</button>
+      <PublicNavbar />
+      <main className="bs-main">
         <div className="cc-settings">
           <h1>Business Settings</h1>
           <p className="sub">Set defaults once and Noodle will prefill them whenever you create a new campaign.</p>
@@ -1881,30 +1938,30 @@ export function BusinessSettings() {
               <h3>Default creator application questions</h3>
               <p>Pick the questions you commonly ask creators. They will automatically appear in new campaigns. You can add your own too.</p>
               <div style={{ display:'flex', flexWrap:'wrap', gap:7, marginBottom:14 }}>
-                {SETTINGS_QUESTIONS.map((q) => <button key={q} type="button" className="cc-preset-chip" onClick={() => setDefaultQuestions((items) => items.some((x) => x.toLowerCase() === q.toLowerCase()) ? items : [...items, q])}>+ {q}</button>)}
+                {SETTINGS_QUESTIONS.map((q) => <button key={q} type="button" className="bs-preset-chip" onClick={() => setDefaultQuestions((items) => items.some((x) => x.toLowerCase() === q.toLowerCase()) ? items : [...items, q])}>+ {q}</button>)}
               </div>
-              {defaultQuestions.map((q, i) => <div className="cc-settings-row" key={`${q}-${i}`}><input className="cc-input" value={q} onChange={(e) => setDefaultQuestions((items) => items.map((x,j) => j===i ? e.target.value : x))} /><button className="cc-settings-remove" type="button" onClick={() => setDefaultQuestions((items) => items.filter((_,j)=>j!==i))}>Remove</button></div>)}
-              <div className="cc-settings-row"><input className="cc-input" value={''} onChange={(e) => setQuestionDraftHack(e.target.value)} placeholder="Write your own question" /><button className="cc-btn-draft" type="button" onClick={() => { const value = questionDraftHack.trim(); if (value) { setDefaultQuestions((items)=>[...items,value]); setQuestionDraftHack(''); } }}>+ Add</button></div>
+              {defaultQuestions.map((q, i) => <div className="cc-settings-row" key={`${q}-${i}`}><input className="bs-input" value={q} onChange={(e) => setDefaultQuestions((items) => items.map((x,j) => j===i ? e.target.value : x))} /><button className="cc-settings-remove" type="button" onClick={() => setDefaultQuestions((items) => items.filter((_,j)=>j!==i))}>Remove</button></div>)}
+              <div className="cc-settings-row"><input className="bs-input" value={''} onChange={(e) => setQuestionDraftHack(e.target.value)} placeholder="Write your own question" /><button className="bs-btn-draft" type="button" onClick={() => { const value = questionDraftHack.trim(); if (value) { setDefaultQuestions((items)=>[...items,value]); setQuestionDraftHack(''); } }}>+ Add</button></div>
             </div>
 
             <div className="cc-settings-card">
               <h3>Default creative rules</h3>
               <p>These are also copied into new campaigns.</p>
-              <div className="cc-settings-row"><input className="cc-input" value={dosDraft} onChange={(e)=>setDosDraft(e.target.value)} placeholder="Default Do's" /><button className="cc-btn-draft" type="button" onClick={()=>addText(dosDraft,setDosDraft,setDefaultDos,defaultDos)}>+ Add</button></div>
-              {defaultDos.map((x,i)=><div className="cc-settings-row" key={`${x}-${i}`}><input className="cc-input" value={x} onChange={(e)=>setDefaultDos(defaultDos.map((v,j)=>j===i?e.target.value:v))}/><button className="cc-settings-remove" type="button" onClick={()=>setDefaultDos(defaultDos.filter((_,j)=>j!==i))}>Remove</button></div>)}
-              <div className="cc-settings-row"><input className="cc-input" value={dontsDraft} onChange={(e)=>setDontsDraft(e.target.value)} placeholder="Default Don'ts" /><button className="cc-btn-draft" type="button" onClick={()=>addText(dontsDraft,setDontsDraft,setDefaultDonts,defaultDonts)}>+ Add</button></div>
-              {defaultDonts.map((x,i)=><div className="cc-settings-row" key={`${x}-${i}`}><input className="cc-input" value={x} onChange={(e)=>setDefaultDonts(defaultDonts.map((v,j)=>j===i?e.target.value:v))}/><button className="cc-settings-remove" type="button" onClick={()=>setDefaultDonts(defaultDonts.filter((_,j)=>j!==i))}>Remove</button></div>)}
-              <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:10,marginTop:12}}><input className="cc-input" value={defaultDuration} onChange={(e)=>setDefaultDuration(e.target.value)} placeholder="Default video length"/><input className="cc-input" value={defaultAspectRatio} onChange={(e)=>setDefaultAspectRatio(e.target.value)} placeholder="Default aspect ratio"/></div>
+              <div className="cc-settings-row"><input className="bs-input" value={dosDraft} onChange={(e)=>setDosDraft(e.target.value)} placeholder="Default Do's" /><button className="bs-btn-draft" type="button" onClick={()=>addText(dosDraft,setDosDraft,setDefaultDos,defaultDos)}>+ Add</button></div>
+              {defaultDos.map((x,i)=><div className="cc-settings-row" key={`${x}-${i}`}><input className="bs-input" value={x} onChange={(e)=>setDefaultDos(defaultDos.map((v,j)=>j===i?e.target.value:v))}/><button className="cc-settings-remove" type="button" onClick={()=>setDefaultDos(defaultDos.filter((_,j)=>j!==i))}>Remove</button></div>)}
+              <div className="cc-settings-row"><input className="bs-input" value={dontsDraft} onChange={(e)=>setDontsDraft(e.target.value)} placeholder="Default Don'ts" /><button className="bs-btn-draft" type="button" onClick={()=>addText(dontsDraft,setDontsDraft,setDefaultDonts,defaultDonts)}>+ Add</button></div>
+              {defaultDonts.map((x,i)=><div className="cc-settings-row" key={`${x}-${i}`}><input className="bs-input" value={x} onChange={(e)=>setDefaultDonts(defaultDonts.map((v,j)=>j===i?e.target.value:v))}/><button className="cc-settings-remove" type="button" onClick={()=>setDefaultDonts(defaultDonts.filter((_,j)=>j!==i))}>Remove</button></div>)}
+              <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:10,marginTop:12}}><input className="bs-input" value={defaultDuration} onChange={(e)=>setDefaultDuration(e.target.value)} placeholder="Default video length"/><input className="bs-input" value={defaultAspectRatio} onChange={(e)=>setDefaultAspectRatio(e.target.value)} placeholder="Default aspect ratio"/></div>
               <div style={{display:'flex',gap:16,marginTop:12}}><label><input type="checkbox" checked={defaultVoiceover} onChange={(e)=>setDefaultVoiceover(e.target.checked)}/> Voiceover required</label><label><input type="checkbox" checked={defaultSubtitles} onChange={(e)=>setDefaultSubtitles(e.target.checked)}/> Subtitles required</label></div>
             </div>
 
-            <div style={{display:'flex',alignItems:'center',gap:12,marginBottom:18}}><button className="cc-btn-publish" type="button" disabled={saving} onClick={save}>{saving?'Saving…':'Save Campaign Defaults'}</button>{message && <span className="cc-hint">{message}</span>}</div>
+            <div style={{display:'flex',alignItems:'center',gap:12,marginBottom:18}}><button className="bs-btn-publish" type="button" disabled={saving} onClick={save}>{saving?'Saving…':'Save Campaign Defaults'}</button>{message && <span className="bs-hint">{message}</span>}</div>
           </>}
 
-          <div className="cc-settings-card"><h3>Business Information</h3><p>Update your company details, location, and contact information.</p><button className="cc-btn-draft" onClick={()=>navigate('/profile')}>Edit Business Profile</button></div>
-          <div className="cc-settings-card"><h3>Create a campaign</h3><p>Start with your saved defaults and adjust anything that is specific to this campaign.</p><button className="cc-btn-publish" onClick={()=>navigate('/campaigns/new')}>Create New Campaign</button></div>
+          <div className="cc-settings-card"><h3>Business Information</h3><p>Update your company details, location, and contact information.</p><button className="bs-btn-draft" onClick={()=>navigate('/profile')}>Edit Business Profile</button></div>
+          <div className="cc-settings-card"><h3>Create a campaign</h3><p>Start with your saved defaults and adjust anything that is specific to this campaign.</p><button className="bs-btn-publish" onClick={()=>navigate('/campaigns/new')}>Create New Campaign</button></div>
         </div>
-      </main></div>
+      </main>
     </div>
   );
 }

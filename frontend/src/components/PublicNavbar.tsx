@@ -1,8 +1,9 @@
 import { useEffect, useRef, useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
-import { Heart, Menu, X } from 'lucide-react';
+import { Heart, Menu, Trash2, X } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
-import { BRAND_NAME, BRAND_PURPLE, BRAND_PURPLE_DARK, LogoMark } from './Logo';
+import { BRAND_NAME, BRAND_PURPLE, BRAND_PURPLE_DARK, LogoMark, OFF_WHITE } from './Logo';
+import { getSavedCampaigns, unsaveCampaign, type SavedCampaignEntry } from '../api/client';
 
 const API_ORIGIN = 'http://localhost:8000';
 
@@ -31,6 +32,12 @@ export function PublicNavbar({ sticky = true }: { sticky?: boolean }) {
   const [profileOpen, setProfileOpen] = useState(false);
   const profileRef = useRef<HTMLDivElement>(null);
 
+  const [wishlistOpen, setWishlistOpen] = useState(false);
+  const [wishlist, setWishlist] = useState<SavedCampaignEntry[]>([]);
+  const [wishlistLoading, setWishlistLoading] = useState(false);
+  const [wishlistError, setWishlistError] = useState('');
+  const [removingId, setRemovingId] = useState<number | null>(null);
+
   const authenticated = !loading && !!user;
   const isHome = location.pathname === '/' && !location.hash;
   const isCampaigns = location.pathname.startsWith('/campaigns');
@@ -40,7 +47,53 @@ export function PublicNavbar({ sticky = true }: { sticky?: boolean }) {
   useEffect(() => {
     setMobileOpen(false);
     setProfileOpen(false);
+    setWishlistOpen(false);
   }, [location.pathname, location.hash]);
+
+  useEffect(() => {
+    if (!wishlistOpen) return;
+    let cancelled = false;
+    setWishlistLoading(true);
+    setWishlistError('');
+    getSavedCampaigns()
+      .then((data) => {
+        if (!cancelled) setWishlist(data);
+      })
+      .catch((err) => {
+        console.error('Could not load wishlist:', err);
+        if (!cancelled) setWishlistError('Could not load your wishlist. Please try again.');
+      })
+      .finally(() => {
+        if (!cancelled) setWishlistLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [wishlistOpen]);
+
+  // Lock page scroll while the wishlist drawer is open.
+  useEffect(() => {
+    if (!wishlistOpen) return;
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    return () => {
+      document.body.style.overflow = previousOverflow;
+    };
+  }, [wishlistOpen]);
+
+  const handleRemoveFromWishlist = async (entry: SavedCampaignEntry) => {
+    setRemovingId(entry.id);
+    const previous = wishlist;
+    setWishlist(wishlist.filter((item) => item.id !== entry.id));
+    try {
+      await unsaveCampaign(entry.campaign_id);
+    } catch (err) {
+      console.error('Could not remove saved campaign:', err);
+      setWishlist(previous);
+    } finally {
+      setRemovingId(null);
+    }
+  };
 
   useEffect(() => {
     const handlePointerDown = (event: MouseEvent) => {
@@ -74,7 +127,7 @@ export function PublicNavbar({ sticky = true }: { sticky?: boolean }) {
           top: 0;
           z-index: 1000;
           width: 100%;
-          background: #FBF8F4;
+          background: ${OFF_WHITE};
           border-bottom: 1px solid #EEE8E2;
           box-sizing: border-box;
         }
@@ -144,12 +197,12 @@ export function PublicNavbar({ sticky = true }: { sticky?: boolean }) {
         .ch-public-login:hover { color: ${BRAND_PURPLE}; }
         .ch-public-register { color: #fff; background: ${BRAND_PURPLE}; border: 1px solid ${BRAND_PURPLE}; }
         .ch-public-register:hover { background: ${BRAND_PURPLE_DARK}; border-color: ${BRAND_PURPLE_DARK}; }
-        .ch-public-round {
-          width: 38px; height: 38px; border: 1px solid #E5DFDA; border-radius: 50%;
+        .ch-public-wishlist-btn {
+          width: 38px; height: 38px; border: none; background: transparent; padding: 0;
           display: inline-flex; align-items: center; justify-content: center;
-          color: #55545A; background: #fff; text-decoration: none;
+          color: #55545A; cursor: pointer;
         }
-        .ch-public-round:hover { color: ${BRAND_PURPLE}; border-color: #D7CDE4; }
+        .ch-public-wishlist-btn:hover, .ch-public-wishlist-btn.is-active { color: ${BRAND_PURPLE}; }
         .ch-public-profile { position: relative; }
         .ch-public-avatar {
           width: 38px; height: 38px; padding: 0; border-radius: 50%; border: 1px solid #E5DFDA;
@@ -186,11 +239,53 @@ export function PublicNavbar({ sticky = true }: { sticky?: boolean }) {
         @media (max-width: 760px) {
           .ch-public-nav-inner { min-height: 66px; padding: 14px 18px; grid-template-columns: 1fr auto; }
           .ch-public-links { display: none; }
-          .ch-public-actions > .ch-public-auth-link, .ch-public-actions > .ch-public-profile, .ch-public-actions > .ch-public-round { display: none; }
+          .ch-public-actions > .ch-public-auth-link, .ch-public-actions > .ch-public-profile, .ch-public-actions > .ch-public-wishlist-btn { display: none; }
           .ch-public-burger { display: inline-flex; }
           .ch-public-logo { font-size: 20px; }
           .ch-public-mobile { display: block; }
         }
+
+        .ch-wishlist-overlay {
+          position: fixed; inset: 0; background: rgba(23, 23, 26, 0.32);
+          z-index: 1400; animation: ch-fade-in .15s ease;
+        }
+        @keyframes ch-fade-in { from { opacity: 0; } to { opacity: 1; } }
+        .ch-wishlist-drawer {
+          position: fixed; top: 0; right: 0; bottom: 0; width: min(400px, 100%);
+          background: ${OFF_WHITE}; z-index: 1401; display: flex; flex-direction: column;
+          box-shadow: -18px 0 48px rgba(36,31,46,.18);
+          animation: ch-slide-in .22s ease;
+        }
+        @keyframes ch-slide-in { from { transform: translateX(100%); } to { transform: translateX(0); } }
+        .ch-wishlist-head {
+          display: flex; align-items: center; justify-content: space-between;
+          padding: 20px 22px; border-bottom: 1px solid #EEE8E2; flex-shrink: 0;
+        }
+        .ch-wishlist-title { display: flex; align-items: center; gap: 8px; font: 700 16px 'Poppins', sans-serif; color: #241F2E; }
+        .ch-wishlist-close {
+          width: 34px; height: 34px; border-radius: 9px; border: 1px solid #E5DFDA; background: #fff;
+          color: #55545A; display: inline-flex; align-items: center; justify-content: center; cursor: pointer;
+        }
+        .ch-wishlist-close:hover { color: ${BRAND_PURPLE}; border-color: #D7CDE4; }
+        .ch-wishlist-body { flex: 1; overflow-y: auto; padding: 14px 18px 24px; }
+        .ch-wishlist-state { padding: 60px 18px; text-align: center; color: #8A8394; font: 500 13px 'Poppins', sans-serif; }
+        .ch-wishlist-empty-title { color: #241F2E; font-weight: 700; font-size: 14.5px; margin-bottom: 6px; }
+        .ch-wishlist-item {
+          display: flex; align-items: flex-start; gap: 10px; background: #fff; border: 1px solid #EEE8E2;
+          border-radius: 14px; padding: 14px; margin-bottom: 10px;
+        }
+        .ch-wishlist-item-link { flex: 1; min-width: 0; text-decoration: none; color: inherit; }
+        .ch-wishlist-item-title {
+          font: 650 13.5px 'Poppins', sans-serif; color: #241F2E; margin: 0 0 5px; line-height: 1.35;
+          display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
+        }
+        .ch-wishlist-item-meta { display: flex; align-items: center; gap: 5px; font: 500 11.5px 'Poppins', sans-serif; color: #8A8394; flex-wrap: wrap; }
+        .ch-wishlist-remove {
+          flex-shrink: 0; width: 30px; height: 30px; border-radius: 8px; border: 1px solid #EEE8E2; background: #fff;
+          color: #8A8394; display: inline-flex; align-items: center; justify-content: center; cursor: pointer;
+        }
+        .ch-wishlist-remove:hover { background: #FFF0EF; border-color: #F6C8C8; color: #C84642; }
+        .ch-wishlist-remove:disabled { opacity: .5; cursor: not-allowed; }
       `}</style>
 
       <nav className="ch-public-nav" aria-label="Main navigation">
@@ -216,9 +311,15 @@ export function PublicNavbar({ sticky = true }: { sticky?: boolean }) {
             ) : (
               <>
                 {user?.role === 'creator' && (
-                  <Link to="/saved" className="ch-public-round" aria-label="Wishlist" title="Wishlist">
-                    <Heart size={18} />
-                  </Link>
+                  <button
+                    type="button"
+                    className={`ch-public-wishlist-btn${wishlistOpen ? ' is-active' : ''}`}
+                    aria-label="Open wishlist"
+                    title="Wishlist"
+                    onClick={() => setWishlistOpen(true)}
+                  >
+                    <Heart size={19} fill={wishlistOpen ? 'currentColor' : 'none'} />
+                  </button>
                 )}
                 <div className="ch-public-profile" ref={profileRef}>
                   <button
@@ -263,7 +364,11 @@ export function PublicNavbar({ sticky = true }: { sticky?: boolean }) {
             <Link to="/#for-brands" className={isAbout ? 'is-active' : ''} onClick={closeMobile}>About</Link>
             {authenticated ? (
               <>
-                {user?.role === 'creator' && <Link to="/saved" onClick={closeMobile}>Wishlist</Link>}
+                {user?.role === 'creator' && (
+                  <button type="button" className="ch-public-mobile-wishlist" onClick={() => { closeMobile(); setWishlistOpen(true); }}>
+                    Wishlist
+                  </button>
+                )}
                 <Link to="/dashboard" onClick={closeMobile}>Dashboard</Link>
                 <button type="button" className="logout" onClick={handleLogout}>Log out</button>
               </>
@@ -276,6 +381,54 @@ export function PublicNavbar({ sticky = true }: { sticky?: boolean }) {
           </div>
         )}
       </nav>
+
+      {wishlistOpen && (
+        <>
+          <div className="ch-wishlist-overlay" onClick={() => setWishlistOpen(false)} />
+          <aside className="ch-wishlist-drawer" role="dialog" aria-label="Wishlist">
+            <div className="ch-wishlist-head">
+              <span className="ch-wishlist-title"><Heart size={17} /> Wishlist</span>
+              <button type="button" className="ch-wishlist-close" aria-label="Close wishlist" onClick={() => setWishlistOpen(false)}>
+                <X size={17} />
+              </button>
+            </div>
+            <div className="ch-wishlist-body">
+              {wishlistLoading && <div className="ch-wishlist-state">Loading your wishlist…</div>}
+              {!wishlistLoading && wishlistError && <div className="ch-wishlist-state">{wishlistError}</div>}
+              {!wishlistLoading && !wishlistError && wishlist.length === 0 && (
+                <div className="ch-wishlist-state">
+                  <div className="ch-wishlist-empty-title">Nothing saved yet</div>
+                  Tap the heart on any campaign to bookmark it here.
+                </div>
+              )}
+              {!wishlistLoading && !wishlistError && wishlist.map((entry) => {
+                const c = entry.campaign;
+                return (
+                  <div className="ch-wishlist-item" key={entry.id}>
+                    <Link to={`/campaigns/${c.id}`} className="ch-wishlist-item-link" onClick={() => setWishlistOpen(false)}>
+                      <p className="ch-wishlist-item-title">{c.title}</p>
+                      <div className="ch-wishlist-item-meta">
+                        <span>{c.brand_name || 'Business'}</span>
+                        {c.category && <span>· {c.category}</span>}
+                      </div>
+                    </Link>
+                    <button
+                      type="button"
+                      className="ch-wishlist-remove"
+                      aria-label="Remove from wishlist"
+                      title="Remove from wishlist"
+                      disabled={removingId === entry.id}
+                      onClick={() => handleRemoveFromWishlist(entry)}
+                    >
+                      <Trash2 size={14} />
+                    </button>
+                  </div>
+                );
+              })}
+            </div>
+          </aside>
+        </>
+      )}
     </>
   );
 }

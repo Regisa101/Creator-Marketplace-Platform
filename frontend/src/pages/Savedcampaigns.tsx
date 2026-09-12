@@ -2,7 +2,8 @@ import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { ArrowLeft, MapPin, Building2, BookmarkX, DollarSign } from 'lucide-react';
 import { getSavedCampaigns, unsaveCampaign, type SavedCampaignEntry } from '../api/client';
-import { LogoMark, BRAND_NAME, PAGE_GRADIENT_BG } from '../components/Brand';
+import { PAGE_GRADIENT_BG } from '../components/Brand';
+import { PublicNavbar } from '../components/PublicNavbar';
 
 const CORAL = '#FF6B5A';
 const CORAL_DARK = '#F0523F';
@@ -169,9 +170,7 @@ export function SavedCampaigns() {
         .sc-state-title { font-size: 16px; font-weight: 600; color: var(--ink); margin-bottom: 6px; }
       `}</style>
 
-      <div className="sc-topbar">
-        <span className="sc-logo"><LogoMark size={20} /> {BRAND_NAME}</span>
-      </div>
+      <PublicNavbar />
 
       <div className="sc-body">
         <Link to="/campaigns" className="sc-back">

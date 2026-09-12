@@ -41,7 +41,7 @@ import {
 import { useAuth } from '../context/AuthContext';
 import { AppLayout } from '../components/AppLayout';
 import { PublicNavbar } from '../components/PublicNavbar';
-import { BRAND_PURPLE, BRAND_PURPLE_DARK, BRAND_PINK_CORAL } from '../components/Logo';
+import { BRAND_PURPLE, BRAND_PURPLE_DARK, BRAND_PINK_CORAL, OFF_WHITE } from '../components/Logo';
 
 const CORAL = BRAND_PINK_CORAL;
 const CORAL_DARK = BRAND_PURPLE_DARK;
@@ -511,7 +511,7 @@ export function CampaignDetail() {
           --soft: #f7f7fa;
           --line: #e7e7eb;
           min-height: 100vh;
-          background: #F5F4FA;
+          background: ${OFF_WHITE};
           color: var(--ink);
           font-family: 'Poppins', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
         }

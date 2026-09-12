@@ -11,7 +11,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
-import { LogoMark } from "../components/Logo";
+import { LogoMark, OFF_WHITE } from "../components/Logo";
 import { PublicNavbar } from "../components/PublicNavbar";
 import { useAuth } from "../context/AuthContext";
 import { getPublicCampaigns, getSavedCampaigns, saveCampaign, unsaveCampaign, type PublicCampaign, type SavedCampaignEntry } from "../api/client";
@@ -34,12 +34,12 @@ import {
 const NAVY = "#7661A1";
 const CORAL = "#F47C78";
 
-// Warm neutral surfaces sampled from the supplied reference image.
-// Nav and hero are intentionally close, but not white, so they read as
-// two separate sections without introducing another purple background.
-const NAV_BG = "#FBF8F4";
-const HERO_BG = "#F8F4F1";
-const PAGE_BG = "#F8F4F1";
+// Single off-white surface used everywhere — navbar, hero, and page
+// body all share the same tone so the whole app reads as one
+// consistent background.
+const NAV_BG = OFF_WHITE;
+const HERO_BG = OFF_WHITE;
+const PAGE_BG = OFF_WHITE;
 
 // ============================================
 // LIVE CAMPAIGN DATA
