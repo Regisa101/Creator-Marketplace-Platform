@@ -5,16 +5,16 @@ import { verifyPayment, type Payment } from '../../api/client';
 import { AppLayout } from '../../components/AppLayout';
 
 const C = {
-  surface: '#F5F4FA',
+  surface: '#F5F5F5',
   card: '#FFFFFF',
-  ink: '#1A1625',
+  ink: '#181818',
   inkSoft: '#6B6478',
-  line: '#EAE7F2',
-  navy: '#7661A1',
+  line: '#E8E8E8',
+  navy: '#111111',
   green: '#22C55E',
-  greenSoft: '#EAFBF1',
+  greenSoft: '#F5F5F5',
   red: '#E23D3D',
-  redSoft: '#FDECEC',
+  redSoft: '#F0F0F0',
 };
 
 // Khalti redirects here after the user pays (or cancels) on their end.

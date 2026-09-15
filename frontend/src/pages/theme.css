@@ -11,26 +11,20 @@
 
 @import url('https://fonts.googleapis.com/css2?family=League+Spartan:wght@600;700;800&family=Poppins:wght@300;400;500;600;700&display=swap');
 
-body {
-  font-family: 'Poppins', -apple-system, Helvetica, Arial, sans-serif;
-}
-
-.font-logo {
-  font-family: 'League Spartan', sans-serif;
-  font-weight: 700;
-  letter-spacing: 0.01em;
-}
-
 :root {
-  --bg: #FBF8F4;
-  --surface: #FBF8F4;
+  /* Pin the color scheme so browsers never apply dark native
+     form-control styling (buttons, inputs, etc.) to this app. */
+  color-scheme: light;
+
+  --bg: #FFFFFF;
+  --surface: #FFFFFF;
   --ink: #171717;
   --ink-soft: #737373;
   --ink-faint: #a3a3a3;
   --line: #e5e5e5;
 
-  --accent: #2563eb;
-  --accent-soft: #eff4ff;
+  --accent: #111111;
+  --accent-soft: #F5F5F5;
   --accent-ink: #ffffff;
 
   --good: #16a34a;
@@ -43,4 +37,30 @@ body {
   --radius-sm: 8px;
   --radius-md: 12px;
   --radius-lg: 16px;
+}
+
+body {
+  font-family: 'Poppins', -apple-system, Helvetica, Arial, sans-serif;
+  background: var(--bg);
+  color: var(--ink);
+}
+
+/* Reset native button/input chrome globally so component-level
+   background/color styles always win, in any OS/browser theme. */
+button,
+input,
+select,
+textarea {
+  appearance: none;
+  -webkit-appearance: none;
+  color-scheme: light;
+  font-family: inherit;
+  color: inherit;
+  background: none;
+}
+
+.font-logo {
+  font-family: 'League Spartan', sans-serif;
+  font-weight: 700;
+  letter-spacing: 0.01em;
 }

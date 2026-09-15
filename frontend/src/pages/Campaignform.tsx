@@ -32,8 +32,8 @@ import {
 import { useAuth } from '../context/AuthContext';
 import { AppLayout } from '../components/AppLayout';
 
-const NAVY = '#7661A1';
-const CORAL = '#F47C78';
+const NAVY = '#111111';
+const CORAL = '#111111';
 
 // How many chip options show before a "+N more" toggle appears. This is the
 // fix for pickers with long option lists (18 creator categories, etc.)
@@ -688,11 +688,11 @@ export function CampaignForm({ mode }: { mode: 'create' | 'edit' }) {
   .cc-page {
     --accent: ${NAVY};
     --coral: ${CORAL};
-    --ink: #1A1625;
+    --ink: #181818;
     --ink-soft: #6c6d73;
     --line: #e6e6ea;
     --surface: #f7f7f9;
-    --accent-soft: #EAEBF5;
+    --accent-soft: #ECECEC;
     --good: #16a34a;
     padding: 4px 24px 60px;
   }
@@ -710,8 +710,8 @@ export function CampaignForm({ mode }: { mode: 'create' | 'edit' }) {
 
   .cc-hero {
     display: flex; align-items: center; justify-content: space-between; gap: 16px;
-    background: linear-gradient(135deg, #EDEEF9 0%, #F8F2FA 100%);
-    border: 1px solid #E4E3F2; border-radius: 16px; padding: 14px 16px 14px 26px; margin-bottom: 20px;
+    background: linear-gradient(135deg, #EFEFEF 0%, #F4F4F4 100%);
+    border: 1px solid #E4E4E4; border-radius: 16px; padding: 14px 16px 14px 26px; margin-bottom: 20px;
   }
   .cc-hero-copy { max-width: 440px; }
   .cc-hero-kicker { font-size: 10px; letter-spacing: .09em; text-transform: uppercase; font-weight: 700; color: #8B8697; }
@@ -782,7 +782,7 @@ export function CampaignForm({ mode }: { mode: 'create' | 'edit' }) {
   .cc-product-main { position: relative; min-width: 0; height: 175px; border-radius: 11px; overflow: hidden; background: var(--surface); }
   .cc-product-main img { width: 100%; height: 100%; object-fit: cover; display: block; }
   .cc-product-thumbs { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; align-content: start; }
-  .cc-product-thumb, .cc-product-add { min-width: 0; height: 72px; border-radius: 9px; overflow: hidden; border: 1.5px solid var(--line); background: #fafafd; position: relative; cursor: pointer; }
+  .cc-product-thumb, .cc-product-add { min-width: 0; height: 72px; border-radius: 9px; overflow: hidden; border: 1.5px solid var(--line); background: #FAFAFA; position: relative; cursor: pointer; }
   .cc-product-thumb img { width: 100%; height: 100%; object-fit: cover; display: block; }
   .cc-product-add { border-style: dashed; color: var(--accent); display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px; font-size: 10px; font-weight: 600; }
   .cc-product-badge { position: absolute; left: 10px; top: 10px; background: #fff; color: var(--accent); border-radius: 999px; padding: 6px 9px; font-size: 10px; font-weight: 700; box-shadow: 0 2px 8px rgba(0,0,0,.08); z-index: 2; }
@@ -790,7 +790,7 @@ export function CampaignForm({ mode }: { mode: 'create' | 'edit' }) {
   .cc-product-actions { display: flex; gap: 8px; margin-top: 10px; flex-wrap: wrap; }
   .cc-product-help { font-size: 11.5px; color: var(--ink-soft); margin-top: 8px; display: flex; gap: 5px; line-height: 1.5; }
   .cc-hero-placeholder { display: flex; flex-direction: column; align-items: center; gap: 6px; color: var(--ink-soft); font-size: 12.5px; }
-  .cc-hero-btn { display: inline-flex; align-items: center; gap: 7px; font-size: 12.5px; font-weight: 600; color: var(--accent); background: var(--accent-soft); border: 1px solid #D6DCF5; border-radius: 8px; padding: 9px 14px; }
+  .cc-hero-btn { display: inline-flex; align-items: center; gap: 7px; font-size: 12.5px; font-weight: 600; color: var(--accent); background: var(--accent-soft); border: 1px solid #D9D9D9; border-radius: 8px; padding: 9px 14px; }
   @media (max-width: 560px) { .cc-product-gallery-main { grid-template-columns: 1fr; } .cc-product-main { height: 165px; } .cc-product-thumbs { grid-template-columns: repeat(4, 1fr); } }
 
   .cc-error { font-size: 13px; color: #d64545; background: #fdecec; border-radius: 10px; padding: 11px 14px; margin-bottom: 18px; }
@@ -815,24 +815,24 @@ export function CampaignForm({ mode }: { mode: 'create' | 'edit' }) {
   .cc-advanced-chevron--open { transform: rotate(180deg); }
   .cc-advanced-body { padding: 16px 16px 4px; }
 
-  .cc-suggest-box { border: 1px dashed #D6DCF5; background: #f8f7fd; border-radius: 12px; padding: 14px 16px; margin: -4px 0 18px; }
+  .cc-suggest-box { border: 1px dashed #D9D9D9; background: #F7F7F7; border-radius: 12px; padding: 14px 16px; margin: -4px 0 18px; }
   .cc-suggest-title { display: flex; align-items: center; gap: 6px; font-size: 12.5px; font-weight: 700; color: var(--accent); margin-bottom: 10px; }
   .cc-suggest-group { margin-bottom: 8px; }
   .cc-suggest-group:last-child { margin-bottom: 0; }
   .cc-suggest-group-label { font-size: 11px; font-weight: 600; color: var(--ink-soft); margin-bottom: 6px; text-transform: uppercase; letter-spacing: 0.02em; }
   .cc-suggest-list { display: flex; flex-wrap: wrap; gap: 6px; }
-  .cc-suggest-chip, .cc-preset-chip { font-size: 12px; font-weight: 500; border: 1px solid #D6DCF5; background: #fff; color: var(--accent); border-radius: 999px; padding: 5px 11px; }
+  .cc-suggest-chip, .cc-preset-chip { font-size: 12px; font-weight: 500; border: 1px solid #D9D9D9; background: #fff; color: var(--accent); border-radius: 999px; padding: 5px 11px; }
   .cc-suggest-chip:hover, .cc-preset-chip:hover { background: var(--accent-soft); }
   .cc-suggest-chip:disabled, .cc-preset-chip:disabled { opacity: 0.55; cursor: default; background: var(--accent-soft); }
   .cc-preset-row { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; }
 
-  .cc-requirement-block { border: 1.5px solid #DDE2F6; border-radius: 12px; padding: 15px 16px; background: #fafaff; margin: 18px 0; }
+  .cc-requirement-block { border: 1.5px solid #DEDEDE; border-radius: 12px; padding: 15px 16px; background: #FAFAFA; margin: 18px 0; }
   .cc-requirement-heading { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 2px; font-size: 13px; font-weight: 700; color: var(--ink); }
   .cc-required-star { color: #d64545; }
   .cc-required-label { font-size: 10.5px; font-weight: 700; color: #d64545; background: #fdecec; border-radius: 999px; padding: 4px 8px; }
 
   .cc-review { display: grid; gap: 14px; }
-  .cc-review-intro { padding: 18px 20px; border-radius: 12px; background: var(--accent-soft); border: 1px solid #DDE2F6; }
+  .cc-review-intro { padding: 18px 20px; border-radius: 12px; background: var(--accent-soft); border: 1px solid #DEDEDE; }
   .cc-review-intro strong { display: block; color: var(--accent); font-size: 15px; margin-bottom: 4px; }
   .cc-review-intro span { color: var(--ink-soft); font-size: 12.5px; line-height: 1.55; }
   .cc-review-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
@@ -853,7 +853,7 @@ export function CampaignForm({ mode }: { mode: 'create' | 'edit' }) {
   .cc-btn-draft:hover, .cc-next-step:hover { border-color: var(--accent); color: var(--accent); }
   .cc-btn-draft:disabled, .cc-next-step:disabled { opacity: 0.6; cursor: not-allowed; }
   .cc-btn-publish, .cc-continue { display: inline-flex; align-items: center; gap: 8px; font-size: 14px; font-weight: 600; color: #fff; background: var(--accent); border: none; padding: 12px 24px; border-radius: 8px; }
-  .cc-btn-publish:disabled, .cc-continue:disabled { background: #b9bcdd; cursor: not-allowed; }
+  .cc-btn-publish:disabled, .cc-continue:disabled { background: #C4C4C4; cursor: not-allowed; }
   .cc-spin { animation: cc-spin 0.8s linear infinite; }
   @keyframes cc-spin { to { transform: rotate(360deg); } }
 
@@ -1118,7 +1118,7 @@ export function CampaignForm({ mode }: { mode: 'create' | 'edit' }) {
 
                         <div className="cc-field" style={{marginTop:12}}>
                           <label className="cc-label">Completion & payment protection</label>
-                          <div className="cc-input" style={{display:'flex',alignItems:'center',color:'#6B6478',background:'#F5F4FA',cursor:'default'}}>Content approval is the final requirement</div>
+                          <div className="cc-input" style={{display:'flex',alignItems:'center',color:'#6B6478',background:'#F5F5F5',cursor:'default'}}>Content approval is the final requirement</div>
                           <div className="cc-hint">Paid campaigns are funded at the agreed amount before work starts. Payment is released automatically once all deliverables are approved.</div>
                         </div>
 

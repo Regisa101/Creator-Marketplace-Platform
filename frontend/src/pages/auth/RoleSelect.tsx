@@ -15,8 +15,8 @@ export function RoleSelect() {
 
         .rs-page {
   min-height: 100vh;
-  background: #FBF8F4;
-  color: #241F2E;
+  background: #FFFFFF;
+  color: #212121;
   font-family: 'Poppins', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
 }
         .rs-page *, .rs-page *::before, .rs-page *::after { box-sizing: border-box; }
@@ -46,7 +46,7 @@ export function RoleSelect() {
 }
         .rs-title {
           margin: 10px 0 9px;
-          color: #241F2E;
+          color: #212121;
           font-family: 'League Spartan', sans-serif;
           font-size: 40px;
           line-height: 1.02;
@@ -72,7 +72,7 @@ export function RoleSelect() {
           display: flex;
           flex-direction: column;
           min-width: 0;
-          border: 1px solid #E4DFE8;
+          border: 1px solid #E1E1E1;
           border-radius: 22px;
           background: #FFFFFF;
           box-shadow: 0 20px 45px -32px rgba(49,35,68,.30);
@@ -82,8 +82,8 @@ export function RoleSelect() {
           transform: translateY(-4px);
           box-shadow: 0 25px 48px -30px rgba(49,35,68,.36);
         }
-        .rs-card--creator:hover { border-color: rgba(244,124,120,.70); }
-        .rs-card--business:hover { border-color: rgba(118,97,161,.70); }
+        .rs-card--creator:hover { border-color: rgba(17,17,17,.70); }
+        .rs-card--business:hover { border-color: rgba(17,17,17,.70); }
         .rs-visual {
           position: relative;
           height: 275px;
@@ -99,7 +99,7 @@ export function RoleSelect() {
           background: linear-gradient(145deg, #F9D1CE, #FFF8F7);
         }
         .rs-card--business .rs-visual {
-          background: linear-gradient(145deg, #E1D8EE, #FBF9FD);
+          background: linear-gradient(145deg, #DCDCDC, #FAFAFA);
         }
         .rs-visual img {
           width: 100%;
@@ -109,10 +109,10 @@ export function RoleSelect() {
           object-position: center;
         }
         .rs-card--creator .rs-visual::after {
-          background: linear-gradient(180deg, rgba(244,124,120,.02), rgba(255,247,246,.34));
+          background: linear-gradient(180deg, rgba(17,17,17,.02), rgba(255,247,246,.34));
         }
         .rs-card--business .rs-visual::after {
-          background: linear-gradient(180deg, rgba(118,97,161,.03), rgba(250,248,252,.34));
+          background: linear-gradient(180deg, rgba(17,17,17,.03), rgba(250,248,252,.34));
         }
         .rs-role-icon {
           position: absolute;
@@ -138,14 +138,14 @@ export function RoleSelect() {
         }
         .rs-name {
           margin: 0;
-          color: #25304F;
+          color: #303030;
           font-family: 'League Spartan', sans-serif;
           font-size: 27px;
           line-height: 1.05;
           font-weight: 700;
         }
-        .rs-card--creator .rs-name { color: #25304F; }
-        .rs-card--business .rs-name { color: #25304F; }
+        .rs-card--creator .rs-name { color: #303030; }
+        .rs-card--business .rs-name { color: #303030; }
         .rs-desc {
           min-height: 62px;
           margin: 10px 0 20px;
@@ -169,11 +169,11 @@ export function RoleSelect() {
         }
         .rs-card--creator .rs-continue {
           background: ${BRAND_PINK_CORAL};
-          box-shadow: 0 9px 18px -13px rgba(244,124,120,.8);
+          box-shadow: 0 9px 18px -13px rgba(17,17,17,.8);
         }
         .rs-card--business .rs-continue {
           background: ${BRAND_PURPLE};
-          box-shadow: 0 9px 18px -13px rgba(118,97,161,.8);
+          box-shadow: 0 9px 18px -13px rgba(17,17,17,.8);
         }
         .rs-continue:hover { filter: brightness(.94); transform: translateY(-1px); }
         .rs-switch {

@@ -13,20 +13,20 @@ import { useAuth } from '../context/AuthContext';
 import { AppLayout } from '../components/AppLayout';
 
 const C = {
-  surface: '#FBF8F4',
+  surface: '#FFFFFF',
   card: '#FFFFFF',
-  ink: '#1A1625',
+  ink: '#181818',
   inkSoft: '#6B6478',
   inkFaint: '#A39DB8',
-  line: '#EAE7F2',
-  navy: '#1E2A78',
-  navySoft: '#EEF1FF',
-  coral: '#FF6B5A',
+  line: '#E8E8E8',
+  navy: '#2D2D2D',
+  navySoft: '#F1F1F1',
+  coral: '#111111',
   green: '#22C55E',
-  greenSoft: '#EAFBF1',
+  greenSoft: '#F5F5F5',
   amberSoft: '#FFF6E5',
   blue: '#38BDF8',
-  blueSoft: '#EAF8FE',
+  blueSoft: '#F5F5F5',
 };
 
 const CATEGORIES = [
@@ -84,7 +84,7 @@ function statusMeta(status: string) {
       return {
         label: 'Draft',
         color: C.inkSoft,
-        bg: '#F0EFF4',
+        bg: '#F3F3F3',
         Icon: Clock3,
       };
 
@@ -109,7 +109,7 @@ function statusMeta(status: string) {
       return {
         label: status || 'Active',
         color: C.inkSoft,
-        bg: '#F0EFF4',
+        bg: '#F3F3F3',
         Icon: Clock3,
       };
   }
@@ -531,7 +531,7 @@ export function CampaignBrowse() {
           margin: 6px 0 8px;
           border-radius: 99px;
           overflow: hidden;
-          background: #ECEAF1;
+          background: #EBEBEB;
         }
 
         .mc-progress-fill {
@@ -547,7 +547,7 @@ export function CampaignBrowse() {
           gap: 8px;
           margin-bottom: 14px;
           padding-top: 12px;
-          border-top: 1px solid #F0EEF4;
+          border-top: 1px solid #EFEFEF;
           color: ${C.inkFaint};
           font-size: 12px;
           white-space: nowrap;

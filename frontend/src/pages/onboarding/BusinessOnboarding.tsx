@@ -460,7 +460,7 @@ export function BusinessOnboarding() {
           --surface: #f7f7f9;
           --accent: ${BRAND_LAVENDER};
           --accent-hover: ${BRAND_LAVENDER_DARK};
-          --accent-soft: #F0EBF6;
+          --accent-soft: #F3F3F3;
           --coral: ${BRAND_CORAL};
           --good: #16a34a;
 
@@ -617,15 +617,15 @@ export function BusinessOnboarding() {
         .co-footer { display: flex; align-items: center; justify-content: space-between; margin-top: 30px; padding-top: 22px; border-top: 1px solid var(--line); }
         .co-back { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; font-weight: 600; color: var(--ink-soft); background: none; border: none; padding: 8px 4px; }
         .co-continue { display: inline-flex; align-items: center; gap: 8px; font-size: 14px; font-weight: 600; color: #fff; background: var(--accent); border: none; padding: 12px 24px; border-radius: 8px; }
-        .co-continue:disabled { background: #b9bcdd; cursor: not-allowed; }
+        .co-continue:disabled { background: #C4C4C4; cursor: not-allowed; }
 
         .co-done { text-align: center; padding: 20px 0 10px; }
-        .co-done-icon { width: 64px; height: 64px; border-radius: 50%; background: #E1F6EA; color: #16A34A; display: flex; align-items: center; justify-content: center; margin: 0 auto 20px; }
+        .co-done-icon { width: 64px; height: 64px; border-radius: 50%; background: #F5F5F5; color: #16A34A; display: flex; align-items: center; justify-content: center; margin: 0 auto 20px; }
         .co-done-title { font-size: 22px; font-weight: 700; margin: 0 0 8px; }
         .co-done-sub { font-size: 14px; color: var(--ink-soft); margin: 0 0 28px; }
         .co-done-btn { display: inline-flex; align-items: center; gap: 8px; font-size: 14px; font-weight: 600; color: #fff; background: var(--accent); border: none; padding: 13px 26px; border-radius: 8px; }
 
-        .co-error { margin-top: 16px; padding: 12px; background: #fdecee; color: #d1293d; border-radius: 8px; font-size: 13px; text-align: center; }
+        .co-error { margin-top: 16px; padding: 12px; background: #F0F0F0; color: #4E4E4E; border-radius: 8px; font-size: 13px; text-align: center; }
 
         @media (max-width: 480px) {
           .co { padding: 16px 12px 50px; }

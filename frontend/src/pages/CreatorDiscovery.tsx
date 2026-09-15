@@ -13,16 +13,16 @@ import {
 import { AppLayout } from '../components/AppLayout';
 
 const C = {
-  surface: '#FBF8F4',
+  surface: '#FFFFFF',
   card: '#FFFFFF',
-  ink: '#1A1625',
+  ink: '#181818',
   inkSoft: '#6B6478',
   inkFaint: '#A39DB8',
-  line: '#EAE7F2',
-  navy: '#7661A1',
-  navySoft: '#F0EBF6',
-  coral: '#F47C78',
-  coralSoft: '#FDEBE9',
+  line: '#E8E8E8',
+  navy: '#111111',
+  navySoft: '#F3F3F3',
+  coral: '#111111',
+  coralSoft: '#F5F5F5',
 };
 
 const CATEGORIES = [

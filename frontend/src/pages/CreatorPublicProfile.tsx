@@ -14,15 +14,15 @@ import {
 import { PublicNavbar } from '../components/PublicNavbar';
 
 const C = {
-  surface: '#FBF8F4',
+  surface: '#FFFFFF',
   card: '#FFFFFF',
-  ink: '#1A1625',
+  ink: '#181818',
   inkSoft: '#6B6478',
   inkFaint: '#A39DB8',
-  line: '#EAE7F2',
-  navy: '#7661A1',
-  navySoft: '#F0EBF6',
-  coral: '#F47C78',
+  line: '#E8E8E8',
+  navy: '#111111',
+  navySoft: '#F3F3F3',
+  coral: '#111111',
 };
 
 function initials(name?: string | null) {
@@ -105,7 +105,7 @@ export function CreatorPublicProfile() {
           border-radius: 10px; padding: 10px 18px; font-size: 13.5px; font-weight: 700; cursor: pointer; display: inline-flex; align-items: center; gap: 6px;
         }
         .cp-heart-btn { border: 1px solid ${C.line}; background: ${C.card}; color: ${C.ink}; }
-        .cp-heart-btn--active { color: ${C.coral}; border-color: ${C.coral}33; background: #FDEBE9; }
+        .cp-heart-btn--active { color: ${C.coral}; border-color: ${C.coral}33; background: #F5F5F5; }
         .cp-invite-btn { border: none; background: ${C.navy}; color: #fff; }
 
         .cp-section { background: ${C.card}; border: 1px solid ${C.line}; border-radius: 16px; padding: 20px 22px; margin-bottom: 16px; }

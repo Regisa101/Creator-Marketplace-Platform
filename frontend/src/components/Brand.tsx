@@ -20,7 +20,7 @@ export {
   BRAND_PINK_CORAL as CORAL,
 } from "./Logo";
 
-export const CORAL_DARK = "#E86966";
+export const CORAL_DARK = "#000000";
 
 // Kept as the same flat off-white (name preserved for backwards
 // compatibility with pages that already import PAGE_GRADIENT_BG).

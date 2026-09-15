@@ -26,9 +26,9 @@ import {
 import { OFF_WHITE } from '../components/Brand';
 import { PublicNavbar } from '../components/PublicNavbar';
 
-const VIOLET = '#7661A1';
-const VIOLET_DARK = '#66518F';
-const CORAL = '#F47C78';
+const VIOLET = '#111111';
+const VIOLET_DARK = '#000000';
+const CORAL = '#111111';
 
 export function BusinessProfile() {
   const { user, deleteAccount } = useAuth();
@@ -210,7 +210,7 @@ export function BusinessProfile() {
           border: 1px solid var(--line);
           border-radius: 20px;
           overflow: hidden;
-          box-shadow: 0 8px 30px rgba(30,42,120,.035);
+          box-shadow: 0 8px 30px rgba(17,17,17,.035);
         }
 
         .bp-cover {
@@ -322,7 +322,7 @@ export function BusinessProfile() {
           font-weight: 650;
           padding: 6px 11px;
           border-radius: 999px;
-          background: #f2f4fc;
+          background: #F3F3F3;
           color: var(--violet-dark);
         }
 
@@ -343,7 +343,7 @@ export function BusinessProfile() {
           width: 32px;
           height: 32px;
           border-radius: 9px;
-          background: #f2f4fc;
+          background: #F3F3F3;
           color: var(--violet);
           display: flex;
           align-items: center;
@@ -394,7 +394,7 @@ export function BusinessProfile() {
           font-size: 14px;
           line-height: 1.75;
           color: var(--ink);
-          background: #f8f8fa;
+          background: #F7F7F7;
           border-radius: 13px;
           padding: 17px 18px;
           margin: 0;
@@ -412,7 +412,7 @@ export function BusinessProfile() {
           font-weight: 600;
           padding: 7px 12px;
           border-radius: 999px;
-          background: #f2f4fc;
+          background: #F3F3F3;
           color: var(--violet);
         }
 
@@ -436,7 +436,7 @@ export function BusinessProfile() {
           width: 38px;
           height: 38px;
           border-radius: 10px;
-          background: #f2f4fc;
+          background: #F3F3F3;
           color: var(--violet);
           display: flex;
           align-items: center;
@@ -478,13 +478,13 @@ export function BusinessProfile() {
         }
 
         .bp-campaign-card:hover {
-          border-color: #bfc4e2;
+          border-color: #C5C5C5;
           transform: translateY(-1px);
         }
 
         .bp-campaign-image {
           height: 125px;
-          background: linear-gradient(135deg, #f2f4fc, #fff4f2);
+          background: linear-gradient(135deg, #F3F3F3, #F5F5F5);
           overflow: hidden;
         }
 
@@ -542,7 +542,7 @@ export function BusinessProfile() {
           width: 40px;
           height: 40px;
           border-radius: 50%;
-          background: #f2f4fc;
+          background: #F3F3F3;
           color: var(--violet);
           display: flex;
           align-items: center;
@@ -572,7 +572,7 @@ export function BusinessProfile() {
 
         .bp-empty {
           border: 1px dashed #d9d8df;
-          background: #fafafd;
+          background: #FAFAFA;
           border-radius: 13px;
           padding: 22px;
           text-align: center;
@@ -597,7 +597,7 @@ export function BusinessProfile() {
 
         .bp-danger-zone {
           border: 1px solid #f3caca;
-          background: #fff8f8;
+          background: #F7F7F7;
           border-radius: 13px;
           padding: 17px 18px;
           display: flex;

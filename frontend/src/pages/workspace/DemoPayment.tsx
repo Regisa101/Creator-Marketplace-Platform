@@ -25,21 +25,21 @@ import { AppLayout } from "../../components/AppLayout";
    ========================================================= */
 
 const C = {
-  bg: "#F6F5FA",
+  bg: "#F6F6F6",
   card: "#FFFFFF",
-  ink: "#141323",
+  ink: "#141414",
   soft: "#6F6B7F",
   faint: "#A5A0B3",
-  line: "#E7E4EE",
+  line: "#E5E5E5",
 
-  purple: "#7661A1",
-  purpleSoft: "#F3F0F8",
+  purple: "#111111",
+  purpleSoft: "#F1F1F1",
 
   green: "#16834A",
-  greenSoft: "#EAF8F0",
+  greenSoft: "#F5F5F5",
 
   red: "#D64545",
-  redSoft: "#FDECEC",
+  redSoft: "#F0F0F0",
 };
 
 /*
@@ -363,7 +363,7 @@ export function DemoPayment() {
           padding: 14px 0;
 
           border-bottom:
-            1px solid #EEEAF2;
+            1px solid #EDEDED;
         }
 
         .dp-row:last-of-type {
@@ -434,7 +434,7 @@ export function DemoPayment() {
 
           padding: 12px 13px;
 
-          background: #F7F6FA;
+          background: #F5F5F5;
 
           color: ${C.soft};
 
@@ -641,11 +641,11 @@ export function DemoPayment() {
           padding: 10px 11px;
 
           border:
-            1px solid #DCD7E8;
+            1px solid #D9D9D9;
 
           border-radius: 9px;
 
-          background: #F7F6FA;
+          background: #F5F5F5;
 
           color: ${C.ink};
 
@@ -663,7 +663,7 @@ export function DemoPayment() {
 
           background: ${C.purpleSoft};
 
-          border-color: #D8CDE7;
+          border-color: #D1D1D1;
 
           letter-spacing: 0.02em;
         }
@@ -678,7 +678,7 @@ export function DemoPayment() {
           height: 43px;
 
           border:
-            1px solid #DCD8E5;
+            1px solid #DADADA;
 
           border-radius: 10px;
 
@@ -713,7 +713,7 @@ export function DemoPayment() {
 
           border-radius: 11px;
 
-          background: #FBFAFD;
+          background: #FAFAFA;
 
           padding: 11px 12px;
 
@@ -775,7 +775,7 @@ export function DemoPayment() {
         }
 
         .dp-primary:hover:not(:disabled) {
-          background: #685391;
+          background: #5C5C5C;
         }
 
         .dp-primary:disabled {
@@ -931,7 +931,7 @@ export function DemoPayment() {
           padding: 10px 12px;
 
           border-bottom:
-            1px solid #EEEAF2;
+            1px solid #EDEDED;
 
           font-size: 11px;
         }
@@ -996,7 +996,7 @@ export function DemoPayment() {
         }
 
         .dp-link.primary:hover {
-          background: #685391;
+          background: #5C5C5C;
         }
 
         .dp-link.secondary {

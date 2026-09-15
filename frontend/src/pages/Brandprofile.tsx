@@ -17,9 +17,9 @@ import { getPublicBusinessProfile, type PublicBusinessProfile } from '../api/cli
 import { OFF_WHITE } from '../components/Brand';
 import { PublicNavbar } from '../components/PublicNavbar';
 
-const CORAL = '#F47C78';
-const CORAL_DARK = '#E86966';
-const VIOLET = '#7661A1';
+const CORAL = '#111111';
+const CORAL_DARK = '#000000';
+const VIOLET = '#111111';
 
 function normalizeWebsite(url: string): string {
   if (/^https?:\/\//i.test(url)) return url;
@@ -338,7 +338,7 @@ export function BrandProfile() {
               </div>
               {Array.isArray(brand.work_history) && brand.work_history.length > 0 && (
                 <div style={{display:'grid',gap:9,marginTop:16}}>
-                  {brand.work_history.map((item:any)=><div key={item.application_id} style={{border:'1px solid #ececf2',borderRadius:10,padding:'10px 12px'}}><div style={{fontWeight:700,fontSize:12.5}}>{item.campaign_title}</div><div style={{fontSize:11,color:'#6b6478',marginTop:3}}>{item.creator_name || `Creator #${item.creator_id}`} · Completed</div></div>)}
+                  {brand.work_history.map((item:any)=><div key={item.application_id} style={{border:'1px solid #ECECEC',borderRadius:10,padding:'10px 12px'}}><div style={{fontWeight:700,fontSize:12.5}}>{item.campaign_title}</div><div style={{fontSize:11,color:'#6b6478',marginTop:3}}>{item.creator_name || `Creator #${item.creator_id}`} · Completed</div></div>)}
                 </div>
               )}
             </section>
@@ -443,10 +443,10 @@ const brandStyles = `
   .bp-back-top { margin-bottom: 16px; }
   .bp-hero {
     background: #fff;
-    border: 1px solid rgba(255,107,90,.25);
+    border: 1px solid rgba(17,17,17,.25);
     border-radius: 18px;
     padding: 28px;
-    box-shadow: 0 0 0 1px rgba(30,42,120,.03), 0 12px 30px rgba(30,42,120,.07), 0 0 34px rgba(255,107,90,.08);
+    box-shadow: 0 0 0 1px rgba(17,17,17,.03), 0 12px 30px rgba(17,17,17,.07), 0 0 34px rgba(17,17,17,.08);
   }
   .bp-hero-main { display: flex; align-items: flex-start; gap: 20px; min-width: 0; }
   .bp-avatar {
@@ -542,7 +542,7 @@ const brandStyles = `
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    background: #fff1ea;
+    background: #F5F5F5;
     color: var(--coral-dark);
     font-size: 11.5px;
     font-weight: 700;
@@ -558,8 +558,8 @@ const brandStyles = `
   .bp-field-label { color: var(--ink-soft); font-size: 12px; font-weight: 650; margin-bottom: 8px; }
   .bp-chips { display: flex; flex-wrap: wrap; gap: 8px; }
   .bp-chip {
-    border: 1px solid #ffd9c2;
-    background: #fff7f2;
+    border: 1px solid #E0E0E0;
+    background: #F5F5F5;
     color: var(--coral-dark);
     border-radius: 999px;
     padding: 6px 11px;
@@ -591,8 +591,8 @@ const brandStyles = `
   .bp-campaign-meta { color: var(--ink-soft); font-size: 12px; }
   .bp-campaign-right { display: flex; align-items: center; gap: 8px; color: var(--coral-dark); flex: 0 0 auto; }
   .bp-campaign-type {
-    border: 1px solid #ffd9c2;
-    background: #fff7f2;
+    border: 1px solid #E0E0E0;
+    background: #F5F5F5;
     border-radius: 999px;
     padding: 4px 8px;
     color: var(--coral-dark);

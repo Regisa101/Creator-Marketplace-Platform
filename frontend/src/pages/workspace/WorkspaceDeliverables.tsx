@@ -19,22 +19,22 @@ import { useAuth } from '../../context/AuthContext';
 import { AppLayout } from '../../components/AppLayout';
 
 const C = {
-  surface: '#FBF8F4',
+  surface: '#FFFFFF',
   card: '#FFFFFF',
-  ink: '#1A1625',
+  ink: '#181818',
   inkSoft: '#6B6478',
   inkFaint: '#A39DB8',
-  line: '#EAE7F2',
-  navy: '#7661A1',
-  navySoft: '#F0EBF6',
-  coral: '#F47C78',
-  coralSoft: '#FDEBE9',
+  line: '#E8E8E8',
+  navy: '#111111',
+  navySoft: '#F3F3F3',
+  coral: '#111111',
+  coralSoft: '#F5F5F5',
 };
 
 const STATUS_META: Record<string, { label: string; bg: string; color: string }> = {
   pending: { label: 'Awaiting submission', bg: '#fff4de', color: '#9a6b00' },
-  submitted: { label: 'Submitted — in review', bg: '#EAF8FE', color: '#0369a1' },
-  approved: { label: 'Approved', bg: '#e6f7ec', color: '#1a8a4a' },
+  submitted: { label: 'Submitted — in review', bg: '#F5F5F5', color: '#0369a1' },
+  approved: { label: 'Approved', bg: '#F5F5F5', color: '#1a8a4a' },
   revision_requested: { label: 'Revision requested', bg: '#fdecec', color: '#d64545' },
 };
 
@@ -111,10 +111,10 @@ export function WorkspaceDeliverables() {
         .wd-feedback { font-size: 12.5px; color: #d64545; background: #fdecec; padding: 10px 12px; border-radius: 8px; margin: 10px 0; }
         .wd-file-link { font-size: 12.5px; color: ${C.navy}; word-break: break-all; }
 
-        .wd-media-preview { margin-top: 12px; border: 1px solid ${C.line}; border-radius: 12px; padding: 10px; background: #fafafd; }
+        .wd-media-preview { margin-top: 12px; border: 1px solid ${C.line}; border-radius: 12px; padding: 10px; background: #FAFAFA; }
         .wd-media-label { font-size: 11px; font-weight: 700; color: ${C.inkSoft}; margin-bottom: 8px; }
         .wd-media-image, .wd-media-video { display: block; width: 100%; max-height: 420px; object-fit: contain; border-radius: 9px; background: #111; }
-        .wd-media-image { background: #f1eff6; }
+        .wd-media-image { background: #F0F0F0; }
         .wd-media-footer { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; margin-top: 8px; font-size: 11px; color: ${C.inkSoft}; }
         .wd-upload-box { border: 1.5px dashed ${C.line}; border-radius: 10px; padding: 16px; display: flex; flex-direction: column; align-items: center; gap: 5px; text-align: center; cursor: pointer; color: ${C.inkSoft}; }
         .wd-upload-box strong { color: ${C.ink}; font-size: 12.5px; }
@@ -131,7 +131,7 @@ export function WorkspaceDeliverables() {
         .wd-btn--ghost { background: ${C.surface}; color: ${C.ink}; }
         .wd-btn:disabled { opacity: 0.6; cursor: not-allowed; }
 
-        .wd-payment-note { margin-bottom: 14px; padding: 10px 12px; border-radius: 9px; background: #EAF8F0; color: #16834A; font-size: 12px; font-weight: 650; }
+        .wd-payment-note { margin-bottom: 14px; padding: 10px 12px; border-radius: 9px; background: #F5F5F5; color: #16834A; font-size: 12px; font-weight: 650; }
 
         .wd-state { text-align: center; padding: 40px 20px; color: ${C.inkSoft}; font-size: 13px; }
         .wd-spin { animation: wd-spin 0.8s linear infinite; }
@@ -374,7 +374,7 @@ function PublicationProofPanel({ collabId, isBusiness, proofs, setProofs, error,
   const platformHasPending = proofs.some((p:any)=>p.status==='pending' && p.platform===selectedPlatform);
   const submit=async()=>{ if(!url.trim()){setError('Add the public post URL.');return;} setBusy(true);setError(''); try{let screenshot_url;if(file)screenshot_url=(await uploadImage(file)).url;const p=await submitPublicationProof(collabId,{platform:selectedPlatform||'social',post_type:postTypeList.length===1?postTypeList[0]:undefined,post_url:url.trim(),screenshot_url});setProofs((x:any[])=>[p,...x]);setUrl('');setFile(null);}catch(e:any){setError(e?.response?.data?.detail||'Could not submit proof.')}finally{setBusy(false)}};
   const review=async(id:number,status:string)=>{setBusy(true);setError('');try{const p=await reviewPublicationProof(collabId,id,{status,feedback:status==='correction_requested'?feedback.trim()||'Please correct the publication proof.':undefined});setProofs((x:any[])=>x.map(a=>a.id===id?p:a));setFeedback('')}catch(e:any){setError(e?.response?.data?.detail||'Could not review proof.')}finally{setBusy(false)}};
-  return <div className="wd-card" style={{border:'1px solid #d9d5ef'}}><div className="wd-title">📱 Publication verification</div><div className="wd-sub">{platformList.length?`Required platform(s): ${platformList.join(', ')}`:'Publish the approved content and submit proof.'}{postTypeList.length?` · ${postTypeList.join(', ')}`:''}</div>{!isBusiness && <div className="wd-inline-form">{platformList.length>1 && <select className="cc-input" value={selectedPlatform} onChange={e=>setSelectedPlatform(e.target.value)} style={{marginBottom:8}}>{platformList.map((pl:string)=><option key={pl} value={pl}>{pl}</option>)}</select>}{platformHasPending ? <div className="wd-sub">A proof for {selectedPlatform} is already pending review.</div> : <><input value={url} onChange={e=>setUrl(e.target.value)} placeholder="Public post URL (https://...)"/><label className="wd-upload-box"><Upload size={16}/><strong>{file?file.name:'Upload publication screenshot'}</strong><span>Optional screenshot evidence</span><input type="file" accept="image/*" onChange={e=>setFile(e.target.files?.[0]||null)}/></label>{error&&<div className="wd-form-error">{error}</div>}<button className="wd-btn wd-btn--primary" disabled={busy} onClick={submit}>{busy?'Submitting…':`Submit proof for ${selectedPlatform}`}</button></>}</div>}{proofs.map((p:any)=><div key={p.id} style={{marginTop:12,padding:12,border:'1px solid #eeeaf5',borderRadius:10}}><div style={{fontSize:12,fontWeight:700}}>{p.platform} · {p.status}</div><a className="wd-file-link" href={p.post_url} target="_blank" rel="noreferrer">Open published post</a>{p.screenshot_url&&<img className="wd-media-image" style={{marginTop:8,maxHeight:240}} src={p.screenshot_url} alt="Publication proof"/>}{p.feedback&&<div className="wd-feedback">{p.feedback}</div>}{isBusiness&&p.status==='pending'&&<div className="wd-inline-actions" style={{marginTop:8}}><button className="wd-btn wd-btn--approve" disabled={busy} onClick={()=>review(p.id,'verified')}><Check size={13}/> Verify</button><button className="wd-btn wd-btn--revise" disabled={busy} onClick={()=>review(p.id,'correction_requested')}><RefreshCw size={13}/> Request correction</button></div>}</div>)}{!proofs.length&&<div className="wd-sub" style={{marginTop:10}}>No publication proof submitted yet.</div>}{error&&isBusiness&&<div className="wd-form-error" style={{marginTop:8}}>{error}</div>} </div>
+  return <div className="wd-card" style={{border:'1px solid #D8D8D8'}}><div className="wd-title">📱 Publication verification</div><div className="wd-sub">{platformList.length?`Required platform(s): ${platformList.join(', ')}`:'Publish the approved content and submit proof.'}{postTypeList.length?` · ${postTypeList.join(', ')}`:''}</div>{!isBusiness && <div className="wd-inline-form">{platformList.length>1 && <select className="cc-input" value={selectedPlatform} onChange={e=>setSelectedPlatform(e.target.value)} style={{marginBottom:8}}>{platformList.map((pl:string)=><option key={pl} value={pl}>{pl}</option>)}</select>}{platformHasPending ? <div className="wd-sub">A proof for {selectedPlatform} is already pending review.</div> : <><input value={url} onChange={e=>setUrl(e.target.value)} placeholder="Public post URL (https://...)"/><label className="wd-upload-box"><Upload size={16}/><strong>{file?file.name:'Upload publication screenshot'}</strong><span>Optional screenshot evidence</span><input type="file" accept="image/*" onChange={e=>setFile(e.target.files?.[0]||null)}/></label>{error&&<div className="wd-form-error">{error}</div>}<button className="wd-btn wd-btn--primary" disabled={busy} onClick={submit}>{busy?'Submitting…':`Submit proof for ${selectedPlatform}`}</button></>}</div>}{proofs.map((p:any)=><div key={p.id} style={{marginTop:12,padding:12,border:'1px solid #ECECEC',borderRadius:10}}><div style={{fontSize:12,fontWeight:700}}>{p.platform} · {p.status}</div><a className="wd-file-link" href={p.post_url} target="_blank" rel="noreferrer">Open published post</a>{p.screenshot_url&&<img className="wd-media-image" style={{marginTop:8,maxHeight:240}} src={p.screenshot_url} alt="Publication proof"/>}{p.feedback&&<div className="wd-feedback">{p.feedback}</div>}{isBusiness&&p.status==='pending'&&<div className="wd-inline-actions" style={{marginTop:8}}><button className="wd-btn wd-btn--approve" disabled={busy} onClick={()=>review(p.id,'verified')}><Check size={13}/> Verify</button><button className="wd-btn wd-btn--revise" disabled={busy} onClick={()=>review(p.id,'correction_requested')}><RefreshCw size={13}/> Request correction</button></div>}</div>)}{!proofs.length&&<div className="wd-sub" style={{marginTop:10}}>No publication proof submitted yet.</div>}{error&&isBusiness&&<div className="wd-form-error" style={{marginTop:8}}>{error}</div>} </div>
 }
 
 function RequestModal({

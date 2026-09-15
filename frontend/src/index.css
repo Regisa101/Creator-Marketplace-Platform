@@ -1,5 +1,3 @@
-/* frontend/src/index.css */
-
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
@@ -13,19 +11,79 @@ html,
 body,
 #root {
   min-height: 100%;
-  background: #FBF8F4;
+  background: #ffffff;
+  color: #111111;
 }
 
 body {
   margin: 0;
-  background: #FBF8F4;
+  background: #ffffff;
+  color: #111111;
 }
 
-/* Keep every main page surface off-white */
 main,
 section,
 .app-layout,
 .app-main,
 .app-page-content {
-  background-color: #FBF8F4;
+  background-color: #ffffff;
+  color: #111111;
+}
+
+/* Global monochrome design system */
+button:not(:disabled) {
+  background-color: #111111;
+  color: #ffffff;
+  border-color: #111111;
+}
+
+button:not(:disabled):hover {
+  background-color: #000000;
+  color: #ffffff;
+  border-color: #000000;
+}
+
+/* Keep form controls and links monochrome instead of purple/pink accents. */
+input:focus,
+textarea:focus,
+select:focus {
+  border-color: #111111 !important;
+  outline-color: #111111;
+  box-shadow: 0 0 0 2px rgba(17, 17, 17, 0.08) !important;
+}
+
+a {
+  color: #111111;
+}
+
+a:hover {
+  color: #000000;
+}
+
+/* Common Tailwind color utilities used by older pages. */
+[class*="text-purple-"],
+[class*="text-violet-"],
+[class*="text-pink-"],
+[class*="text-rose-"],
+[class*="text-fuchsia-"],
+[class*="text-indigo-"] {
+  color: #111111 !important;
+}
+
+[class*="bg-purple-"],
+[class*="bg-violet-"],
+[class*="bg-pink-"],
+[class*="bg-rose-"],
+[class*="bg-fuchsia-"],
+[class*="bg-indigo-"] {
+  background-color: #f5f5f5 !important;
+}
+
+[class*="border-purple-"],
+[class*="border-violet-"],
+[class*="border-pink-"],
+[class*="border-rose-"],
+[class*="border-fuchsia-"],
+[class*="border-indigo-"] {
+  border-color: #dedede !important;
 }

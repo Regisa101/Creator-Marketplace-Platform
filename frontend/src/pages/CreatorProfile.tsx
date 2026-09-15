@@ -22,9 +22,9 @@ import { getCreatorProgress, getApplications } from '../api/client';
 import { OFF_WHITE } from '../components/Brand';
 import { PublicNavbar } from '../components/PublicNavbar';
 
-const CORAL = '#F47C78';
-const CORAL_DARK = '#E86966';
-const VIOLET = '#7661A1';
+const CORAL = '#111111';
+const CORAL_DARK = '#000000';
+const VIOLET = '#111111';
 
 function InstagramIcon({ size = 16 }: { size?: number }) {
   return (
@@ -373,7 +373,7 @@ export function CreatorProfile() {
           font-weight: 650;
           padding: 6px 11px;
           border-radius: 999px;
-          background: #fff4f2;
+          background: #F5F5F5;
           color: var(--coral-dark);
         }
 
@@ -402,7 +402,7 @@ export function CreatorProfile() {
           width: 32px;
           height: 32px;
           border-radius: 9px;
-          background: #fff4f2;
+          background: #F5F5F5;
           color: var(--coral-dark);
           display: flex;
           align-items: center;
@@ -453,7 +453,7 @@ export function CreatorProfile() {
           font-size: 14px;
           line-height: 1.75;
           color: var(--ink);
-          background: #f8f8fa;
+          background: #F7F7F7;
           border-radius: 13px;
           padding: 17px 18px;
           margin: 0;
@@ -470,7 +470,7 @@ export function CreatorProfile() {
           font-weight: 600;
           padding: 7px 12px;
           border-radius: 999px;
-          background: #f1eefc;
+          background: #F3F3F3;
           color: var(--violet);
         }
 
@@ -501,7 +501,7 @@ export function CreatorProfile() {
           width: 38px;
           height: 38px;
           border-radius: 10px;
-          background: #fff4f2;
+          background: #F5F5F5;
           color: var(--coral-dark);
           display: flex;
           align-items: center;
@@ -569,7 +569,7 @@ export function CreatorProfile() {
 
         .cp-portfolio-media {
           height: 165px;
-          background: linear-gradient(135deg, #f4f1fc, #fff4f2);
+          background: linear-gradient(135deg, #F2F2F2, #F5F5F5);
           display: flex;
           align-items: center;
           justify-content: center;
@@ -643,7 +643,7 @@ export function CreatorProfile() {
           width: 38px;
           height: 38px;
           border-radius: 10px;
-          background: #f2f4fc;
+          background: #F3F3F3;
           color: var(--violet);
           display: flex;
           align-items: center;
@@ -675,7 +675,7 @@ export function CreatorProfile() {
 
         .cp-empty {
           border: 1px dashed #d9d8df;
-          background: #fafafd;
+          background: #FAFAFA;
           border-radius: 13px;
           padding: 22px;
           text-align: center;
@@ -708,15 +708,15 @@ export function CreatorProfile() {
         .cp-payment-title { margin: 0; font-size: 14px; font-weight: 800; color: var(--ink); }
         .cp-payment-desc { margin: 4px 0 0; color: var(--ink-soft); font-size: 11.5px; line-height: 1.55; max-width: 620px; }
         .cp-payment-form { display: flex; gap: 9px; max-width: 620px; }
-        .cp-payment-input { flex: 1; min-width: 0; height: 42px; border: 1px solid #ddd9e6; border-radius: 10px; padding: 0 12px; background: #fff; color: var(--ink); font: inherit; font-size: 12px; outline: none; }
-        .cp-payment-input:focus { border-color: var(--violet); box-shadow: 0 0 0 3px rgba(118,97,161,.09); }
+        .cp-payment-input { flex: 1; min-width: 0; height: 42px; border: 1px solid #DBDBDB; border-radius: 10px; padding: 0 12px; background: #fff; color: var(--ink); font: inherit; font-size: 12px; outline: none; }
+        .cp-payment-input:focus { border-color: var(--violet); box-shadow: 0 0 0 3px rgba(17,17,17,.09); }
         .cp-payment-save { min-width: 78px; height: 42px; border: 0; border-radius: 10px; background: var(--violet); color: #fff; font-size: 11.5px; font-weight: 750; cursor: pointer; }
-        .cp-payment-save:hover { background: #66518F; }
+        .cp-payment-save:hover { background: #000000; }
         .cp-payment-note { margin: 9px 0 0; color: var(--ink-faint); font-size: 10px; line-height: 1.5; }
 
         .cp-danger-zone {
           border: 1px solid #f3caca;
-          background: #fff8f8;
+          background: #F7F7F7;
           border-radius: 13px;
           padding: 17px 18px;
           display: flex;

@@ -45,7 +45,7 @@ export function AuthLayout({
           .az-root {
             width: 100%;
             min-height: 100vh;
-            background: #FBF8F4;
+            background: #FFFFFF;
           }
 
           /* =========================
@@ -67,9 +67,9 @@ export function AuthLayout({
             box-sizing: border-box;
             overflow-x: hidden;
 
-            background: #FBF8F4;
+            background: #FFFFFF;
 
-            color: #241F2E;
+            color: #212121;
 
             font-family:
               'Poppins',
@@ -115,7 +115,7 @@ export function AuthLayout({
 
             overflow: hidden;
 
-            border: 1px solid #E6E1EA;
+            border: 1px solid #E3E3E3;
             border-radius: 24px;
 
             background: #FFFFFF;
@@ -260,7 +260,7 @@ export function AuthLayout({
           .az-panel-title {
             margin: 0;
 
-            color: #241F2E;
+            color: #212121;
 
             font-family:
               'League Spartan',
@@ -319,7 +319,7 @@ export function AuthLayout({
           .az-h1 {
             margin: 0 0 24px;
 
-            color: #241F2E;
+            color: #212121;
 
             font-family:
               'League Spartan',
@@ -366,7 +366,7 @@ export function AuthLayout({
 
             padding: 11px 13px;
 
-            border: 1.5px solid #E3DEE8;
+            border: 1.5px solid #E0E0E0;
 
             border-radius: 9px;
 
@@ -374,7 +374,7 @@ export function AuthLayout({
 
             background: #FFFFFF;
 
-            color: #241F2E;
+            color: #212121;
 
             font-size: 13.5px;
 
@@ -441,9 +441,9 @@ export function AuthLayout({
 
             border-radius: 8px;
 
-            background: #FDECEE;
+            background: #F5F5F5;
 
-            color: #C32E42;
+            color: #4F4F4F;
 
             font-size: 12px;
 

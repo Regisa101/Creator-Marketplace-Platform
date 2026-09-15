@@ -6,16 +6,16 @@ import { useAuth } from '../context/AuthContext';
 import { AppLayout } from '../components/AppLayout';
 
 const C = {
-  surface: '#FBF8F4',
+  surface: '#FFFFFF',
   card: '#FFFFFF',
-  ink: '#1A1625',
+  ink: '#181818',
   inkSoft: '#6B6478',
   inkFaint: '#A39DB8',
-  line: '#EAE7F2',
-  navy: '#7661A1',
-  navySoft: '#F0EBF6',
-  coral: '#F47C78',
-  coralSoft: '#FDEBE9',
+  line: '#E8E8E8',
+  navy: '#111111',
+  navySoft: '#F3F3F3',
+  coral: '#111111',
+  coralSoft: '#F5F5F5',
 };
 
 const TABS: { key: ApplicationStatus | 'all'; label: string }[] = [
@@ -249,9 +249,9 @@ export function ApplicationsInbox() {
           flex-shrink: 0;
         }
         .ai-status-pill--pending { background: #fff4de; color: #9a6b00; }
-        .ai-status-pill--accepted { background: #e6f7ec; color: #1a8a4a; }
+        .ai-status-pill--accepted { background: #F5F5F5; color: #1a8a4a; }
         .ai-status-pill--rejected { background: #fdecec; color: #d64545; }
-        .ai-status-pill--withdrawn { background: #f1f0f5; color: ${C.inkSoft}; }
+        .ai-status-pill--withdrawn { background: #F1F1F1; color: ${C.inkSoft}; }
 
         .ai-proposal { font-size: 13.5px; color: #3d3d42; line-height: 1.65; margin-bottom: 10px; white-space: pre-wrap; }
         .ai-rate { display: inline-flex; align-items: center; gap: 5px; font-size: 12.5px; font-weight: 600; color: ${C.navy}; margin-bottom: 10px; }
@@ -276,7 +276,7 @@ export function ApplicationsInbox() {
 
         .ai-match { display:flex; align-items:center; gap:10px; margin-bottom:10px; }
         .ai-match-score {
-          font-size:13px; font-weight:800; color:#16834A; background:#EAF8F0;
+          font-size:13px; font-weight:800; color:#16834A; background:#F5F5F5;
           border-radius:999px; padding:5px 10px; border: none; cursor: pointer;
         }
         .ai-match-score:hover { background:#DEF3E6; }
@@ -284,11 +284,11 @@ export function ApplicationsInbox() {
         .ai-match-breakdown { display:flex; flex-wrap:wrap; gap:6px; margin:8px 0 11px; }
         .ai-match-chip { font-size:10.5px; color:${C.inkSoft}; background:${C.surface}; border:1px solid ${C.line}; border-radius:999px; padding:4px 8px; }
         .ai-match-chip--good { color:#16834A; background:#F0FAF4; border-color:#CDEEDB; }
-        .ai-why { font-size:11.5px; color:${C.inkSoft}; line-height:1.5; background:#FAFAFD; border-radius:8px; padding:8px 10px; margin-bottom:11px; }
+        .ai-why { font-size:11.5px; color:${C.inkSoft}; line-height:1.5; background:#FAFAFA; border-radius:8px; padding:8px 10px; margin-bottom:11px; }
 
         .ai-select { display:inline-flex;align-items:center;gap:6px;font-size:13px;font-weight:700;border:0;background:#1a8a4a;color:#fff;border-radius:8px;padding:8px 14px;cursor:pointer; }
         .ai-select:disabled { opacity:.55;cursor:not-allowed; }
-        .ai-neg-summary { margin:10px 0 12px;padding:10px 12px;border:1px solid ${C.line};border-radius:10px;background:#FAFAFD;font-size:12px;color:${C.inkSoft}; }
+        .ai-neg-summary { margin:10px 0 12px;padding:10px 12px;border:1px solid ${C.line};border-radius:10px;background:#FAFAFA;font-size:12px;color:${C.inkSoft}; }
         .ai-modal-backdrop { position:fixed;inset:0;background:rgba(26,22,37,.48);z-index:120;display:flex;align-items:center;justify-content:center;padding:20px; }
         .ai-modal { width:100%;max-width:560px;background:#fff;border-radius:16px;padding:22px;box-shadow:0 20px 60px rgba(0,0,0,.18); }
         .ai-modal-head { display:flex;justify-content:space-between;align-items:flex-start;gap:12px;margin-bottom:14px; }
@@ -429,7 +429,7 @@ export function ApplicationsInbox() {
                     <div style={{marginTop:10}}>
                       <div style={{fontSize:11,fontWeight:700,color:C.inkSoft,marginBottom:6}}>Selected work</div>
                       <div style={{display:'grid',gridTemplateColumns:'repeat(4,1fr)',gap:6}}>
-                        {app.selected_portfolio.slice(0,4).map((item:any,i:number)=><div key={i} style={{border:'1px solid #EAE7F2',borderRadius:8,overflow:'hidden'}}>{item.media_url && <img src={item.media_url} alt={item.title || 'Work'} style={{width:'100%',aspectRatio:1,objectFit:'cover',display:'block'}} />}<div style={{fontSize:9,padding:'4px 5px',whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{item.title}</div></div>)}
+                        {app.selected_portfolio.slice(0,4).map((item:any,i:number)=><div key={i} style={{border:'1px solid #E8E8E8',borderRadius:8,overflow:'hidden'}}>{item.media_url && <img src={item.media_url} alt={item.title || 'Work'} style={{width:'100%',aspectRatio:1,objectFit:'cover',display:'block'}} />}<div style={{fontSize:9,padding:'4px 5px',whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{item.title}</div></div>)}
                       </div>
                     </div>
                   )}

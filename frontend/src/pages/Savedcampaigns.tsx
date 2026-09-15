@@ -5,8 +5,8 @@ import { getSavedCampaigns, unsaveCampaign, type SavedCampaignEntry } from '../a
 import { PAGE_GRADIENT_BG } from '../components/Brand';
 import { PublicNavbar } from '../components/PublicNavbar';
 
-const CORAL = '#F47C78';
-const CORAL_DARK = '#E86966';
+const CORAL = '#111111';
+const CORAL_DARK = '#000000';
 
 export function SavedCampaigns() {
   const [saved, setSaved] = useState<SavedCampaignEntry[]>([]);
@@ -124,9 +124,9 @@ export function SavedCampaigns() {
           font-weight: 700;
           padding: 4px 10px;
           border-radius: 999px;
-          background: #fff1ea;
+          background: #F5F5F5;
           color: var(--coral-dark);
-          border: 1px solid #ffd9c2;
+          border: 1px solid #E0E0E0;
         }
         .sc-unsave {
           display: flex;

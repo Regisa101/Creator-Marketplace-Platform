@@ -18,22 +18,22 @@ import { AppLayout } from '../../components/AppLayout';
 // is resolved at render time and pushed into CSS as --cw-accent / --cw-accent-soft,
 // so the stylesheet below never hardcodes one role's color.
 const C = {
-  bg: '#FBF8F4',
+  bg: '#FFFFFF',
   card: '#FFFFFF',
-  ink: '#1A1625',
+  ink: '#181818',
   soft: '#6B6478',
   faint: '#A39DB8',
-  line: '#EAE7F2',
+  line: '#E8E8E8',
   good: '#16A34A',
-  goodSoft: '#EAFBF1',
+  goodSoft: '#F5F5F5',
   warn: '#B45309',
   warnSoft: '#FFF4DE',
   bad: '#DC2626',
-  badSoft: '#FDECEC',
-  creator: '#7661A1',
-  creatorSoft: '#F0EBF6',
-  brand: '#7661A1',
-  brandSoft: '#F0EBF6',
+  badSoft: '#F0F0F0',
+  creator: '#111111',
+  creatorSoft: '#F3F3F3',
+  brand: '#111111',
+  brandSoft: '#F3F3F3',
 };
 
 function initials(name?: string | null) {
@@ -735,7 +735,7 @@ function Deliverables({
 const styles = `
 .cw-shell{display:grid;grid-template-columns:290px minmax(0,1fr);min-height:calc(100vh - 150px);background:${C.bg};border-top:1px solid ${C.line}}
 .cw-list{background:#fff;border-right:1px solid ${C.line};padding:16px 9px}.cw-list-head{display:flex;justify-content:space-between;padding:0 10px 11px;font-size:12px;color:${C.soft}}.cw-list-head span{font-size:10px;background:${C.bg};padding:3px 7px;border-radius:99px}
-.cw-person{width:100%;border:0;background:transparent;display:flex;gap:9px;align-items:center;padding:10px;border-radius:12px;text-align:left;cursor:pointer}.cw-person:hover{background:#f6f6fb}.cw-person.is-active{background:var(--cw-accent-soft)}.cw-person img,.cw-avatar{width:38px;height:38px;border-radius:50%;object-fit:cover;flex:none}.cw-avatar{display:flex;align-items:center;justify-content:center;background:var(--cw-accent-soft);color:var(--cw-accent);font-size:11px;font-weight:800}.cw-person-main{min-width:0;display:flex;flex-direction:column;gap:2px;flex:1}.cw-person-main strong{font-size:12px;color:${C.ink};white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.cw-person-main small{font-size:10px;color:${C.soft};white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.cw-person-main em{font-style:normal;font-size:9px;color:${C.faint};white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.cw-counts{display:flex;gap:4px}.cw-counts b{min-width:18px;height:18px;padding:0 5px;border-radius:99px;background:var(--cw-accent);color:#fff;font-size:8px;display:flex;align-items:center;justify-content:center}.cw-counts .work-count{background:#e8e8ea;color:${C.ink}}
+.cw-person{width:100%;border:0;background:transparent;display:flex;gap:9px;align-items:center;padding:10px;border-radius:12px;text-align:left;cursor:pointer}.cw-person:hover{background:#F6F6F6}.cw-person.is-active{background:var(--cw-accent-soft)}.cw-person img,.cw-avatar{width:38px;height:38px;border-radius:50%;object-fit:cover;flex:none}.cw-avatar{display:flex;align-items:center;justify-content:center;background:var(--cw-accent-soft);color:var(--cw-accent);font-size:11px;font-weight:800}.cw-person-main{min-width:0;display:flex;flex-direction:column;gap:2px;flex:1}.cw-person-main strong{font-size:12px;color:${C.ink};white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.cw-person-main small{font-size:10px;color:${C.soft};white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.cw-person-main em{font-style:normal;font-size:9px;color:${C.faint};white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.cw-counts{display:flex;gap:4px}.cw-counts b{min-width:18px;height:18px;padding:0 5px;border-radius:99px;background:var(--cw-accent);color:#fff;font-size:8px;display:flex;align-items:center;justify-content:center}.cw-counts .work-count{background:#e8e8ea;color:${C.ink}}
 .cw-main{min-width:0;background:${C.bg}}.cw-header{background:#fff;border-bottom:1px solid ${C.line};padding:17px 24px;display:flex;align-items:center;justify-content:space-between;gap:14px}.cw-header-person{display:flex;gap:11px;align-items:center}.cw-header-person img,.cw-avatar-lg{width:44px;height:44px;box-shadow:0 0 0 3px var(--cw-accent-soft)}.cw-header h2{font-size:15px;margin:0;color:${C.ink}}.cw-header p{font-size:10.5px;margin:3px 0 0;color:${C.soft}}.cw-status{font-size:9.5px;font-weight:750;padding:5px 9px;border-radius:99px;background:${C.warnSoft};color:${C.warn}}.cw-status.good{background:${C.goodSoft};color:${C.good}}
 .cw-tabs{background:#fff;border-bottom:1px solid ${C.line};display:flex;padding:0 24px;gap:20px}.cw-tabs button{border:0;background:none;padding:12px 1px 10px;color:${C.soft};font-size:11px;font-weight:750;border-bottom:2px solid transparent;cursor:pointer}.cw-tabs button.is-active{color:${C.ink};border-bottom-color:var(--cw-accent)}.cw-tabs b{font-size:8px;background:var(--cw-accent);color:#fff;border-radius:99px;padding:2px 5px;margin-left:4px}.cw-body{padding:22px;max-width:1000px}.cw-overview{display:flex;flex-direction:column;gap:14px}
 .cw-next{padding:18px 20px;background:#fff;border:1px solid ${C.line};border-radius:16px;display:flex;justify-content:space-between;align-items:center;gap:20px}.cw-next-action{border-color:var(--cw-accent-soft);background:linear-gradient(180deg,#fff,var(--cw-accent-soft) 220%)}.cw-next-wait{background:#fafafa}.cw-next-copy{min-width:0;display:flex;gap:13px;align-items:flex-start}.cw-next-icon{flex:none;width:38px;height:38px;border-radius:12px;background:var(--cw-accent-soft);color:var(--cw-accent);display:flex;align-items:center;justify-content:center;font-size:15px}.cw-next small{font-size:8px;font-weight:850;letter-spacing:.1em;color:var(--cw-accent)}.cw-next-wait small{color:${C.faint}}.cw-next h3{font-size:14px;margin:4px 0;color:${C.ink}}.cw-next p{font-size:10.5px;color:${C.soft};margin:0;line-height:1.55;max-width:620px}.cw-next-actions{display:flex;flex:none}.cw-rate-fix{display:flex;gap:8px;align-items:center}.cw-rate-fix-input{width:150px;height:36px;border:1px solid ${C.line};border-radius:9px;padding:0 10px;font-size:11px;outline:none}.cw-rate-fix-input:focus{border-color:var(--cw-accent)}

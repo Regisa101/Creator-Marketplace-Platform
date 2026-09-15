@@ -48,8 +48,8 @@ interface PortfolioItem {
 // CONSTANTS
 // ============================================================
 
-const CORAL = '#F47C78';
-const CORAL_DARK = '#E86966';
+const CORAL = '#111111';
+const CORAL_DARK = '#000000';
 
 const LANGUAGES = ['English', 'Nepali', 'Hindi', 'Newari', 'Maithili'];
 
@@ -724,7 +724,7 @@ export function CreatorOnboarding() {
           --accent: ${CORAL};
           --accent-hover: ${CORAL_DARK};
           --accent-soft: #FFEDEA;
-          --coral: #F47C78;
+          --coral: #111111;
           --good: #16a34a;
 
           font-family: Inter, Poppins, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
@@ -816,7 +816,7 @@ export function CreatorOnboarding() {
           border: 1px solid var(--line);
           border-radius: 18px;
           padding: 36px 40px 40px;
-          box-shadow: 0 30px 60px -24px rgba(244,124,120,0.18), 0 4px 14px rgba(17,18,23,0.04);
+          box-shadow: 0 30px 60px -24px rgba(17,17,17,0.18), 0 4px 14px rgba(17,18,23,0.04);
         }
 
         .co-h2 { font-size: 22px; font-weight: 700; margin: 0 0 5px; }
@@ -875,7 +875,7 @@ export function CreatorOnboarding() {
         .co-social-handle, .co-portfolio-item-title { font-size: 13px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
         .co-social-meta, .co-portfolio-item-desc { font-size: 11.5px; color: var(--ink-soft); margin-top: 1px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
         .co-social-remove { background: none; border: none; color: var(--ink-soft); padding: 6px; border-radius: 6px; flex-shrink: 0; }
-        .co-social-remove:hover { color: #d1293d; }
+        .co-social-remove:hover { color: #4E4E4E; }
 
         .co-social-form, .co-portfolio-form { border: 1.5px dashed var(--line); border-radius: 12px; padding: 16px; }
         .co-social-form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 10px; }
@@ -907,12 +907,12 @@ export function CreatorOnboarding() {
         .co-continue:disabled { background: #F4D0CE; cursor: not-allowed; }
 
         .co-done { text-align: center; padding: 20px 0 10px; }
-        .co-done-icon { width: 64px; height: 64px; border-radius: 50%; background: #E1F6EA; color: #16A34A; display: flex; align-items: center; justify-content: center; margin: 0 auto 20px; }
+        .co-done-icon { width: 64px; height: 64px; border-radius: 50%; background: #F5F5F5; color: #16A34A; display: flex; align-items: center; justify-content: center; margin: 0 auto 20px; }
         .co-done-title { font-size: 22px; font-weight: 700; margin: 0 0 8px; }
         .co-done-sub { font-size: 14px; color: var(--ink-soft); margin: 0 0 28px; }
         .co-done-btn { display: inline-flex; align-items: center; gap: 8px; font-size: 14px; font-weight: 600; color: #fff; background: var(--accent); border: none; padding: 13px 26px; border-radius: 8px; }
 
-        .co-error { margin-top: 16px; padding: 12px; background: #fdecee; color: #d1293d; border-radius: 8px; font-size: 13px; text-align: center; }
+        .co-error { margin-top: 16px; padding: 12px; background: #F0F0F0; color: #4E4E4E; border-radius: 8px; font-size: 13px; text-align: center; }
 
         @media (max-width: 480px) {
           .co { padding: 16px 12px 50px; }

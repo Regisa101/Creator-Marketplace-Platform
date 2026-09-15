@@ -28,18 +28,18 @@ import { LogoMark } from "./Logo";
 import { getNotifications, getUnreadNotificationCount, markNotificationRead } from "../api/client";
 
 const C = {
-  sidebar: "#FBF8F4",
-  sidebarBorder: "#EEE8E2",
-  surface: "#FBF8F4",
+  sidebar: "#FFFFFF",
+  sidebarBorder: "#E5E5E5",
+  surface: "#FFFFFF",
   card: "#FFFFFF",
-  ink: "#1A1625",
+  ink: "#181818",
   inkSoft: "#6B6478",
   inkFaint: "#A39DB8",
-  line: "#EAE7F2",
-  navy: "#7661A1",
-  navySoft: "#F0EBF6",
-  coral: "#F47C78",
-  coralSoft: "#FDEBE9",
+  line: "#E8E8E8",
+  navy: "#111111",
+  navySoft: "#F3F3F3",
+  coral: "#111111",
+  coralSoft: "#F5F5F5",
 };
 
 const WORKSPACE_CHILDREN = [
@@ -199,8 +199,8 @@ export function AppLayout({
 
   const primaryDark =
     role === "creator"
-      ? "#E86966"
-      : "#66518F";
+      ? "#000000"
+      : "#000000";
 
   const profileCompletion =
     calculateProfileCompletion(
@@ -575,7 +575,7 @@ export function AppLayout({
 
         .app-nav-link:hover,
         .app-nav-button:hover {
-          background: #F7F6FA;
+          background: #F5F5F5;
           color: ${C.ink};
         }
 
@@ -615,7 +615,7 @@ export function AppLayout({
 
           border-radius: 12px;
 
-          background: #1F1A2E;
+          background: #1D1D1D;
         }
 
         .app-completion-title {
@@ -641,7 +641,7 @@ export function AppLayout({
 
           border-radius: 99px;
 
-          background: #332C48;
+          background: #303030;
 
           overflow: hidden;
         }
@@ -700,7 +700,7 @@ export function AppLayout({
 
           background: ${C.navySoft};
 
-          border: 1px solid #D7DDF5;
+          border: 1px solid #DDDDDD;
         }
 
         .app-defaults-close {
@@ -883,7 +883,7 @@ export function AppLayout({
 
         .app-user-menu a:hover,
         .app-user-menu button:hover {
-          background: #F7F6FA;
+          background: #F5F5F5;
         }
 
         .app-nav-badge {
@@ -1082,7 +1082,7 @@ export function AppLayout({
 
           border-radius: 999px;
 
-          background: #E51E4B;
+          background: #4C4C4C;
 
           color: #FFFFFF;
 
@@ -1223,12 +1223,12 @@ export function AppLayout({
         }
         .app-payment-modal-backdrop { position: fixed; inset: 0; z-index: 9999; background: rgba(20, 18, 30, .48); display: flex; align-items: center; justify-content: center; padding: 20px; }
         .app-payment-modal { position: relative; width: min(430px, 100%); background: #fff; border-radius: 18px; padding: 30px 28px 26px; text-align: center; box-shadow: 0 24px 70px rgba(25, 20, 40, .22); }
-        .app-payment-modal-close { position: absolute; top: 12px; right: 12px; width: 34px; height: 34px; border: 0; border-radius: 50%; background: #F5F4FA; color: #6B6478; display: flex; align-items: center; justify-content: center; cursor: pointer; }
-        .app-payment-success-icon { width: 62px; height: 62px; margin: 0 auto 12px; border-radius: 50%; background: #EAF8F0; color: #16834A; display: flex; align-items: center; justify-content: center; }
+        .app-payment-modal-close { position: absolute; top: 12px; right: 12px; width: 34px; height: 34px; border: 0; border-radius: 50%; background: #F5F5F5; color: #6B6478; display: flex; align-items: center; justify-content: center; cursor: pointer; }
+        .app-payment-success-icon { width: 62px; height: 62px; margin: 0 auto 12px; border-radius: 50%; background: #F5F5F5; color: #16834A; display: flex; align-items: center; justify-content: center; }
         .app-payment-success-kicker { color: #16834A; font-size: 10px; font-weight: 800; letter-spacing: .12em; margin-bottom: 7px; }
-        .app-payment-modal h2 { margin: 0 0 9px; color: #1A1625; font-size: 21px; }
+        .app-payment-modal h2 { margin: 0 0 9px; color: #181818; font-size: 21px; }
         .app-payment-modal p { margin: 0; color: #6B6478; font-size: 13px; line-height: 1.55; }
-        .app-payment-success-button { width: 100%; margin-top: 19px; border: 0; border-radius: 9px; padding: 11px 14px; background: #7661A1; color: #fff; font-size: 13px; font-weight: 700; cursor: pointer; }
+        .app-payment-success-button { width: 100%; margin-top: 19px; border: 0; border-radius: 9px; padding: 11px 14px; background: #111111; color: #fff; font-size: 13px; font-weight: 700; cursor: pointer; }
       `}</style>
 
       {/* =================================================

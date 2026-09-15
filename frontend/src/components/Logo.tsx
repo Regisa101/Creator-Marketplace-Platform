@@ -1,42 +1,54 @@
-// frontend/src/components/Logo.tsx
-//
-// SINGLE SOURCE OF TRUTH FOR CREATORHUB BRANDING
-//
-// Every public page and every future page should import the logo/colors
-// from this file. Do not redefine creatorhub colors inside individual pages.
+// Shared monochrome branding for the Creator Marketplace Platform.
 
-export const BRAND_PURPLE = "#7661A1";
-export const BRAND_PURPLE_DARK = "#66518F";
-export const BRAND_PINK_CORAL = "#F47C78";
+export const BRAND_PURPLE = "#111111";
+export const BRAND_PURPLE_DARK = "#000000";
+export const BRAND_PINK_CORAL = "#FFFFFF";
 
 export const BRAND_NAME = "creatorhub";
-
-// The one off-white background color used across every page and the
-// navbar, so the whole app reads as one consistent surface.
-export const OFF_WHITE = "#FBF8F4";
+export const OFF_WHITE = "#FFFFFF";
 
 export function LogoMark({ size = 24 }: { size?: number }) {
   return (
     <svg
       width={size}
       height={size}
-      viewBox="0 0 26 26"
+      viewBox="0 0 32 32"
       aria-hidden="true"
-      style={{ flexShrink: 0, display: "block" }}
+      style={{
+        flexShrink: 0,
+        display: "block",
+      }}
     >
-      <circle
-        cx="10"
-        cy="13"
-        r="8"
-        fill={BRAND_PURPLE}
+      {/* Thin C-shaped outer mark */}
+      <path
+        d="M20.8 7.1
+           C18.9 5.7 16.6 4.9 14.1 4.9
+           C7.9 4.9 3 9.9 3 16
+           C3 22.1 7.9 27.1 14.1 27.1
+           C16.6 27.1 18.9 26.3 20.8 24.9"
+        fill="none"
+        stroke="#111111"
+        strokeWidth="3"
+        strokeLinecap="round"
       />
 
-      <circle
-        cx="17"
-        cy="9"
-        r="6"
-        fill={BRAND_PINK_CORAL}
-        fillOpacity={0.92}
+      {/* Slim inner connection */}
+      <path
+        d="M14 16H25"
+        fill="none"
+        stroke="#111111"
+        strokeWidth="3"
+        strokeLinecap="round"
+      />
+
+      {/* White cut / separation */}
+      <path
+        d="M20.5 8.2L27 16L20.5 23.8"
+        fill="none"
+        stroke="#FFFFFF"
+        strokeWidth="3"
+        strokeLinecap="round"
+        strokeLinejoin="round"
       />
     </svg>
   );

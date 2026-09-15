@@ -14,12 +14,12 @@ import {
 
 const C = {
   card: '#FFF',
-  ink: '#1A1625',
+  ink: '#181818',
   soft: '#6B6478',
   faint: '#A39DB8',
-  line: '#EAE7F2',
-  navy: '#7661A1',
-  coral: '#F47C78',
+  line: '#E8E8E8',
+  navy: '#111111',
+  coral: '#111111',
   green: '#16834A',
   red: '#C84642',
 };
@@ -253,7 +253,7 @@ export function Analytics() {
         .an-result {
           padding: 13px;
           border-radius: 12px;
-          background: #F7F6FA;
+          background: #F5F5F5;
         }
 
         .an-result b {
@@ -281,7 +281,7 @@ export function Analytics() {
         .an-error {
           padding: 11px 12px;
           border-radius: 9px;
-          background: #FDECEC;
+          background: #F0F0F0;
           color: ${C.red};
           font-size: 12px;
           margin-bottom: 14px;
