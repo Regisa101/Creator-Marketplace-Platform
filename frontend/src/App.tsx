@@ -7,8 +7,7 @@ import {
 
 import { AuthProvider, useAuth } from "./context/AuthContext";
 
-import { LoginCreator } from "./pages/auth/LoginCreator";
-import { LoginBusiness } from "./pages/auth/LoginBusiness";
+import { Login } from "./pages/auth/Login";
 import { RegisterCreator } from "./pages/auth/RegisterCreator";
 import { RegisterBusiness } from "./pages/auth/RegisterBusiness";
 import { RoleSelect } from "./pages/auth/RoleSelect";
@@ -102,7 +101,7 @@ function App() {
 
           <Route
             path="/login"
-            element={<RoleSelect />}
+            element={<Login />}
           />
 
           <Route
@@ -112,12 +111,12 @@ function App() {
 
           <Route
             path="/login/creator"
-            element={<LoginCreator />}
+            element={<Navigate to="/login" replace />}
           />
 
           <Route
             path="/login/business"
-            element={<LoginBusiness />}
+            element={<Navigate to="/login" replace />}
           />
 
           <Route

@@ -616,6 +616,7 @@ export function Landing() {
           --line: #E5E5E5;
 
           font-family: 'Poppins', sans-serif;
+          font-weight: 400;
           color: var(--ink);
           background: var(--page-bg);
           overflow-x: hidden;
@@ -625,6 +626,7 @@ export function Landing() {
         .lp h2,
         .lp h3 {
           font-family: 'League Spartan', sans-serif;
+          font-weight: 400;
         }
 
         .lp a {
@@ -742,7 +744,7 @@ export function Landing() {
         .lp-h1 {
           font-size: 64px;
           line-height: 1.02;
-          font-weight: 700;
+          font-weight: 400;
           color: #111111;
           margin: 0 0 22px;
           letter-spacing: -0.035em;
@@ -774,7 +776,7 @@ export function Landing() {
           justify-content: center;
           gap: 8px;
           font-size: 13px;
-          font-weight: 600;
+          font-weight: 500;
           transition: all .18s ease;
         }
 
@@ -912,7 +914,7 @@ export function Landing() {
 
         .lp-hero-creator-name {
           font-size: 12px;
-          font-weight: 600;
+          font-weight: 400;
           color: #111111;
           line-height: 1.25;
         }
@@ -966,7 +968,7 @@ export function Landing() {
 
         .lp-hero-campaign-brand {
           font-size: 11.5px;
-          font-weight: 600;
+          font-weight: 400;
           color: #666666;
           margin-bottom: 5px;
         }
@@ -974,7 +976,7 @@ export function Landing() {
         .lp-hero-campaign-title {
           font-family: 'League Spartan', sans-serif;
           font-size: 24px;
-          font-weight: 600;
+          font-weight: 400;
           color: #111111;
           margin: 0 0 12px;
         }
@@ -1001,7 +1003,7 @@ export function Landing() {
         }
 
         .lp-hero-campaign-budget {
-          font-weight: 700;
+          font-weight: 400;
           color: #111111;
         }
 
@@ -1077,7 +1079,7 @@ export function Landing() {
 
         .lp-cat-title {
           font-size: 32px;
-          font-weight: 500;
+          font-weight: 400;
           color: var(--navy);
           margin: 0 0 28px;
         }
@@ -1150,7 +1152,7 @@ export function Landing() {
 
         .lp-cat-label {
           font-size: 14px;
-          font-weight: 600;
+          font-weight: 400;
           line-height: 1.3;
           color: #ffffff;
           text-shadow: 0 1px 8px rgba(0,0,0,.22);
@@ -1224,14 +1226,14 @@ export function Landing() {
 
         .lp-h2 {
           font-size: 28px;
-          font-weight: 500;
+          font-weight: 400;
           color: var(--navy);
           margin: 0;
         }
 
         .lp-view-all {
           font-size: 14px;
-          font-weight: 600;
+          font-weight: 400;
           color: var(--coral);
           display: inline-flex;
           align-items: center;
@@ -1349,7 +1351,7 @@ export function Landing() {
           top: 10px;
           right: 10px;
           font-size: 11px;
-          font-weight: 700;
+          font-weight: 400;
           letter-spacing: 0.3px;
           padding: 4px 10px;
           border-radius: 999px;
@@ -1382,7 +1384,7 @@ export function Landing() {
           border-radius: 50%;
           color: #fff;
           font-size: 10px;
-          font-weight: 700;
+          font-weight: 400;
           display: flex;
           align-items: center;
           justify-content: center;
@@ -1393,12 +1395,12 @@ export function Landing() {
         .lp-card-brand-name {
           font-size: 12.5px;
           color: var(--ink-soft);
-          font-weight: 500;
+          font-weight: 400;
         }
 
         .lp-card-title {
           font-size: 16px;
-          font-weight: 700;
+          font-weight: 400;
           color: var(--ink);
           margin: 0;
           line-height: 1.3;
@@ -1429,7 +1431,7 @@ export function Landing() {
           display: inline-flex;
           align-items: center;
           font-size: 11px;
-          font-weight: 600;
+          font-weight: 400;
           color: var(--navy);
           background: var(--navy-soft);
           padding: 3px 10px;
@@ -1456,7 +1458,7 @@ export function Landing() {
 
         .lp-card-comp {
           color: var(--navy);
-          font-weight: 700;
+          font-weight: 400;
         }
 
         .lp-card-secondary-meta {
@@ -1494,7 +1496,7 @@ export function Landing() {
           padding: 9px 10px;
           border-radius: 10px;
           font-size: 12.5px;
-          font-weight: 600;
+          font-weight: 500;
           white-space: nowrap;
           transition: all .18s ease;
         }
@@ -1552,7 +1554,7 @@ export function Landing() {
           font-family: 'League Spartan', sans-serif;
           font-size: 34px;
           line-height: 1;
-          font-weight: 500;
+          font-weight: 400;
           letter-spacing: -0.02em;
           color: #111111;
         }
@@ -1581,7 +1583,7 @@ export function Landing() {
           background: #FFFFFF;
           color: #333333;
           font-size: 13px;
-          font-weight: 500;
+          font-weight: 400;
           line-height: 1;
           white-space: nowrap;
           display: flex;
@@ -1658,7 +1660,7 @@ export function Landing() {
           font-family: 'League Spartan', sans-serif;
           font-size: 24px;
           line-height: 1.12;
-          font-weight: 500;
+          font-weight: 400;
           color: #111111;
         }
 
@@ -1733,7 +1735,7 @@ export function Landing() {
           font-family: 'League Spartan', sans-serif;
           font-size: 34px;
           line-height: 1.08;
-          font-weight: 600;
+          font-weight: 400;
           letter-spacing: -0.025em;
           color: #111111;
         }
@@ -1759,7 +1761,7 @@ export function Landing() {
           background: #111111;
           color: #ffffff;
           font-size: 13px;
-          font-weight: 600;
+          font-weight: 500;
           transition: transform .18s ease, background .18s ease;
         }
 
@@ -1800,7 +1802,7 @@ export function Landing() {
 
         .lp-footer-brand-row span {
           font-family: 'League Spartan', sans-serif;
-          font-weight: 700;
+          font-weight: 400;
           font-size: 19px;
           color: var(--navy);
         }
@@ -1861,7 +1863,7 @@ export function Landing() {
           align-items: center;
           justify-content: center;
           font-size: 10.5px;
-          font-weight: 700;
+          font-weight: 400;
           letter-spacing: 0.3px;
         }
 

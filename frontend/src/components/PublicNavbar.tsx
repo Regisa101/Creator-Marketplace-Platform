@@ -654,9 +654,11 @@ export function PublicNavbar({ sticky = true }: PublicNavbarProps) {
 
           font-family: 'Poppins', sans-serif;
           font-size: 13px;
-          font-weight: 600;
+          font-weight: 500;
 
           text-decoration: none;
+
+          transition: all .18s ease;
         }
 
         .ch-public-login {
@@ -671,10 +673,22 @@ export function PublicNavbar({ sticky = true }: PublicNavbarProps) {
 
         .ch-public-login:hover {
           background: #000000;
+          border-color: #000000;
+          color: #FFFFFF;
+          transform: translateY(-1px);
         }
 
         .ch-public-register:hover {
-          background: #F3F3F3;
+          background: #F5F5F5;
+          border-color: #111111;
+          color: #111111;
+          transform: translateY(-1px);
+        }
+
+        .ch-public-login:focus-visible,
+        .ch-public-register:focus-visible {
+          outline: 2px solid #111111;
+          outline-offset: 2px;
         }
 
         /*
