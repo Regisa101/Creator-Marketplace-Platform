@@ -1,271 +1,662 @@
 import { useLocation, Link } from "react-router-dom";
 import { ArrowRight, UserRound, Building2 } from "lucide-react";
-import { PublicNavbar } from "../../components/PublicNavbar";
 import { LogoMark } from "../../components/Logo";
-import { BRAND_PINK_CORAL, BRAND_PURPLE } from "../../components/Logo";
 
 export function RoleSelect() {
   const location = useLocation();
-  const mode: "login" | "register" = location.pathname.startsWith("/login") ? "login" : "register";
+
+  const mode: "login" | "register" =
+    location.pathname.startsWith("/login")
+      ? "login"
+      : "register";
 
   return (
     <div className="rs-page">
       <style>{`
-        @import url('https://fonts.googleapis.com/css2?family=League+Spartan:wght@600;700;800&family=Poppins:wght@300;400;500;600;700&display=swap');
+        /* =====================================================
+           PAGE
+        ===================================================== */
 
         .rs-page {
-  min-height: 100vh;
-  background: #FFFFFF;
-  color: #212121;
-  font-family: 'Poppins', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-}
-        .rs-page *, .rs-page *::before, .rs-page *::after { box-sizing: border-box; }
-        .rs-page a { text-decoration: none; }
-        .rs-shell {
+          min-height: 100vh;
           width: 100%;
-          max-width: 1180px;
-          margin: 0 auto;
-          padding: 46px 32px 64px;
-        }
-        .rs-heading {
-          text-align: center;
-          max-width: 680px;
-          margin: 0 auto 30px;
-        }
-        .rs-welcome {
-  display: inline-flex;
-  align-items: center;
-  gap: 10px;
-  color: #6F6A7C;
-  font-size: 16px;
-  font-weight: 600;
-}
 
-.rs-welcome svg {
-  flex-shrink: 0;
-}
-        .rs-title {
-          margin: 10px 0 9px;
-          color: #212121;
-          font-family: 'League Spartan', sans-serif;
-          font-size: 40px;
-          line-height: 1.02;
-          letter-spacing: -.02em;
-        }
-        .rs-subtitle {
-          max-width: 560px;
-          margin: 0 auto;
-          color: #77727F;
-          font-size: 14px;
-          line-height: 1.6;
-        }
-        .rs-grid {
-          display: grid;
-          grid-template-columns: 1fr 1fr;
-          gap: 24px;
-          max-width: 1000px;
-          margin: 0 auto;
-        }
-        .rs-card {
-          position: relative;
-          overflow: hidden;
+          margin: 0;
+          padding: 0;
+
+          background: #ffffff;
+          color: #111111;
+
+          font-family:
+            Poppins,
+            -apple-system,
+            BlinkMacSystemFont,
+            "Segoe UI",
+            Roboto,
+            Helvetica,
+            Arial,
+            sans-serif;
+
           display: flex;
           flex-direction: column;
-          min-width: 0;
-          border: 1px solid #E1E1E1;
-          border-radius: 22px;
-          background: #FFFFFF;
-          box-shadow: 0 20px 45px -32px rgba(49,35,68,.30);
-          transition: transform .18s ease, box-shadow .18s ease, border-color .18s ease;
+          align-items: center;
         }
-        .rs-card:hover {
-          transform: translateY(-4px);
-          box-shadow: 0 25px 48px -30px rgba(49,35,68,.36);
+
+        .rs-page *,
+        .rs-page *::before,
+        .rs-page *::after {
+          box-sizing: border-box;
         }
-        .rs-card--creator:hover { border-color: rgba(17,17,17,.70); }
-        .rs-card--business:hover { border-color: rgba(17,17,17,.70); }
-        .rs-visual {
-          position: relative;
-          height: 275px;
-          overflow: hidden;
+
+        .rs-page a {
+          text-decoration: none;
         }
-        .rs-visual::after {
-          content: '';
-          position: absolute;
-          inset: 0;
-          pointer-events: none;
-        }
-        .rs-card--creator .rs-visual {
-          background: linear-gradient(145deg, #F9D1CE, #FFF8F7);
-        }
-        .rs-card--business .rs-visual {
-          background: linear-gradient(145deg, #DCDCDC, #FAFAFA);
-        }
-        .rs-visual img {
+
+
+        /* =====================================================
+           LOGO
+           
+           Completely white.
+           No navbar.
+           No border.
+           No divider.
+           No gradient.
+        ===================================================== */
+
+        .rs-logo {
           width: 100%;
-          height: 100%;
-          display: block;
-          object-fit: cover;
-          object-position: center;
-        }
-        .rs-card--creator .rs-visual::after {
-          background: linear-gradient(180deg, rgba(17,17,17,.02), rgba(255,247,246,.34));
-        }
-        .rs-card--business .rs-visual::after {
-          background: linear-gradient(180deg, rgba(17,17,17,.03), rgba(250,248,252,.34));
-        }
-        .rs-role-icon {
-          position: absolute;
-          z-index: 2;
-          left: 24px;
-          bottom: 20px;
-          width: 46px;
-          height: 46px;
-          border-radius: 50%;
+          height: 90px;
+
           display: flex;
           align-items: center;
           justify-content: center;
-          background: rgba(255,255,255,.91);
-          box-shadow: 0 8px 20px -12px rgba(38,27,51,.42);
+
+          background: #ffffff;
+
+          border: none;
+          outline: none;
+          box-shadow: none;
         }
-        .rs-card--creator .rs-role-icon { color: ${BRAND_PINK_CORAL}; }
-        .rs-card--business .rs-role-icon { color: ${BRAND_PURPLE}; }
-        .rs-body {
-          padding: 23px 28px 28px;
-          display: flex;
-          flex-direction: column;
-          flex: 1;
-        }
-        .rs-name {
-          margin: 0;
-          color: #303030;
-          font-family: 'League Spartan', sans-serif;
-          font-size: 27px;
-          line-height: 1.05;
-          font-weight: 700;
-        }
-        .rs-card--creator .rs-name { color: #303030; }
-        .rs-card--business .rs-name { color: #303030; }
-        .rs-desc {
-          min-height: 62px;
-          margin: 10px 0 20px;
-          color: #6D7180;
-          font-size: 13px;
-          line-height: 1.62;
-        }
-        .rs-continue {
-          min-height: 46px;
-          width: 100%;
+
+        .rs-logo-link {
           display: inline-flex;
           align-items: center;
           justify-content: center;
-          gap: 7px;
-          border-radius: 9px;
-          color: #FFFFFF !important;
-          -webkit-text-fill-color: #FFFFFF;
-          font-size: 13px;
-          font-weight: 700;
-          transition: transform .16s ease, filter .16s ease;
-        }
-        .rs-card--creator .rs-continue {
-          background: ${BRAND_PINK_CORAL};
-          box-shadow: 0 9px 18px -13px rgba(17,17,17,.8);
-        }
-        .rs-card--business .rs-continue {
-          background: ${BRAND_PURPLE};
-          box-shadow: 0 9px 18px -13px rgba(17,17,17,.8);
-        }
-        .rs-continue:hover { filter: brightness(.94); transform: translateY(-1px); }
-        .rs-switch {
-          margin-top: 26px;
-          text-align: center;
-          color: #77727F;
-          font-size: 12.5px;
-        }
-        .rs-switch a { color: ${BRAND_PURPLE}; font-weight: 700; }
 
-        @media (max-width: 760px) {
-          .rs-shell { padding: 32px 18px 48px; }
-          .rs-title { font-size: 34px; }
-          .rs-grid { grid-template-columns: 1fr; max-width: 520px; }
-          .rs-visual { height: 235px; }
+          gap: 7px;
+
+          color: #111111;
+
+          text-decoration: none;
+
+          transition: opacity 0.18s ease;
         }
-        @media (max-width: 460px) {
-          .rs-title { font-size: 30px; }
-          .rs-body { padding: 20px 20px 22px; }
-          .rs-name { font-size: 24px; }
+
+        .rs-logo-link:hover {
+          opacity: 0.7;
+        }
+
+        .rs-logo-mark {
+          display: flex;
+          align-items: center;
+          justify-content: center;
+
+          line-height: 0;
+        }
+
+        .rs-logo-text {
+          color: #111111;
+
+          font-size: 22px;
+          line-height: 1;
+
+          font-weight: 500;
+
+          letter-spacing: -0.9px;
+        }
+
+
+        /* =====================================================
+           MAIN CONTENT
+        ===================================================== */
+
+        .rs-shell {
+          width: 100%;
+          max-width: 900px;
+
+          display: flex;
+          flex-direction: column;
+          align-items: center;
+
+          padding:
+            5px
+            24px
+            60px;
+        }
+
+
+        /* =====================================================
+           HEADING
+        ===================================================== */
+
+        .rs-heading {
+          width: 100%;
+
+          text-align: center;
+
+          margin: 0 0 42px;
+        }
+
+        .rs-title {
+          margin: 0;
+
+          color: #111111;
+
+          font-size: 42px;
+          line-height: 1.12;
+
+          font-weight: 400;
+
+          letter-spacing: -1.4px;
+        }
+
+        .rs-subtitle {
+          margin: 15px 0 0;
+
+          color: #666666;
+
+          font-size: 15px;
+          line-height: 1.55;
+
+          font-weight: 400;
+        }
+
+
+        /* =====================================================
+           ROLE GRID
+        ===================================================== */
+
+        .rs-grid {
+          width: 100%;
+
+          display: grid;
+
+          grid-template-columns:
+            repeat(2, 250px);
+
+          justify-content: center;
+
+          gap: 24px;
+        }
+
+
+        /* =====================================================
+           ROLE CARD
+        ===================================================== */
+
+        .rs-card {
+          width: 250px;
+          min-height: 315px;
+
+          position: relative;
+
+          display: flex;
+          flex-direction: column;
+
+          overflow: hidden;
+
+          background: #ffffff;
+
+          border:
+            1px solid #dddddd;
+
+          border-radius: 9px;
+
+          color: #111111;
+
+          cursor: pointer;
+
+          transition:
+            transform 0.18s ease,
+            border-color 0.18s ease,
+            box-shadow 0.18s ease;
+        }
+
+        .rs-card:hover {
+          transform: translateY(-3px);
+
+          border-color: #aaaaaa;
+
+          box-shadow:
+            0 12px 28px rgba(0, 0, 0, 0.07);
+        }
+
+
+        /* =====================================================
+           CARD VISUAL
+           
+           Monochrome gradient only.
+           No pink.
+           No purple.
+           No green.
+        ===================================================== */
+
+        .rs-visual {
+          position: relative;
+
+          height: 205px;
+
+          margin:
+            16px
+            16px
+            0;
+
+          overflow: hidden;
+
+          border-radius: 8px;
+
+          display: flex;
+          align-items: center;
+          justify-content: center;
+
+          border:
+            1px solid rgba(0, 0, 0, 0.035);
+        }
+
+        .rs-card--creator .rs-visual {
+          background:
+            radial-gradient(
+              circle at 25% 20%,
+              #ffffff 0%,
+              #f2f2f2 45%,
+              #dddddd 100%
+            );
+        }
+
+        .rs-card--business .rs-visual {
+          background:
+            radial-gradient(
+              circle at 75% 25%,
+              #ffffff 0%,
+              #eeeeee 45%,
+              #d9d9d9 100%
+            );
+        }
+
+        .rs-visual::after {
+          content: "";
+
+          position: absolute;
+
+          inset: 0;
+
+          pointer-events: none;
+
+          background:
+            linear-gradient(
+              135deg,
+              rgba(255, 255, 255, 0.42),
+              transparent 60%
+            );
+        }
+
+
+        /* =====================================================
+           ROLE ICON
+        ===================================================== */
+
+        .rs-role-icon {
+          position: relative;
+
+          z-index: 2;
+
+          width: 68px;
+          height: 68px;
+
+          display: flex;
+          align-items: center;
+          justify-content: center;
+
+          color: #111111;
+        }
+
+        .rs-role-icon svg {
+          width: 48px;
+          height: 48px;
+
+          stroke-width: 1.35;
+        }
+
+
+        /* =====================================================
+           CARD BODY
+        ===================================================== */
+
+        .rs-body {
+          flex: 1;
+
+          padding:
+            18px
+            16px
+            20px;
+
+          display: flex;
+          flex-direction: column;
+          align-items: center;
+
+          text-align: center;
+        }
+
+        .rs-name {
+          margin: 0;
+
+          color: #111111;
+
+          font-size: 18px;
+          line-height: 1.3;
+
+          font-weight: 400;
+
+          letter-spacing: -0.2px;
+
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+
+          gap: 4px;
+        }
+
+        .rs-name svg {
+          width: 16px;
+          height: 16px;
+
+          stroke-width: 1.6;
+        }
+
+        .rs-desc {
+          margin:
+            7px
+            0
+            0;
+
+          color: #707070;
+
+          font-size: 13px;
+          line-height: 1.45;
+
+          font-weight: 400;
+
+          max-width: 195px;
+        }
+
+
+        /* =====================================================
+           LOGIN / REGISTER SWITCH
+        ===================================================== */
+
+        .rs-switch {
+          margin-top: 38px;
+
+          color: #555555;
+
+          font-size: 13px;
+          line-height: 1.5;
+
+          font-weight: 400;
+
+          text-align: center;
+        }
+
+        .rs-switch a {
+          color: #111111;
+
+          font-weight: 500;
+
+          text-decoration: underline;
+
+          text-underline-offset: 3px;
+
+          transition: color 0.15s ease;
+        }
+
+        .rs-switch a:hover {
+          color: #666666;
+        }
+
+
+        /* =====================================================
+           MOBILE
+        ===================================================== */
+
+        @media (max-width: 650px) {
+
+          .rs-logo {
+            height: 76px;
+          }
+
+          .rs-shell {
+            padding:
+              45px
+              18px
+              45px;
+          }
+
+          .rs-title {
+            font-size: 34px;
+            letter-spacing: -1px;
+          }
+
+          .rs-subtitle {
+            font-size: 14px;
+          }
+
+          .rs-heading {
+            margin-bottom: 34px;
+          }
+
+          .rs-grid {
+            width: 100%;
+            max-width: 310px;
+
+            grid-template-columns: 1fr;
+
+            gap: 18px;
+          }
+
+          .rs-card {
+            width: 100%;
+          }
+        }
+
+
+        /* =====================================================
+           SMALL MOBILE
+        ===================================================== */
+
+        @media (max-width: 380px) {
+
+          .rs-shell {
+            padding-top: 35px;
+          }
+
+          .rs-title {
+            font-size: 30px;
+          }
+
+          .rs-card {
+            min-height: 300px;
+          }
+
+          .rs-visual {
+            height: 190px;
+          }
         }
       `}</style>
 
-      <PublicNavbar />
+
+      {/* =====================================================
+          CENTERED CREATORHUB LOGO
+
+          Pure white.
+          No navbar.
+          No divider.
+      ===================================================== */}
+
+      <header className="rs-logo">
+        <Link
+          to="/"
+          className="rs-logo-link"
+          aria-label="Creatorhub home"
+        >
+          <span className="rs-logo-mark">
+            <LogoMark size={27} />
+          </span>
+
+          <span className="rs-logo-text">
+            creatorhub
+          </span>
+        </Link>
+      </header>
+
+
+      {/* =====================================================
+          MAIN
+      ===================================================== */}
 
       <main className="rs-shell">
+
+        {/* Heading */}
+
         <header className="rs-heading">
-          <div className="rs-welcome">
-            <LogoMark size={18} />
-            Welcome to creatorhub
-          </div>
+
           <h1 className="rs-title">
-            {mode === "login" ? "How do you want to log in?" : "How do you want to get started?"}
+            {mode === "login"
+              ? "How do you want to log in?"
+              : "How do you want to get started?"}
           </h1>
+
           <p className="rs-subtitle">
-            Choose the account type that matches what you want to do on creatorhub.
+            Choose the account type that matches
+            <br />
+            what you want to do on creatorhub.
           </p>
+
         </header>
 
+
+        {/* ===================================================
+            ROLE CARDS
+        =================================================== */}
+
         <div className="rs-grid">
-          <Link to={`/${mode}/creator`} className="rs-card rs-card--creator">
+
+          {/* =================================================
+              CREATOR
+          ================================================= */}
+
+          <Link
+            to={`/${mode}/creator`}
+            className="rs-card rs-card--creator"
+          >
+
             <div className="rs-visual">
-              <img
-                src="https://images.unsplash.com/photo-1522202176988-66273c2fd55f?w=900&h=600&fit=crop&q=85"
-                alt="Creators collaborating and creating content"
-              />
-              <span className="rs-role-icon"><UserRound size={22} /></span>
-            </div>
-            <div className="rs-body">
-              <h2 className="rs-name">I&apos;m a Creator</h2>
-              <p className="rs-desc">
-                Discover paid campaigns from brands, collaborate on exciting projects, and turn your creativity into opportunities.
-              </p>
-              <span className="rs-continue">
-                {mode === "login" ? "Continue as Creator" : "Continue as Creator"}
-                <ArrowRight size={15} />
+
+              <span className="rs-role-icon">
+                <UserRound />
               </span>
+
             </div>
+
+            <div className="rs-body">
+
+              <h2 className="rs-name">
+
+                <span>
+                  I&apos;m a Creator
+                </span>
+
+                <ArrowRight />
+
+              </h2>
+
+              <p className="rs-desc">
+                Work and get paid
+              </p>
+
+            </div>
+
           </Link>
 
-          <Link to={`/${mode}/business`} className="rs-card rs-card--business">
+
+          {/* =================================================
+              BRAND
+          ================================================= */}
+
+          <Link
+            to={`/${mode}/business`}
+            className="rs-card rs-card--business"
+          >
+
             <div className="rs-visual">
-              <img
-                src="https://images.unsplash.com/photo-1552664730-d307ca884978?w=900&h=600&fit=crop&q=85"
-                alt="A brand team working together"
-              />
-              <span className="rs-role-icon"><Building2 size={22} /></span>
-            </div>
-            <div className="rs-body">
-              <h2 className="rs-name">I&apos;m a Brand</h2>
-              <p className="rs-desc">
-                Find talented creators, launch campaigns, manage collaborations, and grow your brand&apos;s presence.
-              </p>
-              <span className="rs-continue">
-                {mode === "login" ? "Continue as Brand" : "Continue as Brand"}
-                <ArrowRight size={15} />
+
+              <span className="rs-role-icon">
+                <Building2 />
               </span>
+
             </div>
+
+            <div className="rs-body">
+
+              <h2 className="rs-name">
+
+                <span>
+                  I&apos;m a Brand
+                </span>
+
+                <ArrowRight />
+
+              </h2>
+
+              <p className="rs-desc">
+                Find creators and launch campaigns
+              </p>
+
+            </div>
+
           </Link>
+
         </div>
+
+
+        {/* ===================================================
+            LOGIN / REGISTER
+        =================================================== */}
 
         <div className="rs-switch">
+
           {mode === "login" ? (
-            <>Don&apos;t have an account? <Link to="/register">Sign up</Link></>
+            <>
+              Don&apos;t have an account?{" "}
+
+              <Link to="/register">
+                Sign up
+              </Link>
+            </>
           ) : (
-            <>Already have an account? <Link to="/login">Log in</Link></>
+            <>
+              Already have an account?{" "}
+
+              <Link to="/login">
+                Log in
+              </Link>
+            </>
           )}
+
         </div>
+
       </main>
     </div>
   );
 }
 
 export default RoleSelect;
-

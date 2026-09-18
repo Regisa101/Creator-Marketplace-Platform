@@ -465,8 +465,8 @@ export function PublicNavbar({ sticky = true }: PublicNavbarProps) {
         .ch-public-logo-text {
           font-family: 'League Spartan', sans-serif;
           font-size: 23px;
-          font-weight: 600;
-          letter-spacing: 0.01em;
+          font-weight: 400;
+          letter-spacing: -0.9px;
           line-height: 1;
         }
 
