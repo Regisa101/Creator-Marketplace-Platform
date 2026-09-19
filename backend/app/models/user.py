@@ -79,6 +79,7 @@ class User(Base):
                 "industry": p.industry,
                 "location": p.location,
                 "website": p.website,
+                "social_links": p.social_links,
                 "description": p.description,
                 "logo_url": p.logo_url,
                 "contact_phone": p.contact_phone,

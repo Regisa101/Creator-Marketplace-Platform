@@ -150,13 +150,19 @@ def _score_application(campaign, profile, db):
         "photographer": "photographer",
     }
 
+    creator_types = [
+        item.strip()
+        for item in (profile.creator_type or "").replace("|", ",").replace("•", ",").split(",")
+        if item.strip()
+    ]
+
     cat_match = (
         _matches_any(cat_values, categories)
         or any(
-            _norm(r) == _norm(profile.creator_type)
-            or _norm(profile.creator_type)
-            == cat_aliases.get(_norm(r), "__none__")
-            for r in categories
+            _norm(required) == _norm(creator_type)
+            or _norm(creator_type) == cat_aliases.get(_norm(required), "__none__")
+            for required in categories
+            for creator_type in creator_types
         )
     )
 

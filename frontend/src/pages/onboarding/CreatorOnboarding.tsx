@@ -1,256 +1,271 @@
-import { useState, useEffect } from 'react';
-import { useNavigate, Link } from 'react-router-dom';
+import { useEffect, useRef, useState } from "react";
+import type { ReactNode } from "react";
+import { Link, useNavigate } from "react-router-dom";
 import {
-  ArrowRight,
   ArrowLeft,
+  ArrowRight,
   Camera,
+  Check,
+  ChevronDown,
   Plus,
-  CheckCircle2,
-  Info,
   Trash2,
-  Save,
-  Image as ImageIcon,
-  Video,
   UploadCloud,
-  MapPin,
-} from 'lucide-react';
-
+  ExternalLink,
+} from "lucide-react";
+import { LogoMark } from "../../components/Logo";
 import {
   completeCreatorOnboarding,
   getCreatorProgress,
   saveCreatorProgress,
   uploadImage,
-} from '../../api/client';
-import type { CreatorOnboardingData } from '../../api/client';
-import { useAuth } from '../../context/AuthContext';
-import { LogoMark, BRAND_NAME, OFF_WHITE } from '../../components/Logo';
+} from "../../api/client";
+import { useAuth } from "../../context/AuthContext";
 
-// ============================================================
-// TYPES
-// ============================================================
+const TYPES = [
+  "Influencer",
+  "UGC Creator",
+  "Content Creator",
+  "Lifestyle Vlogger",
+  "Model",
+  "Photographer",
+  "Videographer",
+  "Blogger",
+  "Makeup Artist",
+  "Fashion Creator",
+  "Fitness Creator",
+  "Gaming Creator",
+  "Educator",
+  "Podcaster",
+  "Other",
+];
 
-interface Social {
+const CATEGORIES = [
+  "Beauty",
+  "Fashion",
+  "Food",
+  "Fitness",
+  "Tech",
+  "Travel",
+  "Gaming",
+  "Music",
+  "Lifestyle",
+  "Wellness",
+  "Sports",
+  "Education",
+  "Art & Design",
+  "Comedy",
+  "Automotive",
+  "Pets",
+];
+
+const CONTENT = ["Reels", "Photos", "Stories", "YouTube Videos", "Shorts", "Reviews", "UGC"];
+const LANGUAGES = ["English", "Nepali", "Hindi", "Newari", "Maithili"];
+
+const LOCATIONS = [
+  "Kathmandu, Nepal",
+  "Lalitpur, Nepal",
+  "Bhaktapur, Nepal",
+  "Pokhara, Nepal",
+  "Chitwan, Nepal",
+  "Biratnagar, Nepal",
+  "Butwal, Nepal",
+  "Bharatpur, Nepal",
+  "Dharan, Nepal",
+  "Hetauda, Nepal",
+  "Janakpur, Nepal",
+  "Nepalgunj, Nepal",
+  "Dhangadhi, Nepal",
+  "Itahari, Nepal",
+  "Birgunj, Nepal",
+  "Birtamod, Nepal",
+  "Banepa, Nepal",
+  "Tansen, Nepal",
+  "Gorkha, Nepal",
+  "Lumbini, Nepal",
+  "Mustang, Nepal",
+  "Nagarkot, Nepal",
+  "Nationwide, Nepal",
+  "International",
+];
+
+const STEPS = ["Basic profile", "Professional", "Portfolio & social", "Availability"];
+
+type Social = {
   platform: string;
   username: string;
   profile_url: string;
   follower_count: number;
-}
+};
 
-interface PortfolioItem {
+type Portfolio = {
   title: string;
-  description: string;
   media_url: string;
-  platform: string;
-  type: string;
-}
+  type?: string;
+};
 
-// ============================================================
-// CONSTANTS
-// ============================================================
-
-const CORAL = '#111111';
-const CORAL_DARK = '#000000';
-
-const LANGUAGES = ['English', 'Nepali', 'Hindi', 'Newari', 'Maithili'];
-
-// NOTE: "Content niches" and "Your audience's interests" used to be
-// two separate questions with the *same* option list — pure
-// redundancy. Merged into one field (`categories`) and expanded with
-// a few more common niches (Lifestyle, Parenting, Finance, etc).
-const CATEGORIES = [
-  'Beauty', 'Fashion', 'Food', 'Fitness', 'Tech',
-  'Travel', 'Gaming', 'Music', 'Home', 'Wellness',
-  'Lifestyle', 'Parenting', 'Finance', 'Sports', 'Art & Design',
-  'Comedy', 'Education', 'Automotive', 'Pets',
-];
-
-const CONTENT_TYPES = [
-  'Reels', 'Photos', 'Stories', 'YouTube Videos', 'Shorts', 'Reviews', 'UGC',
-];
-
-const CREATOR_TYPES = [
-  'Influencer', 'UGC Creator', 'Content Creator', 'Model', 'Photographer', 'Videographer', 'Other',
-];
-
-const AUDIENCE_AGE_RANGES = ['13-17', '18-24', '25-34', '35-44', '45-54', '55+'];
-
-const AUDIENCE_LOCATIONS = [
-  'Kathmandu', 'Pokhara', 'Lalitpur', 'Bhaktapur', 'Chitwan', 'Biratnagar', 'Nationwide', 'International',
-];
-
-const PORTFOLIO_TYPES = ['image', 'video', 'reel', 'link'];
-
-const USERNAME_REGEX = /^[a-zA-Z0-9_]{3,24}$/;
-
-const PLATFORMS = [
-  { id: 'instagram', label: 'Instagram', handleLabel: 'Followers' },
-  { id: 'tiktok', label: 'TikTok', handleLabel: 'Followers' },
-];
-
-const INSTAGRAM_USERNAME_REGEX = /^[a-zA-Z0-9._]{1,30}$/;
-const TIKTOK_USERNAME_REGEX = /^[a-zA-Z0-9._]{2,24}$/;
-
-const LOCATION_SUGGESTIONS = [
-  'Kathmandu, Nepal', 'Lalitpur, Nepal', 'Bhaktapur, Nepal', 'Pokhara, Nepal',
-  'Biratnagar, Nepal', 'Birgunj, Nepal', 'Dharan, Nepal', 'Bharatpur, Nepal',
-  'Butwal, Nepal', 'Hetauda, Nepal', 'Nepalgunj, Nepal', 'Itahari, Nepal',
-  'Janakpur, Nepal', 'Dhangadhi, Nepal', 'Tulsipur, Nepal', 'Ghorahi, Nepal',
-  'Birendranagar, Nepal', 'Kalaiya, Nepal', 'Damak, Nepal', 'Dhulikhel, Nepal',
-];
-
-function validateSocialAccount(platform: string, username: string, profileUrl: string) {
-  const handle = username.trim().replace(/^@/, '');
-  const url = profileUrl.trim();
-
-  if (!handle) return 'Please enter your Instagram or TikTok username.';
-
-  if (platform === 'instagram' && !INSTAGRAM_USERNAME_REGEX.test(handle)) {
-    return 'Enter a valid Instagram username (letters, numbers, dots and underscores only).';
+const parseTypes = (value: unknown): string[] => {
+  if (typeof value === "string") {
+    return value
+      .split(/\s*(?:,|\||•)\s*/)
+      .map((item) => item.trim())
+      .filter(Boolean);
   }
 
-  if (platform === 'tiktok' && !TIKTOK_USERNAME_REGEX.test(handle)) {
-    return 'Enter a valid TikTok username (letters, numbers, dots and underscores only).';
+  if (Array.isArray(value)) {
+    return value.filter((item): item is string => typeof item === "string");
   }
 
-  const expectedHost = platform === 'instagram' ? 'instagram.com' : 'tiktok.com';
-  if (!url) return `Please enter your ${platform === 'instagram' ? 'Instagram' : 'TikTok'} profile URL.`;
+  return [];
+};
 
-  try {
-    const parsed = new URL(url.startsWith('http') ? url : `https://${url}`);
-    const host = parsed.hostname.toLowerCase().replace(/^www\./, '');
-    if (host !== expectedHost) return `Use a valid ${platform === 'instagram' ? 'Instagram' : 'TikTok'} profile URL.`;
+const toggle = (list: string[], value: string) =>
+  list.includes(value) ? list.filter((item) => item !== value) : [...list, value];
 
-    const path = parsed.pathname.replace(/^\//, '').replace(/\/$/, '').replace(/^@/, '');
-    if (!path || path.includes('/')) return 'Profile URL must point to a single account.';
+function LocationField({ value, onChange }: { value: string; onChange: (value: string) => void }) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
 
-    const urlHandle = path.replace(/^@/, '');
-    if (urlHandle.toLowerCase() !== handle.toLowerCase()) {
-      return 'Username and profile URL do not match.';
-    }
-  } catch {
-    return 'Please enter a valid profile URL.';
-  }
-
-  return '';
-}
-
-function resolveCreatorStep(
-  profile: Record<string, any> | null | undefined,
-  socials: any[] | null | undefined
-): number {
-  if (!profile) return 1;
-
-  const step1Done =
-    Boolean(profile.display_name?.trim?.()) &&
-    USERNAME_REGEX.test(profile.username || '') &&
-    Boolean(profile.bio?.trim?.()) &&
-    Boolean(profile.location?.trim?.());
-  if (!step1Done) return 1;
-
-  const step2Done =
-    Boolean(profile.creator_type) &&
-    Array.isArray(profile.categories) && profile.categories.length > 0 &&
-    Array.isArray(profile.content_types) && profile.content_types.length > 0 &&
-    Array.isArray(profile.languages) && profile.languages.length > 0 &&
-    Array.isArray(profile.audience_age_range) && profile.audience_age_range.length > 0 &&
-    Array.isArray(profile.audience_location) && profile.audience_location.length > 0;
-  if (!step2Done) return 2;
-
-  const step3Done = Array.isArray(socials) && socials.length > 0;
-  if (!step3Done) return 3;
-
-  return 4;
-}
-
-// ============================================================
-// CHIP + CHIP GROUP (with "show 7, then expand" behavior)
-// ============================================================
-
-interface ChipProps {
-  label: string;
-  active: boolean;
-  onClick: () => void;
-}
-
-function Chip({ label, active, onClick }: ChipProps) {
-  return (
-    <button type="button" className={`co-chip ${active ? 'co-chip-active' : ''}`} onClick={onClick}>
-      {label}
-    </button>
+  const suggestions = LOCATIONS.filter((item) =>
+    item.toLowerCase().includes(value.trim().toLowerCase()),
   );
-}
 
-interface ChipGroupProps {
-  items: string[];
-  isActive: (item: string) => boolean;
-  onToggle: (item: string) => void;
-  limit?: number;
-}
+  useEffect(() => {
+    const handleOutside = (event: MouseEvent) => {
+      if (ref.current && !ref.current.contains(event.target as Node)) {
+        setOpen(false);
+      }
+    };
 
-function ChipGroup({ items, isActive, onToggle, limit = 7 }: ChipGroupProps) {
-  const [expanded, setExpanded] = useState(false);
-  const hasMore = items.length > limit;
-  const visible = expanded ? items : items.slice(0, limit);
+    document.addEventListener("mousedown", handleOutside);
+    return () => document.removeEventListener("mousedown", handleOutside);
+  }, []);
+
+  useEffect(() => {
+    const previousOverflow = document.body.style.overflow;
+    if (open) document.body.style.overflow = "hidden";
+    return () => {
+      document.body.style.overflow = previousOverflow;
+    };
+  }, [open]);
 
   return (
-    <div className="co-chips">
-      {visible.map((item) => (
-        <Chip key={item} label={item} active={isActive(item)} onClick={() => onToggle(item)} />
-      ))}
-      {hasMore && (
+    <div className="onb-location" ref={ref}>
+      <div className={`onb-location-control ${open ? "open" : ""}`}>
+        <input
+          className="onb-input onb-location-input"
+          value={value}
+          onFocus={() => setOpen(true)}
+          onChange={(event) => {
+            onChange(event.target.value);
+            setOpen(true);
+          }}
+          placeholder="Start typing your city or location"
+          autoComplete="off"
+        />
         <button
           type="button"
-          className="co-chip co-chip-more"
-          onClick={() => setExpanded((e) => !e)}
+          className="onb-icon-trigger"
+          aria-label="Show location suggestions"
+          onClick={() => setOpen((current) => !current)}
         >
-          {expanded ? 'Show less' : `+${items.length - limit} more`}
+          <ChevronDown size={16} strokeWidth={1.7} />
         </button>
+      </div>
+
+      {open && (
+        <div className="onb-suggestion-menu">
+          {suggestions.length > 0 ? (
+            suggestions.map((item) => (
+              <button
+                type="button"
+                className={`onb-suggestion ${item === value ? "selected" : ""}`}
+                key={item}
+                onClick={() => {
+                  onChange(item);
+                  setOpen(false);
+                }}
+              >
+                {item}
+              </button>
+            ))
+          ) : (
+            <div className="onb-no-suggestions">No matching suggestion. You can enter your own location.</div>
+          )}
+        </div>
       )}
     </div>
   );
 }
 
-// ============================================================
-// LOCATION AUTOCOMPLETE
-// ============================================================
-
-interface LocationAutocompleteProps {
-  value: string;
-  onChange: (value: string) => void;
-}
-
-function LocationAutocomplete({ value, onChange }: LocationAutocompleteProps) {
+function MultiSelect({
+  selected,
+  onToggle,
+}: {
+  selected: string[];
+  onToggle: (value: string) => void;
+}) {
   const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
 
-  const query = value.trim().toLowerCase();
-  const filtered = (
-    query
-      ? LOCATION_SUGGESTIONS.filter((loc) => loc.toLowerCase().includes(query))
-      : LOCATION_SUGGESTIONS
-  ).slice(0, 6);
+  useEffect(() => {
+    const handleOutside = (event: MouseEvent) => {
+      if (ref.current && !ref.current.contains(event.target as Node)) {
+        setOpen(false);
+      }
+    };
+
+    document.addEventListener("mousedown", handleOutside);
+    return () => document.removeEventListener("mousedown", handleOutside);
+  }, []);
+
+  useEffect(() => {
+    const previousOverflow = document.body.style.overflow;
+    if (open) document.body.style.overflow = "hidden";
+    return () => {
+      document.body.style.overflow = previousOverflow;
+    };
+  }, [open]);
 
   return (
-    <div className="co-autocomplete">
-      <input
-        className="co-input"
-        value={value}
-        onChange={(e) => { onChange(e.target.value); setOpen(true); }}
-        onFocus={() => setOpen(true)}
-        onBlur={() => setTimeout(() => setOpen(false), 150)}
-        placeholder="City, Province, Country"
-        autoComplete="off"
-      />
-      {open && filtered.length > 0 && (
-        <div className="co-autocomplete-list">
-          {filtered.map((loc) => (
+    <div className="onb-multi-select" ref={ref}>
+      <button
+        type="button"
+        className={`onb-select-trigger ${open ? "open" : ""}`}
+        onClick={() => setOpen((current) => !current)}
+        aria-expanded={open}
+      >
+        <span className={selected.length ? "selected-text" : "placeholder-text"}>
+          {selected.length ? `${selected.length} selected` : "Select one or more creator types"}
+        </span>
+        <ChevronDown className="onb-chevron" size={16} strokeWidth={1.7} />
+      </button>
+
+      {open && (
+        <div className="onb-select-menu">
+          {TYPES.map((item) => (
+            <label className="onb-select-option" key={item}>
+              <input
+                type="checkbox"
+                checked={selected.includes(item)}
+                onChange={() => onToggle(item)}
+              />
+              <span>{item}</span>
+            </label>
+          ))}
+        </div>
+      )}
+
+      {selected.length > 0 && (
+        <div className="onb-selected-tags">
+          {selected.map((item) => (
             <button
               type="button"
-              key={loc}
-              className="co-autocomplete-item"
-              onMouseDown={() => { onChange(loc); setOpen(false); }}
+              className="onb-selected-tag"
+              key={item}
+              onClick={() => onToggle(item)}
             >
-              <MapPin size={13} style={{ flexShrink: 0, opacity: 0.6 }} />
-              {loc}
+              {item}
+              <span>×</span>
             </button>
           ))}
         </div>
@@ -259,1548 +274,743 @@ function LocationAutocomplete({ value, onChange }: LocationAutocompleteProps) {
   );
 }
 
-// ============================================================
-// STEP HEADER
-// ============================================================
-
-const STEP_LABELS = ['Basic Info', 'Type & Niche', 'Socials', 'Portfolio', 'Payout & Publish'];
-
-function StepHeader({ step }: { step: number }) {
+function StyledSelect({
+  value,
+  onChange,
+  children,
+  placeholder,
+}: {
+  value: string;
+  onChange: (value: string) => void;
+  children: ReactNode;
+  placeholder?: string;
+}) {
   return (
-    <div className="co-steps">
-      {STEP_LABELS.map((label, index) => {
-        const number = index + 1;
-        const state = number < step ? 'done' : number === step ? 'active' : 'upcoming';
-
-        return (
-          <div className="co-step" key={label}>
-            <span className={`co-step-dot co-step-${state}`}>
-              {state === 'done' ? <CheckCircle2 size={14} /> : number}
-            </span>
-            <span className={`co-step-label co-step-label-${state}`}>{label}</span>
-            {number < STEP_LABELS.length && (
-              <span className={`co-step-line ${number < step ? 'co-step-line-done' : ''}`} />
-            )}
-          </div>
-        );
-      })}
+    <div className="onb-native-select">
+      <select
+        className="onb-input onb-select-input"
+        value={value}
+        onChange={(event) => onChange(event.target.value)}
+      >
+        {placeholder && <option value="">{placeholder}</option>}
+        {children}
+      </select>
+      <ChevronDown className="onb-native-chevron" size={16} strokeWidth={1.7} />
     </div>
   );
 }
 
-// ============================================================
-// MAIN COMPONENT
-// ============================================================
+function externalHref(value: string): string | null {
+  const trimmed = value.trim();
+  if (!trimmed) return null;
+
+  try {
+    const url = new URL(/^https?:\/\//i.test(trimmed) ? trimmed : `https://${trimmed}`);
+    if (url.protocol !== "http:" && url.protocol !== "https:") return null;
+    return url.toString();
+  } catch {
+    return null;
+  }
+}
 
 export function CreatorOnboarding() {
   const navigate = useNavigate();
   const { user, updateProfile } = useAuth();
 
   const [step, setStep] = useState(1);
-  const [done, setDone] = useState(false);
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const [error, setError] = useState('');
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [uploading, setUploading] = useState(false);
+  const [error, setError] = useState("");
 
-  // Show the short welcome screen first. Clicking Get started
-  // enters the existing onboarding flow below without changing
-  // any of the saved-progress or API logic.
-  const [showWelcome, setShowWelcome] = useState(true);
-
-  // Three short questions shown after the welcome screen and before the profile form.
-  const [introQuestionStep, setIntroQuestionStep] = useState(0);
-  const [introAnswers, setIntroAnswers] = useState<string[]>(['', '', '']);
-
-  const introQuestions = [
-    {
-      title: 'A few quick questions: first, have you freelanced before?',
-      sub: "This helps us personalize your Creatorhub experience. You can always change your profile details later.",
-      options: [
-        ['I am brand new to this', 'New to freelance work'],
-        ['I have some experience', 'I have worked with clients or brands before'],
-        ['I am an expert', 'I regularly work with clients or campaigns'],
-      ],
-    },
-    {
-      title: 'What type of content do you enjoy creating?',
-      sub: 'Choose the type of content you would most like to create on Creatorhub.',
-      options: [
-        ['Video content', 'Create Reels, Shorts, Stories, and other videos'],
-        ['Photo & visual content', 'Create photos, product visuals, and creative assets'],
-        ['UGC & product reviews', 'Create authentic reviews, tutorials, and UGC'],
-      ],
-    },
-    {
-      title: 'What are you hoping to get from Creatorhub?',
-      sub: 'Choose what matters most to you right now. Your profile can be updated anytime.',
-      options: [
-        ['Find paid campaigns', 'Discover campaigns that fit your skills'],
-        ['Build my portfolio', 'Showcase your work and attract brands'],
-        ['Grow my income', 'Turn your creative skills into steady work'],
-      ],
-    },
-  ];
-
-
-  // ----------------------------------------------------------
-  // STEP 1 — Basic Info
-  // ----------------------------------------------------------
-
-  const [profileImage, setProfileImage] = useState<string | null>(null);
-  const [displayName, setDisplayName] = useState(user?.full_name ?? '');
-  const [username, setUsername] = useState('');
-  const [usernameError, setUsernameError] = useState('');
-  const [bio, setBio] = useState('');
-  const [location, setLocation] = useState('');
-
-  const handleUsernameChange = (value: string) => {
-    const cleaned = value.replace(/\s/g, '');
-    setUsername(cleaned);
-    setUsernameError(
-      cleaned && !USERNAME_REGEX.test(cleaned)
-        ? '3–24 characters: letters, numbers, and underscores only.'
-        : ''
-    );
-  };
-
-  // ----------------------------------------------------------
-  // STEP 2 — Type & Niche (content classification + audience)
-  // ----------------------------------------------------------
-
-  const [creatorType, setCreatorType] = useState('');
-  const [categories, setCategories] = useState<string[]>([]); // doubles as content niche + audience interest
-  const [contentTypes, setContentTypes] = useState<string[]>([]);
+  const [photo, setPhoto] = useState<string | null>(null);
+  const [name, setName] = useState(user?.full_name ?? "");
+  const [username, setUsername] = useState("");
+  const [location, setLocation] = useState("");
+  const [types, setTypes] = useState<string[]>([]);
+  const [bio, setBio] = useState("");
+  const [categories, setCategories] = useState<string[]>([]);
+  const [content, setContent] = useState<string[]>([]);
   const [languages, setLanguages] = useState<string[]>([]);
-  const [audienceAgeRanges, setAudienceAgeRanges] = useState<string[]>([]);
-  const [audienceLocations, setAudienceLocations] = useState<string[]>([]);
-
-  // ----------------------------------------------------------
-  // STEP 3 — Socials
-  // ----------------------------------------------------------
-
   const [socials, setSocials] = useState<Social[]>([]);
-  const [socialError, setSocialError] = useState('');
-  const [socialDraft, setSocialDraft] = useState({
-    platform: 'instagram',
-    username: '',
-    profile_url: '',
-    follower_count: '0',
-  });
-
-  // ----------------------------------------------------------
-  // STEP 4 — Portfolio
-  // ----------------------------------------------------------
-
-  const [portfolio, setPortfolio] = useState<PortfolioItem[]>([]);
-  const [portfolioDraft, setPortfolioDraft] = useState({
-    title: '',
-    description: '',
-    media_url: '',
-    platform: '',
-    type: 'image',
-  });
-  const [uploadingPortfolioImage, setUploadingPortfolioImage] = useState(false);
-  const [portfolioError, setPortfolioError] = useState('');
-
-  // ----------------------------------------------------------
-  // STEP 5 — Publish
-  // ----------------------------------------------------------
-
-  const [startingPrice, setStartingPrice] = useState('');
-  const [payoutAccountHolderName, setPayoutAccountHolderName] = useState('');
-  const [payoutProvider, setPayoutProvider] = useState('');
-  const [payoutAccountNumber, setPayoutAccountNumber] = useState('');
-  const [payoutBranch, setPayoutBranch] = useState('');
-  const [payoutRouting, setPayoutRouting] = useState('');
-  const [payoutMethod, setPayoutMethod] = useState('');
-
-  // ----------------------------------------------------------
-  // RESUME PROGRESS / PHOTO UPLOAD / SAVE DRAFT STATE
-  // ----------------------------------------------------------
-
-  const [loadingProgress, setLoadingProgress] = useState(true);
-  const [uploadingPhoto, setUploadingPhoto] = useState(false);
-  const [photoError, setPhotoError] = useState('');
-  const [draftSaved, setDraftSaved] = useState(false);
-
-  // ==========================================================
-  // RESUME WHERE YOU LEFT OFF
-  // ==========================================================
+  const [socialPlatform, setSocialPlatform] = useState("Instagram");
+  const [socialUsername, setSocialUsername] = useState("");
+  const [socialUrl, setSocialUrl] = useState("");
+  const [followers, setFollowers] = useState("");
+  const [portfolio, setPortfolio] = useState<Portfolio[]>([]);
+  const [portfolioTitle, setPortfolioTitle] = useState("");
+  const [availability, setAvailability] = useState("Available");
 
   useEffect(() => {
     let cancelled = false;
 
-    const loadProgress = async () => {
+    (async () => {
       try {
         const saved = await getCreatorProgress();
-        const profile = saved?.profile ?? user?.profile ?? null;
-        const socialsData = saved?.socials ?? (user?.profile?.socials as any[] | undefined) ?? [];
+        const profile = saved?.profile ?? user?.profile;
 
         if (!cancelled && profile) {
-          setProfileImage(profile.profile_image ?? null);
-          setDisplayName(profile.display_name ?? user?.full_name ?? '');
-          setUsername(profile.username ?? '');
-          setBio(profile.bio ?? '');
-          setLocation(profile.location ?? '');
-
-          setCreatorType(profile.creator_type ?? '');
-          // Merge legacy `interests` into `categories` too, in case
-          // a draft was saved before the two fields were combined.
-          setCategories(
-            Array.from(new Set([
-              ...(profile.categories ?? profile.niches ?? []),
-              ...(profile.interests ?? profile.audience_interests ?? []),
-            ]))
-          );
-          setContentTypes(profile.content_types ?? []);
-          setLanguages(profile.languages ?? profile.content_languages ?? []);
-          setAudienceAgeRanges(profile.audience_age_range ?? []);
-          setAudienceLocations(profile.audience_location ?? []);
-
-          setSocials(
-            (socialsData || []).map((s: any) => ({
-              platform: s.platform,
-              username: s.username ?? '',
-              profile_url: s.profile_url ?? '',
-              follower_count: s.follower_count ?? 0,
-            }))
-          );
-
-          setPortfolio(
-            (profile.portfolio || []).map((p: any) => ({
-              title: p.title ?? '',
-              description: p.description ?? '',
-              media_url: p.media_url ?? '',
-              platform: p.platform ?? '',
-              type: p.type ?? 'image',
-            }))
-          );
-
-          setStartingPrice(
-            profile.starting_price !== null && profile.starting_price !== undefined
-              ? String(profile.starting_price)
-              : ''
-          );
-          setPayoutAccountHolderName(profile.payout_account_holder_name ?? '');
-          setPayoutProvider(profile.payout_provider ?? '');
-          setPayoutAccountNumber(profile.payout_account_number ?? '');
-          setPayoutBranch(profile.payout_branch ?? '');
-          setPayoutRouting(profile.payout_routing ?? '');
-          setPayoutMethod(profile.payout_method ?? '');
-
-          setStep(resolveCreatorStep(profile, socialsData));
+          setPhoto(profile.profile_image ?? null);
+          setName(profile.display_name ?? user?.full_name ?? "");
+          setUsername(profile.username ?? "");
+          setLocation(profile.location ?? "");
+          setTypes(parseTypes(profile.creator_type));
+          setBio(profile.bio ?? "");
+          setCategories(profile.niches ?? profile.categories ?? []);
+          setContent(profile.content_types ?? []);
+          setLanguages(profile.content_languages ?? profile.languages ?? []);
+          setSocials(saved?.socials ?? profile.socials ?? []);
+          setPortfolio(Array.isArray(profile.portfolio) ? profile.portfolio : []);
+          setAvailability("Available");
         }
       } catch (err) {
-        console.error('Could not load onboarding progress:', err);
+        console.error(err);
       } finally {
-        if (!cancelled) setLoadingProgress(false);
+        if (!cancelled) setLoading(false);
       }
+    })();
+
+    return () => {
+      cancelled = true;
     };
+  }, [user?.full_name]);
 
-    loadProgress();
-    return () => { cancelled = true; };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  const upload = async (file: File, kind: "photo" | "portfolio") => {
+    setError("");
+    setUploading(true);
 
-  // ==========================================================
-  // HELPERS
-  // ==========================================================
-
-  const toggle = (list: string[], setList: (value: string[]) => void, value: string) => {
-    if (list.includes(value)) {
-      setList(list.filter((item) => item !== value));
-    } else {
-      setList([...list, value]);
-    }
-  };
-
-  const toggleSingle = (current: string, setValue: (value: string) => void, value: string) => {
-    setValue(current === value ? '' : value);
-  };
-
-  // ==========================================================
-  // PROGRESS SAVING
-  // ==========================================================
-
-  const saveStep1Progress = () => {
-    const payload = {
-      display_name: displayName.trim(),
-      username: username.trim(),
-      bio: bio.trim(),
-      location: location.trim(),
-      profile_image: profileImage,
-    };
-    updateProfile?.(payload);
-    return saveCreatorProgress(payload);
-  };
-
-  const saveStep2Progress = () => {
-    // `categories` is sent as both niches and audience_interests so
-    // the backend/matching logic that reads either field still works
-    // — same list, no separate question for the user anymore.
-    const payload = {
-      creator_type: creatorType,
-      niches: categories,
-      content_types: contentTypes,
-      content_languages: languages,
-      audience_interests: categories,
-      audience_age_range: audienceAgeRanges,
-      audience_location: audienceLocations,
-    };
-    updateProfile?.(payload);
-    return saveCreatorProgress(payload);
-  };
-
-  const saveStep3Progress = () => {
-    updateProfile?.({ socials });
-    return saveCreatorProgress({ socials });
-  };
-
-  const saveStep4Progress = () => {
-    updateProfile?.({ portfolio });
-    return saveCreatorProgress({ portfolio });
-  };
-
-  const saveStep5Progress = () => {
-    const payload = {
-      starting_price: Number(startingPrice) || 0,
-      payout_account_holder_name: payoutAccountHolderName.trim(),
-      payout_provider: payoutProvider.trim(),
-      payout_account_number: payoutAccountNumber.trim(),
-      payout_branch: payoutBranch.trim() || undefined,
-      payout_routing: payoutRouting.trim() || undefined,
-      payout_method: payoutMethod.trim() || undefined,
-    };
-    updateProfile?.(payload);
-    return saveCreatorProgress(payload);
-  };
-
-  const saveCurrentStepProgress = () => {
-    if (step === 1) return saveStep1Progress();
-    if (step === 2) return saveStep2Progress();
-    if (step === 3) return saveStep3Progress();
-    if (step === 4) return saveStep4Progress();
-    if (step === 5) return saveStep5Progress();
-    return Promise.resolve();
-  };
-
-  const handleBackToDashboard = () => {
-    saveCurrentStepProgress()?.catch((err) => {
-      console.error('Could not save progress:', err);
-    });
-    navigate('/dashboard');
-  };
-
-  const handleSaveDraft = async () => {
-    try {
-      await saveCurrentStepProgress();
-      setDraftSaved(true);
-      setTimeout(() => setDraftSaved(false), 2200);
-    } catch (err) {
-      console.error('Could not save draft:', err);
-      setError('Could not save your draft. Please try again.');
-    }
-  };
-
-  // ==========================================================
-  // SOCIAL MEDIA
-  // ==========================================================
-
-  const addSocial = () => {
-    setSocialError('');
-
-    const handle = socialDraft.username.trim().replace(/^@/, '');
-    const url = socialDraft.profile_url.trim();
-    const validation = validateSocialAccount(socialDraft.platform, handle, url);
-
-    if (validation) {
-      setSocialError(validation);
-      return;
-    }
-
-    if (socials.some((s) => s.platform === socialDraft.platform)) {
-      setSocialError(`You can add only one ${socialDraft.platform === 'instagram' ? 'Instagram' : 'TikTok'} account.`);
-      return;
-    }
-
-    setSocials([...socials, {
-      platform: socialDraft.platform,
-      username: handle,
-      profile_url: url.startsWith('http') ? url : `https://${url}`,
-      follower_count: 0,
-    }]);
-
-    setSocialDraft({ platform: 'instagram', username: '', profile_url: '', follower_count: '0' });
-  };
-
-  const removeSocial = (index: number) => {
-    setSocials(socials.filter((_, i) => i !== index));
-  };
-
-  // ==========================================================
-  // PORTFOLIO
-  // ==========================================================
-
-  const addPortfolioItem = () => {
-    if (!portfolioDraft.title.trim() || !portfolioDraft.media_url.trim()) return;
-
-    setPortfolio([...portfolio, {
-      title: portfolioDraft.title.trim(),
-      description: portfolioDraft.description.trim(),
-      media_url: portfolioDraft.media_url.trim(),
-      platform: portfolioDraft.platform,
-      type: portfolioDraft.type,
-    }]);
-
-    setPortfolioDraft({ title: '', description: '', media_url: '', platform: '', type: 'image' });
-  };
-
-  const removePortfolioItem = (index: number) => {
-    setPortfolio(portfolio.filter((_, i) => i !== index));
-  };
-
-  const handlePortfolioImageUpload = async (file: File) => {
-    setPortfolioError('');
-    setUploadingPortfolioImage(true);
     try {
       const { url } = await uploadImage(file);
-      setPortfolioDraft((d) => ({ ...d, media_url: url, type: 'image' }));
+
+      if (kind === "photo") {
+        setPhoto(url);
+      } else {
+        setPortfolio((current) => [
+          ...current,
+          {
+            title: portfolioTitle.trim() || "Portfolio work",
+            media_url: url,
+            type: file.type.startsWith("video/") ? "video" : "image",
+          },
+        ]);
+        setPortfolioTitle("");
+      }
     } catch (err: any) {
-      console.error('Portfolio image upload failed:', err);
-      setPortfolioError(err?.response?.data?.detail || 'Could not upload image. Please try again.');
+      setError(err?.response?.data?.detail || "Upload failed. Please try again.");
     } finally {
-      setUploadingPortfolioImage(false);
+      setUploading(false);
     }
   };
 
-  // ==========================================================
-  // VALIDATION
-  // ==========================================================
+  const saveOptional = async () => {
+    if (step === 2) {
+      await saveCreatorProgress({
+        bio: bio.trim(),
+        niches: categories,
+        content_types: content,
+        content_languages: languages,
+      });
+    }
 
-  const canContinueStep1 =
-    displayName.trim().length > 0 &&
-    USERNAME_REGEX.test(username) &&
-    bio.trim().length > 0 &&
-    location.trim().length > 0;
+    if (step === 3) {
+      await saveCreatorProgress({ socials, portfolio });
+    }
 
-  const canContinueStep2 =
-    creatorType !== '' &&
-    categories.length > 0 &&
-    contentTypes.length > 0 &&
-    languages.length > 0 &&
-    audienceAgeRanges.length > 0 &&
-    audienceLocations.length > 0;
+    if (step === 4) {
+      await saveCreatorProgress({ availability });
+    }
+  };
 
-  const canContinueStep3 = socials.length > 0 && socials.every((s) => !validateSocialAccount(s.platform, s.username, s.profile_url));
+  const saveBasic = async () => {
+    if (!name.trim() || !username.trim() || !location.trim() || !photo || !types.length) {
+      setError("Complete all required basic profile fields before continuing.");
+      return;
+    }
 
-  // Portfolio is optional — always fine to move on.
-  const canContinueStep4 = true;
+    if (socials.length === 0) {
+      setError("Add at least one social profile before continuing.");
+      return;
+    }
 
-  const canFinish =
-    startingPrice !== '' &&
-    Number(startingPrice) >= 0 &&
-    payoutAccountHolderName.trim().length > 0 &&
-    payoutProvider.trim().length > 0 &&
-    payoutAccountNumber.trim().length > 0;
-
-  // ==========================================================
-  // SUBMIT
-  // ==========================================================
-
-  const handleFinish = async () => {
-    setIsSubmitting(true);
-    setError('');
-
-    const payload: CreatorOnboardingData = {
-      display_name: displayName.trim(),
-      username: username.trim(),
-      bio: bio.trim(),
-      location: location.trim(),
-      profile_image: profileImage,
-      creator_type: creatorType,
-      niches: categories,
-      content_languages: languages,
-      content_types: contentTypes,
-      audience_age_range: audienceAgeRanges,
-      audience_location: audienceLocations,
-      audience_interests: categories,
-      socials,
-      portfolio,
-      starting_price: Number(startingPrice) || 0,
-      payout_account_holder_name: payoutAccountHolderName.trim(),
-      payout_provider: payoutProvider.trim(),
-      payout_account_number: payoutAccountNumber.trim(),
-      payout_branch: payoutBranch.trim() || undefined,
-      payout_routing: payoutRouting.trim() || undefined,
-      payout_method: payoutMethod.trim() || undefined,
-    };
+    setSaving(true);
+    setError("");
 
     try {
-      const response = await completeCreatorOnboarding(payload);
-      console.log('Creator onboarding complete:', response);
-      updateProfile?.(payload);
-      setDone(true);
+      const basic = {
+        display_name: name.trim(),
+        username: username.trim(),
+        location: location.trim(),
+        creator_type: types.join(", "),
+        profile_image: photo,
+      };
+
+      await completeCreatorOnboarding({
+        ...basic,
+        bio: bio.trim() || undefined,
+        niches: categories,
+        content_types: content,
+        content_languages: languages,
+        audience_age_range: [],
+        audience_location: [],
+        audience_interests: [],
+        socials,
+        portfolio,
+        availability,
+      } as any);
+
+      updateProfile?.({ ...basic, is_onboarding_complete: true, is_published: true });
+      setStep(2);
     } catch (err: any) {
-      console.error('Creator onboarding failed:', err);
-      setError(err?.response?.data?.detail || 'Failed to complete profile. Please try again.');
+      setError(err?.response?.data?.detail || "Could not save your profile.");
     } finally {
-      setIsSubmitting(false);
+      setSaving(false);
     }
   };
 
-  // ==========================================================
-  // RENDER
-  // ==========================================================
+  const next = async () => {
+    if (step === 1) {
+      await saveBasic();
+      return;
+    }
+
+    setSaving(true);
+    setError("");
+
+    try {
+      await saveOptional();
+      if (step < STEPS.length) {
+        setStep(step + 1);
+      } else {
+        navigate("/dashboard");
+      }
+    } catch (err: any) {
+      setError(err?.response?.data?.detail || "Could not save your progress.");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const skip = async () => {
+    if (step === 1) return;
+
+    setSaving(true);
+    setError("");
+
+    try {
+      await saveOptional();
+      if (step < STEPS.length) {
+        setStep(step + 1);
+      } else {
+        navigate("/dashboard");
+      }
+    } catch (err: any) {
+      setError(err?.response?.data?.detail || "Could not save your progress.");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const addSocial = () => {
+    const cleanUsername = socialUsername.trim().replace(/^@/, "");
+
+    if (!cleanUsername || !socialUrl.trim()) {
+      setError("Add a social username and profile URL.");
+      return;
+    }
+
+    setSocials((current) => [
+      ...current,
+      {
+        platform: socialPlatform,
+        username: cleanUsername,
+        profile_url: socialUrl.trim(),
+        follower_count: Number(followers) || 0,
+      },
+    ]);
+
+    setSocialUsername("");
+    setSocialUrl("");
+    setFollowers("");
+    setError("");
+  };
+
+  if (loading) {
+    return <div className="onb-loading">Loading your profile…</div>;
+  }
 
   return (
-    <div className="co">
+    <div className="onb-page">
       <style>{`
-        @import url('https://fonts.googleapis.com/css2?family=League+Spartan:wght@600;700&display=swap');
-
-        .co {
-          --ink: #111217;
-          --ink-soft: #6c6d73;
-          --line: #e6e6ea;
-          --surface: #f7f7f9;
-          --accent: #111111;
-          --accent-hover: #000000;
-          --accent-soft: #f5f5f5;
-          --coral: #111111;
-          --good: #111111;
-
-          font-family: Inter, Poppins, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-          color: var(--ink);
-          min-height: 100vh;
-          background: #ffffff;
-          padding: 32px 20px 80px;
-          -webkit-font-smoothing: antialiased;
-        }
-
-        .co * { box-sizing: border-box; }
-        .co button { font-family: inherit; cursor: pointer; }
-        .co a { text-decoration: none; color: inherit; }
-
-        .co-shell { max-width: 930px; margin: 0 auto; }
-
-        .co-wordmark { display: flex; align-items: center; justify-content: center; gap: 7px; margin-bottom: 42px; }
-        .co-wordmark svg { width: 22px; height: 22px; flex: 0 0 22px; }
-        .co-wordmark span { font-family: 'League Spartan', sans-serif; font-weight: 500; font-size: 24px; line-height: 1; color: var(--ink); letter-spacing: -0.6px; }
-
-        .co-header {
-          display: flex;
-          align-items: center;
-          justify-content: space-between;
-          padding-bottom: 18px;
-          margin-bottom: 22px;
-          border-bottom: 1px solid var(--line);
-        }
-
-        .co-back-link {
-          display: inline-flex;
-          align-items: center;
-          gap: 6px;
-          font-size: 13px;
-          font-weight: 600;
-          color: var(--ink-soft);
-          background: none;
-          border: none;
-          padding: 6px 4px;
-        }
-        .co-back-link:hover { color: var(--ink); }
-
-        .co-header-right { display: flex; align-items: center; gap: 10px; }
-
-        .co-savedraft-toast {
-          font-size: 11.5px;
-          font-weight: 600;
-          color: var(--good);
-          display: inline-flex;
-          align-items: center;
-          gap: 4px;
-        }
-
-        .co-savedraft-btn {
-          display: inline-flex;
-          align-items: center;
-          gap: 7px;
-          font-size: 12.5px;
-          font-weight: 600;
-          color: var(--ink);
-          background: #fff;
-          border: 1.5px solid var(--line);
-          padding: 9px 15px;
-          border-radius: 8px;
-        }
-        .co-savedraft-btn:hover { border-color: var(--accent); color: var(--accent); }
-        .co-savedraft-btn:disabled { opacity: 0.6; cursor: not-allowed; }
-
-        .co-steps { display: flex; align-items: center; margin-bottom: 28px; }
-        .co-step { display: flex; align-items: center; flex: 1; }
-        .co-step:last-child { flex: 0; }
-
-        .co-step-dot {
-          width: 26px; height: 26px; border-radius: 50%;
-          display: flex; align-items: center; justify-content: center;
-          font-size: 12px; font-weight: 700; flex-shrink: 0;
-        }
-        .co-step-upcoming { background: var(--surface); color: var(--ink-soft); border: 1.5px solid var(--line); }
-        .co-step-active { background: #111111; color: #fff; }
-        .co-step-done { background: var(--good); color: #fff; }
-
-        .co-step-label { font-size: 11.5px; font-weight: 600; margin-left: 8px; white-space: nowrap; color: var(--ink-soft); }
-        .co-step-label-active, .co-step-label-done { color: var(--ink); }
-
-        .co-step-line { flex: 1; height: 1.5px; background: var(--line); margin: 0 10px; }
-        .co-step-line-done { background: #111111; }
-
-        .co-card {
-          background: #fff;
-          border: 1px solid var(--line);
-          border-radius: 18px;
-          padding: 36px 40px 40px;
-          box-shadow: 0 30px 60px -24px rgba(17,17,17,0.18), 0 4px 14px rgba(17,18,23,0.04);
-        }
-
-        .co-h2 { font-size: 22px; font-weight: 700; margin: 0 0 5px; }
-        .co-sub { font-size: 13px; color: var(--ink-soft); margin: 0 0 28px; line-height: 1.5; }
-        .co-section-label { font-size: 12.5px; font-weight: 700; color: var(--ink); margin: 26px 0 14px; }
-        .co-section-label:first-of-type { margin-top: 0; }
-
-        .co-field { margin-bottom: 20px; }
-        .co-label { display: block; font-size: 12.5px; font-weight: 600; color: var(--ink); margin-bottom: 8px; }
-        .co-hint { font-size: 11.5px; color: var(--ink-soft); margin-top: 6px; display: flex; align-items: flex-start; gap: 5px; line-height: 1.5; }
-
-        .co-input, .co-textarea, .co-select {
-          width: 100%; border: 1.5px solid var(--line); border-radius: 9px;
-          padding: 11px 13px; font-size: 13.5px; font-family: inherit; color: var(--ink); background: #fff;
-        }
-        .co-input:focus, .co-textarea:focus, .co-select:focus { outline: none; border-color: var(--accent); }
-        .co-textarea { resize: vertical; min-height: 76px; line-height: 1.5; }
-
-        .co-avatar-row { display: flex; align-items: center; gap: 16px; }
-        .co-avatar {
-          width: 68px; height: 68px; border-radius: 50%;
-          background: var(--accent-soft); color: var(--accent);
-          display: flex; align-items: center; justify-content: center;
-          flex-shrink: 0; overflow: hidden; font-size: 22px; font-weight: 700;
-        }
-        .co-avatar img { width: 100%; height: 100%; object-fit: cover; }
-        .co-avatar-btn { display: inline-flex; align-items: center; gap: 7px; font-size: 12.5px; font-weight: 600; color: var(--ink); background: #fff; border: 1.5px solid var(--line); padding: 9px 14px; border-radius: 8px; }
-
-        .co-chips { display: flex; flex-wrap: wrap; gap: 8px; }
-        .co-chip { font-size: 12.5px; font-weight: 500; color: var(--ink); background: var(--surface); border: 1.5px solid var(--line); padding: 7px 13px; border-radius: 100px; }
-        .co-chip-active { background: #111111; color: #fff; border-color: var(--accent); }
-        .co-chip-more { background: #fff; border-style: dashed; color: var(--accent); font-weight: 600; }
-
-        .co-autocomplete { position: relative; }
-        .co-autocomplete-list {
-          position: absolute; top: calc(100% + 6px); left: 0; right: 0; z-index: 20;
-          background: #fff; border: 1.5px solid var(--line); border-radius: 9px;
-          box-shadow: 0 8px 20px rgba(17,18,23,0.08); overflow: hidden;
-          max-height: 210px; overflow-y: auto;
-        }
-        .co-autocomplete-item {
-          width: 100%; display: flex; align-items: center; gap: 8px;
-          text-align: left; font-size: 13px; color: var(--ink);
-          background: #fff; border: none; padding: 10px 13px;
-        }
-        .co-autocomplete-item:hover { background: var(--surface); }
-
-        .co-social-list, .co-portfolio-list { display: flex; flex-direction: column; gap: 8px; margin-bottom: 18px; }
-        .co-social-item, .co-portfolio-item { display: flex; align-items: center; gap: 11px; border: 1.5px solid var(--line); border-radius: 10px; padding: 10px 12px; }
-        .co-social-icon, .co-portfolio-thumb {
-          width: 34px; height: 34px; border-radius: 8px; background: var(--accent-soft); color: var(--accent);
-          display: flex; align-items: center; justify-content: center; flex-shrink: 0; font-size: 12px; font-weight: 700; overflow: hidden;
-        }
-        .co-portfolio-thumb img { width: 100%; height: 100%; object-fit: cover; }
-        .co-social-main, .co-portfolio-main { flex: 1; min-width: 0; }
-        .co-social-handle, .co-portfolio-item-title { font-size: 13px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-        .co-social-meta, .co-portfolio-item-desc { font-size: 11.5px; color: var(--ink-soft); margin-top: 1px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-        .co-social-remove { background: none; border: none; color: var(--ink-soft); padding: 6px; border-radius: 6px; flex-shrink: 0; }
-        .co-social-remove:hover { color: #4E4E4E; }
-
-        .co-social-form, .co-portfolio-form { border: 1.5px dashed var(--line); border-radius: 12px; padding: 16px; }
-        .co-social-form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 10px; }
-        .co-portfolio-upload-row { display: flex; align-items: center; gap: 8px; margin-bottom: 12px; }
-        .co-portfolio-upload-btn { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 600; color: var(--accent); background: var(--accent-soft); border: none; padding: 9px 13px; border-radius: 8px; white-space: nowrap; }
-        .co-portfolio-upload-btn:disabled { opacity: 0.6; cursor: not-allowed; }
-        .co-portfolio-or { font-size: 11px; color: var(--ink-soft); }
-
-        .co-add-btn { width: 100%; display: flex; align-items: center; justify-content: center; gap: 7px; background: var(--accent-soft); color: var(--accent); border: none; padding: 10px; border-radius: 8px; font-size: 12.5px; font-weight: 600; }
-        .co-add-btn:disabled { opacity: 0.5; cursor: not-allowed; }
-
-        .co-price-row { display: flex; align-items: center; border: 1.5px solid var(--line); border-radius: 9px; overflow: hidden; }
-        .co-price-prefix { background: var(--surface); padding: 11px 13px; font-size: 13px; font-weight: 600; color: var(--ink-soft); border-right: 1px solid var(--line); }
-        .co-price-row input { border: none; flex: 1; padding: 11px 13px; font-size: 13.5px; font-family: inherit; }
-        .co-price-row input:focus { outline: none; }
-
-        .co-recap { display: flex; flex-direction: column; gap: 14px; margin-bottom: 24px; }
-        .co-recap-card { border: 1.5px solid var(--line); border-radius: 12px; padding: 14px 16px; }
-        .co-recap-label { font-size: 11px; font-weight: 700; letter-spacing: 0.05em; text-transform: uppercase; color: var(--ink-soft); margin: 0 0 8px; }
-        .co-recap-row { display: flex; align-items: center; gap: 10px; }
-        .co-recap-name { font-size: 14px; font-weight: 700; margin: 0; }
-        .co-recap-sub { font-size: 12px; color: var(--ink-soft); margin: 1px 0 0; }
-        .co-recap-chips { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
-        .co-recap-empty { font-size: 12.5px; color: var(--ink-soft); }
-
-        .co-footer { display: flex; align-items: center; justify-content: space-between; margin-top: 30px; padding-top: 22px; border-top: 1px solid var(--line); }
-        .co-back { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; font-weight: 600; color: var(--ink-soft); background: none; border: none; padding: 8px 4px; }
-        .co-continue { display: inline-flex; align-items: center; gap: 8px; font-size: 14px; font-weight: 600; color: #fff; background: #111111; border: none; padding: 12px 24px; border-radius: 8px; }
-        .co-continue:disabled { background: #dddddd; cursor: not-allowed; }
-
-        .co-done { text-align: center; padding: 20px 0 10px; }
-        .co-done-icon { width: 64px; height: 64px; border-radius: 50%; background: #F5F5F5; color: #111111; display: flex; align-items: center; justify-content: center; margin: 0 auto 20px; }
-        .co-done-title { font-size: 22px; font-weight: 700; margin: 0 0 8px; }
-        .co-done-sub { font-size: 14px; color: var(--ink-soft); margin: 0 0 28px; }
-        .co-done-btn { display: inline-flex; align-items: center; gap: 8px; font-size: 14px; font-weight: 600; color: #fff; background: #111111; border: none; padding: 13px 26px; border-radius: 8px; }
-
-        .co-error { margin-top: 16px; padding: 12px; background: #F0F0F0; color: #4E4E4E; border-radius: 8px; font-size: 13px; text-align: center; }
-
-
-
-        /* =====================================================
-           WELCOME SCREEN
-           ===================================================== */
-
-        .co-welcome {
-          width: 100%;
-          max-width: 620px;
-          margin: 0 auto;
-          padding: 6px 0 18px;
-        }
-
-        .co-welcome-title {
-          max-width: 470px;
-          margin: 0 0 30px;
-          color: #111111;
-          font-family: 'League Spartan', Inter, sans-serif;
-          font-size: 32px;
-          line-height: 1.08;
-          font-weight: 500;
-          letter-spacing: -0.7px;
-        }
-
-        .co-welcome-list {
-          border-top: 1px solid #e8e8e8;
-          margin-bottom: 20px;
-        }
-
-        .co-welcome-row {
-          min-height: 62px;
-          display: grid;
-          grid-template-columns: 30px 1fr;
-          align-items: center;
-          gap: 10px;
-          border-bottom: 1px solid #e8e8e8;
-        }
-
-        .co-welcome-icon {
-          width: 22px;
-          height: 22px;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          color: #555555;
-        }
-
-        .co-welcome-row-text {
-          margin: 0;
-          color: #222222;
-          font-size: 12.5px;
-          line-height: 1.45;
-          font-weight: 400;
-        }
-
-        .co-welcome-action {
-          display: flex;
-          align-items: center;
-          gap: 18px;
-          margin-top: 16px;
-        }
-
-        .co-welcome-btn {
-          display: inline-flex;
-          align-items: center;
-          justify-content: center;
-          gap: 8px;
-          min-width: 108px;
-          height: 38px;
-          padding: 0 18px;
-          border: 1px solid #111111;
-          border-radius: 6px;
-          background: #111111;
-          color: #ffffff;
-          font-size: 12px;
-          font-weight: 500;
-          cursor: pointer;
-          transition: transform .15s ease, opacity .15s ease;
-        }
-
-        .co-welcome-btn:hover {
-          background: #111111;
-          color: #ffffff;
-          transform: translateY(-1px);
-        }
-
-        .co-welcome-note {
-          max-width: 250px;
-          margin: 0;
-          color: #777777;
-          font-size: 10.5px;
-          line-height: 1.45;
-        }
-
-        .co-welcome-note strong {
-          display: block;
-          color: #555555;
-          font-weight: 500;
-        }
-
-        /* =====================================================
-           THREE QUICK QUESTIONS
-           ===================================================== */
-
-        .co-question-screen {
-          width: 100%;
-          max-width: 930px;
-          margin: 0 auto;
-          padding: 0 0 28px;
-        }
-
-        .co-question-top {
-          margin-bottom: 22px;
-          color: #555555;
-          font-size: 11px;
-          line-height: 1;
-          font-weight: 500;
-        }
-
-        .co-question-title {
-          max-width: 760px;
-          margin: 0 0 10px;
-          color: #111111;
-          font-family: 'League Spartan', Inter, sans-serif;
-          font-size: 32px;
-          line-height: 1.12;
-          font-weight: 400;
-          letter-spacing: -0.65px;
-        }
-
-        .co-question-sub {
-          max-width: 720px;
-          margin: 0 0 25px;
-          color: #777777;
-          font-size: 11.5px;
-          line-height: 1.5;
-          font-weight: 400;
-        }
-
-        .co-question-grid {
-          display: grid;
-          grid-template-columns: repeat(3, minmax(0, 1fr));
-          gap: 16px;
-          width: 100%;
-        }
-
-        .co-question-card {
-          position: relative;
-          min-height: 300px;
-          display: flex;
-          flex-direction: column;
-          align-items: flex-start;
-          padding: 12px;
-          border: 1px solid #cfcfcf !important;
-          border-radius: 5px;
-          background: #ffffff !important;
-          color: #111111 !important;
-          text-align: left;
-          cursor: pointer;
-          appearance: none;
-          -webkit-appearance: none;
-          box-shadow: none;
-          position: relative;
-          transition: border-color .15s ease, box-shadow .15s ease, transform .15s ease;
-        }
-
-        .co-question-card:hover {
-          border-color: #111111 !important;
-          background: #ffffff !important;
-          transform: translateY(-1px);
-        }
-
-        .co-question-card.is-selected {
-          border-color: #111111 !important;
-          background: #ffffff !important;
-          box-shadow: 0 0 0 1px #111111;
-        }
-
-        .co-question-visual {
-          width: 100%;
-          height: 145px;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          margin-bottom: 12px;
-          border-radius: 3px;
-          background: #f5f5f5 !important;
-          color: #222222 !important;
-          border: 1px solid #eeeeee;
-          overflow: hidden;
-        }
-
-        .co-question-image {
-          width: 225px;
-          height: 225px;
-          max-width: none;
-          max-height: none;
-          object-fit: contain;
-          display: block;
-          padding: 0;
-          pointer-events: none;
-          user-select: none;
-          transform: none;
-        }
-
-        .co-question-select {
-          position: absolute;
-          top: 10px;
-          right: 10px;
-          width: 18px;
-          height: 18px;
-          border: 1.5px solid #bdbdbd;
-          border-radius: 50%;
-          background: #ffffff;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          font-size: 11px;
-          font-weight: 700;
-          line-height: 1;
-          color: #ffffff;
-          box-sizing: border-box;
-          transition: background .15s ease, border-color .15s ease;
-        }
-
-        .co-question-card.is-selected .co-question-select {
-          background: #111111;
-          border-color: #111111;
-        }
-
-        .co-question-card-copy {
-          display: flex;
-          flex-direction: column;
-          gap: 3px;
-          padding-right: 20px;
-        }
-
-        .co-question-card-copy strong {
-          color: #111111 !important;
-          font-size: 13px;
-          line-height: 1.3;
-          font-weight: 500;
-        }
-
-        .co-question-card-copy small {
-          color: #777777 !important;
-          font-size: 10.5px;
-          line-height: 1.35;
-          font-weight: 400;
-        }
-
-        .co-question-footer {
-          display: flex;
-          align-items: center;
-          justify-content: flex-start;
-          margin-top: 20px;
-        }
-
-        .co-question-next {
-          display: inline-flex;
-          align-items: center;
-          justify-content: center;
-          gap: 7px;
-          min-width: 130px;
-          height: 38px;
-          padding: 0 17px;
-          border: 1px solid #111111;
-          border-radius: 6px;
-          background: #111111;
-          color: #ffffff;
-          font-size: 12px;
-          font-weight: 500;
-          cursor: pointer;
-        }
-
-        .co-question-next:hover:not(:disabled) {
-          background: #000000;
-        }
-
-        .co-question-next:disabled {
-          background: #d0d0d0;
-          border-color: #d0d0d0;
-          color: #ffffff;
-          cursor: not-allowed;
-        }
-
-        @media (max-width: 480px) {
-          .co { padding: 16px 12px 50px; }
-          .co-wordmark { margin-bottom: 30px; }
-          .co-wordmark span { font-size: 22px; }
-          .co-welcome { padding: 4px 0 12px; }
-          .co-welcome-title { font-size: 28px; margin-bottom: 24px; }
-          .co-welcome-row { min-height: 58px; grid-template-columns: 26px 1fr; }
-          .co-welcome-action { align-items: flex-start; gap: 12px; }
-          .co-welcome-note { font-size: 10px; }
-
-          .co-question-grid { grid-template-columns: 1fr; }
-          .co-question-card { min-height: 270px; }
-          .co-question-visual { height: 145px; min-height: 145px; }
-          .co-question-image { width: 225px; height: 225px; }
-
-          .co-card { padding: 25px 20px 30px; }
-          .co-step-label { display: none; }
-          .co-social-form-row { grid-template-columns: 1fr; }
-          .co-header { flex-direction: column; align-items: stretch; gap: 10px; }
-        }
+        @import url('https://fonts.googleapis.com/css2?family=League+Spartan:wght@400;500&family=Poppins:wght@300;400;500&display=swap');
+
+        .onb-page{min-height:100vh;background:#fff;color:#111;font-family:Poppins,Arial,sans-serif;padding:28px 22px 70px;box-sizing:border-box}
+        .onb-shell{width:100%;max-width:920px;margin:0 auto}
+        .onb-top{position:relative;display:flex;align-items:center;justify-content:center;height:34px;margin-bottom:52px}
+        .onb-logo{display:inline-flex;align-items:center;justify-content:center;gap:8px;padding:0!important;margin:0!important;border:0!important;background:transparent!important;color:#111!important;box-shadow:none!important;outline:none!important;text-decoration:none!important;cursor:pointer}
+        .onb-logo:hover,.onb-logo:focus,.onb-logo:focus-visible,.onb-logo:active{border:0!important;background:transparent!important;color:#111!important;box-shadow:none!important;outline:none!important;text-decoration:none!important}
+        .onb-logo span{font:500 23px/1 'League Spartan',sans-serif}
+        .onb-exit{position:absolute;right:0;top:50%;transform:translateY(-50%);padding:0!important;margin:0!important;border:0!important;background:transparent!important;color:#666!important;box-shadow:none!important;outline:none!important;font:400 12px Poppins,Arial,sans-serif;cursor:pointer}
+        .onb-exit:hover,.onb-exit:focus,.onb-exit:focus-visible,.onb-exit:active{border:0!important;background:transparent!important;color:#111!important;box-shadow:none!important;outline:none!important;text-decoration:underline;text-underline-offset:3px}
+        .onb-progress{margin-bottom:28px}
+        .onb-progress-head{display:flex;justify-content:space-between;align-items:flex-end;gap:20px}
+        .onb-kicker{margin:0 0 5px;font-size:10px;letter-spacing:.14em;color:#777}
+        .onb-progress h1{margin:0 0 5px;font:400 34px/1.1 'League Spartan',sans-serif;letter-spacing:-.3px}
+        .onb-muted{margin:0;color:#777;font-size:12px;line-height:1.5}
+        .onb-progress-count{color:#777;font-size:11px}
+        .onb-steps{display:grid;gap:8px;margin-top:25px}
+        .onb-steps.four{grid-template-columns:repeat(4,1fr)}
+        .onb-step{min-width:0;border-top:1px solid #ddd;padding-top:10px;color:#999;font-size:10px;line-height:1.4}
+        .onb-step.active,.onb-step.done{border-color:#111;color:#111}
+        .onb-step-dot{width:22px;height:22px;display:grid;place-items:center;margin-bottom:7px;border:1px solid #d5d5d5;border-radius:50%;font-size:10px}
+        .onb-step.active .onb-step-dot,.onb-step.done .onb-step-dot{background:#111;color:#fff;border-color:#111}
+        .onb-card{border:1px solid #e2e2e2;border-radius:15px;padding:34px 38px;background:#fff;box-shadow:0 18px 50px rgba(0,0,0,.045)}
+        .onb-card h2{margin:0 0 5px;font:400 25px/1.15 'League Spartan',sans-serif}
+        .onb-sub{margin:0 0 28px;color:#777;font-size:12px;line-height:1.6}
+        .onb-field{margin-bottom:21px}
+        .onb-label{display:block;margin-bottom:8px;font-size:11px;font-weight:500}
+        .onb-input{width:100%;min-height:43px;box-sizing:border-box;border:1px solid #d8d8d8;border-radius:8px;background:#fff!important;color:#111!important;padding:10px 12px;font:400 12px Poppins,Arial,sans-serif;outline:none;box-shadow:none}
+        .onb-input:focus{border-color:#111}
+        .onb-input::placeholder{color:#aaa}
+        .onb-input:disabled{background:#f8f8f8;color:#777}
+        .onb-textarea{min-height:105px;resize:vertical}
+        .onb-grid{display:grid;grid-template-columns:1fr 1fr;gap:13px}
+        .onb-avatar-row{display:flex;align-items:center;gap:14px;margin-bottom:26px}
+        .onb-avatar{width:68px;height:68px;flex:none;display:grid;place-items:center;overflow:hidden;border-radius:50%;background:#f3f3f3;color:#777}
+        .onb-avatar img{width:100%;height:100%;object-fit:cover}
+        .onb-upload{display:inline-flex;align-items:center;gap:6px;border:1px solid #d8d8d8;border-radius:8px;background:#fff;color:#222;padding:9px 12px;font:400 11px Poppins,Arial,sans-serif;cursor:pointer}
+        .onb-upload:hover{border-color:#111}
+        .onb-upload input{display:none}
+        .onb-native-select{position:relative}
+        .onb-select-input{appearance:none;-webkit-appearance:none;padding-right:38px;cursor:pointer;background:#fff!important;color:#111!important}
+        .onb-native-chevron{position:absolute;right:12px;top:50%;transform:translateY(-50%);pointer-events:none;color:#666!important}
+        .onb-location{position:relative}
+        .onb-location-control{position:relative}
+        .onb-location-input{padding-right:40px}
+        .onb-location-control.open .onb-location-input{border-color:#111;box-shadow:0 0 0 1px #111}
+        .onb-icon-trigger{position:absolute;right:1px;top:1px;width:40px;height:41px;display:grid;place-items:center;border:0!important;border-radius:0 7px 7px 0;background:transparent!important;color:#666!important;padding:0;cursor:pointer;box-shadow:none!important;outline:none!important}
+        .onb-icon-trigger:hover{color:#111!important;background:#fafafa!important;border:0!important;box-shadow:none!important}
+        .onb-suggestion-menu{position:absolute;z-index:100;left:0;right:0;top:calc(100% + 6px);max-height:220px;overflow-y:auto;overscroll-behavior:contain;padding:6px;border:1px solid #e1e1e1;border-radius:9px;background:#fff!important;box-shadow:0 16px 35px rgba(0,0,0,.08);box-sizing:border-box;color:#111!important}
+        .onb-suggestion-menu::-webkit-scrollbar{width:6px}
+        .onb-suggestion-menu::-webkit-scrollbar-track{background:transparent}
+        .onb-suggestion-menu::-webkit-scrollbar-thumb{background:#d4d4d4;border-radius:99px}
+        .onb-suggestion{display:block;width:100%;border:0!important;border-radius:6px;background:#fff!important;color:#222!important;text-align:left;padding:9px 10px;font:400 12px Poppins,Arial,sans-serif;cursor:pointer;box-shadow:none!important}
+        .onb-suggestion:hover,.onb-suggestion.selected{background:#f5f5f5!important;color:#111!important;border:0!important;box-shadow:none!important}
+        .onb-no-suggestions{padding:10px;color:#888;font-size:11px;line-height:1.5}
+        .onb-multi-select{position:relative}
+        .onb-select-trigger{width:100%;min-height:43px;display:flex;align-items:center;justify-content:space-between;box-sizing:border-box;border:1px solid #d8d8d8!important;border-radius:8px;background:#fff!important;color:#111!important;padding:10px 12px;font:400 12px Poppins,Arial,sans-serif;text-align:left;cursor:pointer;box-shadow:none!important;outline:none!important}
+        .onb-select-trigger:hover{border-color:#aaa!important;background:#fff!important;color:#111!important}
+        .onb-select-trigger.open{border-color:#111!important;background:#fff!important;color:#111!important;box-shadow:0 0 0 1px #111!important}
+        .onb-chevron{color:#666!important;flex:none}
+        .placeholder-text{color:#999}
+        .selected-text{color:#111}
+        .onb-select-menu{position:absolute;z-index:100;left:0;right:0;top:calc(100% + 6px);display:grid;grid-template-columns:1fr 1fr;gap:2px 4px;max-height:235px;overflow-y:auto;overscroll-behavior:contain;padding:7px;border:1px solid #e1e1e1;border-radius:9px;background:#fff!important;box-shadow:0 16px 35px rgba(0,0,0,.08);box-sizing:border-box;color:#111!important}
+        .onb-select-menu::-webkit-scrollbar{width:6px}
+        .onb-select-menu::-webkit-scrollbar-track{background:transparent}
+        .onb-select-menu::-webkit-scrollbar-thumb{background:#d4d4d4;border-radius:99px}
+        .onb-select-option{display:flex;align-items:center;gap:9px;min-height:38px;padding:7px 9px;border-radius:6px;color:#222!important;background:#fff!important;font-size:12px;cursor:pointer}
+        .onb-select-option:hover{background:#f5f5f5!important;color:#111!important}
+        .onb-select-option input{width:14px;height:14px;margin:0;accent-color:#111}
+        .onb-selected-tags{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}
+        .onb-selected-tag{border:1px solid #ddd;border-radius:999px;background:#f7f7f7;color:#222;padding:5px 9px;font:400 10px Poppins,Arial,sans-serif;cursor:pointer}
+        .onb-selected-tag:hover{border-color:#111}
+        .onb-help{margin:7px 0 0;color:#888;font-size:10px;line-height:1.5}
+        .onb-chips{display:flex;flex-wrap:wrap;gap:7px}
+        .onb-chip{border:1px solid #ddd;border-radius:999px;background:#fff;color:#444;padding:7px 11px;font:400 11px Poppins,Arial,sans-serif;cursor:pointer}
+        .onb-chip:hover{border-color:#111;color:#111}
+        .onb-chip.active{border-color:#111;background:#111;color:#fff}
+        .onb-inline{display:flex;gap:9px}
+        .onb-inline .onb-input{flex:1}
+        .onb-secondary{display:inline-flex;align-items:center;gap:6px;margin-top:10px;border:1px solid #d8d8d8;border-radius:8px;background:#fff;color:#222;padding:9px 12px;font:400 11px Poppins,Arial,sans-serif;cursor:pointer}
+        .onb-secondary:hover{border-color:#111}
+        .onb-list{display:flex;flex-direction:column;gap:6px;margin-top:10px}
+        .onb-list-row{display:flex;align-items:center;justify-content:space-between;gap:12px;border:1px solid #e5e5e5;border-radius:8px;padding:9px 11px;font-size:11px}
+        .onb-list-row button{display:flex;align-items:center;justify-content:center;border:0;background:transparent;color:#777;padding:2px;cursor:pointer}
+        .onb-list-row button:hover{color:#111}
+        .onb-required-help{margin:0 0 10px!important}
+        .onb-social-grid{display:grid;grid-template-columns:180px minmax(0,1fr);gap:10px}
+        .onb-social-add-row{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:10px;margin-top:10px}
+        .onb-social-list{display:grid;gap:8px;margin-top:10px}
+        .onb-social-item{display:flex;align-items:center;justify-content:space-between;gap:12px;border:1px solid #e5e5e5;border-radius:8px;padding:9px 11px;background:#fff}
+        .onb-social-link{display:flex;align-items:center;justify-content:space-between;gap:10px;min-width:0;flex:1;color:#111;text-decoration:none}
+        .onb-social-link:hover{color:#111;text-decoration:none}
+        .onb-social-link>div{display:flex;align-items:center;gap:10px;min-width:0}
+        .onb-social-link strong{font-size:11px;font-weight:500;color:#111}
+        .onb-social-link span{font-size:11px;color:#777;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+        .onb-social-link>svg{flex:none;color:#777}
+        .onb-social-link:hover>svg{color:#111}
+        .onb-social-item div{display:flex;align-items:center;gap:10px;min-width:0}
+        .onb-social-item strong{font-size:11px;font-weight:500;color:#111}
+        .onb-social-item span{font-size:11px;color:#777;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+        .onb-remove{display:inline-flex;align-items:center;justify-content:center;border:0!important;background:transparent!important;color:#777!important;padding:4px!important;box-shadow:none!important;cursor:pointer}
+        .onb-remove:hover{color:#111!important;background:transparent!important}
+        .onb-error{margin-top:8px;border:1px solid #ddd;border-radius:8px;background:#f5f5f5;color:#333;padding:10px 12px;font-size:11px}
+        .onb-footer{display:flex;align-items:center;justify-content:space-between;gap:18px;margin-top:30px;padding-top:20px;border-top:1px solid #eee}
+        .onb-back,.onb-skip{display:inline-flex;align-items:center;gap:6px;border:0!important;background:transparent!important;color:#666!important;box-shadow:none!important;outline:none!important;padding:0!important;font:400 12px Poppins,Arial,sans-serif;cursor:pointer}
+        .onb-back:hover,.onb-back:focus,.onb-skip:hover,.onb-skip:focus{border:0!important;background:transparent!important;color:#111!important;box-shadow:none!important;outline:none!important}
+        .onb-actions{display:flex;align-items:center;gap:17px}
+        .onb-primary{display:inline-flex;align-items:center;gap:7px;border:1px solid #111;border-radius:8px;background:#111;color:#fff;padding:11px 18px;font:400 12px Poppins,Arial,sans-serif;cursor:pointer;transition:transform .15s ease}
+        .onb-primary:hover{background:#000;transform:translateY(-1px)}
+        .onb-primary:disabled{opacity:.55;cursor:not-allowed;transform:none}
+        .onb-loading{min-height:100vh;display:grid;place-items:center;color:#777;font:400 13px Poppins,Arial,sans-serif}
+        @media(max-width:650px){.onb-social-grid,.onb-social-add-row{grid-template-columns:1fr}.onb-page{padding:20px 15px 50px}.onb-top{margin-bottom:35px}.onb-progress h1{font-size:29px}.onb-steps.four{grid-template-columns:1fr 1fr}.onb-card{padding:26px 20px}.onb-grid{grid-template-columns:1fr}.onb-select-menu{grid-template-columns:1fr}.onb-footer{align-items:flex-start}.onb-actions{flex-wrap:wrap;justify-content:flex-end}.onb-inline{flex-direction:column}}
       `}</style>
 
-      <div className="co-shell">
-
-        <Link to="/" className="co-wordmark">
-          <LogoMark size={22} />
-          <span>{BRAND_NAME}</span>
-        </Link>
-
-        {showWelcome ? (
-          <div className="co-welcome">
-            <h1 className="co-welcome-title">
-              <>Hey {user?.full_name || 'there'}. Ready for your next big opportunity?</>
-            </h1>
-
-            <div className="co-welcome-list">
-              
-              <div className="co-welcome-row">
-                <span className="co-welcome-icon"><Info size={15} /></span>
-                <p className="co-welcome-row-text">Answer a few questions and start building your creator profile</p>
-              </div>
-              <div className="co-welcome-row">
-                <span className="co-welcome-icon"><ArrowRight size={15} /></span>
-                <p className="co-welcome-row-text">Apply for open campaigns and find opportunities that fit your creativity</p>
-              </div>
-              <div className="co-welcome-row">
-                <span className="co-welcome-icon"><CheckCircle2 size={15} /></span>
-                <p className="co-welcome-row-text">Get paid safely and know Creatorhub is here to help</p>
-              </div>
-            </div>
-
-            <div className="co-welcome-action">
-              <button
-                type="button"
-                className="co-welcome-btn"
-                onClick={() => { setShowWelcome(false); setIntroQuestionStep(1); }}
-              >
-                Get started <ArrowRight size={14} />
-              </button>
-
-              <p className="co-welcome-note">
-                <strong>It only takes 5–10 minutes</strong>
-                You can edit your answers later, and we’ll save your progress as you go.
-              </p>
-            </div>
-          </div>
-        ) : introQuestionStep > 0 && introQuestionStep <= 3 ? (
-          <div className="co-question-screen">
-            <div className="co-question-top">
-              <span>{introQuestionStep}/3</span>
-            </div>
-
-            <h1 className="co-question-title">
-              {introQuestions[introQuestionStep - 1].title}
-            </h1>
-
-            <p className="co-question-sub">
-              {introQuestions[introQuestionStep - 1].sub}
-            </p>
-
-            <div className="co-question-grid">
-              {introQuestions[introQuestionStep - 1].options.map(([label, description], index) => {
-                const selected = introAnswers[introQuestionStep - 1] === label;
-
-                return (
-                  <button
-                    type="button"
-                    key={label}
-                    className={`co-question-card ${selected ? 'is-selected' : ''}`}
-                    onClick={() => {
-                      const next = [...introAnswers];
-                      const currentIndex = introQuestionStep - 1;
-                      // Clicking the already-selected option again unticks it.
-                      next[currentIndex] = next[currentIndex] === label ? '' : label;
-                      setIntroAnswers(next);
-                    }}
-                  >
-                    <span className="co-question-select" aria-hidden="true">{selected ? '✓' : ''}</span>
-                    <span className="co-question-visual">
-                      <img
-                        className="co-question-image"
-                        src={[
-                          '/assets/onboarding/creator-new.png',
-                          '/assets/onboarding/creator-experience.png',
-                          '/assets/onboarding/creator-expert.png',
-                        ][index]}
-                        alt=""
-                        aria-hidden="true"
-                      />
-                    </span>
-
-                    <span className="co-question-card-copy">
-                      <strong>{label}</strong>
-                      <small>{description}</small>
-                    </span>
-
-                  </button>
-                );
-              })}
-            </div>
-
-            <div className="co-question-footer">
-              <button
-                type="button"
-                className="co-question-next"
-                disabled={!introAnswers[introQuestionStep - 1]}
-                onClick={() => {
-                  if (introQuestionStep < 3) {
-                    setIntroQuestionStep(introQuestionStep + 1);
-                  } else {
-                    setIntroQuestionStep(4);
-                  }
-                }}
-              >
-                {introQuestionStep < 3 ? 'Continue' : 'Continue to profile'}
-                <ArrowRight size={15} />
-              </button>
-            </div>
-          </div>
-        ) : (
-          <>
-        <div className="co-header">
-          <button type="button" className="co-back-link" onClick={handleBackToDashboard}>
-            <ArrowLeft size={15} /> Back to Dashboard
+      <div className="onb-shell">
+        <header className="onb-top">
+          <Link to="/" className="onb-logo" aria-label="Go to creatorhub landing page">
+            <LogoMark size={27} />
+            <span>creatorhub</span>
+          </Link>
+          <button type="button" className="onb-exit" onClick={() => navigate("/dashboard")}>
+            Skip for now
           </button>
+        </header>
 
-          {!done && !loadingProgress && (
-            <div className="co-header-right">
-              {draftSaved && (
-                <span className="co-savedraft-toast">
-                  <CheckCircle2 size={13} /> Draft saved
-                </span>
-              )}
-              <button type="button" className="co-savedraft-btn" onClick={handleSaveDraft}>
-                <Save size={13} /> Save Draft
-              </button>
+        <div className="onb-progress">
+          <div className="onb-progress-head">
+            <div>
+              <p className="onb-kicker">CREATOR PROFILE</p>
+              <h1>Set up your profile</h1>
+              <p className="onb-muted">Step 1 is required. Everything else can be completed later.</p>
             </div>
-          )}
+            <span className="onb-progress-count">{step} / {STEPS.length}</span>
+          </div>
+
+          <div className="onb-steps four">
+            {STEPS.map((label, index) => (
+              <div
+                className={`onb-step ${index + 1 === step ? "active" : ""} ${index + 1 < step ? "done" : ""}`}
+                key={label}
+              >
+                <div className="onb-step-dot">
+                  {index + 1 < step ? <Check size={13} /> : index + 1}
+                </div>
+                <span>{label}{index === 0 ? " · Required" : " · Optional"}</span>
+              </div>
+            ))}
+          </div>
         </div>
 
-        {!done && !loadingProgress && <StepHeader step={step} />}
+        <main className="onb-card">
+          {step === 1 && (
+            <section>
+              <h2>Basic information</h2>
+              <p className="onb-sub">
+                This is the only onboarding step you must finish before entering Creator Hub.
+              </p>
 
-        <div className="co-card">
-
-          {done ? (
-            <div className="co-done">
-              <div className="co-done-icon"><CheckCircle2 size={30} /></div>
-              <p className="co-done-title">Profile complete</p>
-              <p className="co-done-sub">Welcome to CreatorHub!</p>
-              <button className="co-done-btn" onClick={() => navigate('/dashboard')}>
-                Go to Dashboard <ArrowRight size={15} />
-              </button>
-            </div>
-          ) : loadingProgress ? (
-            <div className="co-done" style={{ color: 'var(--ink-soft)' }}>
-              Loading your profile...
-            </div>
-          ) : (
-            <>
-
-              {/* ============================================
-                  STEP 1 — BASIC INFO
-              ============================================ */}
-
-              {step === 1 && (
-                <>
-                  <h2 className="co-h2">Basic Info</h2>
-                  <p className="co-sub">Tell us about yourself — this is what brands will see first.</p>
-
-                  <div className="co-field">
-                    <label className="co-label">Profile picture</label>
-                    <div className="co-avatar-row">
-                      <div className="co-avatar">
-                        {profileImage ? <img src={profileImage} alt="Profile" /> : <Camera size={22} />}
-                      </div>
-                      <label className="co-avatar-btn" style={uploadingPhoto ? { opacity: 0.6, pointerEvents: 'none' } : undefined}>
-                        <Camera size={14} />
-                        {uploadingPhoto ? 'Uploading...' : 'Upload photo'}
-                        <input
-                          type="file"
-                          accept="image/*"
-                          style={{ display: 'none' }}
-                          disabled={uploadingPhoto}
-                          onChange={async (event) => {
-                            const file = event.target.files?.[0];
-                            if (!file) return;
-                            setPhotoError('');
-                            setUploadingPhoto(true);
-                            try {
-                              const { url } = await uploadImage(file);
-                              setProfileImage(url);
-                            } catch (err: any) {
-                              console.error('Photo upload failed:', err);
-                              setPhotoError(err?.response?.data?.detail || 'Could not upload photo. Please try again.');
-                            } finally {
-                              setUploadingPhoto(false);
-                              event.target.value = '';
-                            }
-                          }}
-                        />
-                      </label>
-                    </div>
-                    <p className="co-hint"><Info size={13} style={{ marginTop: 1, flexShrink: 0 }} />JPG, PNG or WebP — up to 20 MB</p>
-                    {photoError && (
-                      <p className="co-hint" style={{ color: '#E8544E' }}>
-                        <Info size={13} style={{ marginTop: 1, flexShrink: 0 }} />{photoError}
-                      </p>
-                    )}
-                  </div>
-
-                  <div className="co-field">
-                    <label className="co-label">Display Name *</label>
-                    <input className="co-input" value={displayName} onChange={(e) => setDisplayName(e.target.value)} placeholder="How brands should address you" />
-                  </div>
-
-                  <div className="co-field">
-                    <label className="co-label">Username *</label>
-                    <input className="co-input" value={username} onChange={(e) => handleUsernameChange(e.target.value)} placeholder="yourusername" />
-                    {usernameError ? (
-                      <p className="co-hint" style={{ color: '#E8544E' }}><Info size={13} style={{ marginTop: 1, flexShrink: 0 }} />{usernameError}</p>
-                    ) : username && USERNAME_REGEX.test(username) ? (
-                      <p className="co-hint" style={{ color: '#555555' }}><CheckCircle2 size={13} style={{ marginTop: 1, flexShrink: 0 }} />@{username} looks good</p>
-                    ) : null}
-                  </div>
-
-                  <div className="co-field">
-                    <label className="co-label">Bio</label>
-                    <textarea className="co-textarea" maxLength={500} value={bio} onChange={(e) => setBio(e.target.value)} placeholder="A short intro brands will see on your profile" />
-                    <p className="co-hint">{bio.length}/500</p>
-                  </div>
-
-                  <div className="co-field">
-                    <label className="co-label">Location *</label>
-                    <LocationAutocomplete value={location} onChange={setLocation} />
-                  </div>
-                </>
-              )}
-
-              {/* ============================================
-                  STEP 2 — TYPE & NICHE
-              ============================================ */}
-
-              {step === 2 && (
-                <>
-                  <h2 className="co-h2">Type & Niche</h2>
-                  <p className="co-sub">What kind of creator are you, and who's your audience?</p>
-
-                  <p className="co-section-label">Creator type *</p>
-                  <div className="co-chips" style={{ marginBottom: 22 }}>
-                    {CREATOR_TYPES.map((t) => (
-                      <Chip key={t} label={t} active={creatorType === t} onClick={() => toggleSingle(creatorType, setCreatorType, t)} />
-                    ))}
-                  </div>
-
-                  <p className="co-section-label">Content niches *</p>
-                  <div style={{ marginBottom: 22 }}>
-                    <ChipGroup
-                      items={CATEGORIES}
-                      isActive={(item) => categories.includes(item)}
-                      onToggle={(item) => toggle(categories, setCategories, item)}
-                    />
-                  </div>
-
-                  <p className="co-section-label">Content types *</p>
-                  <div className="co-chips" style={{ marginBottom: 22 }}>
-                    {CONTENT_TYPES.map((c) => (
-                      <Chip key={c} label={c} active={contentTypes.includes(c)} onClick={() => toggle(contentTypes, setContentTypes, c)} />
-                    ))}
-                  </div>
-
-                  <p className="co-section-label">Languages you create in *</p>
-                  <div className="co-chips" style={{ marginBottom: 22 }}>
-                    {LANGUAGES.map((l) => (
-                      <Chip key={l} label={l} active={languages.includes(l)} onClick={() => toggle(languages, setLanguages, l)} />
-                    ))}
-                  </div>
-
-                  <p className="co-section-label">Audience age range *</p>
-                  <div className="co-chips" style={{ marginBottom: 22 }}>
-                    {AUDIENCE_AGE_RANGES.map((a) => (
-                      <Chip key={a} label={a} active={audienceAgeRanges.includes(a)} onClick={() => toggle(audienceAgeRanges, setAudienceAgeRanges, a)} />
-                    ))}
-                  </div>
-
-                  <p className="co-section-label">Audience location *</p>
-                  <ChipGroup
-                    items={AUDIENCE_LOCATIONS}
-                    isActive={(item) => audienceLocations.includes(item)}
-                    onToggle={(item) => toggle(audienceLocations, setAudienceLocations, item)}
-                  />
-                </>
-              )}
-
-              {/* ============================================
-                  STEP 3 — SOCIALS
-              ============================================ */}
-
-              {step === 3 && (
-                <>
-                  <h2 className="co-h2">Socials</h2>
-                  <p className="co-sub">Add at least one social account so brands can verify your reach.</p>
-
-                  {socials.length > 0 && (
-                    <div className="co-social-list">
-                      {socials.map((s, i) => (
-                        <div className="co-social-item" key={`${s.platform}-${i}`}>
-                          <span className="co-social-icon">{s.platform.slice(0, 2).toUpperCase()}</span>
-                          <span className="co-social-main">
-                            <div className="co-social-handle">@{s.username}</div>
-                            <div className="co-social-meta">{s.platform} · Account connected</div>
-                          </span>
-                          <button className="co-social-remove" onClick={() => removeSocial(i)}><Trash2 size={15} /></button>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-
-                  <div className="co-social-form">
-                    <div className="co-social-form-row">
-                      <select className="co-select" value={socialDraft.platform} onChange={(e) => setSocialDraft({ ...socialDraft, platform: e.target.value })}>
-                        {PLATFORMS.map((p) => <option key={p.id} value={p.id}>{p.label}</option>)}
-                      </select>
-                      <input className="co-input" placeholder="Username" value={socialDraft.username} onChange={(e) => setSocialDraft({ ...socialDraft, username: e.target.value })} />
-                    </div>
-                    <div className="co-social-form-row">
-                      <input
-                        className="co-input"
-                        placeholder={socialDraft.platform === 'instagram' ? 'https://instagram.com/username' : 'https://tiktok.com/@username'}
-                        value={socialDraft.profile_url}
-                        onChange={(e) => setSocialDraft({ ...socialDraft, profile_url: e.target.value })}
-                      />
-                    </div>
-                    <p className="co-hint"><Info size={13} style={{ marginTop: 1, flexShrink: 0 }} />Follower count is not manually entered. It should be synced from the platform when social API verification is connected.</p>
-                    {socialError && <p className="co-hint" style={{ color: '#E8544E' }}>{socialError}</p>}
-                    <button className="co-add-btn" onClick={addSocial} disabled={!socialDraft.username.trim() || !socialDraft.profile_url.trim()}>
-                      <Plus size={14} /> Add account
-                    </button>
-                  </div>
-                </>
-              )}
-
-              {/* ============================================
-                  STEP 4 — PORTFOLIO
-              ============================================ */}
-
-              {step === 4 && (
-                <>
-                  <h2 className="co-h2">Portfolio</h2>
-                  <p className="co-sub">Show brands your best work. Optional — you can add these later too.</p>
-
-                  {portfolio.length > 0 && (
-                    <div className="co-portfolio-list">
-                      {portfolio.map((p, i) => (
-                        <div className="co-portfolio-item" key={`${p.title}-${i}`}>
-                          <span className="co-portfolio-thumb">
-                            {p.media_url ? (
-                              p.type === 'video' ? <Video size={16} /> : <img src={p.media_url} alt={p.title} />
-                            ) : (
-                              <ImageIcon size={16} />
-                            )}
-                          </span>
-                          <span className="co-portfolio-main">
-                            <div className="co-portfolio-item-title">{p.title}</div>
-                            <div className="co-portfolio-item-desc">{p.description || p.type}</div>
-                          </span>
-                          <button className="co-social-remove" onClick={() => removePortfolioItem(i)}><Trash2 size={15} /></button>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-
-                  <div className="co-portfolio-form">
-                    <div className="co-field" style={{ marginBottom: 10 }}>
-                      <input className="co-input" placeholder="Title" value={portfolioDraft.title} onChange={(e) => setPortfolioDraft({ ...portfolioDraft, title: e.target.value })} />
-                    </div>
-                    <div className="co-field" style={{ marginBottom: 10 }}>
-                      <textarea className="co-textarea" style={{ minHeight: 56 }} placeholder="Description (optional)" value={portfolioDraft.description} onChange={(e) => setPortfolioDraft({ ...portfolioDraft, description: e.target.value })} />
-                    </div>
-
-                    <div className="co-portfolio-upload-row">
-                      <label className="co-portfolio-upload-btn" style={uploadingPortfolioImage ? { opacity: 0.6, pointerEvents: 'none' } : undefined}>
-                        <UploadCloud size={13} />
-                        {uploadingPortfolioImage ? 'Uploading...' : 'Upload image'}
-                        <input
-                          type="file"
-                          accept="image/*"
-                          style={{ display: 'none' }}
-                          disabled={uploadingPortfolioImage}
-                          onChange={(e) => {
-                            const file = e.target.files?.[0];
-                            if (file) handlePortfolioImageUpload(file);
-                            e.target.value = '';
-                          }}
-                        />
-                      </label>
-                      <span className="co-portfolio-or">or paste a link below</span>
-                    </div>
-
-                    <div className="co-social-form-row">
-                      <input className="co-input" placeholder="Media URL" value={portfolioDraft.media_url} onChange={(e) => setPortfolioDraft({ ...portfolioDraft, media_url: e.target.value })} />
-                      <select className="co-select" value={portfolioDraft.type} onChange={(e) => setPortfolioDraft({ ...portfolioDraft, type: e.target.value })}>
-                        {PORTFOLIO_TYPES.map((t) => <option key={t} value={t}>{t}</option>)}
-                      </select>
-                    </div>
-
-                    {portfolioError && (
-                      <p className="co-hint" style={{ color: '#E8544E', marginBottom: 10 }}>
-                        <Info size={13} style={{ marginTop: 1, flexShrink: 0 }} />{portfolioError}
-                      </p>
-                    )}
-
-                    <button className="co-add-btn" onClick={addPortfolioItem} disabled={!portfolioDraft.title.trim() || !portfolioDraft.media_url.trim()}>
-                      <Plus size={14} /> Add to portfolio
-                    </button>
-                  </div>
-                </>
-              )}
-
-              {/* ============================================
-                  STEP 5 — PUBLISH
-              ============================================ */}
-
-              {step === 5 && (
-                <>
-                  <h2 className="co-h2">Publish</h2>
-                  <p className="co-sub">Review everything, set your starting price, and go live.</p>
-
-                  <div className="co-recap">
-                    <div className="co-recap-card">
-                      <p className="co-recap-label">Basic Info</p>
-                      <div className="co-recap-row">
-                        <div className="co-avatar" style={{ width: 40, height: 40, fontSize: 15 }}>
-                          {profileImage ? <img src={profileImage} alt="" /> : (displayName[0] || 'C').toUpperCase()}
-                        </div>
-                        <span>
-                          <p className="co-recap-name">{displayName || 'Unnamed creator'}</p>
-                          <p className="co-recap-sub">@{username || 'username'} · {location || 'No location'}</p>
-                        </span>
-                      </div>
-                    </div>
-
-                    <div className="co-recap-card">
-                      <p className="co-recap-label">Type & Niche</p>
-                      {creatorType && <p className="co-recap-sub" style={{ marginBottom: 8 }}>{creatorType}</p>}
-                      <div className="co-recap-chips">
-                        {[...categories, ...contentTypes].map((c) => <span className="co-chip" key={c}>{c}</span>)}
-                      </div>
-                    </div>
-
-                    <div className="co-recap-card">
-                      <p className="co-recap-label">Socials</p>
-                      {socials.length === 0 ? (
-                        <p className="co-recap-empty">None added</p>
-                      ) : (
-                        <p className="co-recap-sub">{socials.map((s) => `@${s.username} (${s.platform})`).join(', ')}</p>
-                      )}
-                    </div>
-
-                    <div className="co-recap-card">
-                      <p className="co-recap-label">Portfolio</p>
-                      <p className="co-recap-empty">
-                        {portfolio.length === 0 ? 'No items yet' : `${portfolio.length} item${portfolio.length > 1 ? 's' : ''} added`}
-                      </p>
-                    </div>
-                  </div>
-
-                  <div className="co-field">
-                    <label className="co-label">Payout account *</label>
-                    <p className="co-sub" style={{ marginBottom: 10 }}>
-                      Add your payout account once. Approved campaign payments will be sent here automatically.
-                    </p>
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
-                      <input className="co-input" value={payoutAccountHolderName} onChange={(e) => setPayoutAccountHolderName(e.target.value)} placeholder="Account holder name" autoComplete="name" />
-                      <input className="co-input" value={payoutProvider} onChange={(e) => setPayoutProvider(e.target.value)} placeholder="Bank / payment provider" />
-                      <input className="co-input" value={payoutAccountNumber} onChange={(e) => setPayoutAccountNumber(e.target.value)} placeholder="Account number" inputMode="numeric" autoComplete="off" />
-                      <input className="co-input" value={payoutMethod} onChange={(e) => setPayoutMethod(e.target.value)} placeholder="Payout method (optional)" />
-                      <input className="co-input" value={payoutBranch} onChange={(e) => setPayoutBranch(e.target.value)} placeholder="Branch (optional)" />
-                      <input className="co-input" value={payoutRouting} onChange={(e) => setPayoutRouting(e.target.value)} placeholder="Routing information (optional)" />
-                    </div>
-                  </div>
-
-                  <div className="co-field">
-                    <label className="co-label">Starting price (per collab) *</label>
-                    <div className="co-price-row">
-                      <span className="co-price-prefix">Rs.</span>
-                      <input type="number" min={0} value={startingPrice} onChange={(e) => setStartingPrice(e.target.value)} placeholder="5000" />
-                    </div>
-                  </div>
-
-                  {error && <div className="co-error">{error}</div>}
-                </>
-              )}
-
-              {/* ============================================
-                  FOOTER NAV
-              ============================================ */}
-
-              <div className="co-footer">
-                {step > 1 ? (
-                  <button className="co-back" onClick={() => setStep(step - 1)}>
-                    <ArrowLeft size={14} /> Previous
-                  </button>
-                ) : <span />}
-
-                {step < 5 ? (
-                  <button
-                    className="co-continue"
-                    disabled={
-                      (step === 1 && !canContinueStep1) ||
-                      (step === 2 && !canContinueStep2) ||
-                      (step === 3 && !canContinueStep3) ||
-                      (step === 4 && !canContinueStep4)
-                    }
-                    onClick={() => {
-                      if (step === 1) saveStep1Progress()?.catch((e) => console.error(e));
-                      if (step === 2) saveStep2Progress()?.catch((e) => console.error(e));
-                      if (step === 3) saveStep3Progress()?.catch((e) => console.error(e));
-                      if (step === 4) saveStep4Progress()?.catch((e) => console.error(e));
-                      setStep(step + 1);
+              <div className="onb-avatar-row">
+                <div className="onb-avatar">
+                  {photo ? <img src={photo} alt="Profile" /> : <Camera size={22} />}
+                </div>
+                <label className="onb-upload">
+                  <UploadCloud size={15} />
+                  {uploading ? " Uploading…" : " Add profile photo"}
+                  <input
+                    type="file"
+                    accept="image/*"
+                    disabled={uploading}
+                    onChange={(event) => {
+                      const file = event.target.files?.[0];
+                      if (file) void upload(file, "photo");
+                      event.currentTarget.value = "";
                     }}
-                  >
-                    Next <ArrowRight size={15} />
-                  </button>
-                ) : (
-                  <button className="co-continue" disabled={!canFinish || isSubmitting} onClick={handleFinish}>
-                    {isSubmitting ? 'Publishing...' : 'Publish Profile'}
-                    <ArrowRight size={15} />
-                  </button>
-                )}
+                  />
+                </label>
               </div>
 
-            </>
+              <div className="onb-grid">
+                <Field label="Creator name *">
+                  <input
+                    className="onb-input"
+                    value={name}
+                    onChange={(event) => setName(event.target.value)}
+                    placeholder="Your creator name"
+                  />
+                </Field>
+                <Field label="Username *">
+                  <input
+                    className="onb-input"
+                    value={username}
+                    onChange={(event) => setUsername(event.target.value)}
+                    placeholder="username"
+                  />
+                </Field>
+              </div>
+
+              <Field label="Location *">
+                <LocationField value={location} onChange={setLocation} />
+                <p className="onb-help">Type a location, choose a suggestion, or enter your own.</p>
+              </Field>
+
+              <Field label="Creator type *">
+                <MultiSelect selected={types} onToggle={(value) => setTypes(toggle(types, value))} />
+                <p className="onb-help">Choose one or more types.</p>
+              </Field>
+
+              <Field label="Social profile *">
+                <p className="onb-help onb-required-help">Add at least one public social profile. This is required so businesses can review your creator presence.</p>
+                <div className="onb-social-grid">
+                  <StyledSelect value={socialPlatform} onChange={setSocialPlatform}>
+                    {['Instagram', 'TikTok', 'YouTube', 'Facebook', 'X', 'LinkedIn', 'Other'].map((item) => (
+                      <option key={item} value={item}>{item}</option>
+                    ))}
+                  </StyledSelect>
+                  <input
+                    className="onb-input"
+                    value={socialUsername}
+                    onChange={(event) => setSocialUsername(event.target.value)}
+                    placeholder="Username or handle"
+                  />
+                </div>
+                <div className="onb-social-add-row">
+                  <input
+                    className="onb-input"
+                    value={socialUrl}
+                    onChange={(event) => setSocialUrl(event.target.value)}
+                    placeholder="https://your-social-profile.com"
+                  />
+                  <button type="button" className="onb-secondary" onClick={addSocial}>
+                    <Plus size={14} /> Add profile
+                  </button>
+                </div>
+                {socials.length > 0 && (
+                  <div className="onb-social-list">
+                    {socials.map((item, index) => (
+                      <div className="onb-social-item" key={`${item.platform}-${item.profile_url}-${index}`}>
+                        <a
+                          className="onb-social-link"
+                          href={externalHref(item.profile_url) ?? undefined}
+                          target="_blank"
+                          rel="noreferrer noopener"
+                        >
+                          <div>
+                            <strong>{item.platform}</strong>
+                            <span>{item.username}</span>
+                          </div>
+                          <ExternalLink size={13} strokeWidth={1.7} aria-hidden="true" />
+                        </a>
+                        <button
+                          type="button"
+                          className="onb-remove"
+                          aria-label={`Remove ${item.platform} profile`}
+                          onClick={() => setSocials((current) => current.filter((_, i) => i !== index))}
+                        >
+                          <Trash2 size={14} />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </Field>
+            </section>
           )}
 
-        </div>
-          </>
-        )}
+          {step === 2 && (
+            <section>
+              <h2>Professional profile</h2>
+              <p className="onb-sub">Add your professional details when you are ready. Everything here is optional.</p>
+
+              <Field label="Bio">
+                <textarea
+                  className="onb-input onb-textarea"
+                  maxLength={600}
+                  value={bio}
+                  onChange={(event) => setBio(event.target.value)}
+                  placeholder="Tell businesses what you create and what makes your work useful."
+                />
+              </Field>
+
+              <Field label="Categories">
+                <Chips items={CATEGORIES} selected={categories} onToggle={(value) => setCategories(toggle(categories, value))} />
+              </Field>
+
+              <Field label="Content types">
+                <Chips items={CONTENT} selected={content} onToggle={(value) => setContent(toggle(content, value))} />
+              </Field>
+
+              <Field label="Languages">
+                <Chips items={LANGUAGES} selected={languages} onToggle={(value) => setLanguages(toggle(languages, value))} />
+              </Field>
+            </section>
+          )}
+
+          {step === 3 && (
+            <section>
+              <h2>Portfolio & social</h2>
+              <p className="onb-sub">Your primary social profile is already required. Add portfolio work and any additional social profiles here when you are ready.</p>
+
+              <Field label="Portfolio work sample">
+                <div className="onb-inline">
+                  <input
+                    className="onb-input"
+                    value={portfolioTitle}
+                    onChange={(event) => setPortfolioTitle(event.target.value)}
+                    placeholder="Work title (optional)"
+                  />
+                  <label className="onb-upload">
+                    <UploadCloud size={15} />
+                    {uploading ? " Uploading…" : " Add work"}
+                    <input
+                      type="file"
+                      accept="image/*,video/*"
+                      disabled={uploading}
+                      onChange={(event) => {
+                        const file = event.target.files?.[0];
+                        if (file) void upload(file, "portfolio");
+                        event.currentTarget.value = "";
+                      }}
+                    />
+                  </label>
+                </div>
+
+                {portfolio.length > 0 && (
+                  <div className="onb-list">
+                    {portfolio.map((item, index) => (
+                      <div className="onb-list-row" key={`${item.media_url}-${index}`}>
+                        <span>{item.title}</span>
+                        <button
+                          type="button"
+                          aria-label={`Remove ${item.title}`}
+                          onClick={() => setPortfolio((current) => current.filter((_, i) => i !== index))}
+                        >
+                          <Trash2 size={14} />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </Field>
+
+              <Field label="Social account">
+                <div className="onb-grid">
+                  <StyledSelect value={socialPlatform} onChange={setSocialPlatform}>
+                    <option>Instagram</option>
+                    <option>TikTok</option>
+                    <option>YouTube</option>
+                    <option>Facebook</option>
+                    <option>LinkedIn</option>
+                    <option>Other</option>
+                  </StyledSelect>
+                  <input
+                    className="onb-input"
+                    value={socialUsername}
+                    onChange={(event) => setSocialUsername(event.target.value)}
+                    placeholder="@username"
+                  />
+                </div>
+
+                <div className="onb-grid" style={{ marginTop: 10 }}>
+                  <input
+                    className="onb-input"
+                    value={socialUrl}
+                    onChange={(event) => setSocialUrl(event.target.value)}
+                    placeholder="Profile URL"
+                  />
+                  <input
+                    className="onb-input"
+                    type="number"
+                    min="0"
+                    value={followers}
+                    onChange={(event) => setFollowers(event.target.value)}
+                    placeholder="Followers (optional)"
+                  />
+                </div>
+
+                <button type="button" className="onb-secondary" onClick={addSocial}>
+                  <Plus size={14} /> Add social account
+                </button>
+
+                {socials.length > 0 && (
+                  <div className="onb-list">
+                    {socials.map((item, index) => (
+                      <div className="onb-list-row" key={`${item.platform}-${item.profile_url}-${index}`}>
+                        <span>{item.platform} · @{item.username}</span>
+                        <button
+                          type="button"
+                          aria-label={`Remove ${item.platform} account`}
+                          onClick={() => setSocials((current) => current.filter((_, i) => i !== index))}
+                        >
+                          <Trash2 size={14} />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </Field>
+            </section>
+          )}
+
+          {step === 4 && (
+            <section>
+              <h2>Availability</h2>
+              <p className="onb-sub">Let businesses know whether you are currently open to new collaborations.</p>
+              <Field label="Current availability">
+                <Chips items={["Available", "Not available"]} selected={[availability]} onToggle={setAvailability} />
+              </Field>
+            </section>
+          )}
+
+          {error && <div className="onb-error">{error}</div>}
+
+          <footer className="onb-footer">
+            <button
+              type="button"
+              className="onb-back"
+              onClick={() => (step === 1 ? navigate("/dashboard") : setStep(step - 1))}
+            >
+              <ArrowLeft size={15} />
+              {step === 1 ? " Dashboard" : " Back"}
+            </button>
+
+            <div className="onb-actions">
+              {step > 1 && (
+                <button type="button" className="onb-skip" onClick={skip} disabled={saving}>
+                  Skip for now
+                </button>
+              )}
+              <button type="button" className="onb-primary" onClick={next} disabled={saving || uploading}>
+                {saving ? "Saving…" : step === STEPS.length ? "Finish" : step === 1 ? "Save & continue" : "Continue"}
+                {!saving && <ArrowRight size={15} />}
+              </button>
+            </div>
+          </footer>
+        </main>
       </div>
     </div>
   );
 }
 
-export default CreatorOnboarding;
+function Field({ label, children }: { label: string; children: ReactNode }) {
+  return (
+    <div className="onb-field">
+      <label className="onb-label">{label}</label>
+      {children}
+    </div>
+  );
+}
+
+function Chips({
+  items,
+  selected,
+  onToggle,
+}: {
+  items: string[];
+  selected: string[];
+  onToggle: (value: string) => void;
+}) {
+  return (
+    <div className="onb-chips">
+      {items.map((item) => (
+        <button
+          type="button"
+          key={item}
+          className={`onb-chip ${selected.includes(item) ? "active" : ""}`}
+          onClick={() => onToggle(item)}
+        >
+          {item}
+        </button>
+      ))}
+    </div>
+  );
+}

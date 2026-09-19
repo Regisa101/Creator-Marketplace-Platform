@@ -10,13 +10,13 @@ from app.schemas.user import (
 from app.schemas.creator import (
     CreatorPortfolioItem,
     CreatorSocialBase,
-    CreatorSocialConnect,
-    CreatorSocialsData,
-    CreatorOnboardingComplete
+    CreatorOnboardingComplete,
+    CreatorOnboardingProgress,
 )
 
 from app.schemas.business import (
-    BusinessOnboardingComplete
+    BusinessOnboardingComplete,
+    BusinessOnboardingProgress,
 )
 
 from app.schemas.campaign import (

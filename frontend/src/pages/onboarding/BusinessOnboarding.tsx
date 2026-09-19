@@ -1,1375 +1,702 @@
-import { useState, useEffect } from 'react';
-import { useNavigate, Link } from 'react-router-dom';
-import {
-  ArrowRight,
-  ArrowLeft,
-  Camera,
-  CheckCircle2,
-  Info,
-  Save,
-  MapPin,
-} from 'lucide-react';
-
+import { useEffect, useRef, useState } from "react";
+import type { ReactNode } from "react";
+import { Link, useNavigate } from "react-router-dom";
+import { ArrowLeft, ArrowRight, Building2, Check, ChevronDown, ExternalLink, UploadCloud } from "lucide-react";
+import { LogoMark } from "../../components/Logo";
 import {
   completeBusinessOnboarding,
   getBusinessProgress,
   saveBusinessProgress,
   uploadImage,
-} from '../../api/client';
-import type { BusinessOnboardingData } from '../../api/client';
-import { useAuth } from '../../context/AuthContext';
-import { LogoMark, BRAND_NAME } from '../../components/Logo';
+} from "../../api/client";
+import { useAuth } from "../../context/AuthContext";
 
-// ============================================================
-// CONSTANTS
-// ============================================================
-
-
-// NOTE: "Business type" and "Industry" were two chip lists asking the
-// same underlying question, so they've been merged into one field:
-// `industry`. Anything downstream (validation, resume logic, payload,
-// recap) has been updated to only reference `industry`.
 const INDUSTRIES = [
-  'Retail & E-commerce', 'Agency', 'SaaS', 'Food & Beverage',
-  'Beauty & Wellness', 'Fashion & Apparel', 'Tech & IT',
-  'Travel & Hospitality', 'Education', 'Healthcare', 'Real Estate',
-  'Finance', 'Entertainment', 'Non-Profit', 'Automotive', 'Other',
+  "Retail & E-commerce",
+  "Agency",
+  "SaaS",
+  "Food & Beverage",
+  "Beauty & Wellness",
+  "Fashion & Apparel",
+  "Tech & IT",
+  "Travel & Hospitality",
+  "Education",
+  "Healthcare",
+  "Real Estate",
+  "Finance",
+  "Entertainment",
+  "Non-Profit",
+  "Automotive",
+  "Other",
 ];
 
-const INTERESTED_CATEGORIES = [
-  'Beauty', 'Fashion', 'Lifestyle', 'Food', 'Tech', 'Fitness', 'Travel',
-  'Gaming', 'Education', 'Finance', 'Wellness', 'Skincare', 'Home Decor',
-  'Parenting', 'Entertainment',
+const LOCATIONS = [
+  "Kathmandu, Nepal",
+  "Lalitpur, Nepal",
+  "Bhaktapur, Nepal",
+  "Pokhara, Nepal",
+  "Chitwan, Nepal",
+  "Biratnagar, Nepal",
+  "Butwal, Nepal",
+  "Bharatpur, Nepal",
+  "Dharan, Nepal",
+  "Hetauda, Nepal",
+  "Janakpur, Nepal",
+  "Nepalgunj, Nepal",
+  "Dhangadhi, Nepal",
+  "Itahari, Nepal",
+  "Birgunj, Nepal",
+  "Birtamod, Nepal",
+  "Banepa, Nepal",
+  "Tansen, Nepal",
+  "Gorkha, Nepal",
+  "Lumbini, Nepal",
+  "Mustang, Nepal",
+  "Nagarkot, Nepal",
+  "Nationwide, Nepal",
+  "International",
 ];
 
-const CONTENT_TYPES = [
-  'Reels', 'Photos', 'Stories', 'YouTube Videos', 'Shorts', 'UGC', 'Reviews',
-];
+const STEPS = ["Business profile", "Contact", "Online presence"];
 
-const TEAM_SIZES = ['Just me', '2–10', '11–50', '51–200', '200+'];
+function LocationField({ value, onChange }: { value: string; onChange: (value: string) => void }) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
 
-// Static suggestion list for the location autocomplete. Swap this out
-// for a real places API later if you want broader / live results —
-// this keeps it dependency-free for now.
-const LOCATION_SUGGESTIONS = [
-  'Kathmandu, Nepal', 'Lalitpur, Nepal', 'Bhaktapur, Nepal', 'Pokhara, Nepal',
-  'Biratnagar, Nepal', 'Birgunj, Nepal', 'Dharan, Nepal', 'Bharatpur, Nepal',
-  'Butwal, Nepal', 'Hetauda, Nepal', 'Nepalgunj, Nepal', 'Itahari, Nepal',
-  'Janakpur, Nepal', 'Dhangadhi, Nepal', 'Tulsipur, Nepal', 'Ghorahi, Nepal',
-  'Birendranagar, Nepal', 'Kalaiya, Nepal', 'Damak, Nepal', 'Dhulikhel, Nepal',
-];
-
-// Figures out which step to land on when resuming.
-function resolveBusinessStep(profile: Record<string, any> | null | undefined): number {
-  if (!profile) return 1;
-
-  const step1Done =
-    Boolean(profile.company_name?.trim?.()) &&
-    Boolean(profile.industry) &&
-    Boolean(profile.location?.trim?.());
-  if (!step1Done) return 1;
-
-  const step2Done = Boolean(profile.description?.trim?.());
-  if (!step2Done) return 2;
-
-  const step3Done =
-    Array.isArray(profile.interested_categories) && profile.interested_categories.length > 0 &&
-    Array.isArray(profile.preferred_content_types) && profile.preferred_content_types.length > 0 &&
-    Boolean(profile.team_size);
-  if (!step3Done) return 3;
-
-  return 4;
-}
-
-// ============================================================
-// CHIP + CHIP GROUP (with "show 7, then expand" behavior)
-// ============================================================
-
-interface ChipProps {
-  label: string;
-  active: boolean;
-  onClick: () => void;
-}
-
-function Chip({ label, active, onClick }: ChipProps) {
-  return (
-    <button type="button" className={`co-chip ${active ? 'co-chip-active' : ''}`} onClick={onClick}>
-      {label}
-    </button>
+  const suggestions = LOCATIONS.filter((item) =>
+    item.toLowerCase().includes(value.trim().toLowerCase()),
   );
-}
 
-interface ChipGroupProps {
-  items: string[];
-  isActive: (item: string) => boolean;
-  onToggle: (item: string) => void;
-  limit?: number;
-}
+  useEffect(() => {
+    const handleOutside = (event: MouseEvent) => {
+      if (ref.current && !ref.current.contains(event.target as Node)) {
+        setOpen(false);
+      }
+    };
 
-// Shows up to `limit` chips by default; if there are more, a
-// "+N more" chip expands the full list (and can collapse back).
-function ChipGroup({ items, isActive, onToggle, limit = 7 }: ChipGroupProps) {
-  const [expanded, setExpanded] = useState(false);
-  const hasMore = items.length > limit;
-  const visible = expanded ? items : items.slice(0, limit);
+    document.addEventListener("mousedown", handleOutside);
+    return () => document.removeEventListener("mousedown", handleOutside);
+  }, []);
+
+  useEffect(() => {
+    const previousOverflow = document.body.style.overflow;
+    if (open) document.body.style.overflow = "hidden";
+    return () => {
+      document.body.style.overflow = previousOverflow;
+    };
+  }, [open]);
 
   return (
-    <div className="co-chips">
-      {visible.map((item) => (
-        <Chip key={item} label={item} active={isActive(item)} onClick={() => onToggle(item)} />
-      ))}
-      {hasMore && (
+    <div className="onb-location" ref={ref}>
+      <div className={`onb-location-control ${open ? "open" : ""}`}>
+        <input
+          className="onb-input onb-location-input"
+          value={value}
+          onFocus={() => setOpen(true)}
+          onChange={(event) => {
+            onChange(event.target.value);
+            setOpen(true);
+          }}
+          placeholder="Start typing your city or location"
+          autoComplete="off"
+        />
         <button
           type="button"
-          className="co-chip co-chip-more"
-          onClick={() => setExpanded((e) => !e)}
+          className="onb-icon-trigger"
+          aria-label="Show location suggestions"
+          onClick={() => setOpen((current) => !current)}
         >
-          {expanded ? 'Show less' : `+${items.length - limit} more`}
+          <ChevronDown size={16} strokeWidth={1.7} />
         </button>
-      )}
-    </div>
-  );
-}
+      </div>
 
-// ============================================================
-// LOCATION AUTOCOMPLETE
-// ============================================================
-
-interface LocationAutocompleteProps {
-  value: string;
-  onChange: (value: string) => void;
-}
-
-function LocationAutocomplete({ value, onChange }: LocationAutocompleteProps) {
-  const [open, setOpen] = useState(false);
-
-  const query = value.trim().toLowerCase();
-  const filtered = (
-    query
-      ? LOCATION_SUGGESTIONS.filter((loc) => loc.toLowerCase().includes(query))
-      : LOCATION_SUGGESTIONS
-  ).slice(0, 6);
-
-  return (
-    <div className="co-autocomplete">
-      <input
-        className="co-input"
-        value={value}
-        onChange={(e) => { onChange(e.target.value); setOpen(true); }}
-        onFocus={() => setOpen(true)}
-        onBlur={() => setTimeout(() => setOpen(false), 150)}
-        placeholder="City, Province, Country"
-        autoComplete="off"
-      />
-      {open && filtered.length > 0 && (
-        <div className="co-autocomplete-list">
-          {filtered.map((loc) => (
-            <button
-              type="button"
-              key={loc}
-              className="co-autocomplete-item"
-              // onMouseDown fires before the input's onBlur closes the list
-              onMouseDown={() => { onChange(loc); setOpen(false); }}
-            >
-              <MapPin size={13} style={{ flexShrink: 0, opacity: 0.6 }} />
-              {loc}
-            </button>
-          ))}
+      {open && (
+        <div className="onb-suggestion-menu">
+          {suggestions.length > 0 ? (
+            suggestions.map((item) => (
+              <button
+                type="button"
+                className={`onb-suggestion ${item === value ? "selected" : ""}`}
+                key={item}
+                onClick={() => {
+                  onChange(item);
+                  setOpen(false);
+                }}
+              >
+                {item}
+              </button>
+            ))
+          ) : (
+            <div className="onb-no-suggestions">No matching suggestion. You can enter your own location.</div>
+          )}
         </div>
       )}
     </div>
   );
 }
 
-// ============================================================
-// STEP HEADER
-// ============================================================
-
-const STEP_LABELS = ['Basic Info', 'About & Contact', 'Preferences', 'Publish'];
-
-function StepHeader({ step }: { step: number }) {
+function StyledSelect({
+  value,
+  onChange,
+  children,
+  placeholder,
+}: {
+  value: string;
+  onChange: (value: string) => void;
+  children: ReactNode;
+  placeholder?: string;
+}) {
   return (
-    <div className="co-steps">
-      {STEP_LABELS.map((label, index) => {
-        const number = index + 1;
-        const state = number < step ? 'done' : number === step ? 'active' : 'upcoming';
-
-        return (
-          <div className="co-step" key={label}>
-            <span className={`co-step-dot co-step-${state}`}>
-              {state === 'done' ? <CheckCircle2 size={14} /> : number}
-            </span>
-            <span className={`co-step-label co-step-label-${state}`}>{label}</span>
-            {number < STEP_LABELS.length && (
-              <span className={`co-step-line ${number < step ? 'co-step-line-done' : ''}`} />
-            )}
-          </div>
-        );
-      })}
+    <div className="onb-native-select">
+      <select
+        className="onb-input onb-select-input"
+        value={value}
+        onChange={(event) => onChange(event.target.value)}
+      >
+        {placeholder && <option value="">{placeholder}</option>}
+        {children}
+      </select>
+      <ChevronDown className="onb-native-chevron" size={16} strokeWidth={1.7} />
     </div>
   );
 }
 
-// ============================================================
-// MAIN COMPONENT
-// ============================================================
+function externalHref(value: string): string | null {
+  const trimmed = value.trim();
+  if (!trimmed) return null;
+
+  try {
+    const url = new URL(/^https?:\/\//i.test(trimmed) ? trimmed : `https://${trimmed}`);
+    if (url.protocol !== "http:" && url.protocol !== "https:") return null;
+    return url.toString();
+  } catch {
+    return null;
+  }
+}
+
+function ExternalProfileLink({ label, value }: { label: string; value: string }) {
+  const href = externalHref(value);
+  if (!href) return null;
+
+  return (
+    <a
+      className="onb-external-link"
+      href={href}
+      target="_blank"
+      rel="noreferrer noopener"
+    >
+      <span>{label}</span>
+      <span className="onb-external-value">{value}</span>
+      <ExternalLink size={13} strokeWidth={1.7} aria-hidden="true" />
+    </a>
+  );
+}
 
 export function BusinessOnboarding() {
   const navigate = useNavigate();
   const { user, updateProfile } = useAuth();
 
   const [step, setStep] = useState(1);
-  const [done, setDone] = useState(false);
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const [error, setError] = useState('');
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [uploading, setUploading] = useState(false);
+  const [error, setError] = useState("");
 
-  // Show the short welcome screen first. Clicking Get started
-  // enters the existing onboarding flow below without changing
-  // any of the saved-progress or API logic.
-  const [showWelcome, setShowWelcome] = useState(true);
-
-  // Three short questions shown after the welcome screen and before the profile form.
-  const [introQuestionStep, setIntroQuestionStep] = useState(0);
-  const [introAnswers, setIntroAnswers] = useState<string[]>(['', '', '']);
-
-  const introQuestions = [
-    {
-      title: 'A few quick questions: first, have you worked with creators before?',
-      sub: "This helps us personalize your Creatorhub experience. You can always change your profile details later.",
-      options: [
-        ['I am brand new to this', 'I have never run a creator campaign'],
-        ['I have some experience', 'I have worked with creators before'],
-        ['I am experienced', 'I regularly run creator campaigns'],
-      ],
-    },
-    {
-      title: 'What kind of creator work are you looking for?',
-      sub: 'Tell us what you want to accomplish with creators on Creatorhub.',
-      options: [
-        ['Social media campaigns', 'Reach audiences through creator content'],
-        ['UGC & product content', 'Get authentic content for your brand'],
-        ['Influencer partnerships', 'Work with creators who have an audience'],
-      ],
-    },
-    {
-      title: 'What matters most for your creator campaigns?',
-      sub: 'Choose the outcome that matters most to your brand right now.',
-      options: [
-        ['Reach & awareness', 'Get your brand in front of more people'],
-        ['Engagement', 'Build genuine interaction with audiences'],
-        ['Quality content', 'Create strong content you can reuse'],
-      ],
-    },
-  ];
-
-
-  // ----------------------------------------------------------
-  // STEP 1 — Basic Info
-  // ----------------------------------------------------------
-
-  const [logoUrl, setLogoUrl] = useState<string | null>(null);
-  const [companyName, setCompanyName] = useState(user?.profile?.company_name ?? '');
-  const [industry, setIndustry] = useState(''); // replaces old businessType + industry pair
-  const [location, setLocation] = useState('');
-
-  // ----------------------------------------------------------
-  // STEP 2 — About & Contact
-  // ----------------------------------------------------------
-
-  const [description, setDescription] = useState('');
-  const [website, setWebsite] = useState('');
-  const [contactPhone, setContactPhone] = useState('');
-
-  // ----------------------------------------------------------
-  // STEP 3 — Preferences
-  // ----------------------------------------------------------
-
-  const [interestedCategories, setInterestedCategories] = useState<string[]>([]);
-  const [preferredContentTypes, setPreferredContentTypes] = useState<string[]>([]);
-  const [typicalBudget, setTypicalBudget] = useState('');
-  const [teamSize, setTeamSize] = useState('');
-  const [yearEstablished, setYearEstablished] = useState('');
-
-  // ----------------------------------------------------------
-  // RESUME PROGRESS / LOGO UPLOAD / SAVE DRAFT STATE
-  // ----------------------------------------------------------
-
-  const [loadingProgress, setLoadingProgress] = useState(true);
-  const [uploadingLogo, setUploadingLogo] = useState(false);
-  const [logoError, setLogoError] = useState('');
-  const [draftSaved, setDraftSaved] = useState(false);
-
-  // ==========================================================
-  // RESUME WHERE YOU LEFT OFF
-  // ==========================================================
+  const [logo, setLogo] = useState<string | null>(null);
+  const [name, setName] = useState(user?.profile?.company_name ?? user?.full_name ?? "");
+  const [industry, setIndustry] = useState("");
+  const [location, setLocation] = useState("");
+  const [description, setDescription] = useState("");
+  const [contactName, setContactName] = useState(user?.full_name ?? "");
+  const contactEmail = user?.email ?? "";
+  const [phone, setPhone] = useState("");
+  const [website, setWebsite] = useState("");
+  const [companySocial, setCompanySocial] = useState("");
+  const [instagram, setInstagram] = useState("");
+  const [facebook, setFacebook] = useState("");
+  const [otherSocial, setOtherSocial] = useState("");
 
   useEffect(() => {
     let cancelled = false;
 
-    const loadProgress = async () => {
+    (async () => {
       try {
         const saved = await getBusinessProgress();
-        const profile = saved?.profile ?? user?.profile ?? null;
+        const profile = saved?.profile ?? user?.profile;
 
         if (!cancelled && profile) {
-          setLogoUrl(profile.logo_url ?? null);
-          setCompanyName(profile.company_name ?? '');
-          setIndustry(profile.industry ?? profile.business_type ?? '');
-          setLocation(profile.location ?? '');
-
-          setDescription(profile.description ?? '');
-          setWebsite(profile.website ?? '');
-          setContactPhone(profile.contact_phone ?? '');
-
-          setInterestedCategories(profile.interested_categories ?? []);
-          setPreferredContentTypes(profile.preferred_content_types ?? []);
-          setTypicalBudget(
-            profile.typical_budget !== null && profile.typical_budget !== undefined
-              ? String(profile.typical_budget)
-              : ''
-          );
-          setTeamSize(profile.team_size ?? '');
-          setYearEstablished(
-            profile.year_established !== null && profile.year_established !== undefined
-              ? String(profile.year_established)
-              : ''
-          );
-
-          setStep(resolveBusinessStep(profile));
+          setLogo(profile.logo_url ?? null);
+          setName(profile.company_name ?? user?.full_name ?? "");
+          setIndustry(profile.industry ?? "");
+          setLocation(profile.location ?? "");
+          setDescription(profile.description ?? "");
+          setContactName(profile.contact_person_name ?? user?.full_name ?? "");
+          setPhone(profile.contact_phone ?? "");
+          setWebsite(profile.website ?? "");
+          setCompanySocial(profile.social_links?.company ?? "");
+          setInstagram(profile.social_links?.instagram ?? "");
+          setFacebook(profile.social_links?.facebook ?? "");
+          setOtherSocial(profile.social_links?.other ?? "");
         }
       } catch (err) {
-        console.error('Could not load onboarding progress:', err);
+        console.error(err);
       } finally {
-        if (!cancelled) setLoadingProgress(false);
+        if (!cancelled) setLoading(false);
       }
+    })();
+
+    return () => {
+      cancelled = true;
     };
+  }, [user?.full_name]);
 
-    loadProgress();
-    return () => { cancelled = true; };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
-  // ==========================================================
-  // HELPERS
-  // ==========================================================
-
-  const toggle = (list: string[], setList: (value: string[]) => void, value: string) => {
-    if (list.includes(value)) {
-      setList(list.filter((item) => item !== value));
-    } else {
-      setList([...list, value]);
-    }
-  };
-
-  const toggleSingle = (current: string, setValue: (value: string) => void, value: string) => {
-    setValue(current === value ? '' : value);
-  };
-
-  // ==========================================================
-  // PROGRESS SAVING
-  // ==========================================================
-
-  const saveStep1Progress = () => {
-    const payload = {
-      logo_url: logoUrl,
-      company_name: companyName.trim(),
-      industry,
-      location: location.trim(),
-    };
-    updateProfile?.(payload);
-    return saveBusinessProgress(payload);
-  };
-
-  const saveStep2Progress = () => {
-    const payload = {
-      description: description.trim(),
-      website: website.trim(),
-      contact_phone: contactPhone.trim(),
-    };
-    updateProfile?.(payload);
-    return saveBusinessProgress(payload);
-  };
-
-  const saveStep3Progress = () => {
-    const payload = {
-      interested_categories: interestedCategories,
-      preferred_content_types: preferredContentTypes,
-      typical_budget: typicalBudget ? Number(typicalBudget) : undefined,
-      team_size: teamSize,
-      year_established: yearEstablished ? Number(yearEstablished) : undefined,
-    };
-    updateProfile?.(payload);
-    return saveBusinessProgress(payload);
-  };
-
-  const saveCurrentStepProgress = () => {
-    if (step === 1) return saveStep1Progress();
-    if (step === 2) return saveStep2Progress();
-    if (step === 3) return saveStep3Progress();
-    return Promise.resolve();
-  };
-
-  const handleBackToDashboard = () => {
-    saveCurrentStepProgress()?.catch((err) => {
-      console.error('Could not save progress:', err);
-    });
-    navigate('/dashboard');
-  };
-
-  const handleSaveDraft = async () => {
-    try {
-      await saveCurrentStepProgress();
-      setDraftSaved(true);
-      setTimeout(() => setDraftSaved(false), 2200);
-    } catch (err) {
-      console.error('Could not save draft:', err);
-      setError('Could not save your draft. Please try again.');
-    }
-  };
-
-  // ==========================================================
-  // VALIDATION
-  // ==========================================================
-
-  const canContinueStep1 =
-    companyName.trim().length > 0 &&
-    industry !== '' &&
-    location.trim().length > 0;
-
-  const canContinueStep2 = description.trim().length > 0;
-
-  const canContinueStep3 =
-    interestedCategories.length > 0 &&
-    preferredContentTypes.length > 0 &&
-    teamSize !== '';
-
-  const canFinish = true;
-
-  // ==========================================================
-  // SUBMIT
-  // ==========================================================
-
-  const handleFinish = async () => {
-    setIsSubmitting(true);
-    setError('');
-
-    const payload: BusinessOnboardingData = {
-      company_name: companyName.trim(),
-      industry,
-      location: location.trim(),
-      website: website.trim(),
-      description: description.trim(),
-      logo_url: logoUrl || undefined,
-      contact_phone: contactPhone.trim(),
-      interested_categories: interestedCategories,
-      preferred_content_types: preferredContentTypes,
-      typical_budget: typicalBudget ? Number(typicalBudget) : undefined,
-      team_size: teamSize,
-      year_established: yearEstablished ? Number(yearEstablished) : undefined,
-    };
+  const uploadLogo = async (file: File) => {
+    setError("");
+    setUploading(true);
 
     try {
-      const response = await completeBusinessOnboarding(payload);
-      console.log('Business onboarding complete:', response);
-      updateProfile?.(payload);
-      setDone(true);
+      const { url } = await uploadImage(file);
+      setLogo(url);
     } catch (err: any) {
-      console.error('Business onboarding failed:', err);
-      setError(err?.response?.data?.detail || 'Failed to complete profile. Please try again.');
+      setError(err?.response?.data?.detail || "Logo upload failed.");
     } finally {
-      setIsSubmitting(false);
+      setUploading(false);
     }
   };
 
-  // ==========================================================
-  // RENDER
-  // ==========================================================
+  const saveOptional = async () => {
+    if (step === 2) {
+      await saveBusinessProgress({
+        contact_person_name: contactName.trim() || undefined,
+        contact_phone: phone.trim() || undefined,
+      });
+    }
+
+    if (step === 3) {
+      await saveBusinessProgress({
+        website: website.trim() || undefined,
+        social_links: {
+          company: companySocial.trim() || undefined,
+          instagram: instagram.trim() || undefined,
+          facebook: facebook.trim() || undefined,
+          other: otherSocial.trim() || undefined,
+        },
+      } as any);
+    }
+  };
+
+  const saveBasic = async () => {
+    if (!name.trim() || !industry || !location.trim() || !description.trim() || !logo) {
+      setError("Complete all required business profile fields before continuing.");
+      return;
+    }
+
+    setSaving(true);
+    setError("");
+
+    try {
+      const basic = {
+        company_name: name.trim(),
+        industry,
+        location: location.trim(),
+        description: description.trim(),
+        logo_url: logo,
+      };
+
+      await completeBusinessOnboarding({
+        ...basic,
+        contact_person_name: contactName.trim() || undefined,
+        contact_phone: phone.trim() || undefined,
+        website: website.trim() || undefined,
+        social_links: {
+          company: companySocial.trim() || undefined,
+          instagram: instagram.trim() || undefined,
+          facebook: facebook.trim() || undefined,
+          other: otherSocial.trim() || undefined,
+        },
+      } as any);
+
+      updateProfile?.({ ...basic, is_onboarding_complete: true, is_published: true });
+      setStep(2);
+    } catch (err: any) {
+      setError(err?.response?.data?.detail || "Could not save your business profile.");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const next = async () => {
+    if (step === 1) {
+      if (!name.trim() || !industry.trim() || !location.trim() || !description.trim()) {
+        setError("Complete all required business profile fields before continuing.");
+        return;
+      }
+
+      if (!website.trim() && !companySocial.trim()) {
+        setError("Add either your company website or a company social profile before continuing.");
+        return;
+      }
+
+      await saveBasic();
+      return;
+    }
+
+    setSaving(true);
+    setError("");
+
+    try {
+      await saveOptional();
+      if (step < STEPS.length) {
+        setStep(step + 1);
+      } else {
+        navigate("/dashboard");
+      }
+    } catch (err: any) {
+      setError(err?.response?.data?.detail || "Could not save your progress.");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const skip = async () => {
+    if (step === 1) return;
+
+    setSaving(true);
+    setError("");
+
+    try {
+      await saveOptional();
+      if (step < STEPS.length) {
+        setStep(step + 1);
+      } else {
+        navigate("/dashboard");
+      }
+    } catch (err: any) {
+      setError(err?.response?.data?.detail || "Could not save your progress.");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  if (loading) {
+    return <div className="onb-loading">Loading your profile…</div>;
+  }
 
   return (
-    <div className="co">
+    <div className="onb-page">
       <style>{`
-        @import url('https://fonts.googleapis.com/css2?family=League+Spartan:wght@600;700&display=swap');
+        @import url('https://fonts.googleapis.com/css2?family=League+Spartan:wght@400;500&family=Poppins:wght@300;400;500&display=swap');
 
-        .co {
-          --ink: #111217;
-          --ink-soft: #6c6d73;
-          --line: #e6e6ea;
-          --surface: #f7f7f9;
-          --accent: #111111;
-          --accent-hover: #000000;
-          --accent-soft: #f5f5f5;
-          --coral: #111111;
-          --good: #111111;
-
-          font-family: Inter, Poppins, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-          color: var(--ink);
-          min-height: 100vh;
-          background: #ffffff;
-          padding: 32px 20px 80px;
-          -webkit-font-smoothing: antialiased;
-        }
-
-        .co * { box-sizing: border-box; }
-        .co button { font-family: inherit; cursor: pointer; }
-        .co a { text-decoration: none; color: inherit; }
-
-        .co-shell { max-width: 930px; margin: 0 auto; }
-
-        .co-wordmark { display: flex; align-items: center; justify-content: center; gap: 7px; margin-bottom: 42px; }
-        .co-wordmark svg { width: 22px; height: 22px; flex: 0 0 22px; }
-        .co-wordmark span { font-family: 'League Spartan', sans-serif; font-weight: 500; font-size: 24px; line-height: 1; color: var(--ink); letter-spacing: -0.6px; }
-
-        .co-header {
-          display: flex;
-          align-items: center;
-          justify-content: space-between;
-          padding-bottom: 18px;
-          margin-bottom: 22px;
-          border-bottom: 1px solid var(--line);
-        }
-
-        .co-back-link {
-          display: inline-flex;
-          align-items: center;
-          gap: 6px;
-          font-size: 13px;
-          font-weight: 600;
-          color: var(--ink-soft);
-          background: none;
-          border: none;
-          padding: 6px 4px;
-        }
-        .co-back-link:hover { color: var(--ink); }
-
-        .co-header-right { display: flex; align-items: center; gap: 10px; }
-
-        .co-savedraft-toast {
-          font-size: 11.5px;
-          font-weight: 600;
-          color: var(--good);
-          display: inline-flex;
-          align-items: center;
-          gap: 4px;
-        }
-
-        .co-savedraft-btn {
-          display: inline-flex;
-          align-items: center;
-          gap: 7px;
-          font-size: 12.5px;
-          font-weight: 600;
-          color: var(--ink);
-          background: #fff;
-          border: 1.5px solid var(--line);
-          padding: 9px 15px;
-          border-radius: 8px;
-        }
-        .co-savedraft-btn:hover { border-color: var(--accent); color: var(--accent); }
-        .co-savedraft-btn:disabled { opacity: 0.6; cursor: not-allowed; }
-
-        .co-steps { display: flex; align-items: center; margin-bottom: 28px; }
-        .co-step { display: flex; align-items: center; flex: 1; }
-        .co-step:last-child { flex: 0; }
-
-        .co-step-dot {
-          width: 26px; height: 26px; border-radius: 50%;
-          display: flex; align-items: center; justify-content: center;
-          font-size: 12px; font-weight: 700; flex-shrink: 0;
-        }
-        .co-step-upcoming { background: var(--surface); color: var(--ink-soft); border: 1.5px solid var(--line); }
-        .co-step-active { background: #111111; color: #fff; }
-        .co-step-done { background: var(--good); color: #fff; }
-
-        .co-step-label { font-size: 11.5px; font-weight: 600; margin-left: 8px; white-space: nowrap; color: var(--ink-soft); }
-        .co-step-label-active, .co-step-label-done { color: var(--ink); }
-
-        .co-step-line { flex: 1; height: 1.5px; background: var(--line); margin: 0 10px; }
-        .co-step-line-done { background: #111111; }
-
-        .co-card {
-          background: #fff;
-          border: 1px solid var(--line);
-          border-radius: 18px;
-          padding: 36px 40px 40px;
-        }
-
-        .co-h2 { font-size: 22px; font-weight: 700; margin: 0 0 5px; }
-        .co-sub { font-size: 13px; color: var(--ink-soft); margin: 0 0 28px; line-height: 1.5; }
-        .co-section-label { font-size: 12.5px; font-weight: 700; color: var(--ink); margin: 26px 0 14px; }
-        .co-section-label:first-of-type { margin-top: 0; }
-
-        .co-field { margin-bottom: 20px; }
-        .co-label { display: block; font-size: 12.5px; font-weight: 600; color: var(--ink); margin-bottom: 8px; }
-        .co-hint { font-size: 11.5px; color: var(--ink-soft); margin-top: 6px; display: flex; align-items: flex-start; gap: 5px; line-height: 1.5; }
-
-        .co-input, .co-textarea, .co-select {
-          width: 100%; border: 1.5px solid var(--line); border-radius: 9px;
-          padding: 11px 13px; font-size: 13.5px; font-family: inherit; color: var(--ink); background: #fff;
-        }
-        .co-input:focus, .co-textarea:focus, .co-select:focus { outline: none; border-color: var(--accent); }
-        .co-textarea { resize: vertical; min-height: 76px; line-height: 1.5; }
-
-        .co-avatar-row { display: flex; align-items: center; gap: 16px; }
-        .co-avatar {
-          width: 68px; height: 68px; border-radius: 16px;
-          background: var(--accent-soft); color: var(--accent);
-          display: flex; align-items: center; justify-content: center;
-          flex-shrink: 0; overflow: hidden; font-size: 22px; font-weight: 700;
-        }
-        .co-avatar img { width: 100%; height: 100%; object-fit: cover; }
-        .co-avatar-btn { display: inline-flex; align-items: center; gap: 7px; font-size: 12.5px; font-weight: 600; color: var(--ink); background: #fff; border: 1.5px solid var(--line); padding: 9px 14px; border-radius: 8px; }
-
-        .co-chips { display: flex; flex-wrap: wrap; gap: 8px; }
-        .co-chip { font-size: 12.5px; font-weight: 500; color: var(--ink); background: var(--surface); border: 1.5px solid var(--line); padding: 7px 13px; border-radius: 100px; }
-        .co-chip-active { background: #111111; color: #fff; border-color: var(--accent); }
-        .co-chip-more { background: #fff; border-style: dashed; color: var(--accent); font-weight: 600; }
-
-        .co-autocomplete { position: relative; }
-        .co-autocomplete-list {
-          position: absolute; top: calc(100% + 6px); left: 0; right: 0; z-index: 20;
-          background: #fff; border: 1.5px solid var(--line); border-radius: 9px;
-          box-shadow: 0 8px 20px rgba(17,18,23,0.08); overflow: hidden;
-          max-height: 210px; overflow-y: auto;
-        }
-        .co-autocomplete-item {
-          width: 100%; display: flex; align-items: center; gap: 8px;
-          text-align: left; font-size: 13px; color: var(--ink);
-          background: #fff; border: none; padding: 10px 13px;
-        }
-        .co-autocomplete-item:hover { background: var(--surface); }
-
-        .co-price-row { display: flex; align-items: center; border: 1.5px solid var(--line); border-radius: 9px; overflow: hidden; }
-        .co-price-prefix { background: var(--surface); padding: 11px 13px; font-size: 13px; font-weight: 600; color: var(--ink-soft); border-right: 1px solid var(--line); }
-        .co-price-row input { border: none; flex: 1; padding: 11px 13px; font-size: 13.5px; font-family: inherit; }
-        .co-price-row input:focus { outline: none; }
-
-        .co-recap { display: flex; flex-direction: column; gap: 14px; margin-bottom: 24px; }
-        .co-recap-card { border: 1.5px solid var(--line); border-radius: 12px; padding: 14px 16px; }
-        .co-recap-label { font-size: 11px; font-weight: 700; letter-spacing: 0.05em; text-transform: uppercase; color: var(--ink-soft); margin: 0 0 8px; }
-        .co-recap-row { display: flex; align-items: center; gap: 10px; }
-        .co-recap-name { font-size: 14px; font-weight: 700; margin: 0; }
-        .co-recap-sub { font-size: 12px; color: var(--ink-soft); margin: 1px 0 0; }
-        .co-recap-chips { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
-        .co-recap-empty { font-size: 12.5px; color: var(--ink-soft); }
-
-        .co-footer { display: flex; align-items: center; justify-content: space-between; margin-top: 30px; padding-top: 22px; border-top: 1px solid var(--line); }
-        .co-back { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; font-weight: 600; color: var(--ink-soft); background: none; border: none; padding: 8px 4px; }
-        .co-continue { display: inline-flex; align-items: center; gap: 8px; font-size: 14px; font-weight: 600; color: #fff; background: #111111; border: none; padding: 12px 24px; border-radius: 8px; }
-        .co-continue:disabled { background: #C4C4C4; cursor: not-allowed; }
-
-        .co-done { text-align: center; padding: 20px 0 10px; }
-        .co-done-icon { width: 64px; height: 64px; border-radius: 50%; background: #F5F5F5; color: #111111; display: flex; align-items: center; justify-content: center; margin: 0 auto 20px; }
-        .co-done-title { font-size: 22px; font-weight: 700; margin: 0 0 8px; }
-        .co-done-sub { font-size: 14px; color: var(--ink-soft); margin: 0 0 28px; }
-        .co-done-btn { display: inline-flex; align-items: center; gap: 8px; font-size: 14px; font-weight: 600; color: #fff; background: #111111; border: none; padding: 13px 26px; border-radius: 8px; }
-
-        .co-error { margin-top: 16px; padding: 12px; background: #F0F0F0; color: #4E4E4E; border-radius: 8px; font-size: 13px; text-align: center; }
-
-
-
-        /* =====================================================
-           WELCOME SCREEN
-           ===================================================== */
-
-        .co-welcome {
-          width: 100%;
-          max-width: 620px;
-          margin: 0 auto;
-          padding: 6px 0 18px;
-        }
-
-        .co-welcome-title {
-          max-width: 470px;
-          margin: 0 0 30px;
-          color: #111111;
-          font-family: 'League Spartan', Inter, sans-serif;
-          font-size: 32px;
-          line-height: 1.08;
-          font-weight: 500;
-          letter-spacing: -0.7px;
-        }
-
-        .co-welcome-list {
-          border-top: 1px solid #e8e8e8;
-          margin-bottom: 20px;
-        }
-
-        .co-welcome-row {
-          min-height: 62px;
-          display: grid;
-          grid-template-columns: 30px 1fr;
-          align-items: center;
-          gap: 10px;
-          border-bottom: 1px solid #e8e8e8;
-        }
-
-        .co-welcome-icon {
-          width: 22px;
-          height: 22px;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          color: #555555;
-        }
-
-        .co-welcome-row-text {
-          margin: 0;
-          color: #222222;
-          font-size: 12.5px;
-          line-height: 1.45;
-          font-weight: 400;
-        }
-
-        .co-welcome-action {
-          display: flex;
-          align-items: center;
-          gap: 18px;
-          margin-top: 16px;
-        }
-
-        .co-welcome-btn {
-          display: inline-flex;
-          align-items: center;
-          justify-content: center;
-          gap: 8px;
-          min-width: 108px;
-          height: 38px;
-          padding: 0 18px;
-          border: 1px solid #111111;
-          border-radius: 6px;
-          background: #111111;
-          color: #ffffff;
-          font-size: 12px;
-          font-weight: 500;
-          cursor: pointer;
-          transition: transform .15s ease, opacity .15s ease;
-        }
-
-        .co-welcome-btn:hover {
-          background: #111111;
-          color: #ffffff;
-          transform: translateY(-1px);
-        }
-
-        .co-welcome-note {
-          max-width: 250px;
-          margin: 0;
-          color: #777777;
-          font-size: 10.5px;
-          line-height: 1.45;
-        }
-
-        .co-welcome-note strong {
-          display: block;
-          color: #555555;
-          font-weight: 500;
-        }
-
-        /* =====================================================
-           THREE QUICK QUESTIONS
-           ===================================================== */
-
-        .co-question-screen {
-          width: 100%;
-          max-width: 930px;
-          margin: 0 auto;
-          padding: 0 0 28px;
-        }
-
-        .co-question-top {
-          margin-bottom: 22px;
-          color: #555555;
-          font-size: 11px;
-          line-height: 1;
-          font-weight: 500;
-        }
-
-        .co-question-title {
-          max-width: 760px;
-          margin: 0 0 10px;
-          color: #111111;
-          font-family: 'League Spartan', Inter, sans-serif;
-          font-size: 32px;
-          line-height: 1.12;
-          font-weight: 400;
-          letter-spacing: -0.65px;
-        }
-
-        .co-question-sub {
-          max-width: 720px;
-          margin: 0 0 25px;
-          color: #777777;
-          font-size: 11.5px;
-          line-height: 1.5;
-          font-weight: 400;
-        }
-
-        .co-question-grid {
-          display: grid;
-          grid-template-columns: repeat(3, minmax(0, 1fr));
-          gap: 16px;
-          width: 100%;
-        }
-
-        .co-question-card {
-          position: relative;
-          min-height: 300px;
-          display: flex;
-          flex-direction: column;
-          align-items: flex-start;
-          padding: 12px;
-          border: 1px solid #cfcfcf !important;
-          border-radius: 5px;
-          background: #ffffff !important;
-          color: #111111 !important;
-          text-align: left;
-          cursor: pointer;
-          appearance: none;
-          -webkit-appearance: none;
-          box-shadow: none;
-          position: relative;
-          transition: border-color .15s ease, box-shadow .15s ease, transform .15s ease;
-        }
-
-        .co-question-card:hover {
-          border-color: #111111 !important;
-          background: #ffffff !important;
-          transform: translateY(-1px);
-        }
-
-        .co-question-card.is-selected {
-          border-color: #111111 !important;
-          background: #ffffff !important;
-          box-shadow: 0 0 0 1px #111111;
-        }
-
-        .co-question-visual {
-          width: 100%;
-          height: 145px;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          margin-bottom: 12px;
-          border-radius: 3px;
-          background: #f5f5f5 !important;
-          color: #222222 !important;
-          border: 1px solid #eeeeee;
-          overflow: hidden;
-        }
-
-        .co-question-image {
-          width: 225px;
-          height: 225px;
-          max-width: none;
-          max-height: none;
-          object-fit: contain;
-          display: block;
-          padding: 0;
-          pointer-events: none;
-          user-select: none;
-          transform: none;
-        }
-
-        .co-question-select {
-          position: absolute;
-          top: 10px;
-          right: 10px;
-          width: 18px;
-          height: 18px;
-          border: 1.5px solid #bdbdbd;
-          border-radius: 50%;
-          background: #ffffff;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          font-size: 11px;
-          font-weight: 700;
-          line-height: 1;
-          color: #ffffff;
-          box-sizing: border-box;
-          transition: background .15s ease, border-color .15s ease;
-        }
-
-        .co-question-card.is-selected .co-question-select {
-          background: #111111;
-          border-color: #111111;
-        }
-
-        .co-question-card-copy {
-          display: flex;
-          flex-direction: column;
-          gap: 3px;
-          padding-right: 20px;
-        }
-
-        .co-question-card-copy strong {
-          color: #111111 !important;
-          font-size: 13px;
-          line-height: 1.3;
-          font-weight: 500;
-        }
-
-        .co-question-card-copy small {
-          color: #777777 !important;
-          font-size: 10.5px;
-          line-height: 1.35;
-          font-weight: 400;
-        }
-
-        .co-question-footer {
-          display: flex;
-          align-items: center;
-          justify-content: flex-start;
-          margin-top: 20px;
-        }
-
-        .co-question-next {
-          display: inline-flex;
-          align-items: center;
-          justify-content: center;
-          gap: 7px;
-          min-width: 130px;
-          height: 38px;
-          padding: 0 17px;
-          border: 1px solid #111111;
-          border-radius: 6px;
-          background: #111111;
-          color: #ffffff;
-          font-size: 12px;
-          font-weight: 500;
-          cursor: pointer;
-        }
-
-        .co-question-next:hover:not(:disabled) {
-          background: #000000;
-        }
-
-        .co-question-next:disabled {
-          background: #d0d0d0;
-          border-color: #d0d0d0;
-          color: #ffffff;
-          cursor: not-allowed;
-        }
-
-        @media (max-width: 480px) {
-          .co { padding: 16px 12px 50px; }
-          .co-wordmark { margin-bottom: 30px; }
-          .co-wordmark span { font-size: 22px; }
-          .co-welcome { padding: 4px 0 12px; }
-          .co-welcome-title { font-size: 28px; margin-bottom: 24px; }
-          .co-welcome-row { min-height: 58px; grid-template-columns: 26px 1fr; }
-          .co-welcome-action { align-items: flex-start; gap: 12px; }
-          .co-welcome-note { font-size: 10px; }
-
-          .co-question-grid { grid-template-columns: 1fr; }
-          .co-question-card { min-height: 270px; }
-          .co-question-visual { height: 145px; min-height: 145px; }
-          .co-question-image { width: 225px; height: 225px; }
-
-          .co-card { padding: 25px 20px 30px; }
-          .co-step-label { display: none; }
-          .co-header { flex-direction: column; align-items: stretch; gap: 10px; }
-        }
+        .onb-page{min-height:100vh;background:#fff;color:#111;font-family:Poppins,Arial,sans-serif;padding:28px 22px 70px;box-sizing:border-box;font-weight:400}.onb-page p,.onb-page label,.onb-page input,.onb-page textarea,.onb-page select,.onb-page button,.onb-page a{font-family:Poppins,Arial,sans-serif}
+        .onb-shell{width:100%;max-width:920px;margin:0 auto}
+        .onb-top{position:relative;display:flex;align-items:center;justify-content:center;height:34px;margin-bottom:52px}
+        .onb-logo{display:inline-flex;align-items:center;justify-content:center;gap:8px;padding:0!important;margin:0!important;border:0!important;background:transparent!important;color:#111!important;box-shadow:none!important;outline:none!important;text-decoration:none!important;cursor:pointer}
+        .onb-logo:hover,.onb-logo:focus,.onb-logo:focus-visible,.onb-logo:active{border:0!important;background:transparent!important;color:#111!important;box-shadow:none!important;outline:none!important;text-decoration:none!important}
+        .onb-logo span{font:500 23px/1 'League Spartan',sans-serif}
+        .onb-exit{position:absolute;right:0;top:50%;transform:translateY(-50%);padding:0!important;margin:0!important;border:0!important;background:transparent!important;color:#666!important;box-shadow:none!important;outline:none!important;font:400 12px Poppins,Arial,sans-serif;cursor:pointer}
+        .onb-exit:hover,.onb-exit:focus,.onb-exit:focus-visible,.onb-exit:active{border:0!important;background:transparent!important;color:#111!important;box-shadow:none!important;outline:none!important;text-decoration:underline;text-underline-offset:3px}
+        .onb-progress{margin-bottom:28px}
+        .onb-progress-head{display:flex;justify-content:space-between;align-items:flex-end;gap:20px}
+        .onb-kicker{margin:0 0 5px;font-size:10px;letter-spacing:.14em;color:#777}
+        .onb-progress h1{margin:0 0 5px;font:400 34px/1.1 'League Spartan',sans-serif;letter-spacing:-.3px}
+        .onb-muted{margin:0;color:#777;font-size:12px;font-weight:400;line-height:1.5}
+        .onb-progress-count{color:#777;font-size:11px}
+        .onb-steps{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:25px}
+        .onb-step{min-width:0;border-top:1px solid #ddd;padding-top:10px;color:#999;font-size:10px;line-height:1.4}
+        .onb-step.active,.onb-step.done{border-color:#111;color:#111}
+        .onb-step-dot{width:22px;height:22px;display:grid;place-items:center;margin-bottom:7px;border:1px solid #d5d5d5;border-radius:50%;font-size:10px}
+        .onb-step.active .onb-step-dot,.onb-step.done .onb-step-dot{background:#111;color:#fff;border-color:#111}
+        .onb-card{border:1px solid #e2e2e2;border-radius:15px;padding:34px 38px;background:#fff;box-shadow:0 18px 50px rgba(0,0,0,.045)}
+        .onb-card h2{margin:0 0 5px;font:400 25px/1.15 'League Spartan',sans-serif}
+        .onb-sub{margin:0 0 28px;color:#777;font-size:12px;line-height:1.6}
+        .onb-field{margin-bottom:21px}
+        .onb-label{display:block;margin-bottom:8px;font-size:11px;font-weight:500;color:#111}
+        .onb-input{width:100%;min-height:43px;box-sizing:border-box;border:1px solid #d8d8d8;border-radius:8px;background:#fff!important;color:#111!important;padding:10px 12px;font:400 12px Poppins,Arial,sans-serif;outline:none;box-shadow:none}
+        .onb-input:focus{border-color:#111}
+        .onb-input::placeholder{color:#aaa}
+        .onb-input:disabled{background:#f8f8f8;color:#777}
+        .onb-textarea{min-height:105px;resize:vertical}
+        .onb-grid{display:grid;grid-template-columns:1fr 1fr;gap:13px}
+        .onb-avatar-row{display:flex;align-items:center;gap:14px;margin-bottom:26px}
+        .onb-avatar{width:68px;height:68px;flex:none;display:grid;place-items:center;overflow:hidden;border-radius:50%;background:#f3f3f3;color:#777}
+        .onb-avatar img{width:100%;height:100%;object-fit:cover}
+        .onb-upload{display:inline-flex;align-items:center;gap:6px;border:1px solid #d8d8d8;border-radius:8px;background:#fff;color:#222;padding:9px 12px;font:400 11px Poppins,Arial,sans-serif;cursor:pointer}
+        .onb-upload:hover{border-color:#111}
+        .onb-upload input{display:none}
+        .onb-native-select{position:relative}
+        .onb-select-input{appearance:none;-webkit-appearance:none;padding-right:38px;cursor:pointer;background:#fff!important;color:#111!important}
+        .onb-native-chevron{position:absolute;right:12px;top:50%;transform:translateY(-50%);pointer-events:none;color:#666!important}
+        .onb-location{position:relative}
+        .onb-location-control{position:relative}
+        .onb-location-input{padding-right:40px}
+        .onb-location-control.open .onb-location-input{border-color:#111;box-shadow:0 0 0 1px #111}
+        .onb-icon-trigger{position:absolute;right:1px;top:1px;width:40px;height:41px;display:grid;place-items:center;border:0!important;border-radius:0 7px 7px 0;background:transparent!important;color:#666!important;padding:0;cursor:pointer;box-shadow:none!important;outline:none!important}
+        .onb-icon-trigger:hover{color:#111!important;background:#fafafa!important;border:0!important;box-shadow:none!important}
+        .onb-suggestion-menu{position:absolute;z-index:100;left:0;right:0;top:calc(100% + 6px);max-height:220px;overflow-y:auto;overscroll-behavior:contain;padding:6px;border:1px solid #e1e1e1;border-radius:9px;background:#fff!important;box-shadow:0 16px 35px rgba(0,0,0,.08);box-sizing:border-box;color:#111!important}
+        .onb-suggestion-menu::-webkit-scrollbar{width:6px}
+        .onb-suggestion-menu::-webkit-scrollbar-track{background:transparent}
+        .onb-suggestion-menu::-webkit-scrollbar-thumb{background:#d4d4d4;border-radius:99px}
+        .onb-suggestion{display:block;width:100%;border:0!important;border-radius:6px;background:#fff!important;color:#222!important;text-align:left;padding:9px 10px;font:400 12px Poppins,Arial,sans-serif;cursor:pointer;box-shadow:none!important}
+        .onb-suggestion:hover,.onb-suggestion.selected{background:#f5f5f5!important;color:#111!important;border:0!important;box-shadow:none!important}
+        .onb-no-suggestions{padding:10px;color:#888;font-size:11px;line-height:1.5}
+        .onb-help{margin:7px 0 0;color:#888;font-size:10px;line-height:1.5}
+        .onb-external-links{display:grid;gap:7px;margin-top:9px}
+        .onb-external-link{display:flex;align-items:center;gap:8px;min-width:0;padding:9px 10px;border:1px solid #e5e5e5;border-radius:8px;background:#fff;color:#222;text-decoration:none;font:400 11px Poppins,Arial,sans-serif;transition:border-color .15s ease,background .15s ease}
+        .onb-external-link:hover{border-color:#bdbdbd;background:#fafafa;color:#111}
+        .onb-external-link span:first-child{flex:none;font-weight:400;color:#555}
+        .onb-external-value{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:#777}
+        .onb-external-link svg{margin-left:auto;flex:none;color:#777}
+        .onb-external-link:hover svg{color:#111}
+        .onb-required-help{margin:0 0 10px!important}
+        .onb-error{margin-top:8px;border:1px solid #ddd;border-radius:8px;background:#f5f5f5;color:#333;padding:10px 12px;font-size:11px}
+        .onb-footer{display:flex;align-items:center;justify-content:space-between;gap:18px;margin-top:30px;padding-top:20px;border-top:1px solid #eee}
+        .onb-back,.onb-skip{display:inline-flex;align-items:center;gap:6px;border:0!important;background:transparent!important;color:#666!important;box-shadow:none!important;outline:none!important;padding:0!important;font:400 12px Poppins,Arial,sans-serif;cursor:pointer}
+        .onb-back:hover,.onb-back:focus,.onb-skip:hover,.onb-skip:focus{border:0!important;background:transparent!important;color:#111!important;box-shadow:none!important;outline:none!important}
+        .onb-actions{display:flex;align-items:center;gap:17px}
+        .onb-primary{display:inline-flex;align-items:center;gap:7px;border:1px solid #111;border-radius:8px;background:#111;color:#fff;padding:11px 18px;font:400 12px Poppins,Arial,sans-serif;cursor:pointer;transition:transform .15s ease}
+        .onb-primary:hover{background:#000;transform:translateY(-1px)}
+        .onb-primary:disabled{opacity:.55;cursor:not-allowed;transform:none}
+        .onb-loading{min-height:100vh;display:grid;place-items:center;color:#777;font:400 13px Poppins,Arial,sans-serif}
+        @media(max-width:650px){.onb-page{padding:20px 15px 50px}.onb-top{margin-bottom:35px}.onb-progress h1{font-size:29px}.onb-steps{grid-template-columns:1fr 1fr}.onb-card{padding:26px 20px}.onb-grid{grid-template-columns:1fr}.onb-footer{align-items:flex-start}.onb-actions{flex-wrap:wrap;justify-content:flex-end}}
       `}</style>
 
-      <div className="co-shell">
-
-        <Link to="/" className="co-wordmark">
-          <LogoMark size={22} />
-          <span>{BRAND_NAME}</span>
-        </Link>
-
-        {showWelcome ? (
-          <div className="co-welcome">
-            <h1 className="co-welcome-title">
-              <>Hey {user?.full_name || 'there'}. Ready to find your next creator?</>
-            </h1>
-
-            <div className="co-welcome-list">
-              
-              <div className="co-welcome-row">
-                <span className="co-welcome-icon"><Info size={15} /></span>
-                <p className="co-welcome-row-text">Answer a few questions and start building your brand profile</p>
-              </div>
-              <div className="co-welcome-row">
-                <span className="co-welcome-icon"><ArrowRight size={15} /></span>
-                <p className="co-welcome-row-text">Find creators and build campaigns that match your brand</p>
-              </div>
-              <div className="co-welcome-row">
-                <span className="co-welcome-icon"><CheckCircle2 size={15} /></span>
-                <p className="co-welcome-row-text">Work with creators safely and manage your collaborations with confidence</p>
-              </div>
-            </div>
-
-            <div className="co-welcome-action">
-              <button
-                type="button"
-                className="co-welcome-btn"
-                onClick={() => { setShowWelcome(false); setIntroQuestionStep(1); }}
-              >
-                Get started <ArrowRight size={14} />
-              </button>
-
-              <p className="co-welcome-note">
-                <strong>It only takes 5–10 minutes</strong>
-                You can edit your answers later, and we’ll save your progress as you go.
-              </p>
-            </div>
-          </div>
-        ) : introQuestionStep > 0 && introQuestionStep <= 3 ? (
-          <div className="co-question-screen">
-            <div className="co-question-top">
-              <span>{introQuestionStep}/3</span>
-            </div>
-
-            <h1 className="co-question-title">
-              {introQuestions[introQuestionStep - 1].title}
-            </h1>
-
-            <p className="co-question-sub">
-              {introQuestions[introQuestionStep - 1].sub}
-            </p>
-
-            <div className="co-question-grid">
-              {introQuestions[introQuestionStep - 1].options.map(([label, description], index) => {
-                const selected = introAnswers[introQuestionStep - 1] === label;
-
-                return (
-                  <button
-                    type="button"
-                    key={label}
-                    className={`co-question-card ${selected ? 'is-selected' : ''}`}
-                    onClick={() => {
-                      const next = [...introAnswers];
-                      const currentIndex = introQuestionStep - 1;
-                      // Clicking the already-selected option again unticks it.
-                      next[currentIndex] = next[currentIndex] === label ? '' : label;
-                      setIntroAnswers(next);
-                    }}
-                  >
-                    <span className="co-question-select" aria-hidden="true">{selected ? '✓' : ''}</span>
-                    <span className="co-question-visual">
-                      <img
-                        className="co-question-image"
-                        src={[
-                          '/assets/onboarding/1.png',
-                          '/assets/onboarding/2.png',
-                          '/assets/onboarding/3.png',
-                        ][index]}
-                        alt=""
-                        aria-hidden="true"
-                      />
-                    </span>
-
-                    <span className="co-question-card-copy">
-                      <strong>{label}</strong>
-                      <small>{description}</small>
-                    </span>
-
-                  </button>
-                );
-              })}
-            </div>
-
-            <div className="co-question-footer">
-              <button
-                type="button"
-                className="co-question-next"
-                disabled={!introAnswers[introQuestionStep - 1]}
-                onClick={() => {
-                  if (introQuestionStep < 3) {
-                    setIntroQuestionStep(introQuestionStep + 1);
-                  } else {
-                    setIntroQuestionStep(4);
-                  }
-                }}
-              >
-                {introQuestionStep < 3 ? 'Continue' : 'Continue to profile'}
-                <ArrowRight size={15} />
-              </button>
-            </div>
-          </div>
-        ) : (
-          <>
-        <div className="co-header">
-          <button type="button" className="co-back-link" onClick={handleBackToDashboard}>
-            <ArrowLeft size={15} /> Back to Dashboard
+      <div className="onb-shell">
+        <header className="onb-top">
+          <Link to="/" className="onb-logo" aria-label="Go to creatorhub landing page">
+            <LogoMark size={27} />
+            <span>creatorhub</span>
+          </Link>
+          <button type="button" className="onb-exit" onClick={() => navigate("/dashboard")}>
+            Skip for now
           </button>
+        </header>
 
-          {!done && !loadingProgress && (
-            <div className="co-header-right">
-              {draftSaved && (
-                <span className="co-savedraft-toast">
-                  <CheckCircle2 size={13} /> Draft saved
-                </span>
-              )}
-              <button type="button" className="co-savedraft-btn" onClick={handleSaveDraft}>
-                <Save size={13} /> Save Draft
-              </button>
+        <div className="onb-progress">
+          <div className="onb-progress-head">
+            <div>
+              <p className="onb-kicker">BRAND PROFILE</p>
+              <h1>Set up your business profile</h1>
+              <p className="onb-muted">Step 1 is required. Everything else can be completed later.</p>
             </div>
-          )}
+            <span className="onb-progress-count">{step} / {STEPS.length}</span>
+          </div>
+
+          <div className="onb-steps">
+            {STEPS.map((label, index) => (
+              <div
+                className={`onb-step ${index + 1 === step ? "active" : ""} ${index + 1 < step ? "done" : ""}`}
+                key={label}
+              >
+                <div className="onb-step-dot">
+                  {index + 1 < step ? <Check size={13} /> : index + 1}
+                </div>
+                <span>{label}{index === 0 ? " · Required" : " · Optional"}</span>
+              </div>
+            ))}
+          </div>
         </div>
 
-        {!done && !loadingProgress && <StepHeader step={step} />}
+        <main className="onb-card">
+          {step === 1 && (
+            <section>
+              <h2>Business information</h2>
+              <p className="onb-sub">This is the only onboarding step you must finish before entering Creator Hub.</p>
 
-        <div className="co-card">
-
-          {done ? (
-            <div className="co-done">
-              <div className="co-done-icon"><CheckCircle2 size={30} /></div>
-              <p className="co-done-title">Profile complete</p>
-              <p className="co-done-sub">Welcome to creatorhub!</p>
-              <button className="co-done-btn" onClick={() => navigate('/dashboard')}>
-                Go to Dashboard <ArrowRight size={15} />
-              </button>
-            </div>
-          ) : loadingProgress ? (
-            <div className="co-done" style={{ color: 'var(--ink-soft)' }}>
-              Loading your profile...
-            </div>
-          ) : (
-            <>
-
-              {/* ============================================
-                  STEP 1 — BASIC INFO
-              ============================================ */}
-
-              {step === 1 && (
-                <>
-                  <h2 className="co-h2">Basic Info</h2>
-                  <p className="co-sub">Tell us about your business — this is what creators will see first.</p>
-
-                  <div className="co-field">
-                    <label className="co-label">Company logo</label>
-                    <div className="co-avatar-row">
-                      <div className="co-avatar">
-                        {logoUrl ? <img src={logoUrl} alt="Logo" /> : <Camera size={22} />}
-                      </div>
-                      <label className="co-avatar-btn" style={uploadingLogo ? { opacity: 0.6, pointerEvents: 'none' } : undefined}>
-                        <Camera size={14} />
-                        {uploadingLogo ? 'Uploading...' : 'Upload logo'}
-                        <input
-                          type="file"
-                          accept="image/*"
-                          style={{ display: 'none' }}
-                          disabled={uploadingLogo}
-                          onChange={async (event) => {
-                            const file = event.target.files?.[0];
-                            if (!file) return;
-                            setLogoError('');
-                            setUploadingLogo(true);
-                            try {
-                              const { url } = await uploadImage(file);
-                              setLogoUrl(url);
-                            } catch (err: any) {
-                              console.error('Logo upload failed:', err);
-                              setLogoError(err?.response?.data?.detail || 'Could not upload logo. Please try again.');
-                            } finally {
-                              setUploadingLogo(false);
-                              event.target.value = '';
-                            }
-                          }}
-                        />
-                      </label>
-                    </div>
-                    <p className="co-hint"><Info size={13} style={{ marginTop: 1, flexShrink: 0 }} />JPG, PNG or WebP — up to 20 MB</p>
-                    {logoError && (
-                      <p className="co-hint" style={{ color: '#E8544E' }}>
-                        <Info size={13} style={{ marginTop: 1, flexShrink: 0 }} />{logoError}
-                      </p>
-                    )}
-                  </div>
-
-                  <div className="co-field">
-                    <label className="co-label">Company Name *</label>
-                    <input className="co-input" value={companyName} onChange={(e) => setCompanyName(e.target.value)} placeholder="Your company's name" />
-                  </div>
-
-                  <p className="co-section-label">Industry *</p>
-                  <div style={{ marginBottom: 22 }}>
-                    <ChipGroup
-                      items={INDUSTRIES}
-                      isActive={(item) => industry === item}
-                      onToggle={(item) => toggleSingle(industry, setIndustry, item)}
-                    />
-                  </div>
-
-                  <div className="co-field">
-                    <label className="co-label">Location *</label>
-                    <LocationAutocomplete value={location} onChange={setLocation} />
-                  </div>
-                </>
-              )}
-
-              {/* ============================================
-                  STEP 2 — ABOUT & CONTACT
-              ============================================ */}
-
-              {step === 2 && (
-                <>
-                  <h2 className="co-h2">About & Contact</h2>
-                  <p className="co-sub">Give creators a sense of who you are and how to reach you.</p>
-
-                  <div className="co-field">
-                    <label className="co-label">Description</label>
-                    <textarea className="co-textarea" maxLength={500} value={description} onChange={(e) => setDescription(e.target.value)} placeholder="What does your business do, and what kind of collabs are you looking for?" />
-                    <p className="co-hint">{description.length}/500</p>
-                  </div>
-
-                  <div className="co-field">
-                    <label className="co-label">Website</label>
-                    <input className="co-input" value={website} onChange={(e) => setWebsite(e.target.value)} placeholder="https://yourcompany.com" />
-                  </div>
-
-                  <div className="co-field" style={{ marginBottom: 4 }}>
-                    <label className="co-label">Contact phone</label>
-                    <input className="co-input" value={contactPhone} onChange={(e) => setContactPhone(e.target.value)} placeholder="+977 98XXXXXXXX" />
-                  </div>
-                </>
-              )}
-
-              {/* ============================================
-                  STEP 3 — PREFERENCES
-              ============================================ */}
-
-              {step === 3 && (
-                <>
-                  <h2 className="co-h2">Preferences</h2>
-                  <p className="co-sub">What kind of creators and content are you looking for?</p>
-
-                  <p className="co-section-label">Interested categories *</p>
-                  <div style={{ marginBottom: 22 }}>
-                    <ChipGroup
-                      items={INTERESTED_CATEGORIES}
-                      isActive={(item) => interestedCategories.includes(item)}
-                      onToggle={(item) => toggle(interestedCategories, setInterestedCategories, item)}
-                    />
-                  </div>
-
-                  <p className="co-section-label">Preferred content types *</p>
-                  <div style={{ marginBottom: 22 }}>
-                    <ChipGroup
-                      items={CONTENT_TYPES}
-                      isActive={(item) => preferredContentTypes.includes(item)}
-                      onToggle={(item) => toggle(preferredContentTypes, setPreferredContentTypes, item)}
-                    />
-                  </div>
-
-                  <p className="co-section-label">Team size *</p>
-                  <div className="co-chips" style={{ marginBottom: 22 }}>
-                    {TEAM_SIZES.map((t) => (
-                      <Chip key={t} label={t} active={teamSize === t} onClick={() => toggleSingle(teamSize, setTeamSize, t)} />
-                    ))}
-                  </div>
-
-                  <div className="co-field">
-                    <label className="co-label">Typical budget per collab</label>
-                    <div className="co-price-row">
-                      <span className="co-price-prefix">Rs.</span>
-                      <input type="number" min={0} value={typicalBudget} onChange={(e) => setTypicalBudget(e.target.value)} placeholder="15000" />
-                    </div>
-                  </div>
-
-                  <div className="co-field" style={{ marginBottom: 4 }}>
-                    <label className="co-label">Year established</label>
-                    <input type="number" className="co-input" value={yearEstablished} onChange={(e) => setYearEstablished(e.target.value)} placeholder="2022" />
-                  </div>
-                </>
-              )}
-
-              {/* ============================================
-                  STEP 4 — PUBLISH
-              ============================================ */}
-
-              {step === 4 && (
-                <>
-                  <h2 className="co-h2">Publish</h2>
-                  <p className="co-sub">Review everything and go live.</p>
-
-                  <div className="co-recap">
-                    <div className="co-recap-card">
-                      <p className="co-recap-label">Basic Info</p>
-                      <div className="co-recap-row">
-                        <div className="co-avatar" style={{ width: 40, height: 40, fontSize: 15, borderRadius: 10 }}>
-                          {logoUrl ? <img src={logoUrl} alt="" /> : (companyName[0] || 'C').toUpperCase()}
-                        </div>
-                        <span>
-                          <p className="co-recap-name">{companyName || 'Unnamed company'}</p>
-                          <p className="co-recap-sub">{industry || 'No industry'} · {location || 'No location'}</p>
-                        </span>
-                      </div>
-                    </div>
-
-                    <div className="co-recap-card">
-                      <p className="co-recap-label">About & Contact</p>
-                      <p className="co-recap-sub" style={{ marginBottom: 6 }}>{description || 'No description yet'}</p>
-                      {(website || contactPhone) && (
-                        <p className="co-recap-sub">{[website, contactPhone].filter(Boolean).join(' · ')}</p>
-                      )}
-                    </div>
-
-                    <div className="co-recap-card">
-                      <p className="co-recap-label">Preferences</p>
-                      <div className="co-recap-chips">
-                        {[...interestedCategories, ...preferredContentTypes].map((c) => <span className="co-chip" key={c}>{c}</span>)}
-                      </div>
-                      {(teamSize || typicalBudget) && (
-                        <p className="co-recap-sub" style={{ marginTop: 8 }}>
-                          {[teamSize, typicalBudget ? `Rs. ${typicalBudget} typical budget` : ''].filter(Boolean).join(' · ')}
-                        </p>
-                      )}
-                    </div>
-                  </div>
-
-                  {error && <div className="co-error">{error}</div>}
-                </>
-              )}
-
-              {/* ============================================
-                  FOOTER NAV
-              ============================================ */}
-
-              <div className="co-footer">
-                {step > 1 ? (
-                  <button className="co-back" onClick={() => setStep(step - 1)}>
-                    <ArrowLeft size={14} /> Previous
-                  </button>
-                ) : <span />}
-
-                {step < 4 ? (
-                  <button
-                    className="co-continue"
-                    disabled={
-                      (step === 1 && !canContinueStep1) ||
-                      (step === 2 && !canContinueStep2) ||
-                      (step === 3 && !canContinueStep3)
-                    }
-                    onClick={() => {
-                      if (step === 1) saveStep1Progress()?.catch((e) => console.error(e));
-                      if (step === 2) saveStep2Progress()?.catch((e) => console.error(e));
-                      if (step === 3) saveStep3Progress()?.catch((e) => console.error(e));
-                      setStep(step + 1);
+              <div className="onb-avatar-row">
+                <div className="onb-avatar">
+                  {logo ? <img src={logo} alt="Business logo" /> : <Building2 size={22} />}
+                </div>
+                <label className="onb-upload">
+                  <UploadCloud size={15} />
+                  {uploading ? " Uploading…" : " Add business logo"}
+                  <input
+                    type="file"
+                    accept="image/*"
+                    disabled={uploading}
+                    onChange={(event) => {
+                      const file = event.target.files?.[0];
+                      if (file) void uploadLogo(file);
+                      event.currentTarget.value = "";
                     }}
-                  >
-                    Next <ArrowRight size={15} />
-                  </button>
-                ) : (
-                  <button className="co-continue" disabled={!canFinish || isSubmitting} onClick={handleFinish}>
-                    {isSubmitting ? 'Publishing...' : 'Publish Profile'}
-                    <ArrowRight size={15} />
-                  </button>
-                )}
+                  />
+                </label>
               </div>
 
-            </>
+              <div className="onb-grid">
+                <Field label="Business name *">
+                  <input
+                    className="onb-input"
+                    value={name}
+                    onChange={(event) => setName(event.target.value)}
+                    placeholder="Your business name"
+                  />
+                </Field>
+
+                <Field label="Industry *">
+                  <StyledSelect value={industry} onChange={setIndustry} placeholder="Select an industry">
+                    {INDUSTRIES.map((item) => (
+                      <option key={item} value={item}>{item}</option>
+                    ))}
+                  </StyledSelect>
+                </Field>
+              </div>
+
+              <Field label="Location *">
+                <LocationField value={location} onChange={setLocation} />
+                <p className="onb-help">Type a location, choose a suggestion, or enter your own.</p>
+              </Field>
+
+              <Field label="Company website or social profile *">
+                <p className="onb-help onb-required-help">Add at least one public company website or social profile so creators can verify your business.</p>
+                <div className="onb-grid">
+                  <input
+                    className="onb-input"
+                    value={website}
+                    onChange={(event) => setWebsite(event.target.value)}
+                    placeholder="https://yourwebsite.com"
+                  />
+                  <input
+                    className="onb-input"
+                    value={companySocial}
+                    onChange={(event) => setCompanySocial(event.target.value)}
+                    placeholder="Company social profile URL"
+                  />
+                </div>
+                <p className="onb-help">Only one is required. You can add more links later.</p>
+                {(externalHref(website) || externalHref(companySocial)) && (
+                  <div className="onb-external-links" aria-label="Business links">
+                    <ExternalProfileLink label="Website" value={website} />
+                    <ExternalProfileLink label="Company social" value={companySocial} />
+                  </div>
+                )}
+              </Field>
+
+              <Field label="Short business description *">
+                <textarea
+                  className="onb-input onb-textarea"
+                  maxLength={1000}
+                  value={description}
+                  onChange={(event) => setDescription(event.target.value)}
+                  placeholder="What does your business do?"
+                />
+              </Field>
+            </section>
           )}
 
-        </div>
-          </>
-        )}
+          {step === 2 && (
+            <section>
+              <h2>Contact information</h2>
+              <p className="onb-sub">Useful for communication with creators. You can add or change this later.</p>
+
+              <Field label="Contact person">
+                <input
+                  className="onb-input"
+                  value={contactName}
+                  onChange={(event) => setContactName(event.target.value)}
+                  placeholder="Contact person"
+                />
+              </Field>
+
+              <Field label="Business email">
+                <input className="onb-input" value={contactEmail} disabled />
+              </Field>
+
+              <Field label="Phone">
+                <input
+                  className="onb-input"
+                  value={phone}
+                  onChange={(event) => setPhone(event.target.value)}
+                  placeholder="Phone number"
+                />
+              </Field>
+            </section>
+          )}
+
+          {step === 3 && (
+            <section>
+              <h2>Online presence</h2>
+              <p className="onb-sub">Add your website and social links when you are ready. Everything here is optional.</p>
+
+              <Field label="Website">
+                <input
+                  className="onb-input"
+                  value={website}
+                  onChange={(event) => setWebsite(event.target.value)}
+                  placeholder="https://yourwebsite.com"
+                />
+                <div className="onb-external-links">
+                  <ExternalProfileLink label="Website" value={website} />
+                </div>
+              </Field>
+
+              <Field label="Social links">
+                <div className="onb-grid">
+                  <input
+                    className="onb-input"
+                    value={instagram}
+                    onChange={(event) => setInstagram(event.target.value)}
+                    placeholder="Instagram URL"
+                  />
+                  <input
+                    className="onb-input"
+                    value={facebook}
+                    onChange={(event) => setFacebook(event.target.value)}
+                    placeholder="Facebook URL"
+                  />
+                </div>
+
+                <input
+                  className="onb-input"
+                  style={{ marginTop: 10 }}
+                  value={otherSocial}
+                  onChange={(event) => setOtherSocial(event.target.value)}
+                  placeholder="Other social link"
+                />
+
+                <div className="onb-external-links">
+                  <ExternalProfileLink label="Instagram" value={instagram} />
+                  <ExternalProfileLink label="Facebook" value={facebook} />
+                  <ExternalProfileLink label="Other" value={otherSocial} />
+                </div>
+              </Field>
+            </section>
+          )}
+
+          {error && <div className="onb-error">{error}</div>}
+
+          <footer className="onb-footer">
+            <button
+              type="button"
+              className="onb-back"
+              onClick={() => (step === 1 ? navigate("/dashboard") : setStep(step - 1))}
+            >
+              <ArrowLeft size={15} />
+              {step === 1 ? " Dashboard" : " Back"}
+            </button>
+
+            <div className="onb-actions">
+              {step > 1 && (
+                <button type="button" className="onb-skip" onClick={skip} disabled={saving}>
+                  Skip for now
+                </button>
+              )}
+              <button type="button" className="onb-primary" onClick={next} disabled={saving || uploading}>
+                {saving ? "Saving…" : step === STEPS.length ? "Finish" : step === 1 ? "Save & continue" : "Continue"}
+                {!saving && <ArrowRight size={15} />}
+              </button>
+            </div>
+          </footer>
+        </main>
       </div>
     </div>
   );
 }
 
-export default BusinessOnboarding;
+function Field({ label, children }: { label: string; children: ReactNode }) {
+  return (
+    <div className="onb-field">
+      <label className="onb-label">{label}</label>
+      {children}
+    </div>
+  );
+}

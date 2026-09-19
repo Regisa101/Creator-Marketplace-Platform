@@ -60,24 +60,21 @@ const CREATOR_PROFILE_FIELDS: Array<string | string[]> = [
   "content_types",
   ["content_languages", "languages"],
   ["audience_interests", "interests"],
-  "audience_age_range",
-  "audience_location",
   "socials",
-  "starting_price",
+  "portfolio",
+  "availability",
 ];
 
 const BUSINESS_PROFILE_FIELDS: Array<string | string[]> = [
   "company_name",
-  "business_type",
   "industry",
   "location",
-  "website",
   "description",
   "logo_url",
   "contact_phone",
-  "interested_categories",
-  "preferred_content_types",
-  "typical_budget",
+  "contact_person_name",
+  "website",
+  "social_links",
 ];
 
 const BASE_COMPLETION = 22;

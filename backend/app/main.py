@@ -66,6 +66,13 @@ def ensure_schema() -> None:
 
     statements = [
         # ----------------------------------------------------
+        # ONBOARDING
+        # ----------------------------------------------------
+        "ALTER TABLE creator_profiles ADD COLUMN IF NOT EXISTS availability VARCHAR(30)",
+        "ALTER TABLE business_profiles ADD COLUMN IF NOT EXISTS contact_person_name VARCHAR(120)",
+        "ALTER TABLE business_profiles ADD COLUMN IF NOT EXISTS social_links JSON",
+
+        # ----------------------------------------------------
         # BUSINESS PROFILE DEFAULTS
         # ----------------------------------------------------
         "ALTER TABLE business_profiles ADD COLUMN IF NOT EXISTS default_dos JSON",

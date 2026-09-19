@@ -15,6 +15,7 @@ class BusinessProfile(Base):
     location = Column(String(100), nullable=True)
     
     website = Column(String(255), nullable=True)
+    social_links = Column(JSON, nullable=True)
     description = Column(Text, nullable=True)
     logo_url = Column(String(255), nullable=True)
     contact_phone = Column(String(50), nullable=True)

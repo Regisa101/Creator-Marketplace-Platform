@@ -21,6 +21,9 @@ from app.models import (  # noqa: F401 - import all models into metadata
 
 
 statements = [
+    "ALTER TABLE creator_profiles ADD COLUMN IF NOT EXISTS availability VARCHAR(30)",
+    "ALTER TABLE business_profiles ADD COLUMN IF NOT EXISTS contact_person_name VARCHAR(120)",
+    "ALTER TABLE business_profiles ADD COLUMN IF NOT EXISTS social_links JSON",
     "ALTER TABLE campaigns ADD COLUMN IF NOT EXISTS application_deadline TIMESTAMPTZ",
     "ALTER TABLE campaigns ADD COLUMN IF NOT EXISTS deliverable_deadline TIMESTAMPTZ",
     "ALTER TABLE campaigns ADD COLUMN IF NOT EXISTS creators_needed INTEGER NOT NULL DEFAULT 1",

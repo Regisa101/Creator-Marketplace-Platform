@@ -1,396 +1,161 @@
 import type { ReactNode } from "react";
 import { Link } from "react-router-dom";
 import { LogoMark } from "../../components/Logo";
-import type { Role } from "./theme";
 
-interface AuthLayoutProps {
-  mode: "login" | "register";
-  title: string;
+type AuthLayoutProps = {
   children: ReactNode;
-  role?: Role;
-}
+  title: string;
+  mode: "login" | "register";
+  role?: "creator" | "business";
+};
 
 export function AuthLayout({
-  mode,
-  title,
   children,
+  title,
+  mode,
   role,
 }: AuthLayoutProps) {
-  const isBusiness = role === "business";
+  const roleLabel = role === "creator" ? "Creator" : "Brand";
 
-  const alternatePath = isBusiness
-    ? "/register/creator"
-    : "/register/business";
+  const alternatePath =
+    role === "creator" ? "/register/business" : "/register/creator";
 
-  const alternateLabel = isBusiness
-    ? "Apply as creator"
-    : "Apply as brand";
-
-  const alternateText = isBusiness
-    ? "Looking for work?"
-    : "Looking to hire?";
+  const alternateLabel =
+    role === "creator" ? "register as a Brand" : "register as a Creator";
 
   return (
-    <div className="az-root">
+    <div className="az-page-shell">
       <style>{`
-
-        /* =====================================================
-           RESET
-        ===================================================== */
-
-        .az-root,
-        .az-root *,
-        .az-root *::before,
-        .az-root *::after {
+        .az-page-shell {
+          min-height: 100vh;
+          width: 100%;
           box-sizing: border-box;
-        }
-
-
-        /* =====================================================
-           ROOT
-        ===================================================== */
-
-        .az-root {
-          width: 100%;
-          min-height: 100vh;
-
-          margin: 0;
-          padding: 0;
-
-          background: #ffffff;
-
-          color: #111111;
-
-          font-family:
-            -apple-system,
-            BlinkMacSystemFont,
-            "Segoe UI",
-            Roboto,
-            Helvetica,
-            Arial,
-            sans-serif;
-
-          -webkit-font-smoothing: antialiased;
-        }
-
-
-        /* =====================================================
-           PAGE
-        ===================================================== */
-
-        .az-page {
-          position: relative;
-
-          width: 100%;
-          min-height: 100vh;
-
           display: flex;
           flex-direction: column;
           align-items: center;
-
-          padding:
-            96px
-            24px
-            42px;
-
+          padding: 28px 20px 48px;
           background: #ffffff;
+          color: #111111;
+          font-family: Inter, system-ui, -apple-system, BlinkMacSystemFont,
+            "Segoe UI", sans-serif;
         }
-
-
-        /* =====================================================
-           TOP BAR
-           
-           White only.
-           
-           Logo is ABSOLUTELY centered against the entire
-           viewport — the right-side text cannot move it.
-        ===================================================== */
-
-        .az-topbar {
-          position: absolute;
-
-          top: 0;
-          left: 0;
-
-          width: 100%;
-          height: 72px;
-
-          background: #ffffff;
-
-          border: none;
-          box-shadow: none;
-        }
-
-
-        /* =====================================================
-           LOGO
-
-           SMALL + EXACTLY CENTERED
-        ===================================================== */
 
         .az-header {
-          position: absolute;
-
-          top: 50%;
-          left: 50%;
-
-          transform: translate(-50%, -50%);
-
-          display: inline-flex;
-          align-items: center;
-          justify-content: center;
-
-          gap: 6px;
-
-          width: max-content;
-
-          margin: 0;
-          padding: 0;
-
-          color: #111111;
-
-          text-decoration: none;
-
-          white-space: nowrap;
-
-          line-height: 1;
-
-          cursor: pointer;
-
-          transition:
-            opacity 0.15s ease;
-        }
-
-        .az-header:hover {
-          color: #111111;
-
-          opacity: 0.72;
-        }
-
-
-        /* =====================================================
-           LOGO MARK
-
-           Keep this SMALL so it matches the landing page.
-        ===================================================== */
-
-        .az-logo {
-          width: 22px;
-          height: 22px;
-
           display: flex;
           align-items: center;
           justify-content: center;
+          gap: 7px;
+          margin-bottom: 44px;
+          color: #111111;
+          text-decoration: none;
+        }
 
-          flex: 0 0 22px;
-
-          line-height: 0;
+        .az-logo {
+          width: 27px;
+          height: 27px;
+          flex: 0 0 27px;
+          display: flex;
+          align-items: center;
+          justify-content: center;
         }
 
         .az-logo svg {
-          width: 22px;
-          height: 22px;
+          display: block;
         }
-
-
-        /* =====================================================
-           LOGO WORDMARK
-        ===================================================== */
 
         .az-brand-name {
           margin: 0;
-
           color: #111111;
-
-          font-size: 22px;
+          font-family: "League Spartan", sans-serif;
+          font-size: 23px;
           line-height: 1;
-
           font-weight: 500;
-
-          letter-spacing: -0.9px;
+          letter-spacing: 0;
         }
-
-
-        /* =====================================================
-           TOP RIGHT ROLE SWITCH
-
-           BLACK / GRAY ONLY
-           
-           NO GREEN.
-        ===================================================== */
-
-        .az-role-switch {
-          position: absolute;
-
-          top: 50%;
-          right: 24px;
-
-          transform: translateY(-50%);
-
-          display: flex;
-          align-items: center;
-          justify-content: flex-end;
-
-          gap: 7px;
-
-          color: #555555;
-
-          font-size: 13px;
-          line-height: 1.4;
-
-          font-weight: 400;
-
-          white-space: nowrap;
-        }
-
-        .az-role-switch-label {
-          color: #555555;
-
-          font-weight: 400;
-        }
-
-        .az-role-switch a {
-          color: #111111;
-
-          font-weight: 500;
-
-          text-decoration: none;
-
-          cursor: pointer;
-
-          transition:
-            opacity 0.15s ease;
-        }
-
-        .az-role-switch a:hover {
-          color: #111111;
-
-          opacity: 0.62;
-
-          text-decoration: underline;
-
-          text-underline-offset: 3px;
-        }
-
-
-        /* =====================================================
-           AUTH CARD
-        ===================================================== */
 
         .az-card {
           width: 100%;
           max-width: 430px;
-
-          padding:
-            36px
-            38px
-            30px;
-
+          box-sizing: border-box;
+          padding: 38px;
+          border: 1px solid #dedede;
+          border-radius: 16px;
           background: #ffffff;
-
-          border:
-            1px solid #dedede;
-
-          border-radius: 14px;
-
-          box-shadow:
-            0 10px 30px
-            rgba(0, 0, 0, 0.045);
+          box-shadow: 0 14px 40px rgba(0, 0, 0, 0.05);
         }
 
-
-        /* =====================================================
-           HEADING
-        ===================================================== */
-
         .az-heading {
-          margin:
-            0
-            0
-            28px;
-
+          margin: 0 0 26px;
           color: #111111;
-
-          font-size: 28px;
-          line-height: 1.15;
-
+          font-family: "League Spartan", sans-serif;
+          font-size: 30px;
+          line-height: 1.08;
           font-weight: 400;
-
-          letter-spacing: -0.7px;
-
+          letter-spacing: -0.015em;
           text-align: center;
         }
 
-
-        /* =====================================================
-           REMOVE OLD ROLE BADGE
-        ===================================================== */
-
         .az-role {
-          display: none !important;
+          display: block;
+          width: fit-content;
+          margin: -12px auto 24px;
+          padding: 5px 10px;
+          border: 1px solid #dedede;
+          border-radius: 999px;
+          color: #555555;
+          background: #ffffff;
+          font-size: 10px;
+          font-weight: 500;
+          letter-spacing: 0.08em;
+          text-transform: uppercase;
         }
 
-
-        /* =====================================================
-           FORM FIELDS
-        ===================================================== */
-
         .az-field {
-          width: 100%;
-
-          margin-bottom: 17px;
+          margin-bottom: 18px;
         }
 
         .az-label {
           display: flex;
           align-items: center;
           justify-content: space-between;
-
-          margin:
-            0
-            0
-            7px;
-
+          gap: 12px;
+          margin-bottom: 7px;
           color: #222222;
-
           font-size: 13px;
-          line-height: 1.4;
-
           font-weight: 400;
         }
 
+        .az-label a {
+          color: #555555;
+          font-size: 12px;
+          font-weight: 400;
+          text-decoration: none;
+        }
 
-        /* =====================================================
-           INPUT
-        ===================================================== */
+        .az-label a:hover {
+          color: #111111;
+          text-decoration: underline;
+        }
 
+        /*
+         * Inputs
+         * Explicitly override browser autofill so Chrome does not
+         * turn the fields blue.
+         */
         .az-input {
           width: 100%;
           height: 46px;
-
-          display: block;
-
-          padding:
-            0
-            13px;
-
-          border:
-            1px solid #cfcfcf;
-
+          box-sizing: border-box;
+          padding: 0 13px;
+          border: 1px solid #cfcfcf;
           border-radius: 9px;
-
           outline: none;
-
-          background: #ffffff;
-
-          color: #111111;
-
+          color: #111111 !important;
+          background: #ffffff !important;
           font-family: inherit;
-
           font-size: 13px;
-
           font-weight: 400;
-
+          caret-color: #111111;
           transition:
             border-color 0.15s ease,
             box-shadow 0.15s ease;
@@ -402,20 +167,34 @@ export function AuthLayout({
 
         .az-input:focus {
           border-color: #111111;
-
-          box-shadow:
-            0 0 0 2px
-            rgba(0, 0, 0, 0.055);
+          background: #ffffff !important;
+          box-shadow: 0 0 0 2px rgba(0, 0, 0, 0.07);
         }
 
+        .az-input:disabled {
+          opacity: 0.65;
+          cursor: not-allowed;
+        }
 
-        /* =====================================================
-           PASSWORD
-        ===================================================== */
+        /*
+         * Chrome autofill fix.
+         * The inset shadow paints the field white instead of Chrome's
+         * default pale blue autofill background.
+         */
+        .az-input:-webkit-autofill,
+        .az-input:-webkit-autofill:hover,
+        .az-input:-webkit-autofill:focus,
+        .az-input:-webkit-autofill:active {
+          -webkit-text-fill-color: #111111 !important;
+          -webkit-box-shadow: 0 0 0 1000px #ffffff inset !important;
+          box-shadow: 0 0 0 1000px #ffffff inset !important;
+          background-color: #ffffff !important;
+          caret-color: #111111 !important;
+          transition: background-color 9999s ease-in-out 0s;
+        }
 
         .az-pw-wrap {
           position: relative;
-
           width: 100%;
         }
 
@@ -423,511 +202,201 @@ export function AuthLayout({
           padding-right: 44px;
         }
 
+        /*
+         * Password eye
+         * Black, no background, no box, no white icon.
+         */
         .az-pw-toggle {
           position: absolute;
-
           top: 50%;
-          right: 7px;
-
-          width: 31px;
-          height: 31px;
-
+          right: 8px;
+          width: 30px;
+          height: 30px;
           display: flex;
           align-items: center;
           justify-content: center;
-
-          transform: translateY(-50%);
-
           margin: 0;
           padding: 0;
-
+          transform: translateY(-50%);
           border: 0 !important;
           outline: 0 !important;
-
+          border-radius: 6px;
           background: transparent !important;
-
-          color: #777777;
-
+          color: #111111 !important;
           box-shadow: none !important;
-
           cursor: pointer;
-
           appearance: none;
+        }
+
+        .az-pw-toggle svg {
+          color: #111111 !important;
+          stroke: #111111 !important;
+          width: 16px;
+          height: 16px;
         }
 
         .az-pw-toggle:hover,
         .az-pw-toggle:focus,
         .az-pw-toggle:active {
           border: 0 !important;
-
+          outline: 0 !important;
           background: transparent !important;
-
-          color: #111111;
-
+          color: #111111 !important;
           box-shadow: none !important;
         }
 
+        .az-pw-toggle:hover svg,
+        .az-pw-toggle:focus svg,
+        .az-pw-toggle:active svg {
+          color: #111111 !important;
+          stroke: #111111 !important;
+        }
 
-        /* =====================================================
-           ERROR
-        ===================================================== */
+        .az-pw-toggle:disabled {
+          opacity: 0.65;
+          cursor: not-allowed;
+        }
 
         .az-error {
-          margin:
-            -2px
-            0
-            16px;
-
-          padding:
-            10px
-            12px;
-
-          border:
-            1px solid #d8d8d8;
-
+          margin: -2px 0 16px;
+          padding: 10px 12px;
+          border: 1px solid #d7d7d7;
           border-radius: 8px;
-
-          background: #f7f7f7;
-
           color: #222222;
-
+          background: #f7f7f7;
           font-size: 12px;
-
           line-height: 1.45;
         }
 
+        .az-submit {
+          width: 100%;
+          height: 46px;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          gap: 8px;
+          margin-top: 4px;
+          border: 1px solid #111111;
+          border-radius: 9px;
+          background: #111111;
+          color: #ffffff !important;
+          font: inherit;
+          font-size: 13px;
+          font-weight: 500;
+          cursor: pointer;
+          transition: transform 0.15s ease;
+        }
 
-        /* =====================================================
-           TERMS
-        ===================================================== */
+        .az-submit:hover:not(:disabled),
+        .az-submit:focus:not(:disabled),
+        .az-submit:active:not(:disabled) {
+          background: #111111 !important;
+          color: #ffffff !important;
+          transform: translateY(-1px);
+        }
+
+        .az-submit:disabled {
+          opacity: 0.6;
+          cursor: not-allowed;
+        }
+
+        .az-switch {
+          margin: 22px 0 0;
+          color: #666666;
+          font-size: 12px;
+          line-height: 1.5;
+          font-weight: 400;
+          text-align: center;
+        }
+
+        .az-switch a {
+          color: #111111;
+          font-weight: 500;
+          text-decoration: underline;
+        }
+
+        .az-switch a:hover {
+          color: #111111;
+        }
 
         .az-terms {
           display: flex;
           align-items: flex-start;
-
           gap: 8px;
-
-          margin:
-            3px
-            0
-            18px;
-
+          margin: 4px 0 18px;
           color: #666666;
-
           font-size: 11px;
-
           line-height: 1.5;
-
           font-weight: 400;
         }
 
         .az-terms input {
-          width: 14px;
-          height: 14px;
-
-          flex: 0 0 14px;
-
-          margin:
-            2px
-            0
-            0;
-
+          margin-top: 2px;
           accent-color: #111111;
         }
 
         .az-terms a {
           color: #111111;
-
           font-weight: 500;
-
-          text-decoration: none;
         }
 
-        .az-terms a:hover {
-          text-decoration: underline;
-
-          text-underline-offset: 2px;
-        }
-
-
-        /* =====================================================
-           SUBMIT BUTTON
-           
-           BLACK PLATFORM THEME.
-        ===================================================== */
-
-        .az-submit {
-          width: 100%;
-          height: 46px;
-
-          display: flex;
-          align-items: center;
-          justify-content: center;
-
-          margin-top: 3px;
-
-          padding:
-            0
-            16px;
-
-          border:
-            1px solid #111111;
-
-          border-radius: 9px;
-
-          background: #111111;
-
-          color: #ffffff !important;
-
-          font-family: inherit;
-
-          font-size: 13px;
-
-          font-weight: 500;
-
-          cursor: pointer;
-
-          transition:
-            transform 0.15s ease,
-            opacity 0.15s ease;
-        }
-
-        .az-submit:hover:not(:disabled) {
-          background: #111111 !important;
-
-          color: #ffffff !important;
-
-          transform:
-            translateY(-1px);
-        }
-
-        .az-submit:focus,
-        .az-submit:active {
-          background: #111111 !important;
-
-          color: #ffffff !important;
-        }
-
-        .az-submit:disabled {
-          opacity: 0.55;
-
-          cursor: not-allowed;
-        }
-
-
-        /* =====================================================
-           ALREADY HAVE ACCOUNT
-           
-           This is now shown BELOW registration forms.
-        ===================================================== */
-
-        .az-account-switch {
-          margin:
-            21px
-            0
-            0;
-
-          padding-top:
-            18px;
-
-          border-top:
-            1px solid #eeeeee;
-
-          text-align: center;
-
-          color: #666666;
-
-          font-size: 12px;
-
-          line-height: 1.5;
-
-          font-weight: 400;
-        }
-
-        .az-account-switch a {
-          color: #111111;
-
-          font-weight: 500;
-
-          text-decoration: underline;
-
-          text-underline-offset: 3px;
-
-          transition:
-            opacity 0.15s ease;
-        }
-
-        .az-account-switch a:hover {
-          color: #111111;
-
-          opacity: 0.65;
-        }
-
-
-        /* =====================================================
-           LOGIN BOTTOM SWITCH
-        ===================================================== */
-
-        .az-switch {
-          margin:
-            21px
-            0
-            0;
-
-          padding-top:
-            18px;
-
-          border-top:
-            1px solid #eeeeee;
-
-          text-align: center;
-
-          color: #666666;
-
-          font-size: 12px;
-
-          line-height: 1.5;
-        }
-
-        .az-switch a {
-          color: #111111;
-
-          font-weight: 500;
-
-          text-decoration: underline;
-
-          text-underline-offset: 3px;
-        }
-
-
-        /* =====================================================
-           MOBILE
-        ===================================================== */
-
-        @media (max-width: 650px) {
-
-          .az-page {
-            justify-content: flex-start;
-
-            padding:
-              94px
-              16px
-              40px;
-          }
-
-          .az-topbar {
-            height: 68px;
+        @media (max-width: 520px) {
+          .az-page-shell {
+            padding: 28px 16px;
           }
 
           .az-header {
-            gap: 6px;
-          }
-
-          .az-logo {
-            width: 21px;
-            height: 21px;
-
-            flex-basis: 21px;
-          }
-
-          .az-logo svg {
-            width: 21px;
-            height: 21px;
-          }
-
-          .az-brand-name {
-            font-size: 17px;
-          }
-
-          .az-role-switch {
-            right: 16px;
-
-            font-size: 12px;
+            margin-bottom: 34px;
           }
 
           .az-card {
-            max-width: 430px;
-
-            padding:
-              30px
-              22px
-              26px;
-
-            border-radius: 13px;
+            padding: 28px 22px;
+            border-radius: 14px;
           }
 
           .az-heading {
             font-size: 27px;
           }
-        }
 
-
-        /* =====================================================
-           SMALL MOBILE
-        ===================================================== */
-
-        @media (max-width: 430px) {
-
-          .az-role-switch-label {
-            display: none;
-          }
-
-          .az-role-switch {
-            right: 14px;
-
-            font-size: 11px;
-          }
-
-          .az-role-switch a::before {
-            content: "Switch: ";
-
-            color: #666666;
-
-            font-weight: 400;
-          }
-
-          .az-card {
-            padding:
-              27px
-              18px
-              24px;
-          }
-
-          .az-heading {
-            font-size: 25px;
+          .az-brand-name {
+            font-size: 22px;
           }
         }
-
       `}</style>
 
+      <Link
+        to="/"
+        className="az-header"
+        aria-label="Go to creatorhub landing page"
+      >
+        <div className="az-logo" aria-hidden="true">
+          <LogoMark size={27} />
+        </div>
 
-      {/* =====================================================
-          PAGE
-      ===================================================== */}
+        <p className="az-brand-name">creatorhub</p>
+      </Link>
 
-      <main className="az-page">
+      <section className="az-card">
+        <h1 className="az-heading">{title}</h1>
 
+        {mode === "register" && role && (
+          <span className="az-role">{roleLabel} account</span>
+        )}
 
-        {/* ===================================================
-            TOP BAR
-        =================================================== */}
+        {children}
 
-        <header className="az-topbar">
-
-
-          {/* =================================================
-              CENTERED CREATORHUB LOGO
-
-              IMPORTANT:
-              This uses absolute positioning against the
-              viewport, so it stays EXACTLY in the middle.
-          ================================================= */}
-
-          <Link
-            to="/"
-            className="az-header"
-            aria-label="Creatorhub home"
-          >
-            <span
-              className="az-logo"
-              aria-hidden="true"
-            >
-              <LogoMark size={22} />
-            </span>
-
-            <span className="az-brand-name">
-              creatorhub
-            </span>
-          </Link>
-
-
-          {/* =================================================
-              TOP-RIGHT ROLE SWITCH
-          ================================================= */}
-
-          {mode === "register" && role && (
-            <div className="az-role-switch">
-
-              <span className="az-role-switch-label">
-                {alternateText}
-              </span>
-
-              <Link to={alternatePath}>
-                {alternateLabel}
-              </Link>
-
-            </div>
-          )}
-
-        </header>
-
-
-        {/* ===================================================
-            AUTH CARD
-        =================================================== */}
-
-        <section className="az-card">
-
-
-          {/* =================================================
-              TITLE
-          ================================================= */}
-
-          <h1 className="az-heading">
-            {title}
-          </h1>
-
-
-          {/* =================================================
-              FORM
-
-              The existing Creator / Brand form is rendered
-              here without changing its functionality.
-          ================================================= */}
-
-          {children}
-
-
-          {/* =================================================
-              REGISTRATION → LOGIN
-
-              "Already have an account? Log in"
-          ================================================= */}
-
-          {mode === "register" && (
-            <div className="az-account-switch">
-
-              Already have an account?{" "}
-
-              <Link to="/login">
-                Log in
-              </Link>
-
-            </div>
-          )}
-
-
-          {/* =================================================
-              LOGIN → REGISTER
-          ================================================= */}
-
-          {mode === "login" && (
-            <p className="az-switch">
-
-              Don&apos;t have an account?{" "}
-
-              <Link to="/register">
-                Sign up
-              </Link>
-
-            </p>
-          )}
-
-        </section>
-
-      </main>
+        {mode === "login" ? (
+          <p className="az-switch">
+            Don't have an account?{" "}
+            <Link to="/register">Sign up</Link>
+          </p>
+        ) : role ? (
+          <p className="az-switch">
+            Want to register as a different role?{" "}
+            <Link to={alternatePath}>{alternateLabel}</Link>
+          </p>
+        ) : null}
+      </section>
     </div>
   );
 }
-
-export default AuthLayout;

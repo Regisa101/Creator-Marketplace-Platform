@@ -1,11 +1,17 @@
-from pydantic import BaseModel, Field, ConfigDict
-from typing import Optional, List
 from datetime import datetime
 from enum import Enum
+from typing import List, Optional
 
-# ===== ENUMS =====
+from pydantic import BaseModel, ConfigDict, Field
+
+
+# ============================================================
+# ENUMS
+# ============================================================
+
 class CampaignType(str, Enum):
     PAID = "paid"
+
 
 class CampaignStatus(str, Enum):
     DRAFT = "draft"
@@ -15,126 +21,223 @@ class CampaignStatus(str, Enum):
     CANCELLED = "cancelled"
     CLOSED = "closed"
 
-# ===== CHECKLIST ITEM =====
-class ChecklistItem(BaseModel):
-    text: str
-    checked: bool = False
 
-# ===== VIDEO SPECS =====
-class VideoSpec(BaseModel):
-    platform: str
-    duration: Optional[str] = None
-    aspect_ratio: Optional[str] = None
-    resolution: Optional[str] = None
-    frame_rate: Optional[str] = None
-    file_type: Optional[str] = None
-    voiceover_required: bool = False
-    subtitles_required: bool = False
+# ============================================================
+# BASE
+# ============================================================
 
-# ===== BASE SCHEMA =====
 class CampaignBase(BaseModel):
-    title: str = Field(..., min_length=3, max_length=255)
-    tagline: Optional[str] = None
-    description: str = Field(..., min_length=10)
-    brief: Optional[str] = None
-    category: str = Field(..., min_length=2)
-    sub_category: Optional[str] = None
-    campaign_type: CampaignType = CampaignType.PAID
-    brand_name: Optional[str] = None
-    brand_location: Optional[str] = None
-    budget: Optional[float] = Field(None, gt=0)
-    compensation_description: Optional[str] = None
+    title: str = Field(
+        ...,
+        min_length=3,
+        max_length=255,
+    )
+
+    category: str = Field(
+        ...,
+        min_length=2,
+        max_length=100,
+    )
+
+    description: str = Field(
+        ...,
+        min_length=10,
+    )
+
+    responsibilities: Optional[str] = None
+
+    # ------------------------------------------------------------
+    # Creator requirements
+    # ------------------------------------------------------------
+
+    creator_types: Optional[List[str]] = None
+
+    experience_level: Optional[str] = None
+
+    required_skills: Optional[List[str]] = None
+
+    location: Optional[str] = None
+
+    work_arrangement: Optional[str] = None
+
     requirements: Optional[str] = None
-    creator_requirements: Optional[dict] = None
+
+    # ------------------------------------------------------------
+    # Deliverables
+    # ------------------------------------------------------------
+
     deliverables: Optional[List[str]] = None
-    before_you_apply: Optional[List[str]] = None
-    checklist: Optional[List[ChecklistItem]] = None
-    required_scenes: Optional[List[str]] = None
-    video_specs: Optional[List[VideoSpec]] = None
-    dos: Optional[List[str]] = None
-    donts: Optional[List[str]] = None
-    suggested_caption: Optional[str] = None
-    hashtags: Optional[List[str]] = None
-    guidelines_note: Optional[str] = None
-    deadline: Optional[datetime] = None
+
+    # ------------------------------------------------------------
+    # Creator count
+    # ------------------------------------------------------------
+
+    creators_needed: int = Field(
+        default=1,
+        ge=1,
+        le=100,
+    )
+
+    # ------------------------------------------------------------
+    # Engagement
+    # ------------------------------------------------------------
+
+    engagement_type: Optional[str] = None
+
+    duration: Optional[str] = None
+
+    # ------------------------------------------------------------
+    # Compensation
+    # ------------------------------------------------------------
+
+    pricing_model: Optional[str] = None
+
+    compensation_type: Optional[str] = None
+
+    budget: Optional[float] = Field(
+        default=None,
+        gt=0,
+    )
+
+    budget_min: Optional[float] = Field(
+        default=None,
+        gt=0,
+    )
+
+    budget_max: Optional[float] = Field(
+        default=None,
+        gt=0,
+    )
+
+    compensation_description: Optional[str] = None
+
+    # ------------------------------------------------------------
+    # Timeline
+    # ------------------------------------------------------------
+
+    start_date: Optional[datetime] = None
+
+    end_date: Optional[datetime] = None
+
     application_deadline: Optional[datetime] = None
-    deliverable_deadline: Optional[datetime] = None
-    creators_needed: int = Field(1, ge=1, le=100)
+
+    # ------------------------------------------------------------
+    # Screening
+    # ------------------------------------------------------------
+
     application_questions: Optional[List[str]] = None
+
+    # ------------------------------------------------------------
+    # Image
+    # ------------------------------------------------------------
+
     hero_image: Optional[str] = None
-    extra_photos: Optional[List[str]] = None  # ← ADD THIS
 
-    # Completion / publication requirements
-    completion_mode: str = "approval_only"  # approval_only | publication_required
-    required_platforms: Optional[List[str]] = None
-    required_post_types: Optional[List[str]] = None
-    publication_deadline: Optional[datetime] = None
-    required_mentions: Optional[List[str]] = None
 
-    # Deprecated single-value fields — still accepted so older clients don't break.
-    required_platform: Optional[str] = None
-    required_post_type: Optional[str] = None
+# ============================================================
+# CREATE
+# ============================================================
 
-# ===== CREATE =====
 class CampaignCreate(CampaignBase):
     pass
 
-# ===== UPDATE =====
+
+# ============================================================
+# UPDATE
+# ============================================================
+
 class CampaignUpdate(BaseModel):
-    title: Optional[str] = None
-    tagline: Optional[str] = None
-    description: Optional[str] = None
-    brief: Optional[str] = None
+    title: Optional[str] = Field(
+        default=None,
+        min_length=3,
+        max_length=255,
+    )
+
     category: Optional[str] = None
-    sub_category: Optional[str] = None
-    campaign_type: Optional[CampaignType] = None
-    brand_name: Optional[str] = None
-    brand_location: Optional[str] = None
-    budget: Optional[float] = None
-    compensation_description: Optional[str] = None
+
+    description: Optional[str] = None
+
+    responsibilities: Optional[str] = None
+
+    creator_types: Optional[List[str]] = None
+
+    experience_level: Optional[str] = None
+
+    required_skills: Optional[List[str]] = None
+
+    location: Optional[str] = None
+
+    work_arrangement: Optional[str] = None
+
     requirements: Optional[str] = None
-    creator_requirements: Optional[dict] = None
+
     deliverables: Optional[List[str]] = None
-    before_you_apply: Optional[List[str]] = None
-    checklist: Optional[List[ChecklistItem]] = None
-    required_scenes: Optional[List[str]] = None
-    video_specs: Optional[List[VideoSpec]] = None
-    dos: Optional[List[str]] = None
-    donts: Optional[List[str]] = None
-    suggested_caption: Optional[str] = None
-    hashtags: Optional[List[str]] = None
-    guidelines_note: Optional[str] = None
-    deadline: Optional[datetime] = None
+
+    creators_needed: Optional[int] = Field(
+        default=None,
+        ge=1,
+        le=100,
+    )
+
+    engagement_type: Optional[str] = None
+
+    duration: Optional[str] = None
+
+    pricing_model: Optional[str] = None
+
+    compensation_type: Optional[str] = None
+
+    budget: Optional[float] = Field(
+        default=None,
+        gt=0,
+    )
+
+    budget_min: Optional[float] = Field(
+        default=None,
+        gt=0,
+    )
+
+    budget_max: Optional[float] = Field(
+        default=None,
+        gt=0,
+    )
+
+    compensation_description: Optional[str] = None
+
+    start_date: Optional[datetime] = None
+
+    end_date: Optional[datetime] = None
+
     application_deadline: Optional[datetime] = None
-    deliverable_deadline: Optional[datetime] = None
-    creators_needed: Optional[int] = Field(None, ge=1, le=100)
+
     application_questions: Optional[List[str]] = None
-    status: Optional[CampaignStatus] = None
+
     hero_image: Optional[str] = None
-    extra_photos: Optional[List[str]] = None  # ← ADD THIS
+
+    status: Optional[CampaignStatus] = None
+
     is_active: Optional[bool] = None
 
-    # Completion / publication requirements
-    completion_mode: Optional[str] = None
-    required_platforms: Optional[List[str]] = None
-    required_post_types: Optional[List[str]] = None
-    publication_deadline: Optional[datetime] = None
-    required_mentions: Optional[List[str]] = None
-    required_platform: Optional[str] = None  # deprecated
-    required_post_type: Optional[str] = None  # deprecated
 
-# ===== RESPONSE =====
+# ============================================================
+# RESPONSE
+# ============================================================
+
 class CampaignResponse(CampaignBase):
     id: int
+
     business_id: int
+
     status: CampaignStatus
+
     is_active: bool
-    funding_status: str = "unfunded"
-    funded_amount: Optional[float] = None
-    funded_at: Optional[datetime] = None
+
     created_at: datetime
+
     updated_at: Optional[datetime] = None
+
     application_count: int = 0
-    extra_photos: Optional[List[str]] = None  # ← ADD THIS
-    
-    model_config = ConfigDict(from_attributes=True)
+
+    model_config = ConfigDict(
+        from_attributes=True,
+    )

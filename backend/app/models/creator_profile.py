@@ -17,7 +17,7 @@ class CreatorProfile(Base):
     profile_image = Column(String(255), nullable=True)
     
     # ===== TYPE & NICHE =====
-    creator_type = Column(String(50), nullable=True)
+    creator_type = Column(String(255), nullable=True)
     categories = Column(JSON, nullable=True)
     content_types = Column(JSON, nullable=True)
     languages = Column(JSON, nullable=True)
@@ -29,6 +29,7 @@ class CreatorProfile(Base):
     
     # ===== PRICING =====
     starting_price = Column(DECIMAL(10,2), nullable=True)
+    availability = Column(String(30), nullable=True)
     
     # ===== PORTFOLIO =====
     portfolio = Column(JSON, nullable=True)

@@ -82,6 +82,7 @@ async def get_public_business_profile(
         "industry": profile.industry,
         "location": profile.location,
         "website": profile.website,
+        "social_links": profile.social_links or {},
         "description": profile.description,
         "logo_url": profile.logo_url,
         "interested_categories": profile.interested_categories or [],

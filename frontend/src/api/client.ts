@@ -96,6 +96,7 @@ export interface CreatorOnboardingData {
   audience_interests: string[];
   socials: CreatorSocialData[];
   portfolio?: CreatorPortfolioItemData[];
+  availability?: string;
   starting_price: number;
   payout_account_holder_name: string;
   payout_provider: string;
@@ -111,8 +112,10 @@ export interface BusinessOnboardingData {
   industry?: string;
   location?: string;
   website?: string;
+  social_links?: Record<string, string | undefined>;
   description?: string;
   logo_url?: string | null;
+  contact_person_name?: string;
   contact_phone?: string;
   interested_categories?: string[];
   preferred_content_types?: string[];
@@ -129,11 +132,6 @@ export interface BusinessOnboardingData {
 // ============================================
 // CAMPAIGN TYPES
 // ============================================
-
-export interface ChecklistItem {
-  text: string;
-  checked: boolean;
-}
 
 export interface VideoSpec {
   platform: string;
@@ -159,47 +157,32 @@ export interface Campaign {
   id: number;
   business_id: number;
   title: string;
-  tagline?: string | null;
-  description: string;
-  brief?: string | null;
   category: string;
-  sub_category?: string | null;
-  campaign_type: CampaignType;
-  brand_name?: string | null;
-  brand_location?: string | null;
-  budget?: number | null;
-  compensation_description?: string | null;
+  description: string;
+  responsibilities?: string | null;
+  creator_types?: string[] | null;
+  experience_level?: string | null;
+  required_skills?: string[] | null;
+  location?: string | null;
+  work_arrangement?: string | null;
   requirements?: string | null;
-  creator_requirements?: CreatorRequirements | null;
   deliverables?: string[] | null;
-  before_you_apply?: string[] | null;
-  checklist?: ChecklistItem[] | null;
-  required_scenes?: string[] | null;
-  video_specs?: VideoSpec[] | null;
-  dos?: string[] | null;
-  donts?: string[] | null;
-  suggested_caption?: string | null;
-  hashtags?: string[] | null;
-  guidelines_note?: string | null;
-  deadline?: string | null;
-  application_deadline?: string | null;
-  deliverable_deadline?: string | null;
   creators_needed: number;
+  engagement_type?: string | null;
+  duration?: string | null;
+  pricing_model?: string | null;
+  compensation_type?: string | null;
+  budget?: number | null;
+  budget_min?: number | null;
+  budget_max?: number | null;
+  compensation_description?: string | null;
+  start_date?: string | null;
+  end_date?: string | null;
+  application_deadline?: string | null;
   application_questions?: string[] | null;
   hero_image?: string | null;
-  extra_photos?: string[] | null;
-  completion_mode?: 'approval_only' | 'publication_required' | string;
-  required_platforms?: string[] | null;
-  required_post_types?: string[] | null;
-  required_platform?: string | null;
-  required_post_type?: string | null;
-  publication_deadline?: string | null;
-  required_mentions?: string[] | null;
   status: CampaignStatus;
   is_active: boolean;
-  funding_status?: 'unfunded' | 'pending' | 'funded' | 'refunded' | string;
-  funded_amount?: number | null;
-  funded_at?: string | null;
   created_at: string;
   updated_at?: string | null;
   application_count: number;
@@ -221,6 +204,38 @@ export interface CampaignListParams {
   limit?: number;
 }
 
+export interface CampaignCreateData {
+  title: string;
+  category: string;
+  description: string;
+  responsibilities?: string;
+  creator_types?: string[];
+  creators_needed?: number;
+  deliverables?: string[];
+  engagement_type?: string;
+  duration?: string;
+  work_arrangement?: string;
+  pricing_model?: string;
+  compensation_type?: string;
+  budget?: number;
+  budget_min?: number;
+  budget_max?: number;
+  compensation_description?: string;
+  experience_level?: string;
+  required_skills?: string[];
+  location?: string;
+  requirements?: string;
+  start_date?: string;
+  end_date?: string;
+  application_deadline?: string;
+  application_questions?: string[];
+  hero_image?: string | null;
+}
+
+// ============================================
+// PUBLIC CAMPAIGN TYPES
+// ============================================
+
 export interface CreatorRequirements {
   categories?: string[];
   content_types?: string[];
@@ -232,60 +247,26 @@ export interface CreatorRequirements {
   age_ranges?: string[];
 }
 
-export interface CampaignCreateData {
-  title: string;
-  tagline?: string;
-  description: string;
-  brief?: string;
-  category: string;
-  sub_category?: string;
-  campaign_type?: CampaignType;
-  brand_name?: string;
-  brand_location?: string;
-  budget?: number;
-  compensation_description?: string;
-  requirements?: string;
-  creator_requirements?: CreatorRequirements;
-  deliverables?: string[];
-  before_you_apply?: string[];
-  checklist?: ChecklistItem[];
-  required_scenes?: string[];
-  video_specs?: VideoSpec[];
-  dos?: string[];
-  donts?: string[];
-  suggested_caption?: string;
-  hashtags?: string[];
-  guidelines_note?: string;
-  deadline?: string;
-  application_deadline?: string;
-  deliverable_deadline?: string;
-  creators_needed?: number;
-  application_questions?: string[];
-  hero_image?: string | null;
-  extra_photos?: string[] | null;
-  completion_mode?: 'approval_only' | 'publication_required';
-  required_platforms?: string[];
-  required_post_types?: string[];
-  required_platform?: string;
-  required_post_type?: string;
-  publication_deadline?: string;
-  required_mentions?: string[];
-}
-
-// ============================================
-// PUBLIC CAMPAIGN TYPES
-// ============================================
-// Used by the public/logged-out landing + campaign browse pages. Extends the
-// authenticated Campaign shape with fields the public serializer adds
-// (e.g. the brand's logo) that aren't part of the internal Campaign type.
-
 export interface PublicCampaign extends Campaign {
+  brand_name?: string | null;
+  brand_location?: string | null;
   brand_logo?: string | null;
+  campaign_type?: CampaignType | string;
+  sub_category?: string | null;
+  deadline?: string | null;
+  creator_requirements?: CreatorRequirements | null;
+  required_platform?: string | null;
+  required_platforms?: string[] | null;
+  budget?: number | null;
+  extra_photos?: string[] | null;
 }
 
 export interface PublicCampaignListResponse {
   campaigns: PublicCampaign[];
   total?: number;
+  page?: number;
+  limit?: number;
+  pages?: number;
 }
 
 export interface PublicCampaignListParams {
@@ -299,8 +280,7 @@ export interface PublicBusinessCampaign {
   id: number;
   title: string;
   category: string;
-  sub_category?: string | null;
-  campaign_type: string;
+  campaign_type?: string;
   status: string;
 }
 
@@ -313,6 +293,7 @@ export interface PublicBusinessProfile {
   website?: string | null;
   description?: string | null;
   logo_url?: string | null;
+  social_links?: Record<string, string | undefined>;
   interested_categories: string[];
   preferred_content_types: string[];
   team_size?: string | null;

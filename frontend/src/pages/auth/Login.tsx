@@ -1,5 +1,4 @@
 import { useState } from "react";
-import type { FormEvent } from "react";
 import { useNavigate } from "react-router-dom";
 import { ArrowRight, Eye, EyeOff } from "lucide-react";
 import { useAuth } from "../../context/AuthContext";
@@ -17,7 +16,7 @@ export function Login() {
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
 
-  const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
+  const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     setError("");
 
@@ -41,11 +40,15 @@ export function Login() {
     setLoading(true);
 
     try {
+      // Do not send a role. The backend identifies the account by email
+      // and returns the role stored for that account in the database.
       await loginUser({
         email: trimmedEmail,
         password,
       });
 
+      // Both roles use /dashboard. Dashboard reads user.role and renders
+      // the correct creator or brand dashboard.
       navigate("/dashboard", { replace: true });
     } catch (err: any) {
       setError(
@@ -58,13 +61,12 @@ export function Login() {
   };
 
   return (
-    <AuthLayout mode="login" title="Log in to creatorhub">
+    <AuthLayout mode="login" title="Log in to CreatorHub">
       <form onSubmit={handleSubmit} noValidate>
         <div className="az-field">
           <label className="az-label" htmlFor="login-email">
             Email
           </label>
-
           <input
             id="login-email"
             className="az-input"

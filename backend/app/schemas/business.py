@@ -95,6 +95,7 @@ class PublicBusinessProfile(BaseModel):
     industry: Optional[str] = None
     location: Optional[str] = None
     website: Optional[str] = None
+    social_links: Optional[dict] = None
     description: Optional[str] = None
     logo_url: Optional[str] = None
 
