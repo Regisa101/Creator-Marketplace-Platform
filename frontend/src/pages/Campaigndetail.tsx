@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import type { ReactNode } from 'react';
-import { Link, useNavigate, useParams } from 'react-router-dom';
+import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom';
 
 import {
   ArrowLeft,
@@ -11,7 +11,6 @@ import {
   Check,
   ChevronRight,
   Clock3,
-  DollarSign,
   Loader2,
   MapPin,
   Send,
@@ -38,6 +37,8 @@ import {
 } from '../api/client';
 
 import { useAuth } from '../context/AuthContext';
+import { PublicNavbar } from '../components/PublicNavbar';
+import { AppLayout } from '../components/AppLayout';
 
 function money(value?: number | null) {
   if (value == null) return null;
@@ -114,6 +115,13 @@ function getBusinessName(
 export function CampaignDetail() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+
+  // The detail page keeps the exact navigation of the place that opened it.
+  // Landing/home -> PublicNavbar. Dashboard -> AppLayout.
+  const fromLanding = searchParams.get('source') === 'landing';
+  const fromDashboard = searchParams.get('source') === 'dashboard';
+  const backHref = fromLanding ? '/#campaigns' : '/campaigns';
   const { user } = useAuth();
 
   const [campaign, setCampaign] = useState<
@@ -415,29 +423,59 @@ export function CampaignDetail() {
     }
   };
 
+  const renderFrame = (content: ReactNode) => {
+    if (fromLanding) {
+      // Reuse the exact navbar used by the home page. Do not duplicate or
+      // restyle the navbar here. PublicNavbar handles the same logo, search,
+      // profile and Home/Campaigns/For Brands navigation.
+      return (
+        <>
+          <PublicNavbar />
+          {content}
+        </>
+      );
+    }
+
+    // Dashboard/detail links use source=dashboard. For authenticated users
+    // without a source we keep the dashboard shell as the safe fallback.
+    if (fromDashboard || user) {
+      return (
+        <AppLayout
+          title="Campaign details"
+          showSearch={false}
+          showNotifications
+        >
+          {content}
+        </AppLayout>
+      );
+    }
+
+    return content;
+  };
+
   if (loading) {
-    return (
+    return renderFrame(
       <div className="cd-state">
         <Loader2 className="spin" size={20} />
         Loading campaign...
         <style>{STYLE}</style>
-      </div>
+      </div>,
     );
   }
 
   if (!campaign) {
-    return (
+    return renderFrame(
       <div className="cd-state">
         <strong>
           {error || 'Campaign not found.'}
         </strong>
 
-        <Link to="/campaigns">
+        <Link to={backHref}>
           Back to campaigns
         </Link>
 
         <style>{STYLE}</style>
-      </div>
+      </div>,
     );
   }
 
@@ -448,11 +486,6 @@ export function CampaignDetail() {
     business,
   );
 
-  const compensationLabel =
-    campaign.pricing_model ||
-    campaign.compensation_type ||
-    'Compensation';
-
   const proposedCompensationLabel =
     campaign.compensation_type === 'Budget range'
       ? 'Your proposed compensation'
@@ -460,13 +493,13 @@ export function CampaignDetail() {
         ? 'Your proposed compensation'
         : 'Your proposed compensation';
 
-  return (
+  return renderFrame(
     <main className="cd-page">
       <div className="cd-shell">
 
         {/* BACK */}
         <Link
-          to="/campaigns"
+          to={backHref}
           className="cd-back"
         >
           <ArrowLeft size={15} />
@@ -615,15 +648,13 @@ export function CampaignDetail() {
                 Duplicate
               </button>
 
-              {campaign.status === 'draft' && (
-                <button
-                  className="cd-danger"
-                  onClick={() => void remove()}
-                  disabled={!!manageAction}
-                >
-                  Delete
-                </button>
-              )}
+              <button
+                className="cd-danger"
+                onClick={() => void remove()}
+                disabled={!!manageAction}
+              >
+                {campaign.status === 'draft' ? 'Delete' : 'Delete campaign'}
+              </button>
             </div>
           )}
         </header>
@@ -789,48 +820,6 @@ export function CampaignDetail() {
               </Section>
             )}
 
-            {/* BUSINESS */}
-            <Section title="About the business">
-              <div className="cd-business-inline">
-                <div className="cd-business-inline-avatar">
-                  <Building2 size={19} />
-                </div>
-
-                <div>
-                  <h3>{businessName}</h3>
-
-                  {business?.industry && (
-                    <span>
-                      {business.industry}
-                    </span>
-                  )}
-
-                  {business?.location && (
-                    <span>
-                      {business.location}
-                    </span>
-                  )}
-                </div>
-              </div>
-
-              {business?.description && (
-                <p className="cd-copy cd-business-description">
-                  {business.description}
-                </p>
-              )}
-
-              {business?.website && (
-                <a
-                  href={business.website}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="cd-business-link"
-                >
-                  Visit business website
-                  <ChevronRight size={14} />
-                </a>
-              )}
-            </Section>
           </div>
 
           {/* RIGHT SIDEBAR */}
@@ -839,7 +828,7 @@ export function CampaignDetail() {
             <div className="cd-apply-card">
 
               <div className="cd-budget-label">
-                {compensationLabel}
+                Compensation
               </div>
 
               <div className="cd-budget-value">
@@ -915,9 +904,8 @@ export function CampaignDetail() {
 
               <div className="cd-quick-info">
                 <QuickInfo
-                  icon={<DollarSign size={15} />}
                   label="Budget"
-                  value={budgetLabel}
+                  value={budgetLabel || 'NPR not specified'}
                 />
 
                 <QuickInfo
@@ -949,42 +937,55 @@ export function CampaignDetail() {
               </div>
             </div>
 
-            {/* BUSINESS MINI CARD */}
+            {/* ABOUT THE BUSINESS */}
             <div className="cd-business-card">
-              <div className="cd-business-card-heading">
-                <div className="cd-business-card-avatar">
-                  <Building2 size={16} />
-                </div>
-
-                <div>
-                  <span>Posted by</span>
-                  <strong>{businessName}</strong>
-                </div>
+              <div className="cd-business-card-title">
+                About the business
               </div>
 
-              {business?.industry && (
-                <div className="cd-business-meta">
-                  {business.industry}
+              <Link
+                to={`/brands/${campaign.business_id}`}
+                className="cd-business-profile-link"
+                aria-label={`View ${businessName} business profile`}
+              >
+                <div className="cd-business-card-avatar">
+                  {business?.logo_url ? (
+                    <img
+                      src={business.logo_url}
+                      alt={`${businessName} logo`}
+                    />
+                  ) : (
+                    <span>
+                      {(businessName.trim()[0] || 'B').toUpperCase()}
+                    </span>
+                  )}
                 </div>
-              )}
 
-              {business?.location && (
-                <div className="cd-business-meta">
-                  <MapPin size={12} />
-                  {business.location}
+                <div className="cd-business-profile-copy">
+                  <strong>{businessName}</strong>
+
+                  {business?.industry && (
+                    <span>{business.industry}</span>
+                  )}
+
+                  {business?.location && (
+                    <span className="cd-business-location">
+                      <MapPin size={11} />
+                      {business.location}
+                    </span>
+                  )}
                 </div>
-              )}
 
-              {business?.website && (
-                <a
-                  href={business.website}
-                  target="_blank"
-                  rel="noreferrer"
-                >
-                  View business
-                  <ChevronRight size={13} />
-                </a>
-              )}
+                <ChevronRight size={15} className="cd-business-profile-arrow" />
+              </Link>
+
+              <Link
+                to={`/brands/${campaign.business_id}`}
+                className="cd-business-see-more"
+              >
+                See more
+                <ChevronRight size={13} />
+              </Link>
             </div>
           </aside>
         </div>
@@ -1160,7 +1161,7 @@ export function CampaignDetail() {
       )}
 
       <style>{STYLE}</style>
-    </main>
+    </main>,
   );
 }
 
@@ -1216,15 +1217,17 @@ function QuickInfo({
   label,
   value,
 }: {
-  icon: ReactNode;
+  icon?: ReactNode;
   label: string;
   value: string;
 }) {
   return (
-    <div className="cd-quick-info-item">
-      <div className="cd-quick-icon">
-        {icon}
-      </div>
+    <div className={`cd-quick-info-item${icon ? '' : ' cd-quick-info-item--no-icon'}`}>
+      {icon && (
+        <div className="cd-quick-icon">
+          {icon}
+        </div>
+      )}
 
       <div>
         <small>{label}</small>
@@ -1828,60 +1831,108 @@ const STYLE = `
 /* BUSINESS SIDEBAR */
 
 .cd-business-card{
-  margin-top:11px;
+  margin-top:14px;
   padding:17px;
   background:#fff;
   border:1px solid #e3e3e3;
   border-radius:10px;
 }
 
-.cd-business-card-heading{
-  display:flex;
-  align-items:center;
-  gap:9px;
-}
-
-.cd-business-card-avatar{
-  width:32px;
-  height:32px;
-  display:grid;
-  place-items:center;
-  border-radius:7px;
-  background:#f3f3f3;
-  color:#555;
-}
-
-.cd-business-card-heading span{
-  display:block;
-  color:#999;
-  font-size:9px;
-  margin-bottom:2px;
-}
-
-.cd-business-card-heading strong{
-  display:block;
-  font-size:11.5px;
+.cd-business-card-title{
+  margin-bottom:12px;
+  color:#111;
+  font-size:12px;
   font-weight:600;
 }
 
-.cd-business-meta{
+.cd-business-profile-link{
   display:flex;
+  cursor:pointer;
   align-items:center;
-  gap:4px;
-  color:#777;
-  font-size:10px;
-  margin-top:8px;
+  gap:10px;
+  color:#111;
+  text-decoration:none;
+  border-radius:8px;
 }
 
-.cd-business-card>a{
+.cd-business-profile-link:hover .cd-business-profile-copy strong{
+  text-decoration:underline;
+}
+
+.cd-business-profile-link:hover .cd-business-card-avatar{
+  border-color:#bbb;
+}
+
+.cd-business-see-more:hover{
+  text-decoration:underline;
+}
+
+.cd-business-card-avatar{
+  width:40px;
+  height:40px;
+  flex:0 0 40px;
+  display:grid;
+  place-items:center;
+  overflow:hidden;
+  border-radius:9px;
+  background:#f3f3f3;
+  color:#333;
+  font-size:14px;
+  font-weight:600;
+}
+
+.cd-business-card-avatar img{
+  width:100%;
+  height:100%;
+  object-fit:cover;
+}
+
+.cd-business-profile-copy{
+  min-width:0;
+  flex:1;
+}
+
+.cd-business-profile-copy strong{
+  display:block;
+  color:#111;
+  font-size:11.5px;
+  font-weight:600;
+  line-height:1.35;
+}
+
+.cd-business-profile-copy span{
+  display:block;
+  margin-top:3px;
+  color:#777;
+  font-size:10px;
+  line-height:1.35;
+}
+
+.cd-business-profile-copy .cd-business-location{
+  display:flex;
+  align-items:center;
+  gap:3px;
+}
+
+.cd-business-profile-arrow{
+  flex:0 0 auto;
+  color:#777;
+}
+
+.cd-business-see-more{
+  cursor:pointer;
   display:inline-flex;
   align-items:center;
   gap:2px;
-  margin-top:12px;
+  margin-top:13px;
   color:#111;
   font-size:10.5px;
   font-weight:600;
   text-decoration:none;
+}
+
+.cd-business-see-more:hover{
+  text-decoration:underline;
 }
 
 /* MODAL */

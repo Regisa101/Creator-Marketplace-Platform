@@ -63,9 +63,33 @@ const SKILLS = [
   "Tutorials",
 ];
 
+const LOCATION_SUGGESTIONS = [
+  "Kathmandu, Nepal",
+  "Kirtipur, Nepal",
+  "Lalitpur, Nepal",
+  "Bhaktapur, Nepal",
+  "Pokhara, Nepal",
+  "Biratnagar, Nepal",
+  "Birgunj, Nepal",
+  "Butwal, Nepal",
+  "Kolkata, India",
+  "Karachi, Pakistan",
+  "Kuala Lumpur, Malaysia",
+  "Kyiv, Ukraine",
+  "London, UK",
+  "New York, USA",
+  "Los Angeles, USA",
+  "Toronto, Canada",
+  "Sydney, Australia",
+  "Singapore",
+  "Dubai, UAE",
+  "Remote",
+];
+
 const ENGAGEMENT_TYPES = [
   "One-time",
-  "Short-term",
+  "Weekly",
+  "Monthly",
   "Long-term",
 ];
 
@@ -77,7 +101,6 @@ const WORK_ARRANGEMENTS = [
 
 const PRICING_MODELS = [
   "Fixed Price",
-  "Hourly",
   "Monthly",
 ];
 
@@ -170,6 +193,20 @@ function apiDate(v: string) {
   return v ? `${v}T00:00:00Z` : undefined;
 }
 
+function todayInputDate() {
+  const d = new Date();
+  const year = d.getFullYear();
+  const month = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+}
+
+const DATE_BASED_ENGAGEMENTS = [
+  "One-time",
+  "Weekly",
+  "Monthly",
+];
+
 function message(e: unknown, fallback: string) {
   const x = e as {
     response?: {
@@ -200,6 +237,7 @@ function CampaignForm({
 }: {
   mode: "create" | "edit";
 }) {
+  const today = todayInputDate();
   const navigate = useNavigate();
   const { id } = useParams<{ id: string }>();
 
@@ -220,6 +258,8 @@ function CampaignForm({
     useState<"draft" | "publish" | null>(null);
 
   const [error, setError] = useState("");
+  const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
+  const [showPreview, setShowPreview] = useState(false);
 
   useEffect(() => {
     if (!editing || !id) return;
@@ -339,6 +379,12 @@ function CampaignForm({
       ...v,
       [key]: value,
     }));
+    setFieldErrors((v) => {
+      if (!v[key as string]) return v;
+      const next = { ...v };
+      delete next[key as string];
+      return next;
+    });
   };
 
   const toggle = (
@@ -353,6 +399,44 @@ function CampaignForm({
         ? v[key].filter((x) => x !== value)
         : [...v[key], value],
     }));
+    setFieldErrors((v) => {
+      if (!v[key]) return v;
+      const next = { ...v };
+      delete next[key];
+      return next;
+    });
+  };
+
+  const addCustomCreatorType = (value: string) => {
+    const custom = value.trim();
+    if (!custom) return;
+    setForm((v) => ({
+      ...v,
+      creator_types: v.creator_types.includes(custom)
+        ? v.creator_types
+        : [...v.creator_types, custom],
+    }));
+    setFieldErrors((v) => {
+      const next = { ...v };
+      delete next.creator_types;
+      return next;
+    });
+  };
+
+  const addCustomRequiredSkill = (value: string) => {
+    const custom = value.trim();
+    if (!custom) return;
+    setForm((v) => ({
+      ...v,
+      required_skills: v.required_skills.includes(custom)
+        ? v.required_skills
+        : [...v.required_skills, custom],
+    }));
+    setFieldErrors((v) => {
+      const next = { ...v };
+      delete next.required_skills;
+      return next;
+    });
   };
 
   const cleaned = useMemo(
@@ -404,114 +488,49 @@ function CampaignForm({
   );
 
   function validate(s: number): string | null {
+    const nextErrors: Record<string, string> = {};
+
     if (s === 1) {
-      if (!form.title.trim()) {
-        return "Campaign title is required.";
-      }
-
-      if (!form.category) {
-        return "Select a category.";
-      }
-
-      if (!form.creator_types.length) {
-        return "Select at least one creator type.";
-      }
-
-      if (form.creators_needed < 1) {
-        return "Number of creators must be at least 1.";
-      }
-
-      if (!form.description.trim()) {
-        return "Campaign description is required.";
-      }
+      if (!form.title.trim()) nextErrors.title = "Campaign title is required.";
+      if (!form.category) nextErrors.category = "Please select a category.";
+      if (!form.creator_types.length) nextErrors.creator_types = "Select a creator type or add your own.";
+      if (form.creators_needed < 1) nextErrors.creators_needed = "Enter at least 1 creator.";
+      if (!form.description.trim()) nextErrors.description = "Please describe what the campaign is about.";
     }
 
     if (s === 2) {
-      if (!form.responsibilities.trim()) {
-        return "Responsibilities are required.";
-      }
-
-      if (!list(form.deliverables).length) {
-        return "Add at least one deliverable.";
-      }
+      if (!form.responsibilities.trim()) nextErrors.responsibilities = "Please describe the creator's responsibilities.";
+      if (!list(form.deliverables).length) nextErrors.deliverables = "Add at least one deliverable.";
+      else if (form.deliverables.some((x) => !x.trim())) nextErrors.deliverables = "Please complete every deliverable before continuing.";
     }
 
     if (s === 3) {
-      if (!form.engagement_type) {
-        return "Select an engagement type.";
-      }
-
-      if (!form.work_arrangement) {
-        return "Select a work arrangement.";
-      }
-
-      if (!form.pricing_model) {
-        return "Select a pricing model.";
-      }
-
-      if (!form.compensation_type) {
-        return "Select a compensation type.";
-      }
-
-      if (
-        form.compensation_type ===
-          "Fixed amount" &&
-        (!form.budget ||
-          form.budget <= 0)
-      ) {
-        return "Enter a valid fixed compensation amount.";
-      }
-
-      if (
-        form.compensation_type ===
-        "Budget range"
-      ) {
-        if (
-          !form.budget_min ||
-          !form.budget_max ||
-          form.budget_min <= 0 ||
-          form.budget_max <= 0
-        ) {
-          return "Enter both budget values.";
-        }
-
-        if (
-          form.budget_max <
-          form.budget_min
-        ) {
-          return "Maximum budget must be greater than minimum budget.";
-        }
+      if (!form.engagement_type) nextErrors.engagement_type = "Please choose an engagement type.";
+      if (!form.work_arrangement) nextErrors.work_arrangement = "Please select a work arrangement.";
+      if (!form.pricing_model) nextErrors.pricing_model = "Please select a pricing model.";
+      if (!form.compensation_type) nextErrors.compensation_type = "Please select how the creator will be paid.";
+      if (form.compensation_type === "Fixed amount" && (!form.budget || form.budget <= 0)) nextErrors.budget = "Enter a valid fixed amount.";
+      if (form.compensation_type === "Budget range") {
+        if (!form.budget_min || form.budget_min <= 0) nextErrors.budget_min = "Enter the minimum budget.";
+        if (!form.budget_max || form.budget_max <= 0) nextErrors.budget_max = "Enter the maximum budget.";
+        if (form.budget_min && form.budget_max && form.budget_max < form.budget_min) nextErrors.budget_max = "Maximum budget must be greater than minimum budget.";
       }
     }
 
     if (s === 4) {
-      if (!form.experience_level) {
-        return "Select an experience level.";
+      if (!form.experience_level) nextErrors.experience_level = "Please select the experience level you need.";
+      if (!form.required_skills.length) nextErrors.required_skills = "Select at least one required skill.";
+      if (DATE_BASED_ENGAGEMENTS.includes(form.engagement_type)) {
+        if (form.start_date && form.start_date < today) nextErrors.start_date = "Start date cannot be before today.";
+        if (form.end_date && form.end_date < today) nextErrors.end_date = "End date cannot be before today.";
+        if (form.start_date && form.end_date && form.end_date < form.start_date) nextErrors.end_date = "End date cannot be before the start date.";
+        if (form.application_deadline && form.start_date && form.application_deadline > form.start_date) nextErrors.application_deadline = "Deadline should be on or before the start date.";
       }
-
-      if (!form.required_skills.length) {
-        return "Select at least one required skill.";
-      }
-
-      if (
-        form.start_date &&
-        form.end_date &&
-        form.end_date < form.start_date
-      ) {
-        return "End date cannot be before start date.";
-      }
-
-      if (
-        form.application_deadline &&
-        form.start_date &&
-        form.application_deadline >
-          form.start_date
-      ) {
-        return "Application deadline should be on or before the start date.";
-      }
+      if (form.application_deadline && form.application_deadline < today) nextErrors.application_deadline = "Application deadline cannot be before today.";
     }
 
-    return null;
+    setFieldErrors(nextErrors);
+    return Object.values(nextErrors)[0] || null;
   }
 
   function next() {
@@ -679,10 +698,13 @@ function CampaignForm({
             <span>creatorhub</span>
           </button>
 
-          <div
-            className="cf-topbar-spacer"
-            aria-hidden="true"
-          />
+          <button
+            type="button"
+            className="cf-preview-trigger"
+            onClick={() => setShowPreview(true)}
+          >
+            Preview as creator
+          </button>
 
         </div>
 
@@ -795,6 +817,8 @@ function CampaignForm({
                 <Field
                   label="Campaign title"
                   required
+                  hint="Example: Summer product launch campaign"
+                  error={fieldErrors.title}
                 >
                   <input
                     value={form.title}
@@ -813,6 +837,8 @@ function CampaignForm({
                   <Field
                     label="Category"
                     required
+                    hint="Example: Beauty, Fashion, or Food"
+                    error={fieldErrors.category}
                   >
                     <select
                       value={form.category}
@@ -843,6 +869,8 @@ function CampaignForm({
                   <Field
                     label="Number of creators"
                     required
+                    hint="Example: 3 creators"
+                    error={fieldErrors.creators_needed}
                   >
                     <input
                       type="number"
@@ -869,26 +897,33 @@ function CampaignForm({
                 <Field
                   label="Creator type needed"
                   required
-                  hint="Select every creator type that can do the work."
+                  hint="Select every suitable type, or add your own. Example: Travel Creator."
                 >
                   <Options
                     values={CREATOR_TYPES}
-                    selected={
-                      form.creator_types
-                    }
+                    selected={form.creator_types}
                     multi
                     onToggle={(x) =>
-                      toggle(
-                        "creator_types",
-                        x
-                      )
+                      toggle("creator_types", x)
                     }
                   />
+
+                  <CustomCreatorType
+                    onAdd={addCustomCreatorType}
+                  />
+
+                  {fieldErrors.creator_types && (
+                    <span className="cf-field-error cf-option-error">
+                      {fieldErrors.creator_types}
+                    </span>
+                  )}
                 </Field>
 
                 <Field
                   label="Campaign description"
                   required
+                  hint="Example: Explain the goal, audience, product, and what success should look like."
+                  error={fieldErrors.description}
                 >
                   <textarea
                     rows={6}
@@ -901,7 +936,7 @@ function CampaignForm({
                         e.target.value
                       )
                     }
-                    placeholder="Explain the campaign, its goal, context, and what success should look like."
+                    placeholder="e.g. Launch our summer collection with authentic short-form videos that introduce the new products."
                   />
                 </Field>
 
@@ -922,6 +957,8 @@ function CampaignForm({
                 <Field
                   label="Responsibilities"
                   required
+                  hint="Example: Create 3 reels, follow the brief, and submit drafts for review."
+                  error={fieldErrors.responsibilities}
                 >
                   <textarea
                     rows={6}
@@ -934,14 +971,15 @@ function CampaignForm({
                         e.target.value
                       )
                     }
-                    placeholder="Describe what the selected creator will be responsible for."
+                    placeholder="e.g. Create and publish 3 Instagram reels showcasing the product and its key features."
                   />
                 </Field>
 
                 <Field
                   label="Deliverables"
                   required
-                  hint="Add each deliverable separately."
+                  hint="Add each deliverable separately. Example: 1 Instagram reel, 3 stories, or 5 product photos."
+                  error={fieldErrors.deliverables}
                 >
 
                   <div className="cf-list">
@@ -959,23 +997,26 @@ function CampaignForm({
 
                           <input
                             value={x}
-                            onChange={(e) =>
+                            onChange={(e) => {
+                              const value = e.target.value;
                               setForm((v) => ({
                                 ...v,
                                 deliverables:
                                   v.deliverables.map(
                                     (d, j) =>
                                       j === i
-                                        ? e
-                                            .target
-                                            .value
+                                        ? value
                                         : d
                                   ),
-                              }))
-                            }
-                            placeholder={`Deliverable ${
-                              i + 1
-                            }`}
+                              }));
+                              setFieldErrors((v) => {
+                                if (!v.deliverables) return v;
+                                const next = { ...v };
+                                delete next.deliverables;
+                                return next;
+                              });
+                            }}
+                            placeholder="e.g. 1 Instagram reel, 3 stories, or 5 product photos"
                           />
 
                           <button
@@ -1014,6 +1055,7 @@ function CampaignForm({
                   <button
                     type="button"
                     className="cf-add"
+                    disabled={!form.deliverables[form.deliverables.length - 1]?.trim()}
                     onClick={() =>
                       setForm((v) => ({
                         ...v,
@@ -1025,7 +1067,7 @@ function CampaignForm({
                     }
                   >
                     <Plus size={15} />
-                    Add deliverable
+                    <span className="cf-add-label">Add deliverable</span>
                   </button>
 
                 </Field>
@@ -1047,6 +1089,7 @@ function CampaignForm({
                 <Field
                   label="Engagement type"
                   required
+                  error={fieldErrors.engagement_type}
                 >
                   <Options
                     values={
@@ -1055,12 +1098,23 @@ function CampaignForm({
                     selected={
                       form.engagement_type
                     }
-                    onSelect={(x) =>
-                      set(
-                        "engagement_type",
-                        x
-                      )
-                    }
+                    onSelect={(x) => {
+                      set("engagement_type", x);
+                      if (!DATE_BASED_ENGAGEMENTS.includes(x)) {
+                        setForm((v) => ({
+                          ...v,
+                          engagement_type: x,
+                          start_date: "",
+                          end_date: "",
+                        }));
+                        setFieldErrors((v) => {
+                          const next = { ...v };
+                          delete next.start_date;
+                          delete next.end_date;
+                          return next;
+                        });
+                      }
+                    }}
                   />
                 </Field>
 
@@ -1068,7 +1122,7 @@ function CampaignForm({
 
                   <Field
                     label="Duration"
-                    hint="Optional, e.g. 4 weeks."
+                    hint="Example: 4 weeks or 10 days. Leave blank if not needed."
                   >
                     <input
                       value={
@@ -1087,6 +1141,7 @@ function CampaignForm({
                   <Field
                     label="Work arrangement"
                     required
+                    error={fieldErrors.work_arrangement}
                   >
                     <Options
                       values={
@@ -1111,6 +1166,7 @@ function CampaignForm({
                 <Field
                   label="Pricing model"
                   required
+                  error={fieldErrors.pricing_model}
                 >
                   <Options
                     values={
@@ -1131,6 +1187,7 @@ function CampaignForm({
                 <Field
                   label="Compensation"
                   required
+                  error={fieldErrors.compensation_type}
                   hint="Creators can still propose their rate when applying."
                 >
                   <Options
@@ -1154,6 +1211,7 @@ function CampaignForm({
                   <Field
                     label="Fixed amount"
                     required
+                    error={fieldErrors.budget}
                   >
                     <Money
                       value={form.budget}
@@ -1174,6 +1232,7 @@ function CampaignForm({
                     <Field
                       label="Minimum budget"
                       required
+                      error={fieldErrors.budget_min}
                     >
                       <Money
                         value={
@@ -1191,6 +1250,7 @@ function CampaignForm({
                     <Field
                       label="Maximum budget"
                       required
+                      error={fieldErrors.budget_max}
                     >
                       <Money
                         value={
@@ -1210,7 +1270,7 @@ function CampaignForm({
 
                 <Field
                   label="Compensation description"
-                  hint="Optional payment details or negotiation notes."
+                  hint="Example: Includes content creation, editing, revisions, and usage rights."
                 >
                   <textarea
                     rows={4}
@@ -1223,7 +1283,7 @@ function CampaignForm({
                         e.target.value
                       )
                     }
-                    placeholder="Optional details about what the budget covers."
+                    placeholder="e.g. Includes content creation, editing, revisions, and agreed usage rights."
                   />
                 </Field>
 
@@ -1244,6 +1304,7 @@ function CampaignForm({
                 <Field
                   label="Experience level"
                   required
+                  error={fieldErrors.experience_level}
                 >
                   <Options
                     values={
@@ -1264,6 +1325,7 @@ function CampaignForm({
                 <Field
                   label="Required skills"
                   required
+                  error={fieldErrors.required_skills}
                   hint="Select all skills that are genuinely required."
                 >
                   <Options
@@ -1279,30 +1341,29 @@ function CampaignForm({
                       )
                     }
                   />
+
+                  <CustomSkill
+                    onAdd={addCustomRequiredSkill}
+                  />
                 </Field>
 
                 <div className="cf-grid-2">
 
                   <Field
                     label="Location"
-                    hint="Optional if fully remote."
+                    hint="Type a location and choose a suggestion, or enter your own. Example: Kathmandu, Nepal or Remote."
                   >
-                    <input
-                      value={
-                        form.location
+                    <LocationInput
+                      value={form.location}
+                      onChange={(value) =>
+                        set("location", value)
                       }
-                      onChange={(e) =>
-                        set(
-                          "location",
-                          e.target.value
-                        )
-                      }
-                      placeholder="e.g. Kathmandu, Nepal"
                     />
                   </Field>
 
                   <Field
                     label="Additional requirements"
+                    hint="Example: Own camera equipment, fluent English, or available on weekends."
                   >
                     <input
                       value={
@@ -1325,61 +1386,54 @@ function CampaignForm({
                 <div className="cf-subheading">
                   <h3>Timeline</h3>
                   <p>
-                    Optional, but useful for
-                    fixed schedules.
+                    {DATE_BASED_ENGAGEMENTS.includes(form.engagement_type)
+                      ? "Set the campaign dates for this engagement."
+                      : "Long-term campaigns do not need fixed start or end dates."}
                   </p>
                 </div>
 
-                <div className="cf-grid-3">
+                {DATE_BASED_ENGAGEMENTS.includes(form.engagement_type) && (
+                  <div className="cf-grid-2">
+                    <Field
+                      label="Start date"
+                      hint="Example: choose the date the creator should begin."
+                      error={fieldErrors.start_date}
+                    >
+                      <input
+                        type="date"
+                        min={today}
+                        value={form.start_date}
+                        onChange={(e) => set("start_date", e.target.value)}
+                      />
+                    </Field>
 
-                  <Field label="Start date">
-                    <input
-                      type="date"
-                      value={
-                        form.start_date
-                      }
-                      onChange={(e) =>
-                        set(
-                          "start_date",
-                          e.target.value
-                        )
-                      }
-                    />
-                  </Field>
+                    <Field
+                      label="End date"
+                      hint="Example: choose the final delivery date."
+                      error={fieldErrors.end_date}
+                    >
+                      <input
+                        type="date"
+                        min={form.start_date || today}
+                        value={form.end_date}
+                        onChange={(e) => set("end_date", e.target.value)}
+                      />
+                    </Field>
+                  </div>
+                )}
 
-                  <Field label="End date">
-                    <input
-                      type="date"
-                      value={
-                        form.end_date
-                      }
-                      onChange={(e) =>
-                        set(
-                          "end_date",
-                          e.target.value
-                        )
-                      }
-                    />
-                  </Field>
-
-                  <Field
-                    label="Application deadline"
-                  >
-                    <input
-                      type="date"
-                      value={
-                        form.application_deadline
-                      }
-                      onChange={(e) =>
-                        set(
-                          "application_deadline",
-                          e.target.value
-                        )
-                      }
-                    />
-                  </Field>
-
-                </div>
+                <Field
+                  label="Application deadline"
+                  hint="Example: the last day creators can apply. It cannot be before today."
+                  error={fieldErrors.application_deadline}
+                >
+                  <input
+                    type="date"
+                    min={today}
+                    value={form.application_deadline}
+                    onChange={(e) => set("application_deadline", e.target.value)}
+                  />
+                </Field>
 
                 <div className="cf-divider" />
 
@@ -1441,9 +1495,7 @@ function CampaignForm({
                                   )
                               )
                             }
-                            placeholder={`Question ${
-                              i + 1
-                            }`}
+                            placeholder="e.g. What makes you a good fit for this campaign?"
                           />
 
                           <button
@@ -1560,6 +1612,164 @@ function CampaignForm({
 
         </main>
       </div>
+
+      {showPreview && (
+        <CreatorPreview
+          form={form}
+          questions={questions}
+          onClose={() => setShowPreview(false)}
+        />
+      )}
+    </div>
+  );
+}
+
+/* =========================================
+   CREATOR PREVIEW
+========================================= */
+
+function CreatorPreview({
+  form,
+  questions,
+  onClose,
+}: {
+  form: CampaignFormData;
+  questions: string[];
+  onClose: () => void;
+}) {
+  const dateLabel = (value: string) => {
+    if (!value) return "Not specified";
+    const d = new Date(`${value}T00:00:00`);
+    if (Number.isNaN(d.getTime())) return value;
+    return d.toLocaleDateString(undefined, {
+      month: "short",
+      day: "numeric",
+      year: "numeric",
+    });
+  };
+
+  const budgetLabel =
+    form.compensation_type === "Fixed amount" && form.budget
+      ? `Rs. ${form.budget.toLocaleString()}`
+      : form.compensation_type === "Budget range" && form.budget_min && form.budget_max
+        ? `Rs. ${form.budget_min.toLocaleString()} – Rs. ${form.budget_max.toLocaleString()}`
+        : form.compensation_type || "Compensation not specified";
+
+  const deliverables = list(form.deliverables);
+  const skills = list(form.required_skills);
+  const creatorTypes = list(form.creator_types);
+  const applicationQuestions = list(questions);
+
+  return (
+    <div className="cf-preview-overlay" role="dialog" aria-modal="true" aria-label="Creator campaign preview">
+      <div className="cf-preview-modal">
+        <div className="cf-preview-toolbar">
+          <div>
+            <p className="cf-preview-kicker">CREATOR VIEW</p>
+            <h2>Campaign preview</h2>
+            <p>See how this opportunity will look to creators.</p>
+          </div>
+          <button type="button" className="cf-preview-close" onClick={onClose} aria-label="Close preview">
+            <X size={18} />
+          </button>
+        </div>
+
+        <div className="cf-creator-page">
+          <div className="cf-creator-hero">
+            <div>
+              <div className="cf-preview-tags">
+                {form.category && <span>{form.category}</span>}
+                {form.engagement_type && <span>{form.engagement_type}</span>}
+                {form.work_arrangement && <span>{form.work_arrangement}</span>}
+              </div>
+              <h1>{form.title.trim() || "Your campaign title"}</h1>
+              <p>{form.description.trim() || "Your campaign description will appear here."}</p>
+            </div>
+            <button type="button" className="cf-preview-apply" disabled>Apply now</button>
+          </div>
+
+          <div className="cf-creator-layout">
+            <div className="cf-creator-main">
+              <section className="cf-creator-section">
+                <h3>About the campaign</h3>
+                <p>{form.description.trim() || "Campaign details will appear here."}</p>
+              </section>
+
+              <section className="cf-creator-section">
+                <h3>What you'll do</h3>
+                <p>{form.responsibilities.trim() || "Responsibilities will appear here."}</p>
+              </section>
+
+              <section className="cf-creator-section">
+                <h3>Deliverables</h3>
+                {deliverables.length ? (
+                  <ul className="cf-preview-list">
+                    {deliverables.map((item, i) => <li key={`${item}-${i}`}>{item}</li>)}
+                  </ul>
+                ) : (
+                  <p className="cf-preview-muted">No deliverables added yet.</p>
+                )}
+              </section>
+
+              {form.requirements.trim() && (
+                <section className="cf-creator-section">
+                  <h3>Requirements</h3>
+                  <p>{form.requirements}</p>
+                </section>
+              )}
+
+              {applicationQuestions.length > 0 && (
+                <section className="cf-creator-section">
+                  <h3>Application questions</h3>
+                  <ol className="cf-preview-list ordered">
+                    {applicationQuestions.map((item, i) => <li key={`${item}-${i}`}>{item}</li>)}
+                  </ol>
+                </section>
+              )}
+            </div>
+
+            <aside className="cf-creator-side">
+              <div className="cf-preview-info-card">
+                <h3>Campaign details</h3>
+                <div className="cf-preview-detail"><span>Compensation</span><strong>{budgetLabel}</strong></div>
+                {form.pricing_model && <div className="cf-preview-detail"><span>Pricing</span><strong>{form.pricing_model}</strong></div>}
+                {form.duration && <div className="cf-preview-detail"><span>Duration</span><strong>{form.duration}</strong></div>}
+                {form.location && <div className="cf-preview-detail"><span>Location</span><strong>{form.location}</strong></div>}
+                {form.experience_level && <div className="cf-preview-detail"><span>Experience</span><strong>{form.experience_level}</strong></div>}
+                {form.creators_needed > 0 && <div className="cf-preview-detail"><span>Creators needed</span><strong>{form.creators_needed}</strong></div>}
+                {form.application_deadline && <div className="cf-preview-detail"><span>Apply by</span><strong>{dateLabel(form.application_deadline)}</strong></div>}
+              </div>
+
+              {creatorTypes.length > 0 && (
+                <div className="cf-preview-info-card">
+                  <h3>Creator type</h3>
+                  <div className="cf-preview-chip-list">
+                    {creatorTypes.map((x) => <span key={x}>{x}</span>)}
+                  </div>
+                </div>
+              )}
+
+              {skills.length > 0 && (
+                <div className="cf-preview-info-card">
+                  <h3>Skills</h3>
+                  <div className="cf-preview-chip-list">
+                    {skills.map((x) => <span key={x}>{x}</span>)}
+                  </div>
+                </div>
+              )}
+
+              {(form.start_date || form.end_date) && (
+                <div className="cf-preview-info-card">
+                  <h3>Timeline</h3>
+                  <p className="cf-preview-timeline">
+                    {dateLabel(form.start_date)} {form.end_date ? `– ${dateLabel(form.end_date)}` : ""}
+                  </p>
+                </div>
+              )}
+            </aside>
+          </div>
+        </div>
+      </div>
     </div>
   );
 }
@@ -1612,28 +1822,177 @@ function Field({
   label,
   required,
   hint,
+  error,
   children,
 }: {
   label: string;
   required?: boolean;
   hint?: string;
+  error?: string;
   children: ReactNode;
 }) {
   return (
-    <div className="cf-field">
-
+    <div className={`cf-field ${error ? "has-error" : ""}`}>
       <label>
         {label}
-
         {required && <b> *</b>}
-
-        {hint && (
-          <small>{hint}</small>
-        )}
+        {hint && <small>{hint}</small>}
       </label>
-
       {children}
+      {error && <span className="cf-field-error">{error}</span>}
+    </div>
+  );
+}
 
+/* =========================================
+   CUSTOM CREATOR TYPE
+========================================= */
+
+function CustomCreatorType({
+  onAdd,
+}: {
+  onAdd: (value: string) => void;
+}) {
+  const [value, setValue] = useState("");
+
+  const add = () => {
+    const next = value.trim();
+    if (!next) return;
+    onAdd(next);
+    setValue("");
+  };
+
+  return (
+    <div className="cf-custom-type">
+      <div className="cf-custom-type-input">
+        <input
+          value={value}
+          onChange={(e) => setValue(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === "Enter") {
+              e.preventDefault();
+              add();
+            }
+          }}
+          placeholder="e.g. Travel Creator, Food Stylist, Makeup Artist"
+          aria-label="Custom creator type"
+        />
+        <button
+          type="button"
+          className="cf-add cf-custom-type-button"
+          onClick={add}
+          disabled={!value.trim()}
+        >
+          <Plus size={15} />
+          Add your own
+        </button>
+      </div>
+      <small>Can't find the right type? Write your own and add it above.</small>
+    </div>
+  );
+}
+
+/* =========================================
+   CUSTOM REQUIRED SKILL
+========================================= */
+
+function CustomSkill({
+  onAdd,
+}: {
+  onAdd: (value: string) => void;
+}) {
+  const [value, setValue] = useState("");
+
+  const add = () => {
+    const next = value.trim();
+    if (!next) return;
+    onAdd(next);
+    setValue("");
+  };
+
+  return (
+    <div className="cf-custom-type">
+      <div className="cf-custom-type-input">
+        <input
+          value={value}
+          onChange={(e) => setValue(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === "Enter") {
+              e.preventDefault();
+              add();
+            }
+          }}
+          placeholder="e.g. Drone videography, Nepali copywriting, SEO"
+          aria-label="Custom required skill"
+        />
+        <button
+          type="button"
+          className="cf-add cf-custom-type-button"
+          onClick={add}
+          disabled={!value.trim()}
+        >
+          <Plus size={15} />
+          <span className="cf-add-label">Add skill</span>
+        </button>
+      </div>
+      <small>Can't find the skill you need? Write your own and add it above.</small>
+    </div>
+  );
+}
+
+/* =========================================
+   LOCATION SUGGESTIONS
+========================================= */
+
+function LocationInput({
+  value,
+  onChange,
+}: {
+  value: string;
+  onChange: (value: string) => void;
+}) {
+  const [focused, setFocused] = useState(false);
+
+  const query = value.trim().toLowerCase();
+  const suggestions = LOCATION_SUGGESTIONS
+    .filter((location) =>
+      !query || location.toLowerCase().includes(query)
+    )
+    .slice(0, 6);
+
+  const showSuggestions = focused && suggestions.length > 0;
+
+  return (
+    <div className="cf-location-wrap">
+      <input
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        onFocus={() => setFocused(true)}
+        onBlur={() => {
+          window.setTimeout(() => setFocused(false), 120);
+        }}
+        placeholder="e.g. Kathmandu, Nepal or Remote"
+        autoComplete="off"
+      />
+
+      {showSuggestions && (
+        <div className="cf-location-suggestions">
+          {suggestions.map((location) => (
+            <button
+              key={location}
+              type="button"
+              className="cf-location-suggestion"
+              onMouseDown={(e) => e.preventDefault()}
+              onClick={() => {
+                onChange(location);
+                setFocused(false);
+              }}
+            >
+              {location}
+            </button>
+          ))}
+        </div>
+      )}
     </div>
   );
 }
@@ -1662,6 +2021,13 @@ function Options({
         ? [selected]
         : [];
 
+  const displayValues = [
+    ...values,
+    ...selectedValues.filter(
+      (v) => !values.includes(v)
+    ),
+  ];
+
   return (
     <div
       className={`cf-options ${
@@ -1670,7 +2036,7 @@ function Options({
           : "single"
       }`}
     >
-      {values.map((v) => {
+      {displayValues.map((v) => {
         const active =
           selectedValues.includes(v);
 
@@ -1744,7 +2110,7 @@ function Money({
                 )
           )
         }
-        placeholder="0"
+        placeholder="e.g. 2000"
       />
 
     </div>
@@ -1778,6 +2144,252 @@ const CSS = `
   max-width:920px;
 
   margin:auto;
+}
+
+/* =========================================
+   CREATOR PREVIEW
+========================================= */
+
+.cf-preview-trigger{
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  min-height:38px;
+  padding:9px 14px;
+  border:1px solid #d8d8d8 !important;
+  border-radius:8px;
+  background:#fff !important;
+  color:#111 !important;
+  font:400 12px Poppins,Arial,sans-serif !important;
+  cursor:pointer;
+  box-shadow:none !important;
+  outline:none !important;
+}
+
+.cf-preview-trigger:hover{
+  background:#f5f5f5 !important;
+  border-color:#cfcfcf !important;
+}
+
+.cf-preview-overlay{
+  position:fixed;
+  inset:0;
+  z-index:1000;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  padding:24px;
+  background:rgba(17,17,17,.38);
+}
+
+.cf-preview-modal{
+  width:min(1080px,100%);
+  max-height:92vh;
+  overflow:auto;
+  background:#fff;
+  border:1px solid #ddd;
+  border-radius:16px;
+  box-shadow:0 24px 70px rgba(0,0,0,.18);
+}
+
+.cf-preview-toolbar{
+  position:sticky;
+  top:0;
+  z-index:2;
+  display:flex;
+  align-items:flex-start;
+  justify-content:space-between;
+  gap:20px;
+  padding:20px 24px;
+  background:rgba(255,255,255,.96);
+  border-bottom:1px solid #eee;
+}
+
+.cf-preview-toolbar h2{
+  margin:2px 0 2px;
+  font:500 23px 'League Spartan',Arial,sans-serif;
+}
+
+.cf-preview-toolbar p{
+  margin:0;
+  color:#777;
+  font-size:11px;
+}
+
+.cf-preview-kicker{
+  font-size:9px !important;
+  letter-spacing:.12em;
+  color:#777 !important;
+}
+
+.cf-preview-close{
+  width:36px;
+  height:36px;
+  display:grid;
+  place-items:center;
+  border:1px solid #ddd !important;
+  border-radius:8px;
+  background:#fff !important;
+  color:#555 !important;
+  cursor:pointer;
+  box-shadow:none !important;
+}
+
+.cf-preview-close:hover{
+  background:#f5f5f5 !important;
+  color:#111 !important;
+}
+
+.cf-creator-page{
+  padding:28px;
+  background:#fafafa;
+}
+
+.cf-creator-hero{
+  display:flex;
+  align-items:flex-end;
+  justify-content:space-between;
+  gap:24px;
+  padding:28px;
+  background:#fff;
+  border:1px solid #e5e5e5;
+  border-radius:12px;
+}
+
+.cf-creator-hero h1{
+  margin:10px 0 8px;
+  font:500 34px 'League Spartan',Arial,sans-serif;
+  letter-spacing:-.4px;
+}
+
+.cf-creator-hero p{
+  max-width:700px;
+  margin:0;
+  color:#666;
+  font-size:12px;
+  line-height:1.75;
+}
+
+.cf-preview-tags{
+  display:flex;
+  flex-wrap:wrap;
+  gap:7px;
+}
+
+.cf-preview-tags span,
+.cf-preview-chip-list span{
+  display:inline-flex;
+  align-items:center;
+  padding:6px 9px;
+  border:1px solid #ddd;
+  border-radius:999px;
+  background:#f7f7f7;
+  color:#444;
+  font-size:10px;
+}
+
+.cf-preview-apply{
+  flex:0 0 auto;
+  min-width:115px;
+  padding:11px 16px;
+  border:1px solid #111 !important;
+  border-radius:8px;
+  background:#111 !important;
+  color:#fff !important;
+  font:500 12px Poppins,Arial,sans-serif !important;
+}
+
+.cf-creator-layout{
+  display:grid;
+  grid-template-columns:minmax(0,1fr) 300px;
+  gap:18px;
+  margin-top:18px;
+}
+
+.cf-creator-main,
+.cf-creator-side{
+  min-width:0;
+}
+
+.cf-creator-section,
+.cf-preview-info-card{
+  margin-bottom:18px;
+  padding:22px;
+  background:#fff;
+  border:1px solid #e5e5e5;
+  border-radius:12px;
+}
+
+.cf-creator-section h3,
+.cf-preview-info-card h3{
+  margin:0 0 10px;
+  font:500 16px 'League Spartan',Arial,sans-serif;
+}
+
+.cf-creator-section p{
+  margin:0;
+  color:#555;
+  font-size:12px;
+  line-height:1.8;
+  white-space:pre-line;
+}
+
+.cf-preview-list{
+  margin:0;
+  padding-left:19px;
+  color:#444;
+  font-size:12px;
+  line-height:1.8;
+}
+
+.cf-preview-list.ordered{
+  padding-left:22px;
+}
+
+.cf-preview-list li + li{
+  margin-top:7px;
+}
+
+.cf-preview-muted{
+  color:#999 !important;
+}
+
+.cf-preview-detail{
+  display:flex;
+  align-items:flex-start;
+  justify-content:space-between;
+  gap:15px;
+  padding:10px 0;
+  border-bottom:1px solid #eee;
+  font-size:10px;
+}
+
+.cf-preview-detail:last-child{
+  border-bottom:0;
+  padding-bottom:0;
+}
+
+.cf-preview-detail span{
+  color:#888;
+}
+
+.cf-preview-detail strong{
+  max-width:165px;
+  color:#222;
+  font-weight:500;
+  text-align:right;
+}
+
+.cf-preview-chip-list{
+  display:flex;
+  flex-wrap:wrap;
+  gap:7px;
+}
+
+.cf-preview-timeline{
+  margin:0;
+  color:#444;
+  font-size:11px;
 }
 
 /* =========================================
@@ -2158,6 +2770,97 @@ const CSS = `
 }
 
 /* =========================================
+   FIELD VALIDATION + CUSTOM INPUT
+========================================= */
+
+.cf-field-error{
+  display:block;
+  color:#8b5555;
+  font-size:10px;
+  line-height:1.45;
+  margin-top:-2px;
+}
+
+.cf-option-error{
+  margin-top:0;
+}
+
+.cf-custom-type{
+  display:flex;
+  flex-direction:column;
+  gap:5px;
+}
+
+.cf-custom-type-input{
+  display:flex;
+  align-items:center;
+  gap:8px;
+}
+
+.cf-custom-type-input input{
+  flex:1;
+}
+
+.cf-custom-type small{
+  color:#888;
+  font-size:10px;
+}
+
+.cf-custom-type-button{
+  margin-top:0 !important;
+  white-space:nowrap;
+}
+
+.cf-custom-type-button:disabled{
+  opacity:.5;
+  cursor:not-allowed;
+}
+
+/* =========================================
+   LOCATION SUGGESTIONS
+========================================= */
+
+.cf-location-wrap{
+  position:relative;
+  width:100%;
+}
+
+.cf-location-suggestions{
+  position:absolute;
+  z-index:30;
+  left:0;
+  right:0;
+  top:calc(100% + 4px);
+  max-height:220px;
+  overflow:auto;
+  padding:5px;
+  border:1px solid #d8d8d8;
+  border-radius:8px;
+  background:#fff;
+  box-shadow:0 10px 25px rgba(0,0,0,.08);
+}
+
+.cf-location-suggestion{
+  width:100%;
+  display:block;
+  padding:9px 10px;
+  border:0;
+  border-radius:6px;
+  background:#fff;
+  color:#333;
+  font:400 11px Poppins,Arial,sans-serif;
+  text-align:left;
+  cursor:pointer;
+}
+
+.cf-location-suggestion:hover,
+.cf-location-suggestion:focus{
+  background:#f1f1f1;
+  color:#111;
+  outline:none;
+}
+
+/* =========================================
    FORM FIELDS
 ========================================= */
 
@@ -2195,6 +2898,12 @@ const CSS = `
   font-weight:400;
 
   margin-top:4px;
+}
+
+.cf-field.has-error input,
+.cf-field.has-error textarea,
+.cf-field.has-error select{
+  border-color:#c9aaaa !important;
 }
 
 .cf-field input,
@@ -2292,91 +3001,85 @@ const CSS = `
 
 .cf-option{
   width:100%;
-
   display:flex;
-
   align-items:center;
-
   gap:9px;
-
   min-height:43px;
-
   padding:10px 12px;
-
-  border:1px solid #dedede;
-
+  border:1px solid #d8d8d8 !important;
   border-radius:8px;
-
-  background:#fff;
-
-  color:#333;
-
+  background:#fff !important;
+  color:#333 !important;
   font:400 11px Poppins;
-
   text-align:left;
-
   cursor:pointer;
-
-  transition:
-    border-color .15s ease,
-    background .15s ease,
-    color .15s ease;
+  outline:none !important;
+  box-shadow:none !important;
+  transition:background .15s ease, border-color .15s ease, color .15s ease;
 }
 
-.cf-option:hover{
-  border-color:#bcbcbc;
-
-  background:#fafafa;
-
-  color:#111;
-}
-
+/* Unselected card stays white. */
+.cf-option:hover,
 .cf-option:focus,
-.cf-option:focus-visible{
-  outline:none;
-
-  box-shadow:none;
+.cf-option:focus-visible,
+.cf-option:active{
+  border:1px solid #d8d8d8 !important;
+  background:#fff !important;
+  color:#333 !important;
+  outline:none !important;
+  box-shadow:none !important;
 }
 
-.cf-option.selected{
-  border-color:#b8b8b8;
-
-  background:#f5f5f5;
-
-  color:#111;
+/* CLICKED CARD = LIGHT GREY */
+.cf-option.selected,
+.cf-option.selected:hover,
+.cf-option.selected:focus,
+.cf-option.selected:focus-visible,
+.cf-option.selected:active{
+  border:1px solid #d8d8d8 !important;
+  background:#eeeeee !important;
+  color:#111 !important;
+  outline:none !important;
+  box-shadow:none !important;
 }
 
 .cf-option-indicator{
   width:16px;
-
   height:16px;
-
   flex:0 0 16px;
-
   display:grid;
-
   place-items:center;
-
   border:1px solid #cfcfcf;
-
   border-radius:4px;
-
   background:#fff;
-
-  color:#fff;
-
-  transition:
-    background .15s ease,
-    border-color .15s ease;
+  color:transparent;
+  transition:background .15s ease, border-color .15s ease, color .15s ease;
 }
 
-.cf-option.selected
-.cf-option-indicator{
-  border-color:#111;
+/* UNSELECTED CHECKBOX = WHITE */
+.cf-option:hover .cf-option-indicator,
+.cf-option:focus .cf-option-indicator,
+.cf-option:focus-visible .cf-option-indicator{
+  background:#fff;
+  border-color:#cfcfcf;
+  color:transparent;
+}
 
+/* SELECTED CHECKBOX = BLACK + WHITE TICK */
+.cf-option.selected .cf-option-indicator,
+.cf-option.selected:hover .cf-option-indicator,
+.cf-option.selected:focus .cf-option-indicator,
+.cf-option.selected:focus-visible .cf-option-indicator{
   background:#111;
-
+  border-color:#111;
   color:#fff;
+}
+
+.cf-option.selected .cf-option-indicator svg{
+  width:11px;
+  height:11px;
+  stroke:#fff !important;
+  color:#fff !important;
 }
 
 .cf-option-text{
@@ -2431,43 +3134,44 @@ const CSS = `
 
 .cf-remove{
   width:38px;
-
   height:38px;
-
   flex:0 0 38px;
-
   display:grid;
-
   place-items:center;
-
-  border:1px solid #d8d8d8!important;
-
+  border:1px solid #d8d8d8 !important;
   border-radius:8px;
-
-  background:#fff!important;
-
-  color:#777;
-
+  background:#fff !important;
+  color:#555 !important;
   cursor:pointer;
+  outline:none !important;
+  box-shadow:none !important;
+}
 
-  outline:none!important;
-
-  box-shadow:none!important;
+.cf-remove svg{
+  width:15px;
+  height:15px;
+  stroke:#555 !important;
+  color:#555 !important;
+  opacity:1 !important;
+  visibility:visible !important;
 }
 
 .cf-remove:hover,
 .cf-remove:focus,
 .cf-remove:focus-visible,
 .cf-remove:active{
-  border:1px solid #aaa!important;
+  border:1px solid #d8d8d8 !important;
+  background:#f5f5f5 !important;
+  color:#111 !important;
+  outline:none !important;
+  box-shadow:none !important;
+}
 
-  background:#fff!important;
-
-  color:#111;
-
-  outline:none!important;
-
-  box-shadow:none!important;
+.cf-remove:hover svg,
+.cf-remove:focus svg,
+.cf-remove:focus-visible svg{
+  stroke:#111 !important;
+  color:#111 !important;
 }
 
 .cf-add{
@@ -2498,19 +3202,23 @@ const CSS = `
   box-shadow:none!important;
 }
 
-.cf-add:hover,
-.cf-add:focus,
-.cf-add:focus-visible,
-.cf-add:active{
-  border:1px solid #111!important;
-
-  background:#fff!important;
-
+.cf-add:hover:not(:disabled),
+.cf-add:focus:not(:disabled),
+.cf-add:focus-visible:not(:disabled),
+.cf-add:active:not(:disabled){
+  border:1px solid #d8d8d8!important;
+  background:#f7f7f7!important;
   color:#111;
-
   outline:none!important;
-
   box-shadow:none!important;
+}
+
+.cf-add:disabled{
+  opacity:.5;
+  cursor:not-allowed;
+  border-color:#d8d8d8!important;
+  background:#fff!important;
+  color:#777!important;
 }
 
 /* =========================================
@@ -2720,39 +3428,75 @@ const CSS = `
 /* Primary */
 
 .cf-btn.black{
+  appearance:none!important;
+  -webkit-appearance:none!important;
+  display:inline-flex!important;
+  align-items:center!important;
+  justify-content:center!important;
+  gap:7px!important;
+  min-height:40px;
   border:1px solid #111!important;
-
   background:#111!important;
-
-  color:#fff;
-
+  color:#fff!important;
   border-radius:8px;
-
   padding:11px 18px;
-
+  font-family:Poppins,Arial,sans-serif!important;
+  font-size:12px!important;
+  font-weight:500!important;
+  line-height:1!important;
+  text-align:center!important;
+  text-decoration:none!important;
   outline:none!important;
-
   box-shadow:none!important;
 }
 
+/* Force the label and arrow to stay visible on the black button. */
+.cf-btn.black,
+.cf-btn.black span,
+.cf-btn.black svg{
+  color:#fff!important;
+}
+
+.cf-btn.black svg{
+  width:15px!important;
+  height:15px!important;
+  stroke:#fff!important;
+  color:#fff!important;
+  flex-shrink:0;
+}
+
 .cf-btn.black:hover:not(:disabled){
-  border-color:#000!important;
-
-  background:#000!important;
-
-  color:#fff;
-
+  border-color:#111!important;
+  background:#111!important;
+  color:#fff!important;
   transform:translateY(-1px);
-
   box-shadow:none!important;
+}
+
+.cf-btn.black:hover:not(:disabled),
+.cf-btn.black:hover:not(:disabled) span,
+.cf-btn.black:hover:not(:disabled) svg{
+  color:#fff!important;
+}
+
+.cf-btn.black:hover:not(:disabled) svg{
+  stroke:#fff!important;
 }
 
 .cf-btn.black:focus,
 .cf-btn.black:focus-visible,
 .cf-btn.black:active{
+  border-color:#111!important;
+  background:#111!important;
+  color:#fff!important;
   outline:none!important;
-
   box-shadow:none!important;
+}
+
+.cf-btn.black:focus svg,
+.cf-btn.black:focus-visible svg,
+.cf-btn.black:active svg{
+  stroke:#fff!important;
 }
 
 /* =========================================
@@ -2783,6 +3527,26 @@ const CSS = `
 /* =========================================
    RESPONSIVE
 ========================================= */
+
+@media (max-width: 760px){
+  .cf-preview-trigger{
+    padding:8px 10px;
+    font-size:10px !important;
+  }
+  .cf-preview-overlay{
+    padding:10px;
+  }
+  .cf-creator-page{
+    padding:14px;
+  }
+  .cf-creator-hero{
+    flex-direction:column;
+    align-items:stretch;
+  }
+  .cf-creator-layout{
+    grid-template-columns:1fr;
+  }
+}
 
 @media(max-width:650px){
 
@@ -2878,4 +3642,75 @@ const CSS = `
     flex:1;
   }
 }
+
+.cf-add-label{
+  display:inline-block !important;
+  visibility:visible !important;
+  opacity:1 !important;
+  color:inherit !important;
+  white-space:nowrap !important;
+}
+
+/* FINAL ADD-DELIVERABLE BUTTON OVERRIDE
+   Keep the button visible and readable even when disabled. */
+.cf-add{
+  width:max-content !important;
+  min-width:0 !important;
+  min-height:38px !important;
+  display:inline-flex !important;
+  align-items:center !important;
+  justify-content:center !important;
+  gap:6px !important;
+  padding:9px 12px !important;
+  border:1px solid #d8d8d8 !important;
+  border-radius:8px !important;
+  background:#fff !important;
+  color:#222 !important;
+  font-family:Poppins, Arial, sans-serif !important;
+  font-size:11px !important;
+  font-weight:400 !important;
+  line-height:1 !important;
+  text-align:center !important;
+  visibility:visible !important;
+  box-shadow:none !important;
+  outline:none !important;
+}
+
+.cf-add span,
+.cf-add svg{
+  color:#222 !important;
+  stroke:#222 !important;
+  opacity:1 !important;
+  visibility:visible !important;
+}
+
+.cf-add svg{
+  width:15px !important;
+  height:15px !important;
+  flex:0 0 15px !important;
+}
+
+.cf-add:hover:not(:disabled){
+  background:#f7f7f7 !important;
+  border-color:#d8d8d8 !important;
+  color:#111 !important;
+}
+
+.cf-add:disabled{
+  width:max-content !important;
+  min-width:0 !important;
+  opacity:1 !important;
+  background:#fff !important;
+  border-color:#d8d8d8 !important;
+  color:#999 !important;
+  cursor:not-allowed !important;
+}
+
+.cf-add:disabled span,
+.cf-add:disabled svg{
+  color:#999 !important;
+  stroke:#999 !important;
+  opacity:1 !important;
+}
+
 `;

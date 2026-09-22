@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException, status, Query
+from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 from typing import Optional
 from datetime import datetime, timezone
@@ -359,15 +359,8 @@ async def create_application(
             detail="Campaign is not accepting applications",
         )
 
-    campaign_type = getattr(campaign.campaign_type, "value", str(campaign.campaign_type))
-    if campaign_type == "paid" and getattr(campaign, "funding_status", "unfunded") != "funded":
-        raise HTTPException(status_code=400, detail="This paid campaign is not funded yet and is not accepting applications.")
-
     # Check deadline
-    deadline = (
-        campaign.application_deadline
-        or campaign.deadline
-    )
+    deadline = campaign.application_deadline
 
     if deadline:
         if deadline.tzinfo is None:
@@ -419,13 +412,16 @@ async def create_application(
             detail="Already applied to this campaign",
         )
 
-    # Create application
-    # Paid campaigns use the campaign budget as the fixed compensation.
+    # Create application.
+    # Campaign compensation is fixed from the published campaign budget.
     # There is no creator-side counter-offer or post-selection negotiation.
     fixed_rate = (
-        round(float(campaign.budget) / max(int(campaign.creators_needed or 1), 1), 2)
-        if getattr(campaign.campaign_type, "value", str(campaign.campaign_type)) == "paid"
-        and campaign.budget is not None
+        round(
+            float(campaign.budget)
+            / max(int(campaign.creators_needed or 1), 1),
+            2,
+        )
+        if campaign.budget is not None
         else data.rate
     )
 
@@ -561,12 +557,6 @@ async def get_applications(
             float(campaign.budget)
             if campaign.budget is not None
             else None
-        )
-
-        item["campaign_type"] = getattr(
-            campaign.campaign_type,
-            "value",
-            str(campaign.campaign_type),
         )
 
         profile = (
@@ -746,33 +736,27 @@ async def update_application_status(
 
     if data.status == "accepted":
 
-        if getattr(
-            campaign.campaign_type,
-            "value",
-            str(campaign.campaign_type),
-        ) == "paid":
-
-            if getattr(campaign, "funding_status", "unfunded") != "funded":
+        # Compensation is fixed by the published campaign budget.
+        # No negotiation or funding gate is required before selection.
+        if campaign.budget is not None and not application.agreed_rate:
+            if float(campaign.budget) <= 0:
                 raise HTTPException(
                     status_code=400,
-                    detail="Fund the campaign budget before accepting a creator.",
+                    detail="This campaign does not have a valid fixed budget.",
                 )
 
-            # Compensation is fixed by the campaign budget.
-            if not application.agreed_rate:
-                if campaign.budget is None or float(campaign.budget) <= 0:
-                    raise HTTPException(status_code=400, detail="This paid campaign does not have a valid fixed budget.")
-                fixed_rate = round(float(campaign.budget) / max(int(campaign.creators_needed or 1), 1), 2)
-                application.agreed_rate = fixed_rate
-                application.rate = fixed_rate
-                application.rate_locked = 1
+            fixed_rate = round(
+                float(campaign.budget)
+                / max(int(campaign.creators_needed or 1), 1),
+                2,
+            )
+            application.agreed_rate = fixed_rate
+            application.rate = fixed_rate
+            application.rate_locked = 1
 
         now = datetime.now(timezone.utc)
 
-        deadline = (
-            campaign.application_deadline
-            or campaign.deadline
-        )
+        deadline = campaign.application_deadline
 
         if deadline and deadline.tzinfo is None:
             deadline = deadline.replace(
@@ -857,8 +841,7 @@ async def update_application_status(
             type="application_accepted",
             title="You've been accepted!",
             message=(
-                f"{campaign.brand_name or 'The brand'} "
-                f"selected you for {campaign.title}."
+                f"The brand selected you for {campaign.title}."
             ),
             link="/workspace/active",
             reference_id=application.id,

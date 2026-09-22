@@ -1,8 +1,8 @@
 import React, {
   createContext,
   useContext,
-  useState,
   useEffect,
+  useState,
 } from 'react';
 
 import {
@@ -12,187 +12,114 @@ import {
   deleteAccount as deleteAccountRequest,
 } from '../api/client';
 
-import type {
-  User,
-  RegisterData,
-  LoginData,
-} from '../api/client';
+import type { User, RegisterData, LoginData } from '../api/client';
 
 interface AuthContextType {
   user: User | null;
   token: string | null;
   loading: boolean;
-
   loginUser: (data: LoginData) => Promise<void>;
-
-  registerUser: (
-    data: RegisterData
-  ) => Promise<{
+  registerUser: (data: RegisterData) => Promise<{
     user: User;
     redirectTo: string;
   }>;
-
   logout: () => void;
-
-  // Permanently deletes the account on the server (profile, campaigns,
-  // applications, saved campaigns — everything), then clears local
-  // session state the same way logout() does. Throws (with the
-  // backend's error message, e.g. wrong password) if the delete fails,
-  // so the caller's try/catch can show it without touching local state.
   deleteAccount: (password: string) => Promise<void>;
-
-  // Merges partial profile data (e.g. one onboarding step's worth)
-  // into user.profile — both in context state and localStorage —
-  // so anything reading `user.profile` (like the Dashboard's
-  // completion %) updates immediately, without waiting for the
-  // whole onboarding flow to finish.
-  //
-  // NOTE: this is optimistic/client-side only. It does NOT call the
-  // backend. It survives a page refresh in *this* browser via the
-  // checkAuth() fallback below, but it will NOT show up on another
-  // device/browser, and a cleared localStorage will lose it, until
-  // there's a real partial-save API endpoint to call here too.
   updateProfile: (partialProfile: Record<string, any>) => void;
-
   isAuthenticated: boolean;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-export const AuthProvider: React.FC<{
-  children: React.ReactNode;
-}> = ({ children }) => {
+export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [user, setUser] = useState<User | null>(null);
   const [token, setToken] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
-
-  // ============================================
-  // CHECK EXISTING AUTHENTICATION
-  // ============================================
 
   useEffect(() => {
     const checkAuth = async () => {
       const storedToken = localStorage.getItem('access_token');
 
-      if (storedToken) {
-        try {
-          const userData = await getCurrentUser();
-
-          // The server is the source of truth, but there's no
-          // partial-save endpoint yet for onboarding-in-progress —
-          // completeCreatorOnboarding only fires at the very end.
-          // So if the server's profile is empty/missing and we have
-          // a locally cached one from an earlier updateProfile()
-          // call in this browser, keep it instead of dropping it on
-          // refresh. Once a real partial-save API exists, this
-          // fallback can go away.
-          const cachedRaw = localStorage.getItem('user');
-          const cached: User | null = cachedRaw ? JSON.parse(cachedRaw) : null;
-          const cachedProfile = cached?.profile;
-          const serverProfile = userData.profile;
-
-          const mergedUser: User =
-            cachedProfile && (!serverProfile || Object.keys(serverProfile).length === 0)
-              ? { ...userData, profile: cachedProfile }
-              : userData;
-
-          setUser(mergedUser);
-          setToken(storedToken);
-
-          localStorage.setItem('user', JSON.stringify(mergedUser));
-        } catch (error) {
-          console.error('Authentication check failed:', error);
-
-          localStorage.removeItem('access_token');
-          localStorage.removeItem('user');
-
-          setUser(null);
-          setToken(null);
-        }
+      if (!storedToken) {
+        setLoading(false);
+        return;
       }
 
-      setLoading(false);
+      try {
+        const userData = await getCurrentUser();
+
+        let cachedUser: User | null = null;
+        try {
+          const cachedRaw = localStorage.getItem('user');
+          cachedUser = cachedRaw ? JSON.parse(cachedRaw) : null;
+        } catch {
+          localStorage.removeItem('user');
+        }
+
+        const cachedProfile = cachedUser?.profile;
+        const serverProfile = userData.profile;
+
+        const mergedUser: User =
+          cachedProfile &&
+          (!serverProfile || Object.keys(serverProfile).length === 0)
+            ? { ...userData, profile: cachedProfile }
+            : userData;
+
+        setUser(mergedUser);
+        setToken(storedToken);
+        localStorage.setItem('user', JSON.stringify(mergedUser));
+      } catch (error: any) {
+        // 401 means the saved session is no longer valid.
+        if (error?.response?.status !== 401) {
+          console.error('Authentication check failed:', error);
+        }
+
+        localStorage.removeItem('access_token');
+        localStorage.removeItem('user');
+        setUser(null);
+        setToken(null);
+      } finally {
+        setLoading(false);
+      }
     };
 
     checkAuth();
   }, []);
 
-  // ============================================
-  // LOGIN
-  // ============================================
-
   const loginUser = async (data: LoginData): Promise<void> => {
-    try {
-      const response = await login(data);
+    const response = await login(data);
 
-      localStorage.setItem(
-        'access_token',
-        response.access_token
-      );
+    localStorage.setItem('access_token', response.access_token);
+    localStorage.setItem('user', JSON.stringify(response.user));
 
-      localStorage.setItem(
-        'user',
-        JSON.stringify(response.user)
-      );
-
-      setUser(response.user);
-      setToken(response.access_token);
-    } catch (error) {
-      console.error('Login failed:', error);
-      throw error;
-    }
+    setUser(response.user);
+    setToken(response.access_token);
   };
-
-  // ============================================
-  // REGISTER
-  // ============================================
 
   const registerUser = async (
     data: RegisterData
-  ): Promise<{
-    user: User;
-    redirectTo: string;
-  }> => {
-    try {
-      const response = await register(data);
+  ): Promise<{ user: User; redirectTo: string }> => {
+    const response = await register(data);
 
-      localStorage.setItem(
-        'access_token',
-        response.access_token
-      );
+    localStorage.setItem('access_token', response.access_token);
+    localStorage.setItem('user', JSON.stringify(response.user));
 
-      localStorage.setItem(
-        'user',
-        JSON.stringify(response.user)
-      );
+    setUser(response.user);
+    setToken(response.access_token);
 
-      setUser(response.user);
-      setToken(response.access_token);
+    let redirectTo = '/dashboard';
 
-      // Determine where the user should go
-      // based on their role.
-
-      let redirectTo = '/dashboard';
-
-      if (response.user.role === 'creator') {
-        redirectTo = '/onboarding/creator';
-      } else if (response.user.role === 'business') {
-        redirectTo = '/onboarding/business';
-      }
-
-      return {
-        user: response.user,
-        redirectTo,
-      };
-    } catch (error) {
-      console.error('Registration failed:', error);
-      throw error;
+    if (response.user.role === 'creator') {
+      redirectTo = '/onboarding/creator';
+    } else if (response.user.role === 'business') {
+      redirectTo = '/onboarding/business';
     }
-  };
 
-  // ============================================
-  // UPDATE PROFILE (optimistic, client-side)
-  // ============================================
+    return {
+      user: response.user,
+      redirectTo,
+    };
+  };
 
   const updateProfile = (partialProfile: Record<string, any>): void => {
     setUser((prevUser) => {
@@ -207,37 +134,21 @@ export const AuthProvider: React.FC<{
       };
 
       localStorage.setItem('user', JSON.stringify(updatedUser));
-
       return updatedUser;
     });
   };
 
-  // ============================================
-  // LOGOUT
-  // ============================================
-
   const logout = (): void => {
     localStorage.removeItem('access_token');
     localStorage.removeItem('user');
-
     setUser(null);
     setToken(null);
   };
 
-  // ============================================
-  // DELETE ACCOUNT
-  // ============================================
-
   const deleteAccount = async (password: string): Promise<void> => {
     await deleteAccountRequest(password);
-    // Account no longer exists server-side — clear local session state
-    // the same way logout() does.
     logout();
   };
-
-  // ============================================
-  // CONTEXT VALUE
-  // ============================================
 
   const value: AuthContextType = {
     user,
@@ -251,10 +162,6 @@ export const AuthProvider: React.FC<{
     isAuthenticated: !!user && !!token,
   };
 
-  // ============================================
-  // PROVIDER
-  // ============================================
-
   return (
     <AuthContext.Provider value={value}>
       {children}
@@ -262,17 +169,11 @@ export const AuthProvider: React.FC<{
   );
 };
 
-// ============================================
-// useAuth HOOK
-// ============================================
-
 export const useAuth = () => {
   const context = useContext(AuthContext);
 
   if (context === undefined) {
-    throw new Error(
-      'useAuth must be used within an AuthProvider'
-    );
+    throw new Error('useAuth must be used within an AuthProvider');
   }
 
   return context;

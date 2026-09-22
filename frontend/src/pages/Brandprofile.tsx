@@ -234,7 +234,7 @@ export function BrandProfile() {
                         <div className="bp-campaign-title">{campaign.title}</div>
                         <div className="bp-campaign-meta">
                           {campaign.category}
-                          {campaign.sub_category ? ` · ${campaign.sub_category}` : ''}
+                          
                         </div>
                       </div>
                       <div className="bp-campaign-right">

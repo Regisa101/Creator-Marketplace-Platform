@@ -111,10 +111,6 @@ const CAT_PAGE_STEP = 3;
 // CAMPAIGN HELPERS
 // ============================================
 
-function campaignImage(c: PublicCampaign) {
-  return mediaUrl(c.hero_image || c.extra_photos?.[0]);
-}
-
 function campaignPlatform(c: PublicCampaign) {
   return c.required_platforms?.[0] || c.required_platform || "";
 }
@@ -140,6 +136,40 @@ function isUnavailable(c: PublicCampaign) {
 // CAMPAIGN CARD
 // ============================================
 
+function postedAgo(value?: string | null) {
+  if (!value) return "Recently posted";
+
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "Recently posted";
+
+  const diff = Math.max(0, Date.now() - date.getTime());
+  const minutes = Math.floor(diff / 60000);
+  const hours = Math.floor(minutes / 60);
+  const days = Math.floor(hours / 24);
+  const weeks = Math.floor(days / 7);
+  const months = Math.floor(days / 30);
+
+  if (minutes < 1) return "Posted just now";
+  if (minutes < 60) return `Posted ${minutes} min${minutes === 1 ? "" : "s"} ago`;
+  if (hours < 24) return `Posted ${hours} hour${hours === 1 ? "" : "s"} ago`;
+  if (days < 7) return `Posted ${days} day${days === 1 ? "" : "s"} ago`;
+  if (weeks < 5) return `Posted ${weeks} week${weeks === 1 ? "" : "s"} ago`;
+  return `Posted ${months} month${months === 1 ? "" : "s"} ago`;
+}
+
+function campaignTags(c: PublicCampaign) {
+  const tags: string[] = [];
+
+  if (c.category) tags.push(c.category);
+  if (c.required_platforms?.length) {
+    tags.push(...c.required_platforms.slice(0, 2));
+  } else if (c.required_platform) {
+    tags.push(c.required_platform);
+  }
+
+  return Array.from(new Set(tags)).slice(0, 3);
+}
+
 function CampaignCard({
   c,
   isCreator,
@@ -153,123 +183,96 @@ function CampaignCard({
   isSaved: boolean;
   onToggleSave: (campaignId: number) => void;
 }) {
-  const image = campaignImage(c);
   const booked = isBooked(c);
   const unavailable = isUnavailable(c);
-  const platform = campaignPlatform(c);
+  const tags = campaignTags(c);
 
   return (
     <div
       className={`lp-card${booked ? " lp-card-booked" : ""}`}
     >
-      <div className="lp-card-media">
-        {image ? (
-          <img src={image} alt={c.title} loading="lazy" />
-        ) : (
-          <div className="lp-card-image-placeholder">
-            Campaign image
-          </div>
-        )}
-
-        <span
-          className={`lp-badge ${
-            booked ? "lp-badge-booked" : "lp-badge-paid"
-          }`}
-        >
-          {booked ? "Booked" : "Paid"}
-        </span>
-
-        {isCreator && !unavailable && (
-          <button
-            type="button"
-            className={`lp-campaign-save ${
-              isSaved ? "is-saved" : ""
-            }`}
-            onClick={(event) => {
-              event.preventDefault();
-              onToggleSave(c.id);
-            }}
-            aria-label={
-              isSaved ? "Remove from wishlist" : "Save to wishlist"
-            }
-            title={
-              isSaved ? "Remove from wishlist" : "Save to wishlist"
-            }
-          >
-            <Heart
-              size={17}
-              fill={isSaved ? "currentColor" : "none"}
-            />
-          </button>
-        )}
-      </div>
-
       <div className="lp-card-body">
-        <div className="lp-card-brand">
-          <span
-            className="lp-card-avatar"
-            style={{
-              background: c.brand_logo ? "#fff" : "#111111",
-            }}
-          >
-            {c.brand_logo ? (
-              <img src={mediaUrl(c.brand_logo)} alt="" />
-            ) : (
-              initials(c.brand_name || "Brand")
-            )}
-          </span>
+        <div className="lp-card-topline">
+          <div className="lp-card-brand">
+            <span
+              className="lp-card-avatar"
+              style={{
+                background: c.brand_logo ? "#fff" : "#111111",
+              }}
+            >
+              {c.brand_logo ? (
+                <img src={mediaUrl(c.brand_logo)} alt="" />
+              ) : (
+                initials(c.brand_name || "Brand")
+              )}
+            </span>
 
-          <span className="lp-card-brand-name">
-            {c.brand_name || "Brand"}
-          </span>
+            <span className="lp-card-brand-name">
+              {c.brand_name || "Brand"}
+            </span>
+          </div>
+
+          {isCreator && !unavailable && (
+            <button
+              type="button"
+              className={`lp-campaign-save ${
+                isSaved ? "is-saved" : ""
+              }`}
+              onClick={() => onToggleSave(c.id)}
+              aria-label={
+                isSaved ? "Remove from wishlist" : "Save to wishlist"
+              }
+              title={
+                isSaved ? "Remove from wishlist" : "Save to wishlist"
+              }
+            >
+              <Heart
+                size={17}
+                fill={isSaved ? "currentColor" : "none"}
+              />
+            </button>
+          )}
         </div>
 
         <h3 className="lp-card-title">{c.title}</h3>
 
-        <p className="lp-card-description">
-          {c.tagline ||
-            c.description ||
-            "View the brief to see the full campaign details."}
-        </p>
-
-        <span className="lp-card-category">{c.category}</span>
-
-        <div className="lp-card-meta">
-          <span className="lp-card-comp">
-            NRs {(c.budget || 0).toLocaleString()}
-          </span>
-
+        <div className="lp-card-location-row">
           <span>
-            {c.brand_location ? (
-              <>
-                <MapPin size={13} />
-                {c.brand_location}
-              </>
-            ) : null}
+            <MapPin size={13} />
+            {c.brand_location || "Remote / flexible"}
           </span>
+
+          <span>{c.engagement_type || "Short-term"}</span>
         </div>
 
-        <div className="lp-card-secondary-meta">
-          <span>
-            <Calendar size={12} />
-            Apply by{" "}
-            {c.application_deadline || c.deadline
-              ? new Date(
-                  c.application_deadline || (c.deadline as string)
-                ).toLocaleDateString("en-US", {
-                  month: "short",
-                  day: "numeric",
-                })
-              : "—"}
-          </span>
+        <div className="lp-card-budget-row">
+          <strong>
+            {c.budget_min != null && c.budget_max != null
+              ? `NPR ${c.budget_min.toLocaleString()} – ${c.budget_max.toLocaleString()}`
+              : c.budget != null
+                ? `NPR ${c.budget.toLocaleString()}`
+                : "Budget not specified"}
+          </strong>
 
-          <span>
-            {platform ||
-              creatorAudienceLabel(c) ||
-              `${c.creators_needed || 1} creator${
-                (c.creators_needed || 1) === 1 ? "" : "s"
-              }`}
-          </span>
+          {c.duration && <span>{c.duration}</span>}
+        </div>
+
+        {tags.length > 0 && (
+          <div className="lp-card-tags">
+            {tags.map((tag) => (
+              <span key={tag}>{tag}</span>
+            ))}
+          </div>
+        )}
+
+        <p className="lp-card-description">
+          {c.description || "View the brief to see the full campaign details."}
+        </p>
+
+        <div className="lp-card-posted">
+          <span>{postedAgo(c.created_at)}</span>
+
+          {booked && <span className="lp-card-booked-label">Booked</span>}
         </div>
 
         <div className="lp-card-actions">
@@ -556,13 +559,14 @@ export function Landing() {
   // LATEST CAMPAIGNS
   // ============================================
 
-  // Keep exactly the 7 newest live + funded campaigns.
+  // Keep exactly the 7 newest live campaigns.
+  // Publishing is independent of campaign funding, so a published campaign
+  // must appear here even when it has no funding_status/funding record.
   const latestCampaigns = useMemo(() => {
     return [...campaigns]
       .filter((c) => {
-        return (
-          ["published", "in_progress"].includes(String(c.status)) &&
-          String(c.funding_status || "").toLowerCase() === "funded"
+        return ["published", "in_progress"].includes(
+          String(c.status).toLowerCase()
         );
       })
       .sort((a, b) => {
@@ -1274,8 +1278,9 @@ export function Landing() {
         }
 
         .lp-latest-grid {
-          grid-template-columns: repeat(4, 1fr);
+          grid-template-columns: repeat(4, minmax(0, 1fr));
           gap: 22px;
+          align-items: stretch;
         }
 
         /* Latest campaigns pagination */
@@ -1319,72 +1324,58 @@ export function Landing() {
 
         .lp-card {
           background: #fff;
-          border: 1px solid var(--line);
-          border-radius: 16px;
+          border: 1px solid #e4e4e4;
+          border-radius: 14px;
           overflow: hidden;
           display: flex;
           flex-direction: column;
           height: 100%;
+          min-height: 448px;
           min-width: 0;
-          transition: transform .18s, box-shadow .18s;
+          box-sizing: border-box;
+          transition: transform .18s, box-shadow .18s, border-color .18s;
         }
 
         .lp-card:hover {
-          transform: translateY(-4px);
-          box-shadow: 0 18px 34px -16px rgba(30,20,60,0.22);
-        }
-
-        .lp-card-media {
-          position: relative;
-          height: 150px;
-        }
-
-        .lp-card-media img {
-          width: 100%;
-          height: 100%;
-          object-fit: cover;
-          display: block;
-        }
-
-        .lp-badge {
-          position: absolute;
-          top: 10px;
-          right: 10px;
-          font-size: 11px;
-          font-weight: 400;
-          letter-spacing: 0.3px;
-          padding: 4px 10px;
-          border-radius: 999px;
-        }
-
-        .lp-badge-paid {
-          background: var(--coral-soft);
-          color: var(--coral);
+          transform: translateY(-3px);
+          border-color: #d5d5d5;
+          box-shadow: 0 16px 30px -18px rgba(0,0,0,.24);
         }
 
         .lp-card-body {
-          padding: 16px 16px 18px;
+          padding: 18px 18px 17px;
           display: flex;
           flex-direction: column;
-          gap: 8px;
+          gap: 0;
           flex: 1;
           min-width: 0;
+          box-sizing: border-box;
+        }
+
+        .lp-card-topline {
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          gap: 10px;
+          height: 32px;
+          min-height: 32px;
+          margin-bottom: 15px;
         }
 
         .lp-card-brand {
           display: flex;
           align-items: center;
           gap: 8px;
-          min-height: 24px;
+          min-width: 0;
         }
 
         .lp-card-avatar {
-          width: 24px;
-          height: 24px;
-          border-radius: 50%;
+          width: 28px;
+          height: 28px;
+          border-radius: 8px;
           color: #fff;
           font-size: 10px;
-          font-weight: 400;
+          font-weight: 500;
           display: flex;
           align-items: center;
           justify-content: center;
@@ -1392,139 +1383,214 @@ export function Landing() {
           overflow: hidden;
         }
 
+        .lp-card-avatar img {
+          width: 100%;
+          height: 100%;
+          object-fit: cover;
+          border-radius: 8px;
+          display: block;
+        }
+
         .lp-card-brand-name {
-          font-size: 12.5px;
-          color: var(--ink-soft);
-          font-weight: 400;
-        }
-
-        .lp-card-title {
-          font-size: 16px;
-          font-weight: 400;
-          color: var(--ink);
-          margin: 0;
-          line-height: 1.3;
-          min-height: 42px;
-          display: -webkit-box;
-          -webkit-line-clamp: 2;
-          -webkit-box-orient: vertical;
-          overflow: hidden;
-        }
-
-        .lp-card-description {
           font-size: 11.5px;
-          line-height: 1.55;
-          color: var(--ink-soft);
-          margin: -2px 0 1px;
-          display: -webkit-box;
-          -webkit-line-clamp: 2;
-          -webkit-box-orient: vertical;
+          color: #555;
+          font-weight: 500;
           overflow: hidden;
-          min-height: 35px;
-          max-height: 35px;
-        }
-
-        .lp-card-category {
-          align-self: flex-start;
-          height: 22px;
-          box-sizing: border-box;
-          display: inline-flex;
-          align-items: center;
-          font-size: 11px;
-          font-weight: 400;
-          color: var(--navy);
-          background: var(--navy-soft);
-          padding: 3px 10px;
-          border-radius: 999px;
-        }
-
-        .lp-card-meta {
-          display: flex;
-          flex-wrap: wrap;
-          gap: 8px 10px;
-          font-size: 11.5px;
-          color: var(--ink-soft);
-          margin: 2px 0 1px;
-          min-height: 18px;
-          align-items: center;
-        }
-
-        .lp-card-meta span {
-          display: inline-flex;
-          align-items: center;
-          gap: 4px;
+          text-overflow: ellipsis;
           white-space: nowrap;
         }
 
-        .lp-card-comp {
-          color: var(--navy);
-          font-weight: 400;
-        }
-
-        .lp-card-secondary-meta {
+        .lp-campaign-save {
+          position: static;
+          width: 32px;
+          height: 32px;
+          flex: 0 0 32px;
+          border: 1px solid #e1e1e1;
+          border-radius: 50%;
+          background: #fff;
+          color: #666;
           display: flex;
-          justify-content: space-between;
           align-items: center;
-          gap: 8px;
-          font-size: 10.5px;
-          color: var(--ink-soft);
-          margin-bottom: 6px;
-          min-height: 18px;
+          justify-content: center;
+          padding: 0;
         }
 
-        .lp-card-secondary-meta span {
+        .lp-campaign-save:hover,
+        .lp-campaign-save.is-saved {
+          color: #111;
+          border-color: #bdbdbd;
+        }
+
+        .lp-card-title {
+          font-size: 18px;
+          font-weight: 500;
+          color: #111;
+          margin: 0 0 11px;
+          line-height: 1.28;
+          letter-spacing: -.02em;
+          min-height: 46px;
+          display: -webkit-box;
+          -webkit-line-clamp: 2;
+          -webkit-box-orient: vertical;
+          overflow: hidden;
+        }
+
+        .lp-card-location-row,
+        .lp-card-budget-row {
+          display: flex;
+          align-items: center;
+          flex-wrap: wrap;
+          gap: 7px 12px;
+          color: #686868;
+          font-size: 10.5px;
+          line-height: 1.45;
+        }
+
+        .lp-card-location-row {
+          margin-bottom: 11px;
+          min-height: 16px;
+        }
+
+        .lp-card-location-row span {
           display: inline-flex;
           align-items: center;
           gap: 4px;
         }
 
-        .lp-card-actions {
-          margin-top: auto;
-          display: grid;
-          grid-template-columns: minmax(0, 1.25fr) minmax(0, 0.85fr);
+        .lp-card-location-row span + span::before {
+          content: "•";
+          margin-right: 5px;
+          color: #aaa;
+        }
+
+        .lp-card-budget-row {
+          justify-content: space-between;
+          min-height: 45px;
+          box-sizing: border-box;
+          padding: 11px 0;
+          border-top: 1px solid #eeeeee;
+          border-bottom: 1px solid #eeeeee;
+        }
+
+        .lp-card-budget-row strong {
+          color: #111;
+          font-size: 13px;
+          font-weight: 500;
+        }
+
+        .lp-card-budget-row span {
+          color: #777;
+          white-space: nowrap;
+        }
+
+        .lp-card-tags {
+          display: flex;
+          flex-wrap: wrap;
+          align-content: flex-start;
+          gap: 6px;
+          min-height: 28px;
+          margin: 12px 0 9px;
+        }
+
+        .lp-card-tags span {
+          display: inline-flex;
+          align-items: center;
+          min-height: 22px;
+          padding: 3px 8px;
+          border-radius: 999px;
+          background: #f5f5f5;
+          color: #555;
+          font-size: 9.5px;
+          line-height: 1;
+        }
+
+        .lp-card-description {
+          font-size: 10.5px;
+          line-height: 1.6;
+          color: #666;
+          margin: 3px 0 13px;
+          min-height: 50px;
+          display: -webkit-box;
+          -webkit-line-clamp: 3;
+          -webkit-box-orient: vertical;
+          overflow: hidden;
+        }
+
+        .lp-card-posted {
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
           gap: 8px;
-          padding-top: 4px;
+          margin-top: auto;
+          margin-bottom: 12px;
+          color: #888;
+          font-size: 9.5px;
+        }
+
+        .lp-card-booked-label {
+          color: #555;
+          font-weight: 500;
+        }
+
+        .lp-card-apply-disabled {
+          background: #ececec;
+          border-color: #ececec;
+          color: #777;
+          cursor: not-allowed;
+          box-shadow: none;
+        }
+
+        .lp-card-apply-disabled:hover {
+          transform: none;
+          background: #ececec;
+          border-color: #ececec;
+          color: #777;
+        }
+
+        .lp-card-actions {
+          display: grid;
+          grid-template-columns: minmax(0, 1.25fr) minmax(0, .85fr);
+          gap: 7px;
+          min-height: 36px;
         }
 
         .lp-card-apply,
         .lp-card-view {
-          min-height: 40px;
+          min-height: 36px;
           display: flex;
           align-items: center;
           justify-content: center;
           gap: 6px;
-          padding: 9px 10px;
-          border-radius: 10px;
-          font-size: 12.5px;
+          padding: 8px 9px;
+          border-radius: 8px;
+          font-size: 10.5px;
           font-weight: 500;
           white-space: nowrap;
           transition: all .18s ease;
         }
 
         .lp-card-apply {
-          background: #111111;
-          border: 1px solid #111111;
+          background: #111;
+          border: 1px solid #111;
           color: #fff;
         }
 
         .lp-card-apply:hover {
-          background: #111111;
-          border-color: #111111;
+          background: #000;
+          border-color: #000;
           color: #fff;
-          transform: translateY(-1px);
         }
 
         .lp-card-view {
-          background: #F5F5F5;
-          border: 1px solid #DEDEDE;
-          color: #111111;
+          background: #fff;
+          border: 1px solid #dedede;
+          color: #111;
         }
 
         .lp-card-view:hover {
-          background: #000000;
-          border-color: #000000;
-          color: #fff;
-          transform: translateY(-1px);
+          background: #f5f5f5;
+          border-color: #cfcfcf;
+          color: #111;
         }
 
         /* ============================================
@@ -1966,7 +2032,7 @@ export function Landing() {
           }
 
           .lp-latest-grid {
-            grid-template-columns: repeat(2, 1fr);
+            grid-template-columns: repeat(2, minmax(0, 1fr));
             gap: 14px;
           }
 
@@ -2157,6 +2223,10 @@ export function Landing() {
 
           .lp-latest-grid {
             grid-template-columns: 1fr;
+          }
+
+          .lp-card {
+            min-height: 0;
           }
 
           .lp-h1 {

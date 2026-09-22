@@ -27,6 +27,7 @@ import { PaymentReturn } from './pages/workspace/PaymentReturn';
 import { DemoPayment } from './pages/workspace/DemoPayment';
 import { Notifications } from './pages/Notifications';
 import Analytics from './pages/Analytics';
+import Campaigns from "./pages/Campaigns";
 
 function ProfileRouter() {
   const { user } = useAuth();
@@ -76,9 +77,15 @@ export default function App() {
           <Route path="/notifications" element={<ProtectedRoute><Notifications /></ProtectedRoute>} />
           <Route path="/analytics" element={<ProtectedRoute><Analytics /></ProtectedRoute>} />
 
+          <Route path="/campaigns" element={<ProtectedRoute><Campaigns /></ProtectedRoute>} />
+          <Route path="/campaigns/:id" element={<ProtectedRoute><CampaignDetail /></ProtectedRoute>} />
+          <Route path="/campaigns/:id/edit" element={<ProtectedRoute><CampaignEdit /></ProtectedRoute>} />
+
+          {/* Catch-all route for undefined paths */}
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </AuthProvider>
     </BrowserRouter>
   );
-}
+} 
+        

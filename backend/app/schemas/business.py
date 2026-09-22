@@ -27,7 +27,7 @@ class BusinessOnboardingComplete(BaseModel):
 
 
 # ============================================
-# PARTIAL PROGRESS (resume-where-you-left-off)
+# PARTIAL PROGRESS
 # ============================================
 
 class VideoSpecDict(BaseModel):
@@ -69,12 +69,11 @@ class BusinessOnboardingProgress(BaseModel):
 # Deliberately excludes private fields such as contact_phone,
 # typical_budget, and campaign-default settings.
 
+
 class PublicCampaignSummary(BaseModel):
     id: int
     title: str
     category: str
-    sub_category: Optional[str] = None
-    campaign_type: str
     status: str
 
 

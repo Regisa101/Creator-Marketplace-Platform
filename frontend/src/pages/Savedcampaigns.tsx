@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { ArrowLeft, MapPin, Building2, BookmarkX, DollarSign } from 'lucide-react';
+import { ArrowLeft, Building2, BookmarkX, DollarSign } from 'lucide-react';
 import { getSavedCampaigns, unsaveCampaign, type SavedCampaignEntry } from '../api/client';
 import { PAGE_GRADIENT_BG } from '../components/Brand';
 import { PublicNavbar } from '../components/PublicNavbar';
@@ -216,18 +216,10 @@ export function SavedCampaigns() {
                     <h3 className="sc-card-title">{c.title}</h3>
                     <div className="sc-card-meta">
                       <span className="sc-card-meta-item">
-                        <Building2 size={12} /> {c.brand_name || 'Business'}
+                        <Building2 size={12} /> Business
                       </span>
                       <span>·</span>
                       <span>{c.category}</span>
-                      {c.brand_location && (
-                        <>
-                          <span>·</span>
-                          <span className="sc-card-meta-item">
-                            <MapPin size={12} /> {c.brand_location}
-                          </span>
-                        </>
-                      )}
                     </div>
                     <p className="sc-card-desc">{c.description}</p>
                   </Link>

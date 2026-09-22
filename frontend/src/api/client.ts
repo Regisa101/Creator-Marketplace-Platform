@@ -1,6 +1,8 @@
 import axios from 'axios';
 
-const API_BASE_URL = 'http://localhost:8000/api';
+// Use Vite's dev proxy in the browser so API calls stay same-origin and do not hit CORS.
+// The proxy forwards /api -> http://localhost:8000/api.
+const API_BASE_URL = '/api';
 
 const api = axios.create({
   baseURL: API_BASE_URL,
@@ -754,14 +756,7 @@ export const deleteCampaign = async (id: number | string): Promise<void> => {
   await api.delete(`/campaigns/${id}`);
 };
 
-// A campaign auto-flips to "in_progress" as soon as one application on it
-// is accepted, and the backend refuses to delete anything "in_progress"
-// (app/routes/campaigns.py). There was previously no way back out of that
-// state. This calls the same PUT /campaigns/{id} update endpoint (which only
-// blocks changes on "completed" campaigns) to move the status to
-// "cancelled" instead, after which delete works normally. Kept separate
-// from updateCampaign's typed payload since `status` isn't part of
-// CampaignCreateData.
+// Drafts are permanently deleted. Published/booked campaigns are removed from the marketplace while their history is preserved.
 export const closeCampaign = async (id: number | string): Promise<Campaign> => {
   const response = await api.put<Campaign>(`/campaigns/${id}/close`, {});
   return response.data;

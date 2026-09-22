@@ -5,6 +5,7 @@ from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
+from sqlalchemy import and_, func, or_
 
 from app.database import get_db
 from app.dependencies.auth import (
@@ -152,6 +153,25 @@ async def get_public_campaigns(
     Draft, cancelled, completed, and closed campaigns are private.
     """
 
+    # Published campaigns are public. Once a creator is selected, the
+    # campaign stays visible for one day, then disappears from the public
+    # marketplace while its collaboration history remains available.
+    selection_time = func.coalesce(
+        func.max(Application.updated_at),
+        func.max(Application.created_at),
+    )
+    selected_at = (
+        db.query(selection_time)
+        .filter(
+            Application.campaign_id == Campaign.id,
+            Application.status.in_(["accepted", "completed"]),
+        )
+        .correlate(Campaign)
+        .scalar_subquery()
+    )
+
+    hide_after_selection = datetime.now(timezone.utc) - timedelta(days=1)
+
     query = (
         db.query(Campaign)
         .filter(
@@ -162,6 +182,16 @@ async def get_public_campaigns(
                 ]
             ),
             Campaign.is_active.is_(True),
+            or_(
+                Campaign.status == CampaignStatus.PUBLISHED,
+                and_(
+                    Campaign.status == CampaignStatus.IN_PROGRESS,
+                    or_(
+                        selected_at.is_(None),
+                        selected_at >= hide_after_selection,
+                    ),
+                ),
+            ),
         )
     )
 
@@ -1196,7 +1226,11 @@ async def delete_campaign(
     current_user: User = Depends(get_current_user),
 ):
     """
-    Permanently delete a draft campaign that has no applications.
+    Delete a campaign for the owning brand.
+
+    Drafts are permanently deleted. Published/booked campaigns are
+    cancelled and hidden from the marketplace so collaboration history
+    remains intact.
     """
 
     campaign = (
@@ -1220,32 +1254,36 @@ async def delete_campaign(
             detail="Access denied.",
         )
 
-    if campaign.status != CampaignStatus.DRAFT:
-        raise HTTPException(
-            status_code=400,
-            detail=(
-                "Only draft campaigns can be permanently deleted. "
-                "Close or complete active campaigns instead."
-            ),
+    # Draft campaigns can be permanently deleted.
+    if campaign.status == CampaignStatus.DRAFT:
+        application_count = _application_count(
+            db,
+            campaign.id,
         )
 
-    application_count = _application_count(
-        db,
-        campaign.id,
-    )
+        if application_count > 0:
+            raise HTTPException(
+                status_code=400,
+                detail=(
+                    "This campaign has application history "
+                    "and cannot be deleted."
+                ),
+            )
 
-    if application_count > 0:
-        raise HTTPException(
-            status_code=400,
-            detail=(
-                "This campaign has application history "
-                "and cannot be deleted."
-            ),
-        )
+        db.delete(campaign)
+        db.commit()
 
-    db.delete(campaign)
+        return {
+            "message": "Draft campaign deleted successfully."
+        }
+
+    # For a published/booked campaign, Delete removes it from the marketplace
+    # without destroying application, collaboration, or payment history.
+    campaign.status = CampaignStatus.CANCELLED
+    campaign.is_active = False
     db.commit()
+    db.refresh(campaign)
 
     return {
-        "message": "Draft campaign deleted successfully."
+        "message": "Campaign removed from the marketplace successfully."
     }

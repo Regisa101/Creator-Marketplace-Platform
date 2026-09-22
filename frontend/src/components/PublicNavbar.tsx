@@ -1,6 +1,7 @@
 import { Link, useLocation, useNavigate, useSearchParams } from "react-router-dom";
 import { useEffect, useRef, useState } from "react";
 import type { MouseEvent } from "react";
+
 import {
   Heart,
   Menu,
@@ -9,13 +10,17 @@ import {
   LogOut,
   Trash2,
   Search,
+  UserRound,
 } from "lucide-react";
+
 import { LogoMark } from "./Logo";
 import { useAuth } from "../context/AuthContext";
+
 import {
   getSavedCampaigns,
   unsaveCampaign,
   type SavedCampaignEntry,
+  type PublicCampaign,
 } from "../api/client";
 
 type PublicNavbarProps = {
@@ -31,7 +36,12 @@ const SECTION_HASHES: Record<SectionKey, string> = {
 };
 
 const SCROLL_TARGET_KEY = "ch-scroll-target";
+
 const API_ORIGIN = "http://localhost:8000";
+
+/* ============================================================
+   HELPERS
+============================================================ */
 
 function mediaUrl(url?: string | null): string {
   if (!url) return "";
@@ -44,7 +54,9 @@ function mediaUrl(url?: string | null): string {
     return url;
   }
 
-  if (url.startsWith("/api/")) return `${API_ORIGIN}${url}`;
+  if (url.startsWith("/api/")) {
+    return `${API_ORIGIN}${url}`;
+  }
 
   return `${API_ORIGIN}/${url.replace(/^\/+/, "")}`;
 }
@@ -73,45 +85,75 @@ function getAvatarUrl(user: any): string {
   );
 }
 
-export function PublicNavbar({ sticky = true }: PublicNavbarProps) {
+/* ============================================================
+   COMPONENT
+============================================================ */
+
+export function PublicNavbar({
+  sticky = true,
+}: PublicNavbarProps) {
   const location = useLocation();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
 
-  const { user, loading, isAuthenticated, logout } = useAuth();
+  const {
+    user,
+    loading,
+    isAuthenticated,
+    logout,
+  } = useAuth();
 
   const [mobileOpen, setMobileOpen] = useState(false);
   const [profileOpen, setProfileOpen] = useState(false);
+
   const [wishlistOpen, setWishlistOpen] = useState(false);
   const [wishlistLoading, setWishlistLoading] = useState(false);
   const [saved, setSaved] = useState<SavedCampaignEntry[]>([]);
+
   const [activeSection, setActiveSection] =
     useState<SectionKey>("home");
 
   const [searchValue, setSearchValue] = useState("");
 
-  const profileWrapRef = useRef<HTMLDivElement>(null);
+  const profileWrapRef =
+    useRef<HTMLDivElement>(null);
 
-  const isLandingPage = location.pathname === "/";
+  /* ==========================================================
+     PAGE CONTEXT
+  ========================================================== */
 
-  const isLandingContext =
-    isLandingPage || searchParams.get("source") === "landing";
+  const isLandingPage =
+    location.pathname === "/";
 
-  const isCreator = user?.role === "creator";
+  /*
+   * Campaign detail opened from landing:
+   * /campaigns/:id?source=landing
+   *
+   * This should still use the landing/public navbar.
+   */
+  const isPublicHome =
+    isLandingPage ||
+    searchParams.get("source") === "landing";
+
+  const isCampaignsPage =
+    location.pathname === "/campaigns";
+
+  const isCreator =
+    user?.role === "creator";
 
   const showWishlist = Boolean(
     !loading &&
       isAuthenticated &&
       isCreator &&
-      isLandingContext
+      isPublicHome
   );
 
   const avatarUrl = getAvatarUrl(user);
   const initials = getInitials(user?.full_name);
 
-  /* ----------------------------------------------------------
+  /* ==========================================================
      WISHLIST
-  ---------------------------------------------------------- */
+  ========================================================== */
 
   const loadWishlist = async () => {
     if (!isAuthenticated || !isCreator) {
@@ -123,9 +165,16 @@ export function PublicNavbar({ sticky = true }: PublicNavbarProps) {
 
     try {
       const result = await getSavedCampaigns();
-      setSaved(Array.isArray(result) ? result : []);
+
+      setSaved(
+        Array.isArray(result) ? result : []
+      );
     } catch (error) {
-      console.error("Failed to load wishlist", error);
+      console.error(
+        "Failed to load wishlist",
+        error
+      );
+
       setSaved([]);
     } finally {
       setWishlistLoading(false);
@@ -164,44 +213,59 @@ export function PublicNavbar({ sticky = true }: PublicNavbarProps) {
   useEffect(() => {
     if (!wishlistOpen) return;
 
-    const handleKeyDown = (event: KeyboardEvent) => {
+    const handleKeyDown = (
+      event: KeyboardEvent
+    ) => {
       if (event.key === "Escape") {
         setWishlistOpen(false);
       }
     };
 
-    document.addEventListener("keydown", handleKeyDown);
+    document.addEventListener(
+      "keydown",
+      handleKeyDown
+    );
 
     return () => {
-      document.removeEventListener("keydown", handleKeyDown);
+      document.removeEventListener(
+        "keydown",
+        handleKeyDown
+      );
     };
   }, [wishlistOpen]);
 
   useEffect(() => {
-    document.body.style.overflow = wishlistOpen ? "hidden" : "";
+    document.body.style.overflow =
+      wishlistOpen ? "hidden" : "";
 
     return () => {
       document.body.style.overflow = "";
     };
   }, [wishlistOpen]);
 
-  /* ----------------------------------------------------------
+  /* ==========================================================
      PROFILE MENU
-  ---------------------------------------------------------- */
+  ========================================================== */
 
   useEffect(() => {
     if (!profileOpen) return;
 
-    const handleClickOutside = (event: PointerEvent) => {
+    const handleClickOutside = (
+      event: PointerEvent
+    ) => {
       if (
         profileWrapRef.current &&
-        !profileWrapRef.current.contains(event.target as Node)
+        !profileWrapRef.current.contains(
+          event.target as Node
+        )
       ) {
         setProfileOpen(false);
       }
     };
 
-    const handleKeyDown = (event: KeyboardEvent) => {
+    const handleKeyDown = (
+      event: KeyboardEvent
+    ) => {
       if (event.key === "Escape") {
         setProfileOpen(false);
       }
@@ -212,7 +276,10 @@ export function PublicNavbar({ sticky = true }: PublicNavbarProps) {
       handleClickOutside
     );
 
-    document.addEventListener("keydown", handleKeyDown);
+    document.addEventListener(
+      "keydown",
+      handleKeyDown
+    );
 
     return () => {
       document.removeEventListener(
@@ -227,65 +294,137 @@ export function PublicNavbar({ sticky = true }: PublicNavbarProps) {
     };
   }, [profileOpen]);
 
-  /* ----------------------------------------------------------
-     LANDING PAGE SCROLL
-  ---------------------------------------------------------- */
+  /* ==========================================================
+     LANDING PAGE SECTION SCROLL
+  ========================================================== */
 
   useEffect(() => {
-    if (!isLandingPage) return;
+    if (!isPublicHome) return;
 
     const pendingTarget =
-      sessionStorage.getItem(SCROLL_TARGET_KEY);
+      sessionStorage.getItem(
+        SCROLL_TARGET_KEY
+      );
 
     const targetId =
       pendingTarget ||
       location.hash.replace("#", "");
 
     if (pendingTarget) {
-      sessionStorage.removeItem(SCROLL_TARGET_KEY);
+      sessionStorage.removeItem(
+        SCROLL_TARGET_KEY
+      );
     }
 
-    if (targetId) {
-      const sectionKey: SectionKey =
-        targetId === "campaigns" ||
-        targetId === "for-brands"
-          ? targetId
-          : "home";
+    if (!targetId) return;
 
-      setActiveSection(sectionKey);
+    const sectionKey: SectionKey =
+      targetId === "campaigns" ||
+      targetId === "for-brands"
+        ? targetId
+        : "home";
 
-      requestAnimationFrame(() => {
-        document
-          .getElementById(targetId)
-          ?.scrollIntoView({
-            behavior: "smooth",
-            block: "start",
-          });
-      });
+    setActiveSection(sectionKey);
+
+    requestAnimationFrame(() => {
+      document
+        .getElementById(targetId)
+        ?.scrollIntoView({
+          behavior: "smooth",
+          block: "start",
+        });
+    });
+  }, [isPublicHome, location.hash]);
+
+  /* ==========================================================
+     ACTIVE NAV STATE
+  ========================================================== */
+
+  useEffect(() => {
+    if (isCampaignsPage) {
+      setActiveSection("campaigns");
+      return;
     }
-  }, [isLandingPage]);
+
+    if (isPublicHome) {
+      const hash =
+        location.hash.replace("#", "");
+
+      if (hash === "for-brands") {
+        setActiveSection("for-brands");
+      } else if (hash === "campaigns") {
+        setActiveSection("campaigns");
+      } else {
+        setActiveSection("home");
+      }
+    }
+  }, [
+    isCampaignsPage,
+    isPublicHome,
+    location.hash,
+    location.pathname,
+  ]);
+
+  /* ==========================================================
+     NAVIGATION HELPERS
+  ========================================================== */
 
   const navLink = (href: string): string => {
-    if (!href.startsWith("#")) return href;
+    if (!href.startsWith("#")) {
+      return href;
+    }
 
-    return isLandingContext ? href : `/${href}`;
+    /*
+     * On landing:
+     * #home
+     * #campaigns
+     * #for-brands
+     *
+     * On every other public page:
+     * /#home
+     * /#campaigns
+     * /#for-brands
+     */
+    return isPublicHome
+      ? href
+      : `/${href}`;
   };
 
-  const isActive = (href: string): boolean => {
+  const isActive = (
+    href: string
+  ): boolean => {
     if (href === "#home") {
-      return activeSection === "home";
+      return (
+        isPublicHome &&
+        activeSection === "home"
+      );
     }
 
     if (href === "#campaigns") {
-      return activeSection === "campaigns";
+      /*
+       * IMPORTANT:
+       * Campaigns page itself must stay active.
+       */
+      return (
+        isCampaignsPage ||
+        (isPublicHome &&
+          activeSection === "campaigns")
+      );
     }
 
     if (href === "#for-brands") {
-      return activeSection === "for-brands";
+      return (
+        isPublicHome &&
+        activeSection === "for-brands"
+      );
     }
 
     return location.pathname === href;
   };
+
+  /* ==========================================================
+     LANDING SECTION CLICK
+  ========================================================== */
 
   const handleSectionClick = (
     event: MouseEvent<HTMLAnchorElement>,
@@ -294,10 +433,24 @@ export function PublicNavbar({ sticky = true }: PublicNavbarProps) {
     setActiveSection(section);
     setMobileOpen(false);
 
-    const sectionId =
-      section === "home" ? "home" : section;
+    /*
+     * CAMPAIGNS IS A REAL PAGE.
+     *
+     * Never treat it as a landing section from the
+     * main desktop/mobile navigation.
+     */
+    if (section === "campaigns") {
+      event.preventDefault();
+      navigate("/campaigns");
+      return;
+    }
 
-    if (isLandingPage) {
+    const sectionId =
+      section === "home"
+        ? "home"
+        : section;
+
+    if (isPublicHome) {
       event.preventDefault();
 
       document
@@ -320,14 +473,36 @@ export function PublicNavbar({ sticky = true }: PublicNavbarProps) {
     }
   };
 
-  /* ----------------------------------------------------------
-     SEARCH
-  ---------------------------------------------------------- */
+  /* ==========================================================
+     DIRECT CAMPAIGNS NAVIGATION
+  ========================================================== */
 
-  const handleSearch = (event: React.FormEvent) => {
+  const handleCampaignsClick = (
+    event?: MouseEvent<HTMLAnchorElement>
+  ) => {
+    event?.preventDefault();
+
+    setMobileOpen(false);
+    setProfileOpen(false);
+
+    setActiveSection("campaigns");
+
+    navigate("/campaigns");
+  };
+
+  /* ==========================================================
+     SEARCH
+  ========================================================== */
+
+  const handleSearch = (
+    event: React.FormEvent
+  ) => {
     event.preventDefault();
 
-    const value = searchValue.trim();
+    const value =
+      searchValue.trim();
+
+    setMobileOpen(false);
 
     if (!value) {
       navigate("/campaigns");
@@ -335,27 +510,28 @@ export function PublicNavbar({ sticky = true }: PublicNavbarProps) {
     }
 
     navigate(
-      `/campaigns?search=${encodeURIComponent(value)}`
+      `/campaigns?search=${encodeURIComponent(
+        value
+      )}`
     );
-
-    setMobileOpen(false);
   };
 
-  /* ----------------------------------------------------------
+  /* ==========================================================
      LOGOUT
-  ---------------------------------------------------------- */
+  ========================================================== */
 
   const handleLogout = () => {
     setProfileOpen(false);
     setMobileOpen(false);
 
     logout();
+
     navigate("/");
   };
 
-  /* ----------------------------------------------------------
+  /* ==========================================================
      WISHLIST ACTIONS
-  ---------------------------------------------------------- */
+  ========================================================== */
 
   const removeSaved = async (
     event: MouseEvent<HTMLButtonElement>,
@@ -364,11 +540,15 @@ export function PublicNavbar({ sticky = true }: PublicNavbarProps) {
     event.stopPropagation();
 
     try {
-      await unsaveCampaign(campaignId);
+      await unsaveCampaign(
+        campaignId
+      );
 
       setSaved((items) =>
         items.filter(
-          (item) => item.campaign_id !== campaignId
+          (item) =>
+            item.campaign_id !==
+            campaignId
         )
       );
     } catch (error) {
@@ -379,7 +559,9 @@ export function PublicNavbar({ sticky = true }: PublicNavbarProps) {
     }
   };
 
-  const openCampaign = (campaignId: number) => {
+  const openCampaign = (
+    campaignId: number
+  ) => {
     setWishlistOpen(false);
 
     navigate(
@@ -387,10 +569,21 @@ export function PublicNavbar({ sticky = true }: PublicNavbarProps) {
     );
   };
 
+  /* ==========================================================
+     RENDER
+  ========================================================== */
+
   return (
     <>
       <style>{`
+
+        /* =====================================================
+           NAVBAR
+        ===================================================== */
+
         .ch-public-nav {
+          font-size: 16px !important;
+          line-height: normal !important;
           position: ${sticky ? "fixed" : "relative"};
           top: 0;
           left: 0;
@@ -398,20 +591,13 @@ export function PublicNavbar({ sticky = true }: PublicNavbarProps) {
           width: 100%;
           z-index: 9999;
           background: #FFFFFF;
-          backdrop-filter: blur(12px);
           border-bottom: 1px solid #E5E5E5;
           box-sizing: border-box;
         }
 
-        /*
-         * =====================================================
-         * TOP ROW
-         * =====================================================
-         *
-         * Logo is centered.
-         * Search is on the left.
-         * Login/Register or profile actions are on the right.
-         */
+        /* =====================================================
+           TOP ROW
+        ===================================================== */
 
         .ch-public-top {
           position: relative;
@@ -440,22 +626,18 @@ export function PublicNavbar({ sticky = true }: PublicNavbarProps) {
           justify-content: flex-end;
         }
 
-        /*
-         * =====================================================
-         * CENTERED LOGO
-         * =====================================================
-         */
+        /* =====================================================
+           LOGO
+        ===================================================== */
 
         .ch-public-logo {
           position: absolute;
           left: 50%;
           top: 50%;
           transform: translate(-50%, -50%);
-
           display: flex;
           align-items: center;
           gap: 13px;
-
           color: #111111;
           text-decoration: none;
           white-space: nowrap;
@@ -464,17 +646,15 @@ export function PublicNavbar({ sticky = true }: PublicNavbarProps) {
 
         .ch-public-logo-text {
           font-family: 'League Spartan', sans-serif;
-          font-size: 23px;
-          font-weight: 400;
+          font-size: 22px !important;
+          font-weight: 600 !important;
           letter-spacing: -0.9px;
           line-height: 1;
         }
 
-        /*
-         * =====================================================
-         * SEARCH
-         * =====================================================
-         */
+        /* =====================================================
+           SEARCH
+        ===================================================== */
 
         .ch-public-search,
         .ch-public-search * {
@@ -486,63 +666,42 @@ export function PublicNavbar({ sticky = true }: PublicNavbarProps) {
         .ch-public-search {
           width: 280px;
           height: 40px;
-
           display: flex;
           align-items: center;
-
           border-radius: 22px;
           background: #FAFAFA;
-
           overflow: hidden;
-          transition:
-            background .18s ease,
-            box-shadow .18s ease;
         }
 
         .ch-public-search:focus-within {
           background: #FFFFFF;
-          box-shadow: 0 4px 14px rgba(0,0,0,.05) !important;
+          box-shadow:
+            0 4px 14px rgba(0,0,0,.05) !important;
         }
 
         .ch-public-search-icon {
           margin-left: 14px;
           flex-shrink: 0;
           color: #8A8490;
-          border: none !important;
-          box-shadow: none !important;
-          outline: none !important;
         }
 
         .ch-public-search-input {
           width: 100%;
           height: 100%;
           padding: 0 14px 0 9px;
-
           border: none !important;
           outline: none !important;
           box-shadow: none !important;
           background: transparent;
           caret-color: #222222;
-          -webkit-appearance: none;
-          appearance: none;
-
           color: #222222;
-          font: 400 13px 'Poppins', sans-serif;
+          font: 400 13px 'Poppins', sans-serif !important;
         }
 
-        /*
-         * The app's global stylesheet applies
-         *   input:focus { border-color: #111 !important; box-shadow: 0 0 0 2px rgba(17,17,17,.08) !important; }
-         * to every input on focus. That rule's specificity (element + :focus)
-         * beats a plain class selector, so it was leaking a faint ring around
-         * this <input> on focus, visible as a line right after the icon.
-         * This selector matches class + :focus, which is more specific and wins.
-         */
         .ch-public-search-input:focus {
           border: none !important;
           border-color: transparent !important;
           outline: none !important;
-          outline-color: transparent !important;
           box-shadow: none !important;
         }
 
@@ -550,15 +709,12 @@ export function PublicNavbar({ sticky = true }: PublicNavbarProps) {
           color: #99939F;
         }
 
-        /*
-         * =====================================================
-         * NAV MENUS
-         * =====================================================
-         */
+        /* =====================================================
+           NAV MENU
+        ===================================================== */
 
         .ch-public-nav-menu-row {
           height: 48px;
-
           display: flex;
           align-items: center;
           justify-content: center;
@@ -573,21 +729,17 @@ export function PublicNavbar({ sticky = true }: PublicNavbarProps) {
 
         .ch-public-nav-link {
           position: relative;
-
           display: inline-flex;
           align-items: center;
-
           height: 48px;
           padding: 0;
-
           color: #6F6A7C;
           text-decoration: none;
-
           border: 0;
           background: transparent;
-
-          font: 500 14px 'Poppins', sans-serif;
-
+          font: 500 14px 'Poppins', sans-serif !important;
+          line-height: 1 !important;
+          cursor: pointer;
           transition: color .18s ease;
         }
 
@@ -597,25 +749,20 @@ export function PublicNavbar({ sticky = true }: PublicNavbarProps) {
         }
 
         .ch-public-nav-link.active {
-          font-weight: 600;
+          font-weight: 600 !important;
         }
 
         .ch-public-nav-link::after {
           content: '';
-
           position: absolute;
           left: 0;
           right: 0;
           bottom: 6px;
-
           width: 0;
           height: 2px;
-
           margin: auto;
-
           border-radius: 2px;
           background: #111111;
-
           transition: width .18s ease;
         }
 
@@ -624,11 +771,9 @@ export function PublicNavbar({ sticky = true }: PublicNavbarProps) {
           width: 100%;
         }
 
-        /*
-         * =====================================================
-         * LOGIN / REGISTER
-         * =====================================================
-         */
+        /* =====================================================
+           ACTIONS
+        ===================================================== */
 
         .ch-public-nav-actions {
           display: flex;
@@ -642,22 +787,16 @@ export function PublicNavbar({ sticky = true }: PublicNavbarProps) {
           display: inline-flex;
           align-items: center;
           justify-content: center;
-
           min-width: 72px;
           height: 38px;
           box-sizing: border-box;
-
           padding: 0 15px;
-
           border: 1px solid #111111;
           border-radius: 8px;
-
           font-family: 'Poppins', sans-serif;
           font-size: 13px;
           font-weight: 500;
-
           text-decoration: none;
-
           transition: all .18s ease;
         }
 
@@ -673,46 +812,31 @@ export function PublicNavbar({ sticky = true }: PublicNavbarProps) {
 
         .ch-public-login:hover {
           background: #000000;
-          border-color: #000000;
           color: #FFFFFF;
           transform: translateY(-1px);
         }
 
         .ch-public-register:hover {
           background: #F5F5F5;
-          border-color: #111111;
           color: #111111;
           transform: translateY(-1px);
         }
 
-        .ch-public-login:focus-visible,
-        .ch-public-register:focus-visible {
-          outline: 2px solid #111111;
-          outline-offset: 2px;
-        }
-
-        /*
-         * =====================================================
-         * ICON BUTTON
-         * =====================================================
-         */
+        /* =====================================================
+           ICON BUTTON
+        ===================================================== */
 
         .ch-public-icon-btn {
           position: relative;
-
           width: 38px;
           height: 38px;
-
           border: 1px solid #E5E5E5;
           border-radius: 50%;
-
           background: #FFFFFF;
           color: #111111;
-
           display: flex;
           align-items: center;
           justify-content: center;
-
           cursor: pointer;
         }
 
@@ -720,31 +844,22 @@ export function PublicNavbar({ sticky = true }: PublicNavbarProps) {
           background: #F5F5F5;
         }
 
-        /*
-         * =====================================================
-         * AVATAR
-         * =====================================================
-         */
+        /* =====================================================
+           AVATAR
+        ===================================================== */
 
         .ch-public-avatar {
           width: 38px;
           height: 38px;
-
           border-radius: 50%;
           border: 1px solid #E5E5E5;
-
           background: #F3F3F3;
           color: #111111;
-
           display: flex;
           align-items: center;
           justify-content: center;
-
           overflow: hidden;
-          text-decoration: none;
-
           font: 700 12px 'Poppins', sans-serif;
-
           padding: 0;
           cursor: pointer;
         }
@@ -755,35 +870,26 @@ export function PublicNavbar({ sticky = true }: PublicNavbarProps) {
           object-fit: cover;
         }
 
-        /*
-         * =====================================================
-         * WISHLIST BADGE
-         * =====================================================
-         */
+        /* =====================================================
+           WISHLIST BADGE
+        ===================================================== */
 
         .ch-wishlist-badge {
           position: absolute;
           right: -2px;
           top: -3px;
-
           min-width: 16px;
           height: 16px;
-
           padding: 0 4px;
-
           border-radius: 99px;
-
           background: #111111;
           color: #FFFFFF;
-
           font: 700 9px/16px 'Poppins', sans-serif;
         }
 
-        /*
-         * =====================================================
-         * PROFILE DROPDOWN
-         * =====================================================
-         */
+        /* =====================================================
+           PROFILE MENU
+        ===================================================== */
 
         .ch-profile-wrap {
           position: relative;
@@ -791,20 +897,15 @@ export function PublicNavbar({ sticky = true }: PublicNavbarProps) {
 
         .ch-profile-menu {
           position: absolute;
-
           right: 0;
-          top: calc(100% + 76px);
-
+          top: calc(100% + 88px);
           width: 190px;
-
           padding: 7px;
-
           background: #FFFFFF;
           border: 1px solid #E6E6E6;
           border-radius: 12px;
-
-          box-shadow: 0 14px 35px rgba(38,28,54,.14);
-
+          box-shadow:
+            0 14px 35px rgba(38,28,54,.14);
           z-index: 10001;
         }
 
@@ -812,23 +913,16 @@ export function PublicNavbar({ sticky = true }: PublicNavbarProps) {
         .ch-profile-menu button {
           width: 100%;
           box-sizing: border-box;
-
           display: flex;
           align-items: center;
           gap: 9px;
-
           padding: 10px 11px;
-
           border: 0;
           border-radius: 8px;
-
           background: transparent;
           color: #383240;
-
           text-decoration: none;
-
           font: 500 13px 'Poppins', sans-serif;
-
           cursor: pointer;
           text-align: left;
         }
@@ -839,18 +933,14 @@ export function PublicNavbar({ sticky = true }: PublicNavbarProps) {
           color: #111111;
         }
 
-        /*
-         * =====================================================
-         * WISHLIST DRAWER
-         * =====================================================
-         */
+        /* =====================================================
+           WISHLIST DRAWER
+        ===================================================== */
 
         .ch-wishlist-drawer {
           position: fixed;
           inset: 0;
-
           z-index: 10000;
-
           pointer-events: none;
         }
 
@@ -861,50 +951,41 @@ export function PublicNavbar({ sticky = true }: PublicNavbarProps) {
         .ch-wishlist-backdrop {
           position: absolute;
           inset: 0;
-
           background: rgba(25,18,32,.32);
-
           opacity: 0;
-
           transition: opacity .22s ease;
         }
 
-        .ch-wishlist-drawer.open .ch-wishlist-backdrop {
+        .ch-wishlist-drawer.open
+        .ch-wishlist-backdrop {
           opacity: 1;
         }
 
         .ch-wishlist-panel {
           position: absolute;
-
           right: 0;
           top: 0;
-
           height: 100%;
           width: min(410px, 92vw);
-
           background: #FFFDFA;
-
-          box-shadow: -15px 0 40px rgba(35,25,45,.16);
-
+          box-shadow:
+            -15px 0 40px rgba(35,25,45,.16);
           transform: translateX(100%);
           transition: transform .24s ease;
-
           display: flex;
           flex-direction: column;
         }
 
-        .ch-wishlist-drawer.open .ch-wishlist-panel {
+        .ch-wishlist-drawer.open
+        .ch-wishlist-panel {
           transform: translateX(0);
         }
 
         .ch-wishlist-head {
           min-height: 72px;
           box-sizing: border-box;
-
           padding: 0 20px;
-
           border-bottom: 1px solid #E5E5E5;
-
           display: flex;
           align-items: center;
           justify-content: space-between;
@@ -912,36 +993,27 @@ export function PublicNavbar({ sticky = true }: PublicNavbarProps) {
 
         .ch-wishlist-head h3 {
           margin: 0;
-
           color: #1E1E1E;
-
           font: 700 18px 'Poppins', sans-serif;
         }
 
         .ch-wishlist-close {
           width: 36px;
           height: 36px;
-
           border: 0;
           border-radius: 50%;
-
           background: #F0F0F0;
           color: #111111;
-
           display: flex;
           align-items: center;
           justify-content: center;
-
           cursor: pointer;
         }
 
         .ch-wishlist-list {
           flex: 1;
-
           padding: 16px;
-
           overflow-y: auto;
-
           display: flex;
           flex-direction: column;
           gap: 12px;
@@ -950,14 +1022,10 @@ export function PublicNavbar({ sticky = true }: PublicNavbarProps) {
         .ch-wishlist-card {
           display: flex;
           gap: 12px;
-
           padding: 10px;
-
           border: 1px solid #E7E7E7;
           border-radius: 12px;
-
           background: #FFFFFF;
-
           cursor: pointer;
         }
 
@@ -968,13 +1036,9 @@ export function PublicNavbar({ sticky = true }: PublicNavbarProps) {
         .ch-wishlist-image {
           width: 76px;
           height: 68px;
-
           border-radius: 9px;
-
           object-fit: cover;
-
           background: #F3F3F3;
-
           flex: 0 0 auto;
         }
 
@@ -985,11 +1049,8 @@ export function PublicNavbar({ sticky = true }: PublicNavbarProps) {
 
         .ch-wishlist-title {
           margin: 2px 0 5px;
-
           color: #212121;
-
           font: 600 13px 'Poppins', sans-serif;
-
           white-space: nowrap;
           overflow: hidden;
           text-overflow: ellipsis;
@@ -997,28 +1058,21 @@ export function PublicNavbar({ sticky = true }: PublicNavbarProps) {
 
         .ch-wishlist-brand {
           color: #756E7E;
-
           font: 500 11px 'Poppins', sans-serif;
         }
 
         .ch-wishlist-budget {
           margin-top: 6px;
-
           color: #111111;
-
           font: 600 11px 'Poppins', sans-serif;
         }
 
         .ch-wishlist-remove {
           align-self: flex-start;
-
           padding: 4px;
-
           border: 0;
           background: transparent;
-
           color: #AAA2B2;
-
           cursor: pointer;
         }
 
@@ -1028,35 +1082,25 @@ export function PublicNavbar({ sticky = true }: PublicNavbarProps) {
 
         .ch-wishlist-empty {
           padding: 50px 24px;
-
           text-align: center;
-
           color: #7B7484;
-
           font: 500 13px/1.6 'Poppins', sans-serif;
         }
 
-        /*
-         * =====================================================
-         * MOBILE
-         * =====================================================
-         */
+        /* =====================================================
+           MOBILE
+        ===================================================== */
 
         .ch-public-burger {
           display: none;
-
           width: 38px;
           height: 38px;
-
           align-items: center;
           justify-content: center;
-
           border: 1px solid #E5E5E5;
           border-radius: 8px;
-
           background: #FFFFFF;
           color: #111111;
-
           cursor: pointer;
         }
 
@@ -1064,17 +1108,13 @@ export function PublicNavbar({ sticky = true }: PublicNavbarProps) {
           display: none;
         }
 
-        /*
-         * Total desktop navbar height:
-         * 78px top row + 48px menu row = 126px
-         */
-
         .ch-public-nav-spacer {
           height: ${sticky ? "126px" : "0px"};
           width: 100%;
         }
 
         @media (max-width: 900px) {
+
           .ch-public-top {
             padding: 0 24px;
           }
@@ -1094,6 +1134,7 @@ export function PublicNavbar({ sticky = true }: PublicNavbarProps) {
         }
 
         @media (max-width: 760px) {
+
           .ch-public-top {
             height: 64px;
             padding: 0 18px;
@@ -1118,7 +1159,7 @@ export function PublicNavbar({ sticky = true }: PublicNavbarProps) {
           }
 
           .ch-public-logo-text {
-            font-size: 20px;
+            font-size: 20px !important;
           }
 
           .ch-public-nav-menu-row {
@@ -1135,9 +1176,7 @@ export function PublicNavbar({ sticky = true }: PublicNavbarProps) {
 
           .ch-public-mobile-panel {
             display: block;
-
             padding: 12px 18px 16px;
-
             border-top: 1px solid #E5E5E5;
             background: #FFFFFF;
           }
@@ -1145,27 +1184,21 @@ export function PublicNavbar({ sticky = true }: PublicNavbarProps) {
           .ch-public-mobile-panel a,
           .ch-public-mobile-panel button.ch-public-mobile-link {
             display: block;
-
             width: 100%;
-
             padding: 9px 0;
-
             border: 0;
             background: transparent;
-
             color: #6F6A7C;
-
             text-decoration: none;
-
-            font: 500 14px 'Poppins', sans-serif;
-
+            font: 500 14px 'Poppins', sans-serif !important;
+            line-height: 1 !important;
             text-align: left;
-
             cursor: pointer;
           }
 
           .ch-public-mobile-panel a.active,
-          .ch-public-mobile-panel button.ch-public-mobile-link.active {
+          .ch-public-mobile-panel
+          button.ch-public-mobile-link.active {
             color: #111111;
             font-weight: 600;
           }
@@ -1173,7 +1206,6 @@ export function PublicNavbar({ sticky = true }: PublicNavbarProps) {
           .ch-public-mobile-actions {
             display: flex;
             gap: 8px;
-
             padding-top: 8px;
           }
 
@@ -1184,17 +1216,12 @@ export function PublicNavbar({ sticky = true }: PublicNavbarProps) {
 
           .ch-public-mobile-profile {
             display: block;
-
             padding: 9px;
-
             border: 0;
             border-radius: 8px;
-
             background: #F3F3F3;
             color: #111111 !important;
-
             font: 600 13px 'Poppins', sans-serif;
-
             cursor: pointer;
           }
 
@@ -1204,13 +1231,17 @@ export function PublicNavbar({ sticky = true }: PublicNavbarProps) {
         }
       `}</style>
 
+      {/* =====================================================
+          NAVBAR
+      ===================================================== */}
+
       <nav
         className="ch-public-nav"
         aria-label="Main navigation"
       >
-        {/* =====================================================
+        {/* ===================================================
             TOP ROW
-            ===================================================== */}
+        =================================================== */}
 
         <div className="ch-public-top">
 
@@ -1232,7 +1263,9 @@ export function PublicNavbar({ sticky = true }: PublicNavbarProps) {
                 placeholder="Search campaigns..."
                 value={searchValue}
                 onChange={(event) =>
-                  setSearchValue(event.target.value)
+                  setSearchValue(
+                    event.target.value
+                  )
                 }
                 aria-label="Search campaigns"
               />
@@ -1245,7 +1278,10 @@ export function PublicNavbar({ sticky = true }: PublicNavbarProps) {
             to={navLink("#home")}
             className="ch-public-logo"
             onClick={(event) =>
-              handleSectionClick(event, "home")
+              handleSectionClick(
+                event,
+                "home"
+              )
             }
           >
             <LogoMark size={27} />
@@ -1255,12 +1291,13 @@ export function PublicNavbar({ sticky = true }: PublicNavbarProps) {
             </span>
           </Link>
 
-          {/* RIGHT — LOGIN / REGISTER / USER */}
+          {/* RIGHT — ACTIONS */}
 
           <div className="ch-public-top-right">
             <div className="ch-public-nav-actions">
 
-              {!loading && isAuthenticated ? (
+              {!loading &&
+              isAuthenticated ? (
                 <>
                   {showWishlist && (
                     <button
@@ -1292,7 +1329,9 @@ export function PublicNavbar({ sticky = true }: PublicNavbarProps) {
                       className="ch-public-avatar"
                       aria-label="Open profile menu"
                       aria-haspopup="menu"
-                      aria-expanded={profileOpen}
+                      aria-expanded={
+                        profileOpen
+                      }
                       onClick={() =>
                         setProfileOpen(
                           (value) => !value
@@ -1309,7 +1348,9 @@ export function PublicNavbar({ sticky = true }: PublicNavbarProps) {
                           }}
                         />
                       ) : (
-                        <span>{initials}</span>
+                        <span>
+                          {initials}
+                        </span>
                       )}
                     </button>
 
@@ -1321,28 +1362,40 @@ export function PublicNavbar({ sticky = true }: PublicNavbarProps) {
                         <Link
                           to="/dashboard"
                           onClick={() =>
-                            setProfileOpen(false)
+                            setProfileOpen(
+                              false
+                            )
                           }
                         >
-                          <LayoutDashboard size={16} />
+                          <LayoutDashboard
+                            size={16}
+                          />
                           Dashboard
                         </Link>
 
                         <Link
                           to="/profile"
                           onClick={() =>
-                            setProfileOpen(false)
+                            setProfileOpen(
+                              false
+                            )
                           }
                         >
-                          <LayoutDashboard size={16} />
+                          <UserRound
+                            size={16}
+                          />
                           Profile
                         </Link>
 
                         <button
                           type="button"
-                          onClick={handleLogout}
+                          onClick={
+                            handleLogout
+                          }
                         >
-                          <LogOut size={16} />
+                          <LogOut
+                            size={16}
+                          />
                           Logout
                         </button>
                       </div>
@@ -1369,7 +1422,7 @@ export function PublicNavbar({ sticky = true }: PublicNavbarProps) {
             </div>
           </div>
 
-          {/* MOBILE MENU BUTTON */}
+          {/* MOBILE BUTTON */}
 
           <button
             type="button"
@@ -1380,7 +1433,9 @@ export function PublicNavbar({ sticky = true }: PublicNavbarProps) {
                 : "Open menu"
             }
             onClick={() =>
-              setMobileOpen((value) => !value)
+              setMobileOpen(
+                (value) => !value
+              )
             }
           >
             {mobileOpen ? (
@@ -1391,12 +1446,14 @@ export function PublicNavbar({ sticky = true }: PublicNavbarProps) {
           </button>
         </div>
 
-        {/* =====================================================
-            SECOND ROW — NAV MENUS
-            ===================================================== */}
+        {/* ===================================================
+            DESKTOP NAV MENU
+        =================================================== */}
 
         <div className="ch-public-nav-menu-row">
           <div className="ch-public-nav-links">
+
+            {/* HOME */}
 
             <Link
               to={navLink("#home")}
@@ -1415,22 +1472,23 @@ export function PublicNavbar({ sticky = true }: PublicNavbarProps) {
               Home
             </Link>
 
+            {/* CAMPAIGNS — REAL PAGE */}
+
             <Link
-              to={navLink("#campaigns")}
+              to="/campaigns"
               className={`ch-public-nav-link ${
                 isActive("#campaigns")
                   ? "active"
                   : ""
               }`}
-              onClick={(event) =>
-                handleSectionClick(
-                  event,
-                  "campaigns"
-                )
+              onClick={
+                handleCampaignsClick
               }
             >
               Campaigns
             </Link>
+
+            {/* FOR BRANDS */}
 
             <Link
               to={navLink("#for-brands")}
@@ -1448,15 +1506,18 @@ export function PublicNavbar({ sticky = true }: PublicNavbarProps) {
             >
               For Brands
             </Link>
+
           </div>
         </div>
 
-        {/* =====================================================
+        {/* ===================================================
             MOBILE MENU
-            ===================================================== */}
+        =================================================== */}
 
         {mobileOpen && (
           <div className="ch-public-mobile-panel">
+
+            {/* MOBILE SEARCH */}
 
             <form
               className="ch-public-search"
@@ -1484,6 +1545,8 @@ export function PublicNavbar({ sticky = true }: PublicNavbarProps) {
               />
             </form>
 
+            {/* HOME */}
+
             <Link
               to={navLink("#home")}
               className={
@@ -1501,22 +1564,23 @@ export function PublicNavbar({ sticky = true }: PublicNavbarProps) {
               Home
             </Link>
 
+            {/* CAMPAIGNS — IMPORTANT */}
+
             <Link
-              to={navLink("#campaigns")}
+              to="/campaigns"
               className={
                 isActive("#campaigns")
                   ? "active"
                   : ""
               }
-              onClick={(event) =>
-                handleSectionClick(
-                  event,
-                  "campaigns"
-                )
+              onClick={
+                handleCampaignsClick
               }
             >
               Campaigns
             </Link>
+
+            {/* FOR BRANDS */}
 
             <Link
               to={navLink("#for-brands")}
@@ -1535,7 +1599,10 @@ export function PublicNavbar({ sticky = true }: PublicNavbarProps) {
               For Brands
             </Link>
 
-            {!loading && isAuthenticated ? (
+            {/* AUTH ACTIONS */}
+
+            {!loading &&
+            isAuthenticated ? (
               <div className="ch-public-mobile-actions">
 
                 <Link
@@ -1564,7 +1631,9 @@ export function PublicNavbar({ sticky = true }: PublicNavbarProps) {
                     className="ch-public-mobile-profile"
                     onClick={() => {
                       setMobileOpen(false);
-                      setWishlistOpen(true);
+                      setWishlistOpen(
+                        true
+                      );
                     }}
                   >
                     Wishlist ({saved.length})
@@ -1574,10 +1643,13 @@ export function PublicNavbar({ sticky = true }: PublicNavbarProps) {
                 <button
                   type="button"
                   className="ch-public-mobile-profile"
-                  onClick={handleLogout}
+                  onClick={
+                    handleLogout
+                  }
                 >
                   Logout
                 </button>
+
               </div>
             ) : !loading ? (
               <div className="ch-public-mobile-actions">
@@ -1601,15 +1673,25 @@ export function PublicNavbar({ sticky = true }: PublicNavbarProps) {
                 >
                   Register
                 </Link>
+
               </div>
             ) : null}
+
           </div>
         )}
       </nav>
 
-      {/* =======================================================
+      {/* =====================================================
+          NAVBAR SPACER
+      ===================================================== */}
+
+      {sticky && (
+        <div className="ch-public-nav-spacer" />
+      )}
+
+      {/* =====================================================
           WISHLIST DRAWER
-      ======================================================= */}
+      ===================================================== */}
 
       {showWishlist && (
         <div
@@ -1667,12 +1749,13 @@ export function PublicNavbar({ sticky = true }: PublicNavbarProps) {
                 <div className="ch-wishlist-empty">
                   Your wishlist is empty.
                   <br />
-                  Save campaigns you like and they
-                  will appear here.
+                  Save campaigns you like and
+                  they will appear here.
                 </div>
               ) : (
                 saved.map((entry) => {
-                  const campaign = entry.campaign;
+                  const campaign =
+                    entry.campaign;
 
                   return (
                     <div
@@ -1687,7 +1770,8 @@ export function PublicNavbar({ sticky = true }: PublicNavbarProps) {
                       }
                       onKeyDown={(event) => {
                         if (
-                          event.key === "Enter" ||
+                          event.key ===
+                            "Enter" ||
                           event.key === " "
                         ) {
                           event.preventDefault();
@@ -1711,23 +1795,26 @@ export function PublicNavbar({ sticky = true }: PublicNavbarProps) {
                       )}
 
                       <div className="ch-wishlist-info">
+
                         <div className="ch-wishlist-title">
                           {campaign.title}
                         </div>
 
                         <div className="ch-wishlist-brand">
-                          {campaign.brand_name ||
+                          {(campaign as PublicCampaign)
+                            .brand_name ||
                             "Creatorhub campaign"}
                         </div>
 
                         {campaign.budget != null && (
                           <div className="ch-wishlist-budget">
-                            Rs.{" "}
+                            NPR{" "}
                             {Number(
                               campaign.budget
                             ).toLocaleString()}
                           </div>
                         )}
+
                       </div>
 
                       <button
@@ -1747,6 +1834,7 @@ export function PublicNavbar({ sticky = true }: PublicNavbarProps) {
                   );
                 })
               )}
+
             </div>
           </aside>
         </div>
