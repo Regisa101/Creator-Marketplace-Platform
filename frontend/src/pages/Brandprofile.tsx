@@ -1,629 +1,95 @@
 import { useEffect, useState } from 'react';
-import { Link, useNavigate, useParams } from 'react-router-dom';
-import {
-  ArrowLeft,
-  ArrowUpRight,
-  BriefcaseBusiness,
-  Building2,
-  CalendarDays,
-  CheckCircle2,
-  ExternalLink,
-  Globe,
-  MapPin,
-  Sparkles,
-  Users,
-} from 'lucide-react';
+import { ArrowLeft, Building2, ExternalLink, MapPin } from 'lucide-react';
+import { Link, useParams } from 'react-router-dom';
 import { getPublicBusinessProfile, type PublicBusinessProfile } from '../api/client';
-import { OFF_WHITE } from '../components/Brand';
 import { PublicNavbar } from '../components/PublicNavbar';
 
-const CORAL = '#111111';
-const CORAL_DARK = '#000000';
-const VIOLET = '#111111';
+const API_ORIGIN = 'http://localhost:8000';
 
-function normalizeWebsite(url: string): string {
-  if (/^https?:\/\//i.test(url)) return url;
-  return `https://${url}`;
+function mediaUrl(value?: string | null) {
+  if (!value) return '';
+  if (/^(https?:)?\/\//i.test(value) || value.startsWith('data:') || value.startsWith('blob:')) return value;
+  if (value.startsWith('/api/')) return `${API_ORIGIN}${value}`;
+  return `${API_ORIGIN}/${value.replace(/^\/+/, '')}`;
 }
 
-function getInitial(name?: string | null): string {
-  return (name?.trim()?.[0] || 'B').toUpperCase();
+function initials(name?: string | null) {
+  const parts = (name || 'Business').trim().split(/\s+/).filter(Boolean);
+  return parts.length > 1 ? `${parts[0][0]}${parts[1][0]}`.toUpperCase() : (parts[0] || 'B').slice(0, 2).toUpperCase();
 }
 
 export function BrandProfile() {
   const { businessId } = useParams<{ businessId: string }>();
-  const navigate = useNavigate();
-  const [brand, setBrand] = useState<PublicBusinessProfile | null>(null);
+  const [profile, setProfile] = useState<PublicBusinessProfile | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
 
   useEffect(() => {
-    if (!businessId) {
-      setError('Brand profile not found.');
-      setLoading(false);
-      return;
-    }
-
+    if (!businessId) return;
     let cancelled = false;
-
-    (async () => {
-      setLoading(true);
-      setError('');
-      try {
-        const data = await getPublicBusinessProfile(businessId);
-        if (!cancelled) setBrand(data);
-      } catch (err: any) {
-        console.error('Could not load brand profile:', err);
-        if (!cancelled) {
-          setError(
-            err?.response?.data?.detail || 'This brand profile could not be loaded.'
-          );
-        }
-      } finally {
-        if (!cancelled) setLoading(false);
-      }
-    })();
-
-    return () => {
-      cancelled = true;
-    };
+    setLoading(true);
+    setError('');
+    getPublicBusinessProfile(businessId)
+      .then((data) => { if (!cancelled) setProfile(data); })
+      .catch((err: any) => {
+        if (!cancelled) setError(err?.response?.data?.detail || 'Brand profile unavailable.');
+      })
+      .finally(() => { if (!cancelled) setLoading(false); });
+    return () => { cancelled = true; };
   }, [businessId]);
 
-  if (loading) {
-    return (
-      <div className="bp">
-        <style>{brandStyles}</style>
-        <PublicNavbar />
-        <div className="bp-state">
-          <div className="bp-loader">Loading brand profile…</div>
-        </div>
-      </div>
-    );
-  }
-
-  if (error || !brand) {
-    return (
-      <div className="bp">
-        <style>{brandStyles}</style>
-        <PublicNavbar />
-        <div className="bp-state">
-          <div className="bp-error-title">Brand profile unavailable</div>
-          <div className="bp-error-text">{error || 'This brand could not be found.'}</div>
-          <button className="bp-back" onClick={() => navigate(-1)}>
-            <ArrowLeft size={15} /> Go back
-          </button>
-        </div>
-      </div>
-    );
-  }
-
-  const categories = brand.interested_categories || [];
-  const contentTypes = brand.preferred_content_types || [];
-  const campaigns = brand.campaigns || [];
-  const website = brand.website?.trim() ? normalizeWebsite(brand.website.trim()) : '';
-
   return (
-    <div className="bp">
-      <style>{brandStyles}</style>
-
+    <div className="bp-page">
       <PublicNavbar />
-
-      <main className="bp-wrap">
-        <div className="bp-breadcrumb">
-          <Link to="/campaigns">Campaigns</Link>
-          <span>/</span>
-          <span>{brand.company_name}</span>
-        </div>
-
-        <button className="bp-back bp-back-top" onClick={() => navigate(-1)}>
-          <ArrowLeft size={15} /> Back
-        </button>
-
-        <section className="bp-hero">
-          <div className="bp-hero-main">
-            <div className="bp-avatar">
-              {brand.logo_url ? (
-                <img src={brand.logo_url} alt={`${brand.company_name} logo`} />
-              ) : (
-                getInitial(brand.company_name)
-              )}
-            </div>
-
-            <div className="bp-hero-copy">
-              <div className="bp-kicker">
-                <Sparkles size={13} /> Brand Profile
-              </div>
-              <h1 className="bp-name">{brand.company_name}</h1>
-
-              <div className="bp-meta">
-                {brand.industry && (
-                  <span>
-                    <BriefcaseBusiness size={14} /> {brand.industry}
-                  </span>
-                )}
-                {brand.business_type && (
-                  <span>
-                    <Building2 size={14} /> {brand.business_type}
-                  </span>
-                )}
-                {brand.location && (
-                  <span>
-                    <MapPin size={14} /> {brand.location}
-                  </span>
-                )}
-              </div>
-            </div>
-          </div>
-
-          <div className="bp-actions">
-            {website && (
-              <a
-                href={website}
-                target="_blank"
-                rel="noreferrer"
-                className="bp-secondary"
-              >
-                <Globe size={14} /> Website <ExternalLink size={12} />
-              </a>
-            )}
-          </div>
-        </section>
-
-        <div className="bp-grid">
-          <div className="bp-main">
-            {brand.description && (
-              <section className="bp-card">
-                <h2 className="bp-card-title">
-                  <Building2 size={17} /> About the Brand
-                </h2>
-                <p className="bp-text">{brand.description}</p>
-              </section>
-            )}
-
-            {(categories.length > 0 || contentTypes.length > 0) && (
-              <section className="bp-card">
-                <h2 className="bp-card-title">
-                  <Sparkles size={17} /> Creator Collaboration
-                </h2>
-
-                {categories.length > 0 && (
-                  <div className="bp-field-group">
-                    <div className="bp-field-label">Interested categories</div>
-                    <div className="bp-chips">
-                      {categories.map((item, index) => (
-                        <span className="bp-chip" key={`${item}-${index}`}>
-                          {item}
-                        </span>
-                      ))}
-                    </div>
-                  </div>
-                )}
-
-                {contentTypes.length > 0 && (
-                  <div className="bp-field-group">
-                    <div className="bp-field-label">Preferred content types</div>
-                    <div className="bp-chips">
-                      {contentTypes.map((item, index) => (
-                        <span className="bp-chip" key={`${item}-${index}`}>
-                          {item}
-                        </span>
-                      ))}
-                    </div>
-                  </div>
-                )}
-              </section>
-            )}
-
-            <section className="bp-card">
-              <div className="bp-section-heading-row">
-                <h2 className="bp-card-title bp-card-title-no-margin">
-                  <Sparkles size={17} /> Published Campaigns
-                </h2>
-                <span className="bp-count">{campaigns.length}</span>
-              </div>
-
-              {campaigns.length > 0 ? (
-                <div className="bp-campaign-list">
-                  {campaigns.map((campaign) => (
-                    <Link
-                      key={campaign.id}
-                      to={`/campaigns/${campaign.id}`}
-                      className="bp-campaign"
-                    >
-                      <div className="bp-campaign-main">
-                        <div className="bp-campaign-title">{campaign.title}</div>
-                        <div className="bp-campaign-meta">
-                          {campaign.category}
-                          
-                        </div>
-                      </div>
-                      <div className="bp-campaign-right">
-                        <span className="bp-campaign-type">
-                          {campaign.campaign_type}
-                        </span>
-                        <ArrowUpRight size={15} />
-                      </div>
-                    </Link>
-                  ))}
-                </div>
-              ) : (
-                <div className="bp-empty">
-                  This brand does not have any published campaigns right now.
-                </div>
-              )}
-            </section>
-          </div>
-
-          <aside className="bp-side">
-            <section className="bp-card">
-              <h2 className="bp-card-title">
-                <BriefcaseBusiness size={17} /> Business Details
-              </h2>
-
-              <div className="bp-details">
-                <div className="bp-detail">
-                  <div className="bp-detail-label">Industry</div>
-                  <div className="bp-detail-value">
-                    {brand.industry || 'Not specified'}
-                  </div>
-                </div>
-
-                <div className="bp-detail">
-                  <div className="bp-detail-label">Business type</div>
-                  <div className="bp-detail-value">
-                    {brand.business_type || 'Not specified'}
-                  </div>
-                </div>
-
-                <div className="bp-detail">
-                  <div className="bp-detail-label">Location</div>
-                  <div className="bp-detail-value">
-                    {brand.location || 'Not specified'}
-                  </div>
-                </div>
-
-                <div className="bp-detail">
-                  <div className="bp-detail-label">Team size</div>
-                  <div className="bp-detail-value">
-                    {brand.team_size || 'Not specified'}
-                  </div>
-                </div>
-
-                <div className="bp-detail">
-                  <div className="bp-detail-label">Year established</div>
-                  <div className="bp-detail-value">
-                    {brand.year_established || 'Not specified'}
-                  </div>
-                </div>
-
-                {website && (
-                  <div className="bp-detail">
-                    <div className="bp-detail-label">Website</div>
-                    <div className="bp-detail-value">
-                      <a href={website} target="_blank" rel="noreferrer">
-                        Visit website <ExternalLink size={12} style={{ verticalAlign: -1 }} />
-                      </a>
-                    </div>
-                  </div>
-                )}
-              </div>
-            </section>
-
-            <section className="bp-card">
-              <h2 className="bp-card-title">
-                <Users size={17} /> Collaboration Snapshot
-              </h2>
-
-              <div className="bp-stat-grid">
-                <div className="bp-stat">
-                  <div className="bp-stat-number">{campaigns.length}</div>
-                  <div className="bp-stat-label">Published campaigns</div>
-                </div>
-                <div className="bp-stat">
-                  <div className="bp-stat-number">{categories.length}</div>
-                  <div className="bp-stat-label">Categories</div>
-                </div>
-                <div className="bp-stat">
-                  <div className="bp-stat-number">{contentTypes.length}</div>
-                  <div className="bp-stat-label">Content types</div>
-                </div>
-              </div>
-            </section>
-
-            <section className="bp-card">
-              <h2 className="bp-card-title"><CheckCircle2 size={17} /> Completed Collaborations</h2>
-              <div className="bp-stat-grid">
-                <div className="bp-stat"><div className="bp-stat-number">{brand.completed_collaborations ?? 0}</div><div className="bp-stat-label">Completed</div></div>
-                <div className="bp-stat"><div className="bp-stat-number">{brand.creators_worked_with ?? 0}</div><div className="bp-stat-label">Creators worked with</div></div>
-              </div>
-              {Array.isArray(brand.work_history) && brand.work_history.length > 0 && (
-                <div style={{display:'grid',gap:9,marginTop:16}}>
-                  {brand.work_history.map((item:any)=><div key={item.application_id} style={{border:'1px solid #ECECEC',borderRadius:10,padding:'10px 12px'}}><div style={{fontWeight:700,fontSize:12.5}}>{item.campaign_title}</div><div style={{fontSize:11,color:'#6b6478',marginTop:3}}>{item.creator_name || `Creator #${item.creator_id}`} · Completed</div></div>)}
-                </div>
-              )}
-            </section>
-
-            <section className="bp-card bp-note-card">
-              <CalendarDays size={17} color={CORAL_DARK} />
+      <style>{`
+        .bp-page{min-height:100vh;background:#fff;font-family:Poppins,sans-serif;padding-top:124px}.bp-shell{width:min(1120px,calc(100% - 40px));margin:0 auto;padding:30px 0 70px}.bp-back{display:inline-flex;align-items:center;gap:6px;color:#666;text-decoration:none;font:500 12px Poppins;margin-bottom:22px}.bp-card{border:1px solid #e5e5e5;border-radius:18px;background:#fff;padding:28px}.bp-head{display:flex;align-items:center;gap:18px;padding-bottom:24px;border-bottom:1px solid #eee}.bp-logo{width:72px;height:72px;border-radius:16px;overflow:hidden;background:#f3f3f3;display:flex;align-items:center;justify-content:center;font:700 20px Poppins}.bp-logo img{width:100%;height:100%;object-fit:cover}.bp-name{font:700 25px 'League Spartan',sans-serif;color:#111}.bp-meta{display:flex;flex-wrap:wrap;gap:12px;margin-top:7px;color:#777;font:400 11px Poppins}.bp-meta span{display:flex;align-items:center;gap:5px}.bp-desc{margin:18px 0 0;color:#555;font:400 13px/1.7 Poppins}.bp-grid{display:grid;grid-template-columns:1.1fr .9fr;gap:18px;margin-top:18px}.bp-section{border:1px solid #e8e8e8;border-radius:14px;padding:20px}.bp-section h2{margin:0 0 14px;font:700 15px Poppins}.bp-tags{display:flex;flex-wrap:wrap;gap:7px}.bp-tag{padding:7px 10px;background:#f5f5f5;border-radius:999px;font:500 10px Poppins}.bp-campaign{display:block;padding:13px 0;border-top:1px solid #eee;text-decoration:none;color:#111}.bp-campaign:first-of-type{border-top:0}.bp-campaign strong{display:block;font:600 12px Poppins}.bp-campaign span{display:block;margin-top:3px;color:#888;font:400 10px Poppins}.bp-empty,.bp-error{padding:60px;text-align:center;color:#777;font:500 13px Poppins}.bp-error{color:#a33}@media(max-width:760px){.bp-grid{grid-template-columns:1fr}.bp-head{align-items:flex-start}}
+      `}</style>
+      <main className="bp-shell">
+        <Link className="bp-back" to="/campaigns"><ArrowLeft size={14}/> Back to campaigns</Link>
+        {loading && <div className="bp-card bp-empty">Loading brand profile…</div>}
+        {!loading && error && <div className="bp-card bp-error">{error}</div>}
+        {!loading && profile && <>
+          <section className="bp-card">
+            <div className="bp-head">
+              <div className="bp-logo">{profile.logo_url ? <img src={mediaUrl(profile.logo_url)} alt=""/> : initials(profile.company_name)}</div>
               <div>
-                <div className="bp-note-title">Working with {brand.company_name}</div>
-                <div className="bp-note-text">
-                  Review the brand profile and published campaigns before applying to understand the kind of creator collaboration they are looking for.
+                <div className="bp-name">{profile.company_name}</div>
+                <div className="bp-meta">
+                  {profile.industry && <span><Building2 size={13}/>{profile.industry}</span>}
+                  {profile.location && <span><MapPin size={13}/>{profile.location}</span>}
+                  {profile.website && <a href={profile.website} target="_blank" rel="noreferrer" style={{color:'#555',display:'flex',gap:5,alignItems:'center'}}><ExternalLink size={13}/> Website</a>}
                 </div>
               </div>
+            </div>
+            {profile.description && <p className="bp-desc">{profile.description}</p>}
+          </section>
+
+          <div className="bp-grid">
+            <section className="bp-section">
+              <h2>About the business</h2>
+              <div className="bp-meta" style={{marginBottom:14}}>
+                {profile.business_type && <span><Building2 size={13}/>{profile.business_type}</span>}
+                {profile.team_size && <span>{profile.team_size} team</span>}
+                {profile.year_established && <span>Since {profile.year_established}</span>}
+              </div>
+              <div className="bp-tags">
+                {profile.interested_categories.map((item) => <span className="bp-tag" key={`cat-${item}`}>{item}</span>)}
+                {profile.preferred_content_types.map((item) => <span className="bp-tag" key={`type-${item}`}>{item}</span>)}
+              </div>
             </section>
-          </aside>
-        </div>
+            <section className="bp-section">
+              <h2>Published campaigns</h2>
+              {profile.campaigns.length === 0 ? <div className="bp-empty" style={{padding:20}}>No published campaigns.</div> : profile.campaigns.map((campaign) => (
+                <Link className="bp-campaign" key={campaign.id} to={`/campaigns/${campaign.id}?source=landing`}>
+                  <strong>{campaign.title}</strong><span>{campaign.category}</span>
+                </Link>
+              ))}
+            </section>
+          </div>
+        </>}
       </main>
     </div>
   );
 }
 
-const brandStyles = `
-  .bp {
-    --coral: ${CORAL};
-    --coral-dark: ${CORAL_DARK};
-    --violet: ${VIOLET};
-    --ink: #111217;
-    --ink-soft: #6c6d73;
-    --line: #e6e6ea;
-    min-height: 100vh;
-    background: ${OFF_WHITE};
-    color: var(--ink);
-    font-family: 'Poppins', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-  }
-  .bp * { box-sizing: border-box; }
-  .bp-topbar {
-    height: 64px;
-    display: flex;
-    align-items: center;
-    padding: 0 24px;
-    background: #fff;
-    border-bottom: 1px solid var(--line);
-    position: sticky;
-    top: 0;
-    z-index: 20;
-  }
-  .bp-topbar-inner {
-    width: 100%;
-    max-width: 1240px;
-    margin: 0 auto;
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 20px;
-  }
-  .bp-logo {
-    display: inline-flex;
-    align-items: center;
-    gap: 9px;
-    color: var(--ink);
-    text-decoration: none;
-    font-size: 18px;
-    font-weight: 700;
-  }
-  .bp-nav { display: flex; align-items: center; gap: 16px; }
-  .bp-nav-link {
-    color: var(--ink-soft);
-    text-decoration: none;
-    font-size: 13.5px;
-    font-weight: 600;
-  }
-  .bp-nav-link:hover { color: var(--ink); }
-  .bp-wrap {
-    max-width: 1120px;
-    margin: 0 auto;
-    padding: 26px 24px 72px;
-  }
-  .bp-breadcrumb {
-    display: flex;
-    align-items: center;
-    gap: 9px;
-    color: #8a8b92;
-    font-size: 12px;
-    margin-bottom: 10px;
-    white-space: nowrap;
-    overflow: hidden;
-  }
-  .bp-breadcrumb a { color: #686973; text-decoration: none; font-weight: 600; }
-  .bp-breadcrumb span:last-child { overflow: hidden; text-overflow: ellipsis; }
-  .bp-back {
-    border: 0;
-    background: transparent;
-    color: var(--ink-soft);
-    cursor: pointer;
-    display: inline-flex;
-    align-items: center;
-    gap: 6px;
-    font-size: 13px;
-    font-weight: 600;
-    padding: 7px 0;
-  }
-  .bp-back:hover { color: var(--ink); }
-  .bp-back-top { margin-bottom: 16px; }
-  .bp-hero {
-    background: #fff;
-    border: 1px solid rgba(17,17,17,.25);
-    border-radius: 18px;
-    padding: 28px;
-    box-shadow: 0 0 0 1px rgba(17,17,17,.03), 0 12px 30px rgba(17,17,17,.07), 0 0 34px rgba(17,17,17,.08);
-  }
-  .bp-hero-main { display: flex; align-items: flex-start; gap: 20px; min-width: 0; }
-  .bp-avatar {
-    width: 88px;
-    height: 88px;
-    border-radius: 20px;
-    overflow: hidden;
-    flex: 0 0 auto;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    background: var(--coral);
-    color: #fff;
-    font-size: 30px;
-    font-weight: 800;
-    border: 1px solid rgba(0,0,0,.05);
-  }
-  .bp-avatar img { width: 100%; height: 100%; object-fit: cover; }
-  .bp-hero-copy { min-width: 0; }
-  .bp-kicker {
-    display: inline-flex;
-    align-items: center;
-    gap: 6px;
-    color: var(--coral-dark);
-    font-size: 12px;
-    font-weight: 700;
-    margin-bottom: 7px;
-  }
-  .bp-name {
-    font-size: 31px;
-    line-height: 1.2;
-    margin: 0;
-    font-weight: 750;
-    letter-spacing: -.35px;
-  }
-  .bp-meta {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 8px 16px;
-    margin-top: 13px;
-    color: var(--ink-soft);
-    font-size: 13px;
-  }
-  .bp-meta span { display: inline-flex; align-items: center; gap: 5px; }
-  .bp-actions { margin-top: 20px; display: flex; gap: 9px; flex-wrap: wrap; }
-  .bp-secondary {
-    min-height: 40px;
-    border-radius: 10px;
-    padding: 9px 15px;
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    gap: 7px;
-    font-size: 13px;
-    font-weight: 650;
-    text-decoration: none;
-    color: var(--ink);
-    background: #fff;
-    border: 1px solid var(--line);
-  }
-  .bp-secondary:hover { border-color: #cfcfd5; }
-  .bp-grid {
-    display: grid;
-    grid-template-columns: minmax(0, 1fr) 315px;
-    gap: 18px;
-    margin-top: 18px;
-    align-items: start;
-  }
-  .bp-main, .bp-side { display: flex; flex-direction: column; gap: 18px; }
-  .bp-side { position: sticky; top: 82px; }
-  .bp-card {
-    background: #fff;
-    border: 1px solid var(--line);
-    border-radius: 14px;
-    padding: 21px;
-  }
-  .bp-card-title {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    font-size: 16px;
-    font-weight: 750;
-    margin: 0 0 13px;
-  }
-  .bp-card-title svg { color: var(--coral-dark); flex-shrink: 0; }
-  .bp-card-title-no-margin { margin-bottom: 0; }
-  .bp-section-heading-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 14px; }
-  .bp-count {
-    min-width: 28px;
-    height: 24px;
-    padding: 0 8px;
-    border-radius: 999px;
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    background: #F5F5F5;
-    color: var(--coral-dark);
-    font-size: 11.5px;
-    font-weight: 700;
-  }
-  .bp-text {
-    margin: 0;
-    color: #3d3d42;
-    font-size: 14px;
-    line-height: 1.78;
-    white-space: pre-wrap;
-  }
-  .bp-field-group + .bp-field-group { margin-top: 18px; }
-  .bp-field-label { color: var(--ink-soft); font-size: 12px; font-weight: 650; margin-bottom: 8px; }
-  .bp-chips { display: flex; flex-wrap: wrap; gap: 8px; }
-  .bp-chip {
-    border: 1px solid #E0E0E0;
-    background: #F5F5F5;
-    color: var(--coral-dark);
-    border-radius: 999px;
-    padding: 6px 11px;
-    font-size: 12px;
-    font-weight: 600;
-  }
-  .bp-details { display: flex; flex-direction: column; gap: 9px; }
-  .bp-detail { padding: 12px 13px; border: 1px solid var(--line); border-radius: 10px; }
-  .bp-detail-label { color: var(--ink-soft); font-size: 11.5px; margin-bottom: 4px; }
-  .bp-detail-value { font-size: 13px; font-weight: 600; line-height: 1.45; word-break: break-word; }
-  .bp-detail-value a { color: var(--violet); text-decoration: none; }
-  .bp-detail-value a:hover { text-decoration: underline; }
-  .bp-campaign-list { display: flex; flex-direction: column; }
-  .bp-campaign {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 16px;
-    color: inherit;
-    text-decoration: none;
-    padding: 14px 2px;
-    border-top: 1px solid var(--line);
-    transition: transform .16s ease, padding .16s ease;
-  }
-  .bp-campaign:first-child { border-top: 0; padding-top: 2px; }
-  .bp-campaign:hover { transform: translateX(2px); }
-  .bp-campaign-main { min-width: 0; }
-  .bp-campaign-title { font-size: 13.5px; font-weight: 700; line-height: 1.4; margin-bottom: 5px; }
-  .bp-campaign-meta { color: var(--ink-soft); font-size: 12px; }
-  .bp-campaign-right { display: flex; align-items: center; gap: 8px; color: var(--coral-dark); flex: 0 0 auto; }
-  .bp-campaign-type {
-    border: 1px solid #E0E0E0;
-    background: #F5F5F5;
-    border-radius: 999px;
-    padding: 4px 8px;
-    color: var(--coral-dark);
-    font-size: 10.5px;
-    font-weight: 700;
-    text-transform: capitalize;
-  }
-  .bp-stat-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
-  .bp-stat { text-align: center; border: 1px solid var(--line); border-radius: 11px; padding: 12px 7px; }
-  .bp-stat-number { font-size: 18px; font-weight: 750; }
-  .bp-stat-label { color: var(--ink-soft); font-size: 10px; line-height: 1.3; margin-top: 3px; }
-  .bp-note-card { display: flex; align-items: flex-start; gap: 10px; }
-  .bp-note-title { font-size: 13px; font-weight: 700; margin-bottom: 4px; }
-  .bp-note-text { color: var(--ink-soft); font-size: 12.5px; line-height: 1.6; }
-  .bp-empty { color: var(--ink-soft); font-size: 13px; line-height: 1.6; }
-  .bp-state { min-height: calc(100vh - 72px); display: flex; flex-direction: column; align-items: center; justify-content: center; color: var(--ink-soft); gap: 8px; padding: 24px; text-align: center; }
-  .bp-error-title { color: var(--ink); font-size: 18px; font-weight: 700; }
-  .bp-error-text { font-size: 13px; }
-  .bp-loader { font-size: 14px; }
-  @media (max-width: 850px) {
-    .bp-grid { grid-template-columns: 1fr; }
-    .bp-side { position: static; }
-  }
-  @media (max-width: 600px) {
-    .bp-topbar { padding: 0 16px; }
-    .bp-wrap { padding: 20px 16px 52px; }
-    .bp-hero { padding: 20px; }
-    .bp-hero-main { flex-direction: column; }
-    .bp-name { font-size: 26px; }
-    .bp-avatar { width: 72px; height: 72px; border-radius: 16px; font-size: 25px; }
-    .bp-campaign { align-items: flex-start; }
-    .bp-campaign-right { flex-direction: column; align-items: flex-end; }
-  }
-`;
+export default BrandProfile;

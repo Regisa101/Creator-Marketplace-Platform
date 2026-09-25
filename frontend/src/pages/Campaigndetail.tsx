@@ -19,7 +19,6 @@ import {
 } from 'lucide-react';
 
 import {
-  createApplication,
   deleteCampaign,
   duplicateCampaign,
   getApplications,
@@ -30,6 +29,7 @@ import {
   publishCampaign,
   saveCampaign,
   unsaveCampaign,
+  updateCampaign,
   type Application,
   type Campaign,
   type PublicBusinessProfile,
@@ -39,6 +39,7 @@ import {
 import { useAuth } from '../context/AuthContext';
 import { PublicNavbar } from '../components/PublicNavbar';
 import { AppLayout } from '../components/AppLayout';
+import { ApplyModal } from '../components/ApplyModels';
 
 function money(value?: number | null) {
   if (value == null) return null;
@@ -112,6 +113,33 @@ function getBusinessName(
   );
 }
 
+function localDateInputValue(value?: string | null) {
+  if (!value) return '';
+  return value.slice(0, 10);
+}
+
+function isDeadlinePassed(value?: string | null) {
+  if (!value) return false;
+
+  // Date-only deadlines represent the whole local calendar day.
+  if (/^\d{4}-\d{2}-\d{2}$/.test(value)) {
+    const endOfDay = new Date(`${value}T23:59:59.999`);
+    return endOfDay.getTime() < Date.now();
+  }
+
+  const date = new Date(value);
+  return !Number.isNaN(date.getTime()) && date.getTime() < Date.now();
+}
+
+function tomorrowInputValue() {
+  const date = new Date();
+  date.setDate(date.getDate() + 1);
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+}
+
 export function CampaignDetail() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
@@ -138,13 +166,14 @@ export function CampaignDetail() {
 
   const [showApply, setShowApply] = useState(false);
 
-  const [proposal, setProposal] = useState('');
-  const [rate, setRate] = useState('');
-  const [answers, setAnswers] = useState<string[]>([]);
+  const [ownerApplications, setOwnerApplications] = useState<Application[]>([]);
+  const [ownerApplicationsLoaded, setOwnerApplicationsLoaded] = useState(false);
+  const [showExtend, setShowExtend] = useState(false);
+  const [extensionDate, setExtensionDate] = useState('');
+  const [extending, setExtending] = useState(false);
 
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-  const [submitting, setSubmitting] = useState(false);
 
   const [manageAction, setManageAction] = useState('');
   const [error, setError] = useState('');
@@ -157,6 +186,15 @@ export function CampaignDetail() {
   );
 
   const isCreator = user?.role === 'creator';
+
+  const deadlinePassed = isDeadlinePassed(campaign?.application_deadline);
+  const canExtendCampaign = Boolean(
+    isOwner &&
+      campaign?.status === 'published' &&
+      deadlinePassed &&
+      ownerApplicationsLoaded &&
+      ownerApplications.length === 0,
+  );
 
   useEffect(() => {
     if (!id) return;
@@ -178,11 +216,25 @@ export function CampaignDetail() {
 
         setCampaign(data);
 
-        setAnswers(
-          new Array(
-            data.application_questions?.length || 0,
-          ).fill(''),
-        );
+        setOwnerApplicationsLoaded(false);
+        setOwnerApplications([]);
+
+        if (user?.role === 'business' && data.business_id === user.id) {
+          try {
+            const applications = await getApplications({ campaign_id: data.id });
+
+            if (!cancelled) {
+              setOwnerApplications(applications);
+              setOwnerApplicationsLoaded(true);
+            }
+          } catch {
+            // Do not show the extension action unless we successfully verified
+            // that the campaign has no applications.
+            if (!cancelled) {
+              setOwnerApplicationsLoaded(false);
+            }
+          }
+        }
 
         try {
           const profile =
@@ -283,74 +335,6 @@ export function CampaignDetail() {
     }
   };
 
-  const submitApplication = async () => {
-    if (!campaign) return;
-
-    if (!user) {
-      navigate('/login');
-      return;
-    }
-
-    if (user.role !== 'creator') {
-      setError(
-        'Only creator accounts can apply to campaigns.',
-      );
-      return;
-    }
-
-    if (!proposal.trim()) {
-      setError('Please add a short proposal.');
-      return;
-    }
-
-    if (rate && Number(rate) < 0) {
-      setError(
-        'Proposed compensation cannot be negative.',
-      );
-      return;
-    }
-
-    if (
-      campaign.application_questions?.some(
-        (question, index) =>
-          question.trim() &&
-          !answers[index]?.trim(),
-      )
-    ) {
-      setError(
-        'Please answer every screening question.',
-      );
-      return;
-    }
-
-    setSubmitting(true);
-    setError('');
-
-    try {
-      const created = await createApplication({
-        campaign_id: campaign.id,
-        proposal: proposal.trim(),
-        rate: rate ? Number(rate) : null,
-        application_answers: (
-          campaign.application_questions || []
-        ).map((question, index) => ({
-          question,
-          answer: answers[index] || '',
-        })),
-      });
-
-      setApplication(created);
-      setShowApply(false);
-      setNotice('Application submitted successfully.');
-    } catch (err: any) {
-      setError(
-        err?.response?.data?.detail ||
-          'Could not submit your application.',
-      );
-    } finally {
-      setSubmitting(false);
-    }
-  };
 
   const publish = async () => {
     if (!campaign) return;
@@ -423,6 +407,48 @@ export function CampaignDetail() {
     }
   };
 
+  const extendCampaign = async () => {
+    if (!campaign || !canExtendCampaign || !extensionDate) return;
+
+    if (campaign.application_deadline &&
+        extensionDate <= localDateInputValue(campaign.application_deadline)) {
+      setError('Choose a new deadline after the current deadline.');
+      return;
+    }
+
+    setExtending(true);
+    setManageAction('extend');
+    setError('');
+
+    try {
+      const updated = await updateCampaign(campaign.id, {
+        application_deadline: extensionDate,
+      });
+
+      setCampaign(updated);
+      setShowExtend(false);
+      setExtensionDate('');
+      setNotice(`Campaign deadline extended to ${dateLabel(updated.application_deadline) || extensionDate}.`);
+    } catch (err: any) {
+      setError(
+        err?.response?.data?.detail ||
+          'Could not extend the campaign deadline.',
+      );
+    } finally {
+      setExtending(false);
+      setManageAction('');
+    }
+  };
+
+  const openExtensionModal = () => {
+    if (!campaign) return;
+
+    setError('');
+    setNotice('');
+    setExtensionDate('');
+    setShowExtend(true);
+  };
+
   const renderFrame = (content: ReactNode) => {
     if (fromLanding) {
       // Reuse the exact navbar used by the home page. Do not duplicate or
@@ -486,15 +512,9 @@ export function CampaignDetail() {
     business,
   );
 
-  const proposedCompensationLabel =
-    campaign.compensation_type === 'Budget range'
-      ? 'Your proposed compensation'
-      : campaign.compensation_type === 'Negotiable'
-        ? 'Your proposed compensation'
-        : 'Your proposed compensation';
-
   return renderFrame(
     <main className="cd-page">
+      <style>{STYLE}</style>
       <div className="cd-shell">
 
         {/* BACK */}
@@ -630,6 +650,17 @@ export function CampaignDetail() {
                   {manageAction === 'publish'
                     ? 'Publishing...'
                     : 'Publish'}
+                </button>
+              )}
+
+              {canExtendCampaign && (
+                <button
+                  className="cd-dark cd-extend-owner-button"
+                  onClick={openExtensionModal}
+                  disabled={!!manageAction}
+                >
+                  <CalendarDays size={14} />
+                  Extend deadline
                 </button>
               )}
 
@@ -845,6 +876,22 @@ export function CampaignDetail() {
                     : 'Campaign compensation'}
               </div>
 
+              {isOwner && deadlinePassed && (
+                <div className="cd-deadline-notice">
+                  <CalendarDays size={15} />
+                  <div>
+                    <strong>Application deadline has passed</strong>
+                    <span>
+                      {canExtendCampaign
+                        ? 'No creators applied before the deadline. You can extend it.'
+                        : ownerApplicationsLoaded
+                          ? 'Applications were received before the deadline.'
+                          : 'Checking applications...'}
+                    </span>
+                  </div>
+                </div>
+              )}
+
               {isCreator &&
                 !application &&
                 campaign.status ===
@@ -991,176 +1038,139 @@ export function CampaignDetail() {
         </div>
       </div>
 
-      {/* APPLICATION MODAL */}
       {showApply && (
+        <ApplyModal
+          isOpen={showApply}
+          campaign={campaign}
+          onClose={() => setShowApply(false)}
+          onSuccess={async () => {
+            try {
+              const applications = await getApplications({ campaign_id: campaign.id });
+              setApplication(applications.find((item) => item.creator_id === user?.id) || null);
+            } catch {
+              // The success state is still shown even if the refresh is unavailable.
+            }
+          }}
+        />
+      )}
+
+      {showExtend && canExtendCampaign && (
         <div
-          className="cd-modal-backdrop"
+          className="cd-extension-backdrop"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="cd-extension-title"
           onMouseDown={(event) => {
-            if (
-              event.target ===
-              event.currentTarget
-            ) {
-              setShowApply(false);
+            if (event.target === event.currentTarget && !extending) {
+              setShowExtend(false);
             }
           }}
         >
-          <div className="cd-modal">
-
-            <div className="cd-modal-head">
-              <div>
-                <div className="cd-modal-eyebrow">
-                  Submit proposal
-                </div>
-
-                <h2>
-                  Apply to this campaign
+          <div className="cd-extension-modal">
+            <div className="cd-extension-header">
+              <div className="cd-extension-header-content">
+                <div className="cd-extension-eyebrow">Extend campaign</div>
+                <h2 id="cd-extension-title" className="cd-extension-title">
+                  Extend the application deadline
                 </h2>
-
-                <p>{campaign.title}</p>
+                <p className="cd-extension-description">
+                  No creators applied before the previous deadline. Choose a new date to keep this campaign open for applications.
+                </p>
               </div>
 
               <button
-                className="cd-close"
-                onClick={() =>
-                  setShowApply(false)
-                }
+                type="button"
+                className="cd-extension-close"
+                onClick={() => setShowExtend(false)}
+                disabled={extending}
+                aria-label="Close"
               >
-                <X size={17} />
+                <X size={15} />
               </button>
             </div>
 
-            {/* COMPENSATION */}
-            <div className="cd-proposal-budget">
-              <div>
-                <small>
-                  Campaign compensation
-                </small>
-
-                <strong>
-                  {budgetLabel}
-                </strong>
+            <div className="cd-extension-date-comparison">
+              <div className="cd-extension-date-block">
+                <div className="cd-extension-date-label">Current deadline</div>
+                <div className="cd-extension-date-value">
+                  {dateLabel(campaign.application_deadline) || 'Not specified'}
+                </div>
               </div>
 
-              <div>
-                <small>
-                  {proposedCompensationLabel}
-                </small>
+              <div className="cd-extension-date-arrow">
+                <ChevronRight size={18} />
+              </div>
 
-                <div className="cd-money">
-                  <span>Rs.</span>
-
-                  <input
-                    type="number"
-                    min="0"
-                    step="0.01"
-                    value={rate}
-                    onChange={(event) =>
-                      setRate(event.target.value)
-                    }
-                    placeholder="Enter your rate"
-                  />
+              <div className="cd-extension-date-block">
+                <div className="cd-extension-date-label">New deadline</div>
+                <div className="cd-extension-date-value">
+                  {extensionDate ? dateLabel(extensionDate) : 'Choose a date'}
                 </div>
               </div>
             </div>
 
-            {/* PROPOSAL */}
-            <label className="cd-field">
-              <span className="cd-field-title">
-                Why are you a good fit?
-                <b>*</b>
-              </span>
+            <div className="cd-extension-form">
+              <label className="cd-extension-field">
+                <span className="cd-extension-field-label">
+                  Extend applications until
+                </span>
 
-              <span className="cd-field-help">
-                Introduce yourself, explain your
-                experience and describe how you would
-                approach this campaign.
-              </span>
+                <input
+                  className="cd-extension-date-input"
+                  type="date"
+                  value={extensionDate}
+                  min={tomorrowInputValue()}
+                  onChange={(event) => setExtensionDate(event.target.value)}
+                  disabled={extending}
+                  required
+                />
 
-              <textarea
-                rows={7}
-                value={proposal}
-                onChange={(event) =>
-                  setProposal(event.target.value)
-                }
-                placeholder="Write a short proposal..."
-              />
-            </label>
+                <span className="cd-extension-help">
+                  Choose any future date for the new application deadline.
+                </span>
+              </label>
 
-            {/* QUESTIONS */}
-            {(campaign.application_questions ||
-              []).map((question, index) => (
-                <label
-                  className="cd-field"
-                  key={`${question}-${index}`}
+              <div className="cd-extension-confirmation">
+                <Check size={15} />
+                <span>
+                  Once extended, creators will be able to apply again until the new deadline.
+                </span>
+              </div>
+
+              <div className="cd-extension-actions">
+                <button
+                  type="button"
+                  className="cd-extension-cancel"
+                  onClick={() => setShowExtend(false)}
+                  disabled={extending}
                 >
-                  <span className="cd-field-title">
-                    {question}
-                    <b>*</b>
-                  </span>
+                  Cancel
+                </button>
 
-                  <textarea
-                    rows={4}
-                    value={
-                      answers[index] || ''
-                    }
-                    onChange={(event) =>
-                      setAnswers(
-                        (current) =>
-                          current.map(
-                            (
-                              item,
-                              itemIndex,
-                            ) =>
-                              itemIndex ===
-                              index
-                                ? event.target
-                                    .value
-                                : item,
-                          ),
-                      )
-                    }
-                    placeholder="Your answer..."
-                  />
-                </label>
-              ))}
-
-            {/* ACTIONS */}
-            <div className="cd-modal-actions">
-              <button
-                className="cd-light cd-modal-cancel"
-                onClick={() =>
-                  setShowApply(false)
-                }
-              >
-                Cancel
-              </button>
-
-              <button
-                className="cd-dark cd-submit"
-                disabled={submitting}
-                onClick={() =>
-                  void submitApplication()
-                }
-              >
-                {submitting ? (
-                  <Loader2
-                    size={15}
-                    className="spin"
-                  />
-                ) : (
-                  <Send size={15} />
-                )}
-
-                {submitting
-                  ? 'Submitting...'
-                  : 'Submit proposal'}
-              </button>
+                <button
+                  type="button"
+                  className="cd-extension-submit"
+                  onClick={() => void extendCampaign()}
+                  disabled={!extensionDate || extending}
+                >
+                  {extending ? (
+                    <>
+                      <Loader2 size={14} className="spin" />
+                      Extending...
+                    </>
+                  ) : (
+                    <>
+                      <CalendarDays size={14} />
+                      Extend campaign
+                    </>
+                  )}
+                </button>
+              </div>
             </div>
           </div>
         </div>
       )}
 
-      <style>{STYLE}</style>
     </main>,
   );
 }
@@ -1935,6 +1945,287 @@ const STYLE = `
   text-decoration:underline;
 }
 
+/* EXTEND CAMPAIGN
+------------------------------------------------------------ */
+
+.cd-extend-owner-button{
+  white-space:nowrap;
+}
+
+.cd-deadline-notice{
+  display:flex;
+  align-items:flex-start;
+  gap:9px;
+  margin-top:15px;
+  padding:11px 10px;
+  border:1px solid #e7e7e7;
+  border-radius:8px;
+  background:#fafafa;
+  color:#555;
+}
+
+.cd-deadline-notice>svg{
+  flex:none;
+  color:#555;
+  margin-top:1px;
+}
+
+.cd-deadline-notice strong{
+  display:block;
+  color:#222;
+  font-size:10.5px;
+  font-weight:600;
+  line-height:1.4;
+}
+
+.cd-deadline-notice span{
+  display:block;
+  margin-top:3px;
+  color:#888;
+  font-size:9px;
+  line-height:1.45;
+}
+
+/* The extension overlay intentionally starts below the public navbar.
+   This prevents the modal from covering the navbar while keeping the
+   rest of the page dimmed. */
+.cd-extension-backdrop{
+  position:fixed;
+  top:51px;
+  right:0;
+  bottom:0;
+  left:0;
+  z-index:2000;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  padding:24px;
+  box-sizing:border-box;
+  background:rgba(0,0,0,.42);
+  backdrop-filter:blur(2px);
+  -webkit-backdrop-filter:blur(2px);
+  overflow-y:auto;
+}
+
+.cd-extension-modal{
+  width:min(500px,calc(100vw - 48px));
+  max-height:calc(100vh - 99px);
+  overflow-y:auto;
+  background:#fff;
+  border-radius:14px;
+  box-shadow:0 24px 70px rgba(0,0,0,.20),0 4px 20px rgba(0,0,0,.08);
+  position:relative;
+  animation:cd-extension-in .18s ease-out;
+}
+
+@keyframes cd-extension-in{
+  from{opacity:0;transform:translateY(8px) scale(.985)}
+  to{opacity:1;transform:translateY(0) scale(1)}
+}
+
+.cd-extension-header{
+  display:flex;
+  align-items:flex-start;
+  justify-content:space-between;
+  gap:12px;
+  padding:20px 24px 8px;
+}
+
+.cd-extension-header-content{
+  min-width:0;
+}
+
+.cd-extension-eyebrow{
+  margin-bottom:7px;
+  color:#999;
+  font-size:9px;
+  font-weight:700;
+  letter-spacing:.13em;
+  text-transform:uppercase;
+}
+
+.cd-extension-title{
+  margin:0;
+  color:#111;
+  font-size:20px;
+  line-height:1.2;
+  font-weight:700;
+}
+
+.cd-extension-description{
+  margin:7px 0 0;
+  color:#777;
+  font-size:12px;
+  line-height:1.55;
+}
+
+.cd-extension-close{
+  flex:0 0 auto;
+  width:30px;
+  height:30px;
+  margin-left:12px;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  border:0;
+  border-radius:50%;
+  background:#111;
+  color:#fff;
+  cursor:pointer;
+}
+
+.cd-extension-close:disabled{
+  opacity:.5;
+  cursor:not-allowed;
+}
+
+.cd-extension-date-comparison{
+  margin:12px 24px 18px;
+  display:grid;
+  grid-template-columns:1fr 32px 1fr;
+  align-items:center;
+  padding:14px;
+  border:1px solid #e4e4e4;
+  border-radius:10px;
+  background:#fafafa;
+}
+
+.cd-extension-date-block{
+  min-width:0;
+}
+
+.cd-extension-date-label{
+  margin-bottom:5px;
+  color:#999;
+  font-size:9px;
+  font-weight:500;
+}
+
+.cd-extension-date-value{
+  color:#222;
+  font-size:12px;
+  font-weight:700;
+}
+
+.cd-extension-date-arrow{
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  color:#aaa;
+}
+
+.cd-extension-form{
+  padding:0 24px 22px;
+}
+
+.cd-extension-field{
+  display:flex;
+  flex-direction:column;
+  gap:7px;
+}
+
+.cd-extension-field-label{
+  color:#333;
+  font-size:12px;
+  font-weight:700;
+}
+
+.cd-extension-date-input{
+  width:100%;
+  height:43px;
+  padding:0 12px;
+  box-sizing:border-box;
+  border:1px solid #d8d8d8;
+  border-radius:8px;
+  background:#fff;
+  color:#222;
+  font-family:inherit;
+  font-size:13px;
+  outline:none;
+}
+
+.cd-extension-date-input:focus{
+  border-color:#111;
+  box-shadow:0 0 0 2px rgba(0,0,0,.05);
+}
+
+.cd-extension-date-input:disabled{
+  opacity:.65;
+}
+
+.cd-extension-help{
+  color:#999;
+  font-size:10px;
+  line-height:1.4;
+}
+
+.cd-extension-confirmation{
+  display:flex;
+  align-items:center;
+  gap:9px;
+  margin-top:14px;
+  padding:10px 12px;
+  border-radius:7px;
+  background:#f7f7f7;
+  color:#777;
+  font-size:10px;
+  line-height:1.4;
+}
+
+.cd-extension-confirmation svg{
+  flex:0 0 auto;
+  color:#333;
+}
+
+.cd-extension-actions{
+  display:flex;
+  justify-content:flex-end;
+  align-items:center;
+  gap:7px;
+  margin-top:18px;
+}
+
+.cd-extension-cancel,
+.cd-extension-submit{
+  height:37px;
+  padding:0 15px;
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  gap:7px;
+  border-radius:7px;
+  font-family:inherit;
+  font-size:11px;
+  font-weight:600;
+  cursor:pointer;
+}
+
+.cd-extension-cancel{
+  border:1px solid #ddd;
+  background:#fff;
+  color:#222;
+}
+
+.cd-extension-cancel:hover{
+  background:#f7f7f7;
+}
+
+.cd-extension-submit{
+  border:1px solid #111;
+  background:#111;
+  color:#fff;
+}
+
+.cd-extension-submit:hover{
+  background:#292929;
+}
+
+.cd-extension-submit:disabled,
+.cd-extension-cancel:disabled{
+  opacity:.5;
+  cursor:not-allowed;
+}
+
 /* MODAL */
 
 .cd-modal-backdrop{
@@ -2163,6 +2454,50 @@ const STYLE = `
 }
 
 @media(max-width:600px){
+  .cd-extension-backdrop{
+    top:51px;
+    padding:14px;
+    align-items:center;
+  }
+
+  .cd-extension-modal{
+    width:calc(100vw - 28px);
+    max-height:calc(100vh - 79px);
+    border-radius:12px;
+  }
+
+  .cd-extension-header{
+    padding:18px 18px 8px;
+  }
+
+  .cd-extension-title{
+    font-size:18px;
+  }
+
+  .cd-extension-description{
+    font-size:11px;
+  }
+
+  .cd-extension-date-comparison{
+    margin:10px 18px 16px;
+    padding:12px;
+  }
+
+  .cd-extension-form{
+    padding:0 18px 18px;
+  }
+
+  .cd-extension-actions{
+    flex-direction:column-reverse;
+    width:100%;
+  }
+
+  .cd-extension-cancel,
+  .cd-extension-submit{
+    width:100%;
+  }
+
+
   .cd-page{
     padding:20px 14px 60px;
   }

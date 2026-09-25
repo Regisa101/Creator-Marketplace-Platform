@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { AlertCircle, Check, ImagePlus, Loader2, Send, X } from 'lucide-react';
+import { Check, ImagePlus, Loader2, Upload, X } from 'lucide-react';
 import {
   createApplication,
   getCreatorProgress,
@@ -8,472 +8,214 @@ import {
   type CreatorPortfolioItemData,
 } from '../api/client';
 
-interface CreatorApplyProfile {
-  display_name?: string | null;
-  username?: string | null;
-  profile_image?: string | null;
-  portfolio?: CreatorPortfolioItemData[] | null;
-}
-
-interface ApplyModalProps {
+type Props = {
   isOpen: boolean;
   onClose: () => void;
   campaign: Campaign;
   onSuccess?: () => void | Promise<void>;
-}
+};
 
-function mediaUrl(value?: string | null): string {
+function mediaUrl(value?: string | null) {
   if (!value) return '';
-  if (/^(https?:)?\/\//i.test(value) || value.startsWith('data:') || value.startsWith('blob:')) {
-    return value;
-  }
+  if (/^(https?:)?\/\//i.test(value) || value.startsWith('data:') || value.startsWith('blob:')) return value;
   if (value.startsWith('/api/')) return `http://localhost:8000${value}`;
   return `http://localhost:8000/${value.replace(/^\/+/, '')}`;
 }
 
-function getErrorMessage(error: unknown, fallback: string): string {
-  const maybeAxios = error as {
-    response?: { data?: { detail?: string } };
-  };
-  return maybeAxios?.response?.data?.detail || fallback;
+function errorMessage(error: any, fallback: string) {
+  return error?.response?.data?.detail || fallback;
 }
 
-export function ApplyModal({ isOpen, onClose, campaign, onSuccess }: ApplyModalProps) {
-  const [profile, setProfile] = useState<CreatorApplyProfile | null>(null);
-  const [proposal, setProposal] = useState('');
-  const [message, setMessage] = useState('');
-  const [answers, setAnswers] = useState<Record<number, string>>({});
+export function ApplyModal({ isOpen, onClose, campaign, onSuccess }: Props) {
   const [portfolio, setPortfolio] = useState<CreatorPortfolioItemData[]>([]);
-  const [selectedPortfolio, setSelectedPortfolio] = useState<number[]>([]);
-  const [profileLoading, setProfileLoading] = useState(false);
-  const [uploadingWork, setUploadingWork] = useState(false);
+  const [selected, setSelected] = useState<number | null>(null);
+  const [answers, setAnswers] = useState<Record<number, string>>({});
+  const [loading, setLoading] = useState(false);
+  const [uploading, setUploading] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+  const [success, setSuccess] = useState(false);
   const [error, setError] = useState('');
 
   const questions = useMemo(
-    () => (campaign.application_questions || []).map((question) => String(question).trim()).filter(Boolean),
+    () => (campaign.application_questions || []).map((q) => String(q).trim()).filter(Boolean),
     [campaign.application_questions],
   );
 
   useEffect(() => {
     if (!isOpen) return;
-
     let cancelled = false;
-    setProfile(null);
-    setProposal('');
-    setMessage('');
-    setAnswers({});
     setPortfolio([]);
-    setSelectedPortfolio([]);
+    setSelected(null);
+    setAnswers({});
+    setSuccess(false);
     setError('');
-    setProfileLoading(true);
+    setLoading(true);
 
     getCreatorProgress()
       .then((result) => {
         if (cancelled) return;
-
-        const creatorProfile = (result?.profile || {}) as CreatorApplyProfile;
-        const items = Array.isArray(creatorProfile.portfolio)
-          ? creatorProfile.portfolio.filter((item) => item && typeof item.media_url === 'string' && item.media_url)
+        const items = Array.isArray(result?.profile?.portfolio)
+          ? result.profile.portfolio.filter((item: CreatorPortfolioItemData) => item?.media_url)
           : [];
-
-        setProfile(creatorProfile);
         setPortfolio(items);
-
-        // A single existing work sample is automatically relevant.
-        // With multiple samples the creator explicitly chooses which ones to show.
-        if (items.length === 1) setSelectedPortfolio([0]);
       })
-      .catch((err: unknown) => {
-        if (!cancelled) {
-          setError(getErrorMessage(err, 'Could not load your creator profile. You can still upload a work sample below.'));
-        }
+      .catch((err) => {
+        if (!cancelled) setError(errorMessage(err, 'Could not load your portfolio. You can upload one image below.'));
       })
       .finally(() => {
-        if (!cancelled) setProfileLoading(false);
+        if (!cancelled) setLoading(false);
       });
 
-    return () => {
-      cancelled = true;
-    };
+    return () => { cancelled = true; };
   }, [isOpen, campaign.id]);
 
   useEffect(() => {
     if (!isOpen) return;
-
-    const previousOverflow = document.body.style.overflow;
+    const old = document.body.style.overflow;
     document.body.style.overflow = 'hidden';
-
-    return () => {
-      document.body.style.overflow = previousOverflow;
-    };
+    return () => { document.body.style.overflow = old; };
   }, [isOpen]);
-
-  useEffect(() => {
-    if (!isOpen) return;
-
-    const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key === 'Escape' && !submitting) onClose();
-    };
-
-    window.addEventListener('keydown', onKeyDown);
-    return () => window.removeEventListener('keydown', onKeyDown);
-  }, [isOpen, onClose, submitting]);
 
   if (!isOpen) return null;
 
-  const togglePortfolio = (index: number) => {
-    setSelectedPortfolio((current) =>
-      current.includes(index)
-        ? current.filter((item) => item !== index)
-        : [...current, index],
-    );
-  };
-
-  const handleWorkUpload = async (file: File) => {
-    setUploadingWork(true);
+  const uploadWork = async (file: File) => {
+    if (!file.type.startsWith('image/')) {
+      setError('Please upload an image file.');
+      return;
+    }
+    setUploading(true);
     setError('');
-
     try {
       const { url } = await uploadImage(file);
-      const newItem: CreatorPortfolioItemData = {
-        title: file.name.replace(/\.[^.]+$/, ''),
-        media_url: url,
-        type: 'image',
-      };
-
       setPortfolio((current) => {
-        const next = [...current, newItem];
-        setSelectedPortfolio((selected) => [...selected, next.length - 1]);
+        const next = [...current, {
+          title: file.name.replace(/\.[^.]+$/, ''),
+          media_url: url,
+          type: 'image',
+        }];
+        setSelected(next.length - 1);
         return next;
       });
-    } catch (err: unknown) {
-      setError(getErrorMessage(err, 'Could not upload this work sample.'));
+    } catch (err) {
+      setError(errorMessage(err, 'Could not upload the work image.'));
     } finally {
-      setUploadingWork(false);
+      setUploading(false);
     }
   };
 
-  const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
-    event.preventDefault();
+  const submit = async () => {
     setError('');
-
-    if (!proposal.trim()) {
-      setError('Please explain why you are a good fit for this campaign.');
+    if (selected === null || !portfolio[selected]?.media_url) {
+      setError('Please select exactly one appropriate work image.');
       return;
     }
-
-    if (portfolio.length === 0 || selectedPortfolio.length === 0) {
-      setError('Please select at least one relevant work sample, or upload one below.');
-      return;
-    }
-
-    const missingQuestion = questions.findIndex((_, index) => !answers[index]?.trim());
-    if (missingQuestion !== -1) {
-      setError(`Please answer campaign question ${missingQuestion + 1} before applying.`);
+    const missing = questions.findIndex((_, i) => !answers[i]?.trim());
+    if (missing !== -1) {
+      setError(`Please answer question ${missing + 1}.`);
       return;
     }
 
     setSubmitting(true);
-
     try {
       await createApplication({
         campaign_id: campaign.id,
-        proposal: proposal.trim(),
-        message: message.trim() || undefined,
+        proposal: 'Application submitted',
         application_answers: questions.map((question, index) => ({
           question,
           answer: answers[index].trim(),
         })),
-        selected_portfolio: selectedPortfolio.map((index) => portfolio[index]).filter(Boolean),
+        selected_portfolio: [portfolio[selected]],
       });
-
       await onSuccess?.();
-      onClose();
-    } catch (err: unknown) {
-      setError(getErrorMessage(err, 'Could not submit your application. Please try again.'));
+      setSuccess(true);
+    } catch (err) {
+      setError(errorMessage(err, 'Could not submit your application. Please try again.'));
     } finally {
       setSubmitting(false);
     }
   };
 
-  const handleClose = () => {
-    if (!submitting) onClose();
-  };
-
-  const profileImage = mediaUrl(profile?.profile_image);
-  const profileName = profile?.display_name || profile?.username || 'Your creator profile';
-  const selectedCount = selectedPortfolio.length;
-
   return (
-    <div className="am-overlay" role="presentation" onMouseDown={(event) => {
-      if (event.target === event.currentTarget) handleClose();
-    }}>
+    <div className="apply-overlay" onMouseDown={(e) => e.target === e.currentTarget && !submitting && onClose()}>
       <style>{`
-        .am-overlay {
-          position: fixed;
-          inset: 0;
-          z-index: 2000;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          padding: 18px;
-          background: rgba(15, 17, 24, .58);
-          backdrop-filter: blur(6px);
-        }
-        .am-modal {
-          width: min(680px, 100%);
-          max-height: min(92vh, 900px);
-          overflow: auto;
-          background: #fff;
-          border: 1px solid #ececf1;
-          border-radius: 22px;
-          box-shadow: 0 28px 80px rgba(15,17,24,.26);
-          animation: am-enter .2s ease-out;
-        }
-        @keyframes am-enter {
-          from { opacity: 0; transform: translateY(8px) scale(.985); }
-          to { opacity: 1; transform: translateY(0) scale(1); }
-        }
-        .am-top {
-          position: sticky;
-          top: 0;
-          z-index: 4;
-          display: flex;
-          justify-content: space-between;
-          gap: 14px;
-          padding: 22px 24px 17px;
-          background: rgba(255,255,255,.97);
-          border-bottom: 1px solid #eeeef2;
-          backdrop-filter: blur(10px);
-        }
-        .am-title { margin: 0; color: #183b72; font-size: 21px; font-weight: 800; letter-spacing: -.25px; }
-        .am-subtitle { margin: 4px 0 0; color: #7b7d86; font-size: 12.5px; line-height: 1.55; }
-        .am-close { width: 34px; height: 34px; border: 1px solid #e5e5ea; border-radius: 10px; background: #fff; color: #6d6f77; display: inline-flex; align-items: center; justify-content: center; cursor: pointer; flex: 0 0 auto; }
-        .am-close:hover { background: #f7f7f9; color: #20222a; }
-        .am-body { padding: 20px 24px 24px; }
-        .am-campaign { display: flex; align-items: center; gap: 12px; padding: 13px 14px; margin-bottom: 18px; border-radius: 14px; background: #FBFBFB; border: 1px solid #ebebf0; }
-        .am-campaign-image { width: 50px; height: 50px; border-radius: 11px; object-fit: cover; background: #F2F2F2; border: 1px solid #e9e9ee; flex: 0 0 auto; }
-        .am-campaign-copy { min-width: 0; }
-        .am-campaign-title { margin: 0; font-size: 13.5px; font-weight: 750; color: #252631; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-        .am-campaign-meta { margin: 3px 0 0; color: #84858c; font-size: 11.5px; }
-        .am-profile { display: flex; align-items: center; gap: 10px; padding: 11px 12px; border: 1px solid #ececf1; border-radius: 14px; margin-bottom: 18px; }
-        .am-profile-avatar { width: 42px; height: 42px; border-radius: 50%; object-fit: cover; background: #2D2D2D; color: white; display: flex; align-items: center; justify-content: center; font-size: 13px; font-weight: 800; flex: 0 0 auto; overflow: hidden; }
-        .am-profile-avatar img { width: 100%; height: 100%; object-fit: cover; display: block; }
-        .am-profile-label { color: #8a8b92; font-size: 10.5px; margin-bottom: 2px; }
-        .am-profile-name { color: #33353e; font-size: 12.5px; font-weight: 750; }
-        .am-form { display: flex; flex-direction: column; gap: 17px; }
-        .am-section { padding-top: 2px; }
-        .am-section + .am-section { border-top: 1px solid #efeff2; padding-top: 18px; }
-        .am-section-heading { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; margin-bottom: 10px; }
-        .am-section-title { margin: 0; color: #2b2d35; font-size: 14px; font-weight: 800; }
-        .am-section-help { color: #91929a; font-size: 10.5px; }
-        .am-field { display: flex; flex-direction: column; gap: 6px; }
-        .am-field + .am-field { margin-top: 12px; }
-        .am-label { color: #555761; font-size: 11.5px; font-weight: 700; }
-        .am-required { color: #f0523f; }
-        .am-textarea, .am-input { width: 100%; box-sizing: border-box; border: 1px solid #dedfe5; border-radius: 10px; background: #fff; color: #181a20; font: inherit; font-size: 12.5px; outline: none; transition: border-color .15s ease, box-shadow .15s ease; }
-        .am-textarea { min-height: 91px; padding: 10px 11px; resize: vertical; line-height: 1.55; }
-        .am-input { height: 41px; padding: 0 11px; }
-        .am-textarea:focus, .am-input:focus { border-color: #BDBDBD; box-shadow: 0 0 0 3px rgba(17,17,17,.10); }
-        .am-hint { color: #90919a; font-size: 10.5px; line-height: 1.45; }
-        .am-question { padding: 12px; border: 1px solid #ececf1; border-radius: 12px; background: #FCFCFC; }
-        .am-question + .am-question { margin-top: 10px; }
-        .am-question-number { color: #f0523f; font-size: 10px; font-weight: 800; text-transform: uppercase; letter-spacing: .06em; margin-bottom: 4px; }
-        .am-question-text { margin: 0 0 7px; color: #3e4048; font-size: 12px; line-height: 1.5; font-weight: 650; }
-        .am-portfolio-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 9px; }
-        .am-portfolio-card { position: relative; padding: 7px; border: 1px solid #e2e2e8; border-radius: 12px; background: #fff; color: #42444c; text-align: left; cursor: pointer; }
-        .am-portfolio-card:hover { border-color: #f3afa5; }
-        .am-portfolio-card.selected { border-color: #ff7f6f; box-shadow: 0 0 0 2px rgba(17,17,17,.12); }
-        .am-portfolio-media { width: 100%; aspect-ratio: 1; border-radius: 8px; object-fit: cover; display: block; background: #F3F3F3; margin-bottom: 6px; }
-        .am-portfolio-name { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 10.5px; font-weight: 700; }
-        .am-check { position: absolute; top: 11px; right: 11px; width: 20px; height: 20px; border-radius: 50%; border: 1px solid #d7d8df; background: rgba(255,255,255,.96); display: flex; align-items: center; justify-content: center; color: transparent; }
-        .am-check.selected { background: #111111; border-color: #111111; color: #fff; }
-        .am-upload { display: inline-flex; align-items: center; justify-content: center; gap: 7px; min-height: 39px; margin-top: 9px; border: 1px dashed #d4d5dc; border-radius: 10px; background: #fff; color: #f0523f; font-size: 11.5px; font-weight: 750; cursor: pointer; }
-        .am-upload:hover { background: #fff8f6; border-color: #BDBDBD; }
-        .am-upload input { display: none; }
-        .am-selection-note { margin: 8px 0 0; color: #7e8088; font-size: 10.5px; }
-        .am-empty-work { padding: 12px; border: 1px dashed #dcdde3; border-radius: 11px; color: #7c7e86; font-size: 11px; line-height: 1.5; background: #fbfbfc; }
-        .am-error { display: flex; align-items: flex-start; gap: 8px; padding: 10px 11px; border-radius: 10px; border: 1px solid #f1ceca; background: #F5F5F5; color: #c9473f; font-size: 11.5px; line-height: 1.45; }
-        .am-footer { display: grid; grid-template-columns: 1fr 1.5fr; gap: 9px; padding-top: 3px; }
-        .am-btn { min-height: 42px; border-radius: 10px; display: inline-flex; align-items: center; justify-content: center; gap: 7px; font-size: 12px; font-weight: 750; cursor: pointer; }
-        .am-btn-cancel { border: 1px solid #dedfe5; background: #fff; color: #4b4d56; }
-        .am-btn-cancel:hover { background: #F7F7F7; }
-        .am-btn-submit { border: 1px solid #111111; background: #111111; color: #fff; box-shadow: 0 8px 18px rgba(17,17,17,.16); }
-        .am-btn-submit:hover:not(:disabled) { background: #f0523f; border-color: #f0523f; }
-        .am-btn:disabled { opacity: .62; cursor: not-allowed; box-shadow: none; }
-        .am-spin { animation: am-spin .8s linear infinite; }
-        @keyframes am-spin { to { transform: rotate(360deg); } }
-        @media (max-width: 560px) {
-          .am-overlay { padding: 0; align-items: flex-end; }
-          .am-modal { max-height: 94vh; border-radius: 20px 20px 0 0; }
-          .am-top, .am-body { padding-left: 17px; padding-right: 17px; }
-          .am-portfolio-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-        }
+        .apply-overlay{position:fixed;inset:0;z-index:3000;background:rgba(15,15,18,.52);backdrop-filter:blur(5px);display:flex;align-items:center;justify-content:center;padding:18px}
+        .apply-modal{width:min(620px,100%);max-height:92vh;overflow:auto;background:#fff;border:1px solid #e7e7e7;border-radius:20px;box-shadow:0 30px 90px rgba(0,0,0,.2)}
+        .apply-head{display:flex;justify-content:space-between;gap:16px;padding:22px 24px 18px;border-bottom:1px solid #eee;position:sticky;top:0;background:rgba(255,255,255,.97);z-index:2}
+        .apply-eyebrow{font:600 10px/1.2 Poppins,sans-serif;letter-spacing:.12em;text-transform:uppercase;color:#8a8490}.apply-title{margin:5px 0 0;font:700 21px/1.15 Poppins,sans-serif;color:#111}.apply-sub{margin:5px 0 0;font:400 12px/1.5 Poppins,sans-serif;color:#777}
+        .apply-close{width:34px;height:34px;border:1px solid #e5e5e5;border-radius:50%;background:#fff;display:flex;align-items:center;justify-content:center;cursor:pointer}
+        .apply-body{padding:22px 24px 24px}.apply-section{margin-bottom:22px}.apply-section-title{font:700 13px Poppins,sans-serif;color:#171717;margin-bottom:9px}.apply-help{font:400 11.5px/1.55 Poppins,sans-serif;color:#85818c;margin:0 0 10px}
+        .apply-questions{display:flex;flex-direction:column;gap:14px}.apply-label{font:600 12px Poppins,sans-serif;color:#222;display:block;margin-bottom:6px}.apply-label b{color:#111}.apply-textarea{width:100%;min-height:88px;border:1px solid #ddd;border-radius:10px;padding:10px 11px;resize:vertical;outline:none;font:400 12.5px/1.5 Poppins,sans-serif}.apply-textarea:focus{border-color:#111}
+        .apply-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:9px}.apply-work{position:relative;border:1px solid #e2e2e2;border-radius:10px;overflow:hidden;background:#fafafa;cursor:pointer}.apply-work.selected{border:2px solid #111}.apply-work img{display:block;width:100%;aspect-ratio:1;object-fit:cover}.apply-work-name{font:500 9.5px Poppins,sans-serif;padding:6px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.apply-check{position:absolute;right:6px;top:6px;width:22px;height:22px;border-radius:50%;background:#111;color:#fff;display:flex;align-items:center;justify-content:center}
+        .apply-upload{border:1px dashed #cfcfcf;border-radius:10px;min-height:90px;display:flex;align-items:center;justify-content:center;gap:8px;cursor:pointer;font:600 11px Poppins,sans-serif;color:#555;margin-top:10px}.apply-upload:hover{border-color:#111;color:#111}.apply-upload input{display:none}
+        .apply-error{padding:10px 12px;border-radius:9px;background:#f7eeee;color:#b12828;font:500 11.5px/1.45 Poppins,sans-serif;margin-bottom:14px}.apply-actions{display:flex;justify-content:flex-end;gap:9px;border-top:1px solid #eee;padding-top:17px}.apply-cancel,.apply-submit{height:40px;padding:0 16px;border-radius:9px;font:600 12px Poppins,sans-serif;cursor:pointer}.apply-cancel{background:#fff;border:1px solid #ddd;color:#555}.apply-submit{background:#111;border:1px solid #111;color:#fff;display:flex;align-items:center;gap:7px}.apply-submit:disabled{opacity:.55;cursor:not-allowed}
+        .apply-success{text-align:center;padding:48px 30px 42px}.apply-success-icon{width:58px;height:58px;margin:0 auto 16px;border-radius:50%;background:#111;color:#fff;display:flex;align-items:center;justify-content:center}.apply-success h2{font:700 22px Poppins,sans-serif;margin:0 0 8px;color:#111}.apply-success p{max-width:400px;margin:0 auto;font:400 13px/1.65 Poppins,sans-serif;color:#777}.apply-success button{margin-top:24px;height:40px;padding:0 20px;border:0;border-radius:9px;background:#111;color:#fff;font:600 12px Poppins,sans-serif;cursor:pointer}
+        @media(max-width:560px){.apply-grid{grid-template-columns:repeat(2,1fr)}.apply-head,.apply-body{padding-left:17px;padding-right:17px}}
       `}</style>
 
-      <div className="am-modal" role="dialog" aria-modal="true" aria-labelledby="am-title">
-        <div className="am-top">
-          <div>
-            <h2 id="am-title" className="am-title">Apply to this campaign</h2>
-            <p className="am-subtitle">Complete the questions below. Nothing is submitted until you press “Submit application”.</p>
+      <div className="apply-modal">
+        {success ? (
+          <div className="apply-success">
+            <div className="apply-success-icon"><Check size={28}/></div>
+            <h2>Application sent!</h2>
+            <p>Your application has been sent to the brand. We’ll notify you when the brand makes a decision.</p>
+            <button type="button" onClick={onClose}>Done</button>
           </div>
-          <button type="button" className="am-close" onClick={handleClose} aria-label="Close application form">
-            <X size={18} />
-          </button>
-        </div>
-
-        <div className="am-body">
-          <div className="am-campaign">
-            {campaign.hero_image ? (
-              <img className="am-campaign-image" src={mediaUrl(campaign.hero_image)} alt="" />
-            ) : (
-              <div className="am-campaign-image" aria-hidden="true" />
-            )}
-            <div className="am-campaign-copy">
-              <p className="am-campaign-title">{campaign.title}</p>
-              <p className="am-campaign-meta">
-                {campaign.brand_name || 'Brand'} · {campaign.category}
-                {campaign.campaign_type === 'paid' && campaign.budget != null ? ` · NPR ${Number(campaign.budget).toLocaleString()}` : ''}
-              </p>
+        ) : (
+          <>
+            <div className="apply-head">
+              <div>
+                <div className="apply-eyebrow">Apply to campaign</div>
+                <h2 className="apply-title">{campaign.title}</h2>
+                <p className="apply-sub">Answer the questions and send one relevant piece of your work.</p>
+              </div>
+              <button className="apply-close" type="button" onClick={onClose} disabled={submitting}><X size={17}/></button>
             </div>
-          </div>
 
-          <div className="am-profile">
-            <div className="am-profile-avatar">
-              {profileImage ? <img src={profileImage} alt="Your profile" /> : (profileName[0] || '?').toUpperCase()}
-            </div>
-            <div>
-              <div className="am-profile-label">Your profile will be included with this application</div>
-              <div className="am-profile-name">{profileName}</div>
-            </div>
-          </div>
-
-          <form className="am-form" onSubmit={handleSubmit}>
-            {error && (
-              <div className="am-error" role="alert">
-                <AlertCircle size={15} />
-                <span>{error}</span>
-              </div>
-            )}
-
-            <section className="am-section">
-              <div className="am-section-heading">
-                <h3 className="am-section-title">Why are you a good fit?</h3>
-                <span className="am-section-help">Required</span>
-              </div>
-              <div className="am-field">
-                <textarea
-                  className="am-textarea"
-                  value={proposal}
-                  onChange={(event) => setProposal(event.target.value)}
-                  placeholder="Tell the brand what makes you a strong fit and how you would approach the content."
-                  required
-                />
-              </div>
-            </section>
-
-            {questions.length > 0 && (
-              <section className="am-section">
-                <div className="am-section-heading">
-                  <h3 className="am-section-title">Campaign questions</h3>
-                  <span className="am-section-help">Answer every question</span>
-                </div>
-                {questions.map((question, index) => (
-                  <div className="am-question" key={`${question}-${index}`}>
-                    <div className="am-question-number">Question {index + 1}</div>
-                    <p className="am-question-text">{question}</p>
-                    <textarea
-                      className="am-textarea"
-                      value={answers[index] || ''}
-                      onChange={(event) => setAnswers((current) => ({ ...current, [index]: event.target.value }))}
-                      placeholder="Write your answer..."
-                      required
-                    />
-                  </div>
-                ))}
-              </section>
-            )}
-
-            <section className="am-section">
-              <div className="am-section-heading">
-                <h3 className="am-section-title">Relevant work</h3>
-                <span className="am-section-help">At least one required</span>
-              </div>
-
-              {profileLoading ? (
-                <div className="am-hint">Loading your portfolio…</div>
-              ) : portfolio.length > 0 ? (
-                <>
-                  <div className="am-portfolio-grid">
-                    {portfolio.map((item, index) => {
-                      const selected = selectedPortfolio.includes(index);
-                      const image = mediaUrl(item.media_url);
-                      return (
-                        <button
-                          key={`${item.media_url}-${index}`}
-                          type="button"
-                          className={`am-portfolio-card${selected ? ' selected' : ''}`}
-                          onClick={() => togglePortfolio(index)}
-                          aria-pressed={selected}
-                        >
-                          <span className={`am-check${selected ? ' selected' : ''}`} aria-hidden="true">
-                            {selected && <Check size={13} strokeWidth={3} />}
-                          </span>
-                          <img className="am-portfolio-media" src={image} alt={item.title || `Work sample ${index + 1}`} />
-                          <span className="am-portfolio-name">{item.title || `Work sample ${index + 1}`}</span>
+            <div className="apply-body">
+              {loading ? <div style={{padding:'35px 0',textAlign:'center'}}><Loader2 className="spin" size={20}/></div> : <>
+                <section className="apply-section">
+                  <div className="apply-section-title">1. Your work image *</div>
+                  <p className="apply-help">Choose one image that best represents work relevant to this campaign.</p>
+                  {portfolio.length > 0 && (
+                    <div className="apply-grid">
+                      {portfolio.map((item, index) => (
+                        <button type="button" key={`${item.media_url}-${index}`} className={`apply-work ${selected === index ? 'selected' : ''}`} onClick={() => setSelected(index)}>
+                          <img src={mediaUrl(item.media_url)} alt={item.title || 'Work sample'} />
+                          {selected === index && <span className="apply-check"><Check size={13}/></span>}
+                          <div className="apply-work-name">{item.title || 'Work sample'}</div>
                         </button>
-                      );
-                    })}
+                      ))}
+                    </div>
+                  )}
+                  <label className="apply-upload">
+                    <input type="file" accept="image/*" onChange={(e) => { const file = e.target.files?.[0]; if (file) void uploadWork(file); e.currentTarget.value = ''; }} />
+                    {uploading ? <Loader2 size={16} className="spin"/> : <ImagePlus size={17}/>} Upload a work image
+                  </label>
+                </section>
+
+                {questions.length > 0 && <section className="apply-section">
+                  <div className="apply-section-title">2. Screening questions *</div>
+                  <div className="apply-questions">
+                    {questions.map((question, index) => (
+                      <label key={`${question}-${index}`}>
+                        <span className="apply-label">{question} <b>*</b></span>
+                        <textarea className="apply-textarea" value={answers[index] || ''} onChange={(e) => setAnswers((current) => ({...current, [index]: e.target.value}))} placeholder="Your answer..." />
+                      </label>
+                    ))}
                   </div>
-                  <p className="am-selection-note">{selectedCount} work sample{selectedCount === 1 ? '' : 's'} selected. Selected samples will be shown to the brand.</p>
-                </>
-              ) : (
-                <div className="am-empty-work">You do not have a portfolio sample saved yet. Upload a work image below and it will be added to this application automatically.</div>
-              )}
+                </section>}
 
-              <label className="am-upload">
-                <ImagePlus size={15} />
-                {uploadingWork ? 'Uploading…' : 'Upload another work sample'}
-                <input
-                  type="file"
-                  accept="image/*"
-                  disabled={uploadingWork}
-                  onChange={async (event) => {
-                    const file = event.target.files?.[0];
-                    event.target.value = '';
-                    if (!file) return;
-                    await handleWorkUpload(file);
-                  }}
-                />
-              </label>
-            </section>
-
-            <section className="am-section">
-              <div className="am-section-heading">
-                <h3 className="am-section-title">Message to the brand</h3>
-                <span className="am-section-help">Optional</span>
-              </div>
-              <textarea
-                className="am-textarea"
-                style={{ minHeight: 72 }}
-                value={message}
-                onChange={(event) => setMessage(event.target.value)}
-                placeholder="Anything else the brand should know?"
-              />
-            </section>
-
-            <div className="am-footer">
-              <button type="button" className="am-btn am-btn-cancel" onClick={handleClose} disabled={submitting}>
-                Cancel
-              </button>
-              <button type="submit" className="am-btn am-btn-submit" disabled={submitting || profileLoading}>
-                {submitting ? <Loader2 size={16} className="am-spin" /> : <Send size={16} />}
-                {submitting ? 'Submitting application…' : 'Submit application'}
-              </button>
+                {error && <div className="apply-error">{error}</div>}
+                <div className="apply-actions">
+                  <button type="button" className="apply-cancel" onClick={onClose} disabled={submitting}>Cancel</button>
+                  <button type="button" className="apply-submit" onClick={() => void submit()} disabled={submitting || uploading}>
+                    {submitting ? <Loader2 size={15} className="spin"/> : <Upload size={15}/>} {submitting ? 'Sending...' : 'Send application'}
+                  </button>
+                </div>
+              </>}
             </div>
-          </form>
-        </div>
+          </>
+        )}
       </div>
     </div>
   );

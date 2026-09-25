@@ -47,9 +47,14 @@ export function Login() {
         password,
       });
 
-      // Both roles use /dashboard. Dashboard reads user.role and renders
-      // the correct creator or brand dashboard.
-      navigate("/dashboard", { replace: true });
+      const current = JSON.parse(localStorage.getItem('user') || '{}');
+      if (current.role === 'admin') {
+        navigate('/admin', { replace: true });
+      } else if (current.role === 'business') {
+        navigate('/dashboard', { replace: true });
+      } else {
+        navigate('/', { replace: true });
+      }
     } catch (err: any) {
       setError(
         err?.response?.data?.detail ||

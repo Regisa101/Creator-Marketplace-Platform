@@ -1,507 +1,180 @@
-import { useEffect, useMemo, useState } from 'react';
-import { Link } from 'react-router-dom';
-import { Check, X, Loader2 } from 'lucide-react';
-import { getApplications, updateApplicationStatus, type Application, type ApplicationStatus } from '../api/client';
-import { useAuth } from '../context/AuthContext';
+import { useEffect, useState } from 'react';
+import { Check, Loader2, X, ExternalLink, CreditCard } from 'lucide-react';
+import { Link, useSearchParams } from 'react-router-dom';
+import { getApplications, selectApplication, updateApplicationStatus, type Application, type SelectionPaymentStart } from '../api/client';
 import { AppLayout } from '../components/AppLayout';
+import { useAuth } from '../context/AuthContext';
 
-const C = {
-  surface: '#FFFFFF',
-  card: '#FFFFFF',
-  ink: '#181818',
-  inkSoft: '#6B6478',
-  inkFaint: '#A39DB8',
-  line: '#E8E8E8',
-  navy: '#111111',
-  navySoft: '#F3F3F3',
-  coral: '#111111',
-  coralSoft: '#F5F5F5',
-};
-
-const TABS: { key: ApplicationStatus | 'all'; label: string }[] = [
-  { key: 'all', label: 'All' },
-  { key: 'pending', label: 'Pending' },
-  { key: 'accepted', label: 'Accepted' },
-  { key: 'rejected', label: 'Rejected' },
-];
-
-type SortKey = 'match' | 'recent';
+function mediaUrl(value?: string | null) {
+  if (!value) return '';
+  if (/^(https?:)?\/\//i.test(value) || value.startsWith('data:') || value.startsWith('blob:')) return value;
+  if (value.startsWith('/api/')) return `http://localhost:8000${value}`;
+  return `http://localhost:8000/${value.replace(/^\/+/, '')}`;
+}
 
 export function ApplicationsInbox() {
   const { user } = useAuth();
+  const [params] = useSearchParams();
+  const campaignFilter = Number(params.get('campaign')) || undefined;
   const isBusiness = user?.role === 'business';
-  const primary = isBusiness ? C.navy : C.coral;
-
   const [applications, setApplications] = useState<Application[]>([]);
   const [loading, setLoading] = useState(true);
+  const [busy, setBusy] = useState<number | null>(null);
   const [error, setError] = useState('');
-  const [search, setSearch] = useState('');
-  const [activeTab, setActiveTab] = useState<ApplicationStatus | 'all'>('pending');
-  const [sortBy, setSortBy] = useState<SortKey>('match');
-  const [campaignFilter, setCampaignFilter] = useState<number | 'all'>('all');
-  const [actingOn, setActingOn] = useState<number | null>(null);
-  const [actionError, setActionError] = useState<{ id: number; message: string } | null>(null);
-  const [matchDetailApp, setMatchDetailApp] = useState<Application | null>(null);
+  const [paymentPreview, setPaymentPreview] = useState<SelectionPaymentStart | null>(null);
+  const [paymentApplication, setPaymentApplication] = useState<Application | null>(null);
 
-  const load = async (opts?: { silent?: boolean }) => {
-    const silent = !!opts?.silent;
-    if (!silent) setLoading(true);
-    if (!silent) setError('');
+  const load = async () => {
+    setLoading(true);
+    setError('');
     try {
-      const data = await getApplications();
-      setApplications(data);
-    } catch (err) {
-      console.error('Could not load applications:', err);
-      if (!silent) setError('Could not load applications. Please try again.');
-    } finally {
-      if (!silent) setLoading(false);
-    }
-  };
-
-  useEffect(() => {
-    load();
-
-    // Keep the brand inbox fresh while it is open. A creator's application
-    // should appear as soon as it reaches the backend; it must not wait for
-    // another creator to apply or for the brand to navigate away and back.
-    // The refresh is silent (no spinner/flash) and pauses while a modal is
-    // open so it never interrupts something the user is in the middle of.
-    if (!isBusiness) return;
-    const timer = window.setInterval(() => {
-      if (document.visibilityState === 'visible' && !matchDetailApp) {
-        load({ silent: true });
-      }
-    }, 15000);
-    return () => window.clearInterval(timer);
-  }, [isBusiness, matchDetailApp]);
-
-  // Every distinct campaign the business has applications for. Used to power
-  // the "which campaign" filter so a brand running several campaigns at once
-  // can jump straight to one instead of scanning every grouped section.
-  const campaignOptions = useMemo(() => {
-    const map = new Map<number, string>();
-    for (const a of applications) {
-      if (!map.has(a.campaign_id)) {
-        map.set(a.campaign_id, a.campaign_title || `Campaign #${a.campaign_id}`);
-      }
-    }
-    return Array.from(map.entries()).map(([id, title]) => ({ id, title }));
-  }, [applications]);
-
-  // If the currently selected campaign disappears from the list (e.g. all its
-  // applications got filtered out elsewhere), fall back to "All campaigns".
-  useEffect(() => {
-    if (campaignFilter !== 'all' && !campaignOptions.some((c) => c.id === campaignFilter)) {
-      setCampaignFilter('all');
-    }
-  }, [campaignOptions, campaignFilter]);
-
-  // Tab filter, then campaign filter, then free-text search over campaign
-  // title / creator name (the search box lives in AppLayout's topbar, so it
-  // needs to reach in here).
-  const tabFiltered = useMemo(() => {
-    let list = activeTab === 'all' ? applications : applications.filter((a) => a.status === activeTab);
-    if (campaignFilter !== 'all') list = list.filter((a) => a.campaign_id === campaignFilter);
-    return list;
-  }, [applications, activeTab, campaignFilter]);
-
-  const filtered = useMemo(() => {
-    const q = search.trim().toLowerCase();
-    if (!q) return tabFiltered;
-    return tabFiltered.filter((a) => {
-      const campaignTitle = (a.campaign_title || '').toLowerCase();
-      const creatorName = (a.creator_name || '').toLowerCase();
-      return campaignTitle.includes(q) || creatorName.includes(q);
-    });
-  }, [tabFiltered, search]);
-
-  // Group by campaign so a business managing several campaigns doesn't
-  // get one long undifferentiated list — each campaign gets its own section.
-  const grouped = useMemo(() => {
-    const map = new Map<number, { campaignId: number; campaignTitle: string; items: Application[] }>();
-    for (const app of filtered) {
-      const key = app.campaign_id;
-      if (!map.has(key)) {
-        map.set(key, { campaignId: key, campaignTitle: app.campaign_title || `Campaign #${key}`, items: [] });
-      }
-      map.get(key)!.items.push(app);
-    }
-    return Array.from(map.values()).map((group) => ({
-      ...group,
-      items: [...group.items].sort((a, b) => {
-        if (sortBy === 'recent') {
-          return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
-        }
-        return (b.match_score ?? -1) - (a.match_score ?? -1);
-      }),
-    }));
-  }, [filtered, sortBy]);
-
-  const handleAction = async (app: Application, status: 'accepted' | 'rejected') => {
-    setActingOn(app.id);
-    setActionError(null);
-    try {
-      const updated = await updateApplicationStatus(app.id, status);
-      setApplications((prev) => prev.map((a) => (a.id === updated.id ? updated : a)));
+      setApplications(await getApplications(campaignFilter ? { campaign_id: campaignFilter } : undefined));
     } catch (err: any) {
-      console.error('Could not update application:', err);
-      setActionError({
-        id: app.id,
-        message: err?.response?.data?.detail || 'Could not update this application.',
-      });
+      setError(err?.response?.data?.detail || 'Could not load applications.');
     } finally {
-      setActingOn(null);
+      setLoading(false);
     }
   };
 
-  const counts = useMemo(() => {
-    const c: Record<string, number> = { all: applications.length, pending: 0, accepted: 0, rejected: 0, withdrawn: 0 };
-    for (const a of applications) c[a.status] = (c[a.status] || 0) + 1;
-    return c;
-  }, [applications]);
+  useEffect(() => { void load(); }, [campaignFilter]);
+
+  useEffect(() => {
+    if (!isBusiness) return;
+    const timer = window.setInterval(() => { if (document.visibilityState === 'visible') void load(); }, 12000);
+    return () => window.clearInterval(timer);
+  }, [isBusiness, campaignFilter]);
+
+  const reject = async (app: Application) => {
+    setBusy(app.id);
+    try {
+      const updated = await updateApplicationStatus(app.id, 'rejected');
+      setApplications((items) => items.map((item) => item.id === updated.id ? updated : item));
+    } catch (err: any) {
+      setError(err?.response?.data?.detail || 'Could not reject this application.');
+    } finally { setBusy(null); }
+  };
+
+  const select = async (app: Application) => {
+    setBusy(app.id);
+    setError('');
+    try {
+      const result = await selectApplication(app.id);
+      setPaymentApplication(app);
+      setPaymentPreview(result);
+    } catch (err: any) {
+      setError(err?.response?.data?.detail || 'Could not start the payment.');
+    } finally {
+      setBusy(null);
+    }
+  };
+
+  const continueToKhalti = () => {
+    if (!paymentPreview?.payment_url) return;
+    window.location.assign(paymentPreview.payment_url);
+  };
+
+  const closePaymentPreview = () => {
+    setPaymentPreview(null);
+    setPaymentApplication(null);
+  };
 
   return (
     <AppLayout
-      title={isBusiness ? 'Applications' : 'My Applications'}
-      subtitle={
-        isBusiness
-          ? "Review and respond to creators who've applied to your campaigns."
-          : "Track the status of campaigns you've applied to."
-      }
-      searchValue={search}
-      onSearchChange={setSearch}
-      searchPlaceholder={isBusiness ? 'Search by creator or campaign…' : 'Search your applications…'}
-      actionLabel={isBusiness ? 'New Campaign' : undefined}
-      actionTo={isBusiness ? '/campaigns/new' : undefined}
+      title="Applications"
+      subtitle="Review creator profiles, answers and one work sample, then select one creator."
+      showSearch={false}
+      showNotifications
+      actionLabel="New Campaign"
+      actionTo="/campaigns/new"
     >
       <style>{`
-        .ai-content {
-          padding: 28px 24px 40px;
-          max-width: 900px;
-          margin: 0 auto;
-        }
-
-        .ai-tabs { display: flex; gap: 10px; margin-bottom: 26px; flex-wrap: wrap; align-items: center; justify-content: space-between; }
-        .ai-tabs-left { display: flex; gap: 10px; flex-wrap: wrap; }
-        .ai-tabs-right { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
-        .ai-tab {
-          font-size: 14.5px;
-          font-weight: 600;
-          padding: 12px 24px;
-          border-radius: 999px;
-          border: 1px solid ${C.line};
-          background: ${C.card};
-          color: ${C.inkSoft};
-          cursor: pointer;
-        }
-        .ai-tab--active { background: ${primary}; border-color: ${primary}; color: #fff; }
-
-        .ai-sort-select {
-          font-size: 13px;
-          font-weight: 600;
-          color: ${C.ink};
-          background: ${C.card};
-          border: 1px solid ${C.line};
-          border-radius: 10px;
-          padding: 10px 14px;
-          cursor: pointer;
-          outline: none;
-        }
-
-        .ai-group { margin-bottom: 28px; }
-        .ai-group-title {
-          font-size: 14px;
-          font-weight: 700;
-          margin-bottom: 12px;
-          padding-bottom: 8px;
-          border-bottom: 1px solid ${C.line};
-          color: ${C.ink};
-        }
-        .ai-group-title a { color: inherit; text-decoration: none; }
-        .ai-group-title a:hover { text-decoration: underline; }
-
-        .ai-card {
-          background: ${C.card};
-          border: 1px solid ${C.line};
-          border-radius: 14px;
-          padding: 18px 20px;
-          margin-bottom: 12px;
-        }
-        .ai-card-top { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; margin-bottom: 10px; }
-        .ai-applicant { display: flex; align-items: center; gap: 10px; text-decoration: none; color: inherit; }
-        .ai-applicant:hover .ai-applicant-name { text-decoration: underline; }
-        .ai-avatar {
-          width: 38px; height: 38px; border-radius: 50%;
-          background: ${primary}; color: #fff;
-          display: flex; align-items: center; justify-content: center;
-          font-weight: 700; font-size: 15px; flex-shrink: 0;
-          object-fit: cover;
-        }
-        .ai-applicant-name { font-size: 14px; font-weight: 600; color: ${C.ink}; }
-        .ai-applicant-date { font-size: 12px; color: ${C.inkSoft}; }
-
-        .ai-status-pill {
-          font-size: 11px;
-          font-weight: 700;
-          padding: 5px 12px;
-          border-radius: 999px;
-          text-transform: capitalize;
-          flex-shrink: 0;
-        }
-        .ai-status-pill--pending { background: #fff4de; color: #9a6b00; }
-        .ai-status-pill--accepted { background: #F5F5F5; color: #1a8a4a; }
-        .ai-status-pill--rejected { background: #fdecec; color: #d64545; }
-        .ai-status-pill--withdrawn { background: #F1F1F1; color: ${C.inkSoft}; }
-
-        .ai-proposal { font-size: 13.5px; color: #3d3d42; line-height: 1.65; margin-bottom: 10px; white-space: pre-wrap; }
-        .ai-rate { display: inline-flex; align-items: center; gap: 5px; font-size: 12.5px; font-weight: 600; color: ${C.navy}; margin-bottom: 10px; }
-        .ai-message { font-size: 12.5px; color: ${C.inkSoft}; background: ${C.surface}; border-radius: 8px; padding: 10px 12px; margin-bottom: 12px; }
-
-        .ai-actions { display: flex; gap: 8px; }
-        .ai-accept, .ai-reject {
-          display: inline-flex;
-          align-items: center;
-          gap: 6px;
-          font-size: 13px;
-          font-weight: 600;
-          border-radius: 8px;
-          padding: 8px 16px;
-          cursor: pointer;
-          border: none;
-        }
-        .ai-accept { background: #1a8a4a; color: #fff; }
-        .ai-reject { background: #fdecec; color: #d64545; }
-        .ai-accept:disabled, .ai-reject:disabled { opacity: 0.6; cursor: not-allowed; }
-        .ai-action-error { font-size: 12px; color: #d64545; margin-top: 8px; }
-
-        .ai-match { display:flex; align-items:center; gap:10px; margin-bottom:10px; }
-        .ai-match-score {
-          font-size:13px; font-weight:800; color:#16834A; background:#F5F5F5;
-          border-radius:999px; padding:5px 10px; border: none; cursor: pointer;
-        }
-        .ai-match-score:hover { background:#DEF3E6; }
-        .ai-match-label { font-size:11.5px; font-weight:700; color:${C.inkSoft}; }
-        .ai-match-breakdown { display:flex; flex-wrap:wrap; gap:6px; margin:8px 0 11px; }
-        .ai-match-chip { font-size:10.5px; color:${C.inkSoft}; background:${C.surface}; border:1px solid ${C.line}; border-radius:999px; padding:4px 8px; }
-        .ai-match-chip--good { color:#16834A; background:#F0FAF4; border-color:#CDEEDB; }
-        .ai-why { font-size:11.5px; color:${C.inkSoft}; line-height:1.5; background:#FAFAFA; border-radius:8px; padding:8px 10px; margin-bottom:11px; }
-
-        .ai-select { display:inline-flex;align-items:center;gap:6px;font-size:13px;font-weight:700;border:0;background:#1a8a4a;color:#fff;border-radius:8px;padding:8px 14px;cursor:pointer; }
-        .ai-select:disabled { opacity:.55;cursor:not-allowed; }
-        .ai-neg-summary { margin:10px 0 12px;padding:10px 12px;border:1px solid ${C.line};border-radius:10px;background:#FAFAFA;font-size:12px;color:${C.inkSoft}; }
-        .ai-modal-backdrop { position:fixed;inset:0;background:rgba(26,22,37,.48);z-index:120;display:flex;align-items:center;justify-content:center;padding:20px; }
-        .ai-modal { width:100%;max-width:560px;background:#fff;border-radius:16px;padding:22px;box-shadow:0 20px 60px rgba(0,0,0,.18); }
-        .ai-modal-head { display:flex;justify-content:space-between;align-items:flex-start;gap:12px;margin-bottom:14px; }
-        .ai-modal-title { font-size:17px;font-weight:800;color:${C.ink}; }
-        .ai-modal-sub { font-size:11.5px;color:${C.inkSoft};margin-top:3px; }
-        .ai-offers { max-height:280px;overflow:auto;border:1px solid ${C.line};border-radius:10px;padding:10px;margin-bottom:12px; }
-        .ai-offer { padding:10px 4px;border-bottom:1px solid ${C.line}; }
-        .ai-offer:last-child { border-bottom:0; }
-        .ai-offer-row { display:flex;justify-content:space-between;gap:8px;align-items:center; }
-        .ai-offer-amount { font-size:14px;font-weight:800;color:${C.navy}; }
-        .ai-offer-meta { font-size:10.5px;color:${C.inkSoft}; }
-        .ai-offer-message { font-size:11.5px;color:#3d3d42;margin-top:5px;white-space:pre-wrap; }
-        .ai-offer-actions { display:flex;gap:6px;margin-top:8px; }
-        .ai-modal-input { width:100%;height:40px;border:1px solid ${C.line};border-radius:8px;padding:0 10px;font-size:12px;outline:none;box-sizing:border-box; }
-        .ai-modal-textarea { width:100%;min-height:70px;border:1px solid ${C.line};border-radius:8px;padding:9px 10px;font-size:12px;resize:vertical;box-sizing:border-box; }
-        .ai-modal-label { display:block;font-size:11.5px;font-weight:700;color:${C.ink};margin:9px 0 5px; }
-        .ai-modal-footer { display:flex;justify-content:flex-end;gap:8px;margin-top:12px; }
-        .ai-close { border:1px solid ${C.line};background:#fff;color:${C.inkSoft};border-radius:8px;padding:8px 13px;cursor:pointer;font-size:12px;font-weight:700; }
-        .ai-send { border:0;background:${C.navy};color:#fff;border-radius:8px;padding:8px 14px;cursor:pointer;font-size:12px;font-weight:700; }
-        .ai-send:disabled { opacity:.55;cursor:not-allowed; }
-        .ai-neg-error { margin:8px 0;padding:9px 10px;border-radius:8px;background:#fdecec;color:#d64545;font-size:11.5px; }
-        .ai-state { text-align: center; padding: 60px 20px; color: ${C.inkSoft}; font-size: 13px; }
-        .ai-spin { animation: ai-spin 0.8s linear infinite; }
-        @keyframes ai-spin { to { transform: rotate(360deg); } }
+        .ab-wrap{max-width:1040px;margin:0 auto;padding-bottom:50px}.ab-note{padding:11px 13px;background:#f7f7f7;border:1px solid #e5e5e5;border-radius:10px;font:500 12px/1.5 Poppins,sans-serif;color:#666;margin-bottom:16px}.ab-error{padding:11px 13px;background:#f8eeee;color:#ad2929;border-radius:9px;font:500 12px Poppins,sans-serif;margin-bottom:14px}.ab-empty{padding:60px 20px;text-align:center;color:#777;font:500 13px Poppins,sans-serif}.ab-card{background:#fff;border:1px solid #e5e5e5;border-radius:16px;padding:20px;margin-bottom:14px}.ab-top{display:flex;justify-content:space-between;gap:15px;align-items:flex-start}.ab-person{display:flex;gap:11px;align-items:center;text-decoration:none;color:#111}.ab-avatar{width:48px;height:48px;border-radius:50%;overflow:hidden;background:#111;color:#fff;display:flex;align-items:center;justify-content:center;font:700 13px Poppins,sans-serif;flex:none}.ab-avatar img{width:100%;height:100%;object-fit:cover}.ab-name{font:700 14px Poppins,sans-serif}.ab-date{font:400 11px Poppins,sans-serif;color:#888;margin-top:2px}.ab-status{font:600 10px Poppins,sans-serif;text-transform:uppercase;letter-spacing:.06em;padding:6px 9px;border-radius:99px;background:#f3f3f3;color:#555}.ab-campaign{margin-top:15px;font:700 13px Poppins,sans-serif}.ab-budget{margin-top:4px;font:600 12px Poppins,sans-serif;color:#555}.ab-grid{display:grid;grid-template-columns:minmax(0,1fr) 220px;gap:20px;margin-top:17px}.ab-heading{font:700 11px Poppins,sans-serif;color:#888;text-transform:uppercase;letter-spacing:.08em;margin-bottom:7px}.ab-answer{font:400 12px/1.55 Poppins,sans-serif;color:#444;margin-bottom:12px}.ab-work{border:1px solid #e5e5e5;border-radius:10px;overflow:hidden}.ab-work img{display:block;width:100%;aspect-ratio:1;object-fit:cover}.ab-work-title{font:600 10px Poppins,sans-serif;padding:7px;color:#555}.ab-actions{display:flex;gap:8px;margin-top:18px;border-top:1px solid #eee;padding-top:15px}.ab-select,.ab-reject{height:38px;padding:0 15px;border-radius:8px;font:600 12px Poppins,sans-serif;cursor:pointer;display:flex;align-items:center;gap:6px}.ab-select{border:0;background:#111;color:#fff}.ab-reject{border:1px solid #ddd;background:#fff;color:#555}.ab-select:disabled,.ab-reject:disabled{opacity:.5;cursor:not-allowed}.ab-spin{animation:ab-spin .8s linear infinite}@keyframes ab-spin{to{transform:rotate(360deg)}}
+        .ab-modal-backdrop{position:fixed;inset:0;z-index:10050;background:rgba(0,0,0,.42);display:flex;align-items:center;justify-content:center;padding:20px;backdrop-filter:blur(2px)}
+        .ab-payment-modal{width:min(430px,100%);background:#fff;border:1px solid #e7e7e7;border-radius:18px;box-shadow:0 24px 70px rgba(0,0,0,.22);padding:24px;position:relative}
+        .ab-payment-close{position:absolute;right:14px;top:14px;width:32px;height:32px;border:1px solid #e6e6e6;background:#fff;border-radius:50%;display:flex;align-items:center;justify-content:center;cursor:pointer;color:#555}
+        .ab-payment-icon{width:42px;height:42px;border-radius:12px;background:#111;color:#fff;display:flex;align-items:center;justify-content:center;margin-bottom:14px}
+        .ab-payment-title{font:700 18px Poppins,sans-serif;color:#111}
+        .ab-payment-sub{font:400 11px/1.5 Poppins,sans-serif;color:#777;margin-top:4px}
+        .ab-payment-box{margin-top:20px;border:1px solid #e8e8e8;border-radius:13px;overflow:hidden}
+        .ab-payment-row{display:flex;justify-content:space-between;gap:12px;padding:12px 14px;border-bottom:1px solid #eee;font:500 12px Poppins,sans-serif;color:#555}
+        .ab-payment-row:last-child{border-bottom:0}.ab-payment-row strong{color:#111}.ab-payment-total{background:#f7f7f7;font-weight:700}.ab-payment-total strong{font-size:15px}.ab-payment-standard{margin-top:12px;padding:10px 12px;border-radius:10px;background:#f7f7f7;border:1px solid #e9e9e9;font:500 10px/1.5 Poppins,sans-serif;color:#555}.ab-payment-standard strong{color:#111}
+        .ab-payment-note{margin-top:12px;font:400 10px/1.5 Poppins,sans-serif;color:#888}
+        .ab-khalti-btn{width:100%;height:44px;border:0;border-radius:10px;background:#111;color:#fff;font:700 12px Poppins,sans-serif;cursor:pointer;margin-top:17px;display:flex;align-items:center;justify-content:center;gap:8px}.ab-khalti-btn:hover{background:#222}
+        .ab-cancel-btn{width:100%;height:38px;border:1px solid #ddd;border-radius:10px;background:#fff;color:#555;font:600 11px Poppins,sans-serif;cursor:pointer;margin-top:8px}
+        @media(max-width:760px){.ab-grid{grid-template-columns:1fr}.ab-work{max-width:220px}.ab-top{flex-direction:column}}
       `}</style>
-
-      <div className="ai-content">
-        <div className="ai-tabs">
-          <div className="ai-tabs-left">
-            {TABS.map((tab) => (
-              <button
-                key={tab.key}
-                className={`ai-tab ${activeTab === tab.key ? 'ai-tab--active' : ''}`}
-                onClick={() => setActiveTab(tab.key)}
-              >
-                {tab.label} ({counts[tab.key] || 0})
-              </button>
-            ))}
-          </div>
-          {isBusiness && (
-            <div className="ai-tabs-right">
-              {campaignOptions.length > 1 && (
-                <select
-                  className="ai-sort-select"
-                  value={campaignFilter}
-                  onChange={(e) => setCampaignFilter(e.target.value === 'all' ? 'all' : Number(e.target.value))}
-                  aria-label="Filter by campaign"
-                >
-                  <option value="all">All campaigns</option>
-                  {campaignOptions.map((c) => (
-                    <option key={c.id} value={c.id}>{c.title}</option>
-                  ))}
-                </select>
-              )}
-              <select
-                className="ai-sort-select"
-                value={sortBy}
-                onChange={(e) => setSortBy(e.target.value as SortKey)}
-                aria-label="Sort applications"
-              >
-                <option value="match">Sort: Best match</option>
-                <option value="recent">Sort: Most recent</option>
-              </select>
-            </div>
-          )}
-        </div>
-
-        {loading && <div className="ai-state">Loading applications…</div>}
-        {!loading && error && <div className="ai-state">{error}</div>}
-
-        {!loading && !error && grouped.length === 0 && (
-          <div className="ai-state">
-            {search.trim()
-              ? 'No applications match your search.'
-              : `No ${activeTab !== 'all' ? activeTab : ''} applications${activeTab === 'pending' ? ' right now' : ''}.`}
-          </div>
-        )}
-
-        {!loading &&
-          !error &&
-          grouped.map((group) => (
-            <div className="ai-group" key={group.campaignId}>
-              <div className="ai-group-title">
-                <Link to={`/campaigns/${group.campaignId}`}>{group.campaignTitle}</Link>
-                {isBusiness && (
-                  <span style={{ float: 'right', fontWeight: 500, color: C.inkSoft }}>
-                    {group.items.length} application{group.items.length === 1 ? '' : 's'}
-                    {group.items[0]?.creators_needed ? ` · ${group.items[0].creators_needed} creator${group.items[0].creators_needed === 1 ? '' : 's'} needed` : ''}
-                  </span>
-                )}
+      <div className="ab-wrap">
+        <div className="ab-note">Each application contains the creator's profile photo, required answers and exactly one work image. Select a creator to review the payment breakdown and continue to Khalti. The campaign closes only after Khalti confirms payment.</div>
+        {error && <div className="ab-error">{error}</div>}
+        {loading && <div className="ab-empty">Loading applications…</div>}
+        {!loading && applications.length === 0 && <div className="ab-empty">No applications yet.</div>}
+        {!loading && applications.map((app) => {
+          const work = app.selected_portfolio?.[0] as any;
+          return (
+            <article className="ab-card" key={app.id}>
+              <div className="ab-top">
+                <Link className="ab-person" to={`/creators/${app.creator_id}`}>
+                  <div className="ab-avatar">{app.creator_avatar ? <img src={mediaUrl(app.creator_avatar)} alt=""/> : (app.creator_name || 'C').slice(0,1).toUpperCase()}</div>
+                  <div><div className="ab-name">{app.creator_name || `Creator #${app.creator_id}`}</div><div className="ab-date">Applied {new Date(app.created_at).toLocaleDateString()}</div></div>
+                  <ExternalLink size={13} color="#999"/>
+                </Link>
+                <span className="ab-status">{app.status.replace('_',' ')}</span>
               </div>
-
-              {group.items.map((app) => (
-                <div className="ai-card" key={app.id}>
-                  <div className="ai-card-top">
-                    {isBusiness ? (
-                      <Link to={`/creators/${app.creator_id}`} className="ai-applicant">
-                        {app.creator_avatar ? (
-                          <img className="ai-avatar" src={app.creator_avatar} alt={app.creator_name || 'Creator'} />
-                        ) : (
-                          <div className="ai-avatar">{(app.creator_name || 'C')[0].toUpperCase()}</div>
-                        )}
-                        <div>
-                          <div className="ai-applicant-name">{app.creator_name || `Creator #${app.creator_id}`}</div>
-                          <div className="ai-applicant-date">
-                            Applied {new Date(app.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
-                          </div>
-                        </div>
-                      </Link>
-                    ) : (
-                      <div className="ai-applicant-date">
-                        Applied {new Date(app.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
-                      </div>
-                    )}
-                    <span className={`ai-status-pill ai-status-pill--${app.status}`}>{app.status}</span>
-                  </div>
-
-                  {isBusiness && app.match_score != null && (
-                    <div className="ai-match">
-                      <button
-                        type="button"
-                        className="ai-match-score"
-                        onClick={() => setMatchDetailApp(app)}
-                      >
-                        {app.match_score}% matching
-                      </button>
-                      <span className="ai-match-label">{app.match_score >= 90 ? 'Recommended creator' : app.match_score >= 75 ? 'Good Match' : 'Other Applicant'}</span>
-                    </div>
-                  )}
-
-                  <div className="ai-proposal">{app.proposal}</div>
-
-                  {isBusiness && (app.completed_collaborations ?? 0) > 0 && (
-                    <div style={{fontSize:11.5,color:C.inkSoft,marginTop:7}}>{app.completed_collaborations} completed collaboration{app.completed_collaborations === 1 ? '' : 's'} · <Link to={`/creators/${app.creator_id}`} style={{color:C.navy,fontWeight:700}}>View profile & history</Link></div>
-                  )}
-
-                  {isBusiness && app.selected_portfolio && app.selected_portfolio.length > 0 && (
-                    <div style={{marginTop:10}}>
-                      <div style={{fontSize:11,fontWeight:700,color:C.inkSoft,marginBottom:6}}>Selected work</div>
-                      <div style={{display:'grid',gridTemplateColumns:'repeat(4,1fr)',gap:6}}>
-                        {app.selected_portfolio.slice(0,4).map((item:any,i:number)=><div key={i} style={{border:'1px solid #E8E8E8',borderRadius:8,overflow:'hidden'}}>{item.media_url && <img src={item.media_url} alt={item.title || 'Work'} style={{width:'100%',aspectRatio:1,objectFit:'cover',display:'block'}} />}<div style={{fontSize:9,padding:'4px 5px',whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{item.title}</div></div>)}
-                      </div>
-                    </div>
-                  )}
-
-                  {isBusiness && app.application_answers && app.application_answers.length > 0 && (
-                    <div style={{marginTop:10,fontSize:11.5}}>
-                      {app.application_answers.map((a:any,i:number)=><div key={i} style={{marginBottom:6}}><strong>{a.question}</strong><div style={{color:C.inkSoft,marginTop:2}}>{a.answer}</div></div>)}
-                    </div>
-                  )}
-
-                  {app.campaign_type === 'paid' && app.campaign_budget != null && (
-                    <div className="ai-rate">Fixed compensation · Rs. {app.campaign_budget.toLocaleString()}</div>
-                  )}
-
-                  {app.message && <div className="ai-message">{app.message}</div>}
-
-                  {app.status === 'pending' && (
-                    <div className="ai-actions">
-                      {isBusiness && (
-                        <button
-                          className="ai-select"
-                          disabled={actingOn === app.id}
-                          onClick={() => handleAction(app, 'accepted')}
-                        >
-                          {actingOn === app.id ? <Loader2 size={14} className="ai-spin" /> : <Check size={14} />}
-                          Select creator
-                        </button>
-                      )}
-                      {isBusiness && (
-                        <button className="ai-reject" disabled={actingOn === app.id} onClick={() => handleAction(app, 'rejected')}>
-                          <X size={14} /> Reject
-                        </button>
-                      )}
-                    </div>
-                  )}
-
-                  {actionError?.id === app.id && <div className="ai-action-error">{actionError.message}</div>}
+              <div className="ab-campaign">{app.campaign_title || `Campaign #${app.campaign_id}`}</div>
+              {app.campaign_budget != null && <div className="ab-budget">Campaign amount: NPR {Number(app.campaign_budget).toLocaleString()}</div>}
+              <div className="ab-grid">
+                <div>
+                  <div className="ab-heading">Screening answers</div>
+                  {(app.application_answers || []).length === 0 && <div className="ab-answer">No screening questions were added to this campaign.</div>}
+                  {(app.application_answers || []).map((answer, i) => <div className="ab-answer" key={i}><strong>{answer.question}</strong><br/>{answer.answer}</div>)}
                 </div>
-              ))}
-            </div>
-          ))}
+                <div>
+                  <div className="ab-heading">Work sample</div>
+                  {work?.media_url ? <div className="ab-work"><img src={mediaUrl(work.media_url)} alt={work.title || 'Work sample'}/><div className="ab-work-title">{work.title || 'Work sample'}</div></div> : <div className="ab-answer">No work image attached.</div>}
+                </div>
+              </div>
+              {(app.status === 'pending' || app.status === 'payment_pending') && <div className="ab-actions">
+                <button className="ab-select" disabled={busy === app.id} onClick={() => void select(app)}>{busy === app.id ? <Loader2 size={14} className="ab-spin"/> : <CreditCard size={14}/>} {app.status === 'payment_pending' ? 'Continue payment' : 'Select creator & pay'}</button>
+                {app.status === 'pending' && <button className="ab-reject" disabled={busy === app.id} onClick={() => void reject(app)}><X size={14}/> Reject</button>}
+              </div>}
+            </article>
+          );
+        })}
       </div>
 
-      {matchDetailApp && (
-        <div className="ai-modal-backdrop" onClick={() => setMatchDetailApp(null)}>
-          <div className="ai-modal" onClick={(e) => e.stopPropagation()}>
-            <div className="ai-modal-head">
-              <div>
-                <div className="ai-modal-title">{matchDetailApp.match_score}% matching</div>
-                <div className="ai-modal-sub">{matchDetailApp.creator_name || `Creator #${matchDetailApp.creator_id}`} · {matchDetailApp.campaign_title || 'Campaign'}</div>
-              </div>
-              <button className="ai-close" onClick={() => setMatchDetailApp(null)}>Close</button>
+      {paymentPreview && (
+        <div className="ab-modal-backdrop" role="dialog" aria-modal="true" aria-label="Payment confirmation">
+          <div className="ab-payment-modal">
+            <button type="button" className="ab-payment-close" onClick={closePaymentPreview} aria-label="Close payment preview"><X size={16}/></button>
+            <div className="ab-payment-icon"><CreditCard size={20}/></div>
+            <div className="ab-payment-title">Confirm creator payment</div>
+            <div className="ab-payment-sub">{paymentApplication?.creator_name || 'Selected creator'} · {paymentApplication?.campaign_title || 'Campaign'}</div>
+
+            <div className="ab-payment-box">
+              <div className="ab-payment-row"><span>Payment basis</span><strong>{paymentPreview.pricing_term || 'Campaign term'}</strong></div>
+              <div className="ab-payment-row"><span>Campaign amount</span><strong>NPR {Number(paymentPreview.amount).toLocaleString()}</strong></div>
+              <div className="ab-payment-row"><span>CreatorHub fee (10%)</span><strong>NPR {Number(paymentPreview.platform_fee).toLocaleString()}</strong></div>
+              <div className="ab-payment-row"><span>Creator payout</span><strong>NPR {Number(paymentPreview.creator_payout).toLocaleString()}</strong></div>
+              <div className="ab-payment-row ab-payment-total"><span>Brand pays now</span><strong>NPR {Number(paymentPreview.amount).toLocaleString()}</strong></div>
             </div>
 
-            <div className="ai-match-breakdown">
-              {(matchDetailApp.match_breakdown || []).map((b) => (
-                <span key={b.key} className={`ai-match-chip ${b.matched ? 'ai-match-chip--good' : ''}`}>
-                  {b.label} · {b.matched ? 'matched' : 'not matched'} · {b.score}/{b.max}
-                </span>
-              ))}
-            </div>
-
-            {matchDetailApp.match_configured_count ? (
-              <div className="ai-why">
-                <strong>Why we're suggesting them:</strong> Their profile matches {matchDetailApp.match_reasons?.filter((r) => r.endsWith('✓')).length ?? 0}/{matchDetailApp.match_configured_count - 1} configured campaign requirements. Experience is shown as a soft signal and never automatically rejects a creator.
-              </div>
-            ) : null}
+            {paymentPreview.pricing_basis === 'creatorhub_standard_rate' && (
+              <div className="ab-payment-standard"><strong>CreatorHub standard rate</strong><br/>This amount was selected automatically from the campaign term. CreatorHub keeps 10% and the creator receives 90%.</div>
+            )}
+            {paymentPreview.pricing_basis === 'custom_budget' && (
+              <div className="ab-payment-standard"><strong>Your custom budget</strong><br/>The amount you entered is the total brand payment. CreatorHub keeps 10% and the creator receives 90%.</div>
+            )}
+            {paymentPreview.pricing_basis === 'budget_range_max' && (
+              <div className="ab-payment-standard"><strong>Budget range</strong><br/>The maximum budget is used for this creator selection. CreatorHub keeps 10% and the creator receives 90%.</div>
+            )}
+            <div className="ab-payment-note">Your payment is processed securely through Khalti. The creator is officially selected only after the payment is successfully verified.</div>
+            <button type="button" className="ab-khalti-btn" onClick={continueToKhalti}><CreditCard size={15}/> Continue to Khalti</button>
+            <button type="button" className="ab-cancel-btn" onClick={closePaymentPreview}>Cancel</button>
           </div>
         </div>
       )}
-
-
     </AppLayout>
   );
 }
+
+export default ApplicationsInbox;

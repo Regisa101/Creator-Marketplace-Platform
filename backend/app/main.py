@@ -1,7 +1,5 @@
 from __future__ import annotations
 
-import asyncio
-from contextlib import suppress
 from pathlib import Path
 
 from fastapi import FastAPI
@@ -10,7 +8,15 @@ from fastapi.staticfiles import StaticFiles
 from sqlalchemy import text
 
 from app.database import Base, engine
-from app.models import Notification  # noqa: F401 - loads models into metadata
+
+# Import Notification so SQLAlchemy includes the model
+# when creating database metadata.
+from app.models import Notification  # noqa: F401
+
+
+# ============================================================
+# ACTIVE ROUTES
+# ============================================================
 
 from app.routes import (
     applications,
@@ -19,20 +25,21 @@ from app.routes import (
     campaigns,
     creators,
     notifications,
-    publication,
     onboarding,
     payments,
-    ratings,
     saved_campaigns,
     uploads,
-    workspace,
-    campaign_performance,
+    admin,
 )
 
-from app.services.deadline_notifications import check_deadline_notifications
 
+# ============================================================
+# FASTAPI APPLICATION
+# ============================================================
 
-app = FastAPI(title="Creator Marketplace API")
+app = FastAPI(
+    title="Creator Marketplace API"
+)
 
 
 # ============================================================
@@ -41,13 +48,21 @@ app = FastAPI(title="Creator Marketplace API")
 
 app.add_middleware(
     CORSMiddleware,
+
     allow_origins=[
         "http://localhost:5173",
         "http://127.0.0.1:5173",
     ],
+
     allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
+
+    allow_methods=[
+        "*"
+    ],
+
+    allow_headers=[
+        "*"
+    ],
 )
 
 
@@ -57,117 +72,272 @@ app.add_middleware(
 
 def ensure_schema() -> None:
     """
-    Create missing tables and upgrade existing tables with
-    the columns required by the current application.
+    Create missing database tables and add columns required
+    by the current CreatorHub application.
+
+    Existing database tables are preserved.
     """
 
-    # Create all tables represented in SQLAlchemy metadata.
-    Base.metadata.create_all(bind=engine)
+    # Create all currently registered SQLAlchemy tables.
+    Base.metadata.create_all(
+        bind=engine
+    )
 
     statements = [
-        # ----------------------------------------------------
-        # ONBOARDING
-        # ----------------------------------------------------
-        "ALTER TABLE creator_profiles ADD COLUMN IF NOT EXISTS availability VARCHAR(30)",
-        "ALTER TABLE business_profiles ADD COLUMN IF NOT EXISTS contact_person_name VARCHAR(120)",
-        "ALTER TABLE business_profiles ADD COLUMN IF NOT EXISTS social_links JSON",
 
-        # ----------------------------------------------------
-        # BUSINESS PROFILE DEFAULTS
-        # ----------------------------------------------------
-        "ALTER TABLE business_profiles ADD COLUMN IF NOT EXISTS default_dos JSON",
-        "ALTER TABLE business_profiles ADD COLUMN IF NOT EXISTS default_donts JSON",
-        "ALTER TABLE business_profiles ADD COLUMN IF NOT EXISTS default_video_spec JSON",
-        "ALTER TABLE business_profiles ADD COLUMN IF NOT EXISTS default_creator_requirements JSON",
-        "ALTER TABLE business_profiles ADD COLUMN IF NOT EXISTS default_application_questions JSON",
+        # ====================================================
+        # CREATOR PROFILE
+        # ====================================================
 
-        # ----------------------------------------------------
+        """
+        ALTER TABLE creator_profiles
+        ADD COLUMN IF NOT EXISTS availability VARCHAR(30)
+        """,
+
+        # ====================================================
+        # BUSINESS PROFILE
+        # ====================================================
+
+        """
+        ALTER TABLE business_profiles
+        ADD COLUMN IF NOT EXISTS contact_person_name VARCHAR(120)
+        """,
+
+        """
+        ALTER TABLE business_profiles
+        ADD COLUMN IF NOT EXISTS social_links JSON
+        """,
+
+        # Campaign defaults
+        """
+        ALTER TABLE business_profiles
+        ADD COLUMN IF NOT EXISTS default_dos JSON
+        """,
+
+        """
+        ALTER TABLE business_profiles
+        ADD COLUMN IF NOT EXISTS default_donts JSON
+        """,
+
+        """
+        ALTER TABLE business_profiles
+        ADD COLUMN IF NOT EXISTS default_video_spec JSON
+        """,
+
+        """
+        ALTER TABLE business_profiles
+        ADD COLUMN IF NOT EXISTS default_creator_requirements JSON
+        """,
+
+        """
+        ALTER TABLE business_profiles
+        ADD COLUMN IF NOT EXISTS default_application_questions JSON
+        """,
+
+        # ====================================================
         # CAMPAIGNS
-        # ----------------------------------------------------
-        "ALTER TABLE campaigns ADD COLUMN IF NOT EXISTS application_deadline TIMESTAMPTZ",
-        "ALTER TABLE campaigns ADD COLUMN IF NOT EXISTS deliverable_deadline TIMESTAMPTZ",
-        "ALTER TABLE campaigns ADD COLUMN IF NOT EXISTS creators_needed INTEGER NOT NULL DEFAULT 1",
-        "ALTER TABLE campaigns ADD COLUMN IF NOT EXISTS application_questions JSON",
-        "ALTER TABLE campaigns ADD COLUMN IF NOT EXISTS creator_requirements JSON",
-        "ALTER TABLE campaigns ADD COLUMN IF NOT EXISTS extra_photos JSON",
+        # ====================================================
 
-        # Funding (paid campaigns are not open for applications until funded)
-        "ALTER TABLE campaigns ADD COLUMN IF NOT EXISTS funding_status VARCHAR(30) NOT NULL DEFAULT 'unfunded'",
-        "ALTER TABLE campaigns ADD COLUMN IF NOT EXISTS funded_amount NUMERIC(10,2)",
-        "ALTER TABLE campaigns ADD COLUMN IF NOT EXISTS funded_at TIMESTAMPTZ",
+        """
+        ALTER TABLE campaigns
+        ADD COLUMN IF NOT EXISTS application_deadline TIMESTAMPTZ
+        """,
 
-        # Campaign completion/publication rules
-        "ALTER TABLE campaigns ADD COLUMN IF NOT EXISTS completion_mode VARCHAR(30) NOT NULL DEFAULT 'approval_only'",
-        "ALTER TABLE campaigns ADD COLUMN IF NOT EXISTS required_platform VARCHAR(50)",
-        "ALTER TABLE campaigns ADD COLUMN IF NOT EXISTS required_post_type VARCHAR(50)",
-        "ALTER TABLE campaigns ADD COLUMN IF NOT EXISTS publication_deadline TIMESTAMPTZ",
-        "ALTER TABLE campaigns ADD COLUMN IF NOT EXISTS required_mentions JSONB",
-        "ALTER TABLE campaigns ADD COLUMN IF NOT EXISTS required_platforms JSONB",
-        "ALTER TABLE campaigns ADD COLUMN IF NOT EXISTS required_post_types JSONB",
-        # Backfill the new multi-select columns from any existing single-value data.
-        "UPDATE campaigns SET required_platforms = to_jsonb(ARRAY[required_platform]) "
-        "WHERE required_platforms IS NULL AND required_platform IS NOT NULL",
-        "UPDATE campaigns SET required_post_types = to_jsonb(ARRAY[required_post_type]) "
-        "WHERE required_post_types IS NULL AND required_post_type IS NOT NULL",
+        """
+        ALTER TABLE campaigns
+        ADD COLUMN IF NOT EXISTS deliverable_deadline TIMESTAMPTZ
+        """,
 
-        # ----------------------------------------------------
+        """
+        ALTER TABLE campaigns
+        ADD COLUMN IF NOT EXISTS creators_needed
+        INTEGER NOT NULL DEFAULT 1
+        """,
+
+        """
+        ALTER TABLE campaigns
+        ADD COLUMN IF NOT EXISTS application_questions JSON
+        """,
+
+        """
+        ALTER TABLE campaigns
+        ADD COLUMN IF NOT EXISTS creator_requirements JSON
+        """,
+
+        """
+        ALTER TABLE campaigns
+        ADD COLUMN IF NOT EXISTS extra_photos JSON
+        """,
+
+        # ====================================================
+        # FUNDING / PAYMENT COMPATIBILITY
+        # ====================================================
+
+        """
+        ALTER TABLE campaigns
+        ADD COLUMN IF NOT EXISTS funding_status
+        VARCHAR(30) NOT NULL DEFAULT 'unfunded'
+        """,
+
+        """
+        ALTER TABLE campaigns
+        ADD COLUMN IF NOT EXISTS funded_amount
+        NUMERIC(10,2)
+        """,
+
+        """
+        ALTER TABLE campaigns
+        ADD COLUMN IF NOT EXISTS funded_at
+        TIMESTAMPTZ
+        """,
+
+        # ====================================================
+        # LEGACY CAMPAIGN COLUMNS
+        #
+        # These are retained in the database for compatibility
+        # with existing databases, but the current frontend does
+        # not use the old publication workflow.
+        # ====================================================
+
+        """
+        ALTER TABLE campaigns
+        ADD COLUMN IF NOT EXISTS completion_mode
+        VARCHAR(30) DEFAULT 'approval_only'
+        """,
+
+        """
+        ALTER TABLE campaigns
+        ADD COLUMN IF NOT EXISTS required_platform
+        VARCHAR(50)
+        """,
+
+        """
+        ALTER TABLE campaigns
+        ADD COLUMN IF NOT EXISTS required_post_type
+        VARCHAR(50)
+        """,
+
+        """
+        ALTER TABLE campaigns
+        ADD COLUMN IF NOT EXISTS publication_deadline
+        TIMESTAMPTZ
+        """,
+
+        """
+        ALTER TABLE campaigns
+        ADD COLUMN IF NOT EXISTS required_mentions JSONB
+        """,
+
+        """
+        ALTER TABLE campaigns
+        ADD COLUMN IF NOT EXISTS required_platforms JSONB
+        """,
+
+        """
+        ALTER TABLE campaigns
+        ADD COLUMN IF NOT EXISTS required_post_types JSONB
+        """,
+
+        # ====================================================
         # APPLICATIONS
-        # ----------------------------------------------------
-        "ALTER TABLE applications ADD COLUMN IF NOT EXISTS application_answers JSON",
-        "ALTER TABLE applications ADD COLUMN IF NOT EXISTS selected_portfolio JSON",
-        "ALTER TABLE applications ADD COLUMN IF NOT EXISTS deliverable_deadline TIMESTAMPTZ",
+        # ====================================================
 
-        # Legacy pricing columns retained for database compatibility.
-        "ALTER TABLE applications ADD COLUMN IF NOT EXISTS agreed_rate NUMERIC(10,2)",
-        "ALTER TABLE applications ADD COLUMN IF NOT EXISTS rate_locked INTEGER NOT NULL DEFAULT 0",
-        "ALTER TABLE applications ADD COLUMN IF NOT EXISTS negotiation_status VARCHAR(30) NOT NULL DEFAULT 'not_started'",
+        """
+        ALTER TABLE applications
+        ADD COLUMN IF NOT EXISTS application_answers JSON
+        """,
 
-        # ----------------------------------------------------
+        """
+        ALTER TABLE applications
+        ADD COLUMN IF NOT EXISTS selected_portfolio JSON
+        """,
+
+        """
+        ALTER TABLE applications
+        ADD COLUMN IF NOT EXISTS deliverable_deadline
+        TIMESTAMPTZ
+        """,
+
+        # Existing application payment/rate compatibility
+        """
+        ALTER TABLE applications
+        ADD COLUMN IF NOT EXISTS agreed_rate
+        NUMERIC(10,2)
+        """,
+
+        """
+        ALTER TABLE applications
+        ADD COLUMN IF NOT EXISTS rate_locked
+        INTEGER NOT NULL DEFAULT 0
+        """,
+
+        # ====================================================
         # PAYMENTS
-        # ----------------------------------------------------
-        "ALTER TABLE payments ADD COLUMN IF NOT EXISTS payment_details JSON",
+        # ====================================================
 
-        # ----------------------------------------------------
+        """
+        ALTER TABLE payments
+        ADD COLUMN IF NOT EXISTS payment_details JSON
+        """,
+
+        # ====================================================
         # NOTIFICATIONS
-        # ----------------------------------------------------
-        "ALTER TABLE notifications ADD COLUMN IF NOT EXISTS event_key VARCHAR(255)",
+        # ====================================================
 
-        # ----------------------------------------------------
-        # CALENDAR EVENTS
-        # ----------------------------------------------------
-        # Campaign-level events (application deadline, deliverable deadline,
-        # publication deadline) exist from the moment a campaign is
-        # published, before any creator is accepted — so application_id can
-        # no longer be required.
-        "ALTER TABLE calendar_events ADD COLUMN IF NOT EXISTS campaign_id INTEGER REFERENCES campaigns(id)",
-        "ALTER TABLE calendar_events ALTER COLUMN application_id DROP NOT NULL",
-
-        # ----------------------------------------------------
-        # CAMPAIGN PERFORMANCE / ROI
-        # ----------------------------------------------------
-        "ALTER TABLE campaign_performances ADD COLUMN IF NOT EXISTS revenue NUMERIC(12,2) NOT NULL DEFAULT 0",
-        "ALTER TABLE campaign_performances ADD COLUMN IF NOT EXISTS other_costs NUMERIC(12,2) NOT NULL DEFAULT 0",
-        "ALTER TABLE campaign_performances ADD COLUMN IF NOT EXISTS sales_count INTEGER",
-        "ALTER TABLE campaign_performances ADD COLUMN IF NOT EXISTS reach INTEGER",
-        "ALTER TABLE campaign_performances ADD COLUMN IF NOT EXISTS engagement INTEGER",
-        "ALTER TABLE campaign_performances ADD COLUMN IF NOT EXISTS notes TEXT",
+        """
+        ALTER TABLE notifications
+        ADD COLUMN IF NOT EXISTS event_key
+        VARCHAR(255)
+        """,
     ]
 
-    with engine.begin() as conn:
-        for statement in statements:
-            conn.execute(text(statement))
 
-        # Prevent duplicate notification event keys.
-        conn.execute(
-            text(
-                """
-                CREATE UNIQUE INDEX IF NOT EXISTS
-                uq_notifications_event_key
-                ON notifications(event_key)
-                WHERE event_key IS NOT NULL
-                """
+    # ========================================================
+    # APPLY DATABASE UPDATES
+    # ========================================================
+
+    with engine.begin() as connection:
+
+        for statement in statements:
+
+            try:
+                connection.execute(
+                    text(statement)
+                )
+
+            except Exception as exc:
+                # Do not prevent the whole API from starting
+                # because one compatibility column already exists
+                # in a slightly different database state.
+                print(
+                    "Database schema update skipped:",
+                    exc,
+                )
+
+
+        # ====================================================
+        # UNIQUE NOTIFICATION EVENT KEY
+        # ====================================================
+
+        try:
+
+            connection.execute(
+                text(
+                    """
+                    CREATE UNIQUE INDEX IF NOT EXISTS
+                    uq_notifications_event_key
+                    ON notifications(event_key)
+                    WHERE event_key IS NOT NULL
+                    """
+                )
             )
-        )
+
+        except Exception as exc:
+
+            print(
+                "Notification index creation skipped:",
+                exc,
+            )
 
 
 # ============================================================
@@ -176,79 +346,78 @@ def ensure_schema() -> None:
 
 @app.on_event("startup")
 async def startup() -> None:
+
     ensure_schema()
 
-    # Run deadline notifications once when the server starts.
-    try:
-        check_deadline_notifications()
-    except Exception as exc:
-        print(f"Deadline notification check skipped: {exc}")
-
-    # Continue checking every hour.
-    app.state.deadline_task = asyncio.create_task(
-        _deadline_loop()
-    )
-
 
 # ============================================================
-# SHUTDOWN
+# ACTIVE API ROUTES
 # ============================================================
 
-@app.on_event("shutdown")
-async def shutdown() -> None:
-    task = getattr(app.state, "deadline_task", None)
+app.include_router(
+    auth.router
+)
 
-    if task:
-        task.cancel()
+app.include_router(
+    onboarding.router
+)
 
-        with suppress(asyncio.CancelledError):
-            await task
+app.include_router(
+    campaigns.router
+)
 
+app.include_router(
+    applications.router
+)
 
-# ============================================================
-# DEADLINE NOTIFICATION LOOP
-# ============================================================
+app.include_router(
+    businesses.router
+)
 
-async def _deadline_loop() -> None:
-    while True:
-        await asyncio.sleep(3600)
+app.include_router(
+    creators.router
+)
 
-        try:
-            check_deadline_notifications()
-        except Exception as exc:
-            # Notification failures must never crash the API.
-            print(f"Deadline notification error: {exc}")
+app.include_router(
+    notifications.router
+)
 
+app.include_router(
+    payments.router
+)
 
-# ============================================================
-# API ROUTES
-# ============================================================
+app.include_router(
+    saved_campaigns.router
+)
 
-app.include_router(auth.router)
-app.include_router(onboarding.router)
-app.include_router(campaigns.router)
-app.include_router(applications.router)
-app.include_router(uploads.router)
-app.include_router(saved_campaigns.router)
-app.include_router(businesses.router)
-app.include_router(creators.router)
-app.include_router(workspace.router)
-app.include_router(payments.router)
-app.include_router(ratings.router)
-app.include_router(notifications.router)
-app.include_router(publication.router)
-app.include_router(campaign_performance.router)
+app.include_router(
+    uploads.router
+)
+
+app.include_router(
+    admin.router
+)
 
 
 # ============================================================
 # STATIC FILES
 # ============================================================
 
-STATIC_DIR = Path(__file__).resolve().parent / "static"
-STATIC_DIR.mkdir(parents=True, exist_ok=True)
+STATIC_DIR = (
+    Path(__file__).resolve().parent
+    / "static"
+)
+
+STATIC_DIR.mkdir(
+    parents=True,
+    exist_ok=True
+)
+
 
 app.mount(
     "/static",
-    StaticFiles(directory=STATIC_DIR),
+    StaticFiles(
+        directory=STATIC_DIR
+    ),
     name="static",
 )

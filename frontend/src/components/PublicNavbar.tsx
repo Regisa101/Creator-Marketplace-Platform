@@ -1,81 +1,99 @@
-import { Link, useLocation, useNavigate, useSearchParams } from "react-router-dom";
-import { useEffect, useRef, useState } from "react";
-import type { MouseEvent } from "react";
+import {
+  Link,
+  useLocation,
+  useNavigate,
+  useSearchParams,
+} from 'react-router-dom';
 
 import {
+  useEffect,
+  useRef,
+  useState,
+  type FormEvent,
+} from 'react';
+
+import {
+  Bell,
   Heart,
-  Menu,
-  X,
   LayoutDashboard,
   LogOut,
-  Trash2,
+  Menu,
   Search,
+  Trash2,
   UserRound,
-} from "lucide-react";
+  X,
+} from 'lucide-react';
 
-import { LogoMark } from "./Logo";
-import { useAuth } from "../context/AuthContext";
+import { LogoMark } from './Logo';
+import { useAuth } from '../context/AuthContext';
 
 import {
+  getNotifications,
   getSavedCampaigns,
+  getUnreadNotificationCount,
+  markAllNotificationsRead,
+  markNotificationRead,
   unsaveCampaign,
+  type Notification,
   type SavedCampaignEntry,
-  type PublicCampaign,
-} from "../api/client";
+} from '../api/client';
 
-type PublicNavbarProps = {
+
+type Props = {
   sticky?: boolean;
 };
 
-type SectionKey = "home" | "campaigns" | "for-brands";
+type Section =
+  | 'home'
+  | 'campaigns'
+  | 'for-brands';
 
-const SECTION_HASHES: Record<SectionKey, string> = {
-  home: "#home",
-  campaigns: "#campaigns",
-  "for-brands": "#for-brands",
-};
 
-const SCROLL_TARGET_KEY = "ch-scroll-target";
+const API_ORIGIN = 'http://localhost:8000';
 
-const API_ORIGIN = "http://localhost:8000";
 
 /* ============================================================
    HELPERS
 ============================================================ */
 
-function mediaUrl(url?: string | null): string {
-  if (!url) return "";
+function mediaUrl(value?: string | null) {
+  if (!value) {
+    return '';
+  }
 
   if (
-    /^(https?:)?\/\//i.test(url) ||
-    url.startsWith("data:") ||
-    url.startsWith("blob:")
+    /^(https?:)?\/\//i.test(value) ||
+    value.startsWith('data:') ||
+    value.startsWith('blob:')
   ) {
-    return url;
+    return value;
   }
 
-  if (url.startsWith("/api/")) {
-    return `${API_ORIGIN}${url}`;
+  if (value.startsWith('/api/')) {
+    return `${API_ORIGIN}${value}`;
   }
 
-  return `${API_ORIGIN}/${url.replace(/^\/+/, "")}`;
+  return `${API_ORIGIN}/${value.replace(/^\/+/, '')}`;
 }
 
-function getInitials(fullName?: string | null): string {
-  const value = (fullName || "User").trim();
 
-  if (!value) return "U";
+function initials(name?: string | null) {
+  const parts = (name || 'User')
+    .trim()
+    .split(/\s+/)
+    .filter(Boolean);
 
-  const parts = value.split(/\s+/).filter(Boolean);
-
-  if (parts.length >= 2) {
+  if (parts.length > 1) {
     return `${parts[0][0]}${parts[1][0]}`.toUpperCase();
   }
 
-  return parts[0].slice(0, 2).toUpperCase();
+  return (parts[0] || 'U')
+    .slice(0, 2)
+    .toUpperCase();
 }
 
-function getAvatarUrl(user: any): string {
+
+function avatarFor(user: any) {
   return mediaUrl(
     user?.profile?.profile_image ||
       user?.profile?.profile_image_url ||
@@ -85,16 +103,20 @@ function getAvatarUrl(user: any): string {
   );
 }
 
+
 /* ============================================================
-   COMPONENT
+   PUBLIC NAVBAR
 ============================================================ */
 
 export function PublicNavbar({
   sticky = true,
-}: PublicNavbarProps) {
+}: Props) {
+
   const location = useLocation();
   const navigate = useNavigate();
-  const [searchParams] = useSearchParams();
+
+  const [searchParams] =
+    useSearchParams();
 
   const {
     user,
@@ -103,471 +125,537 @@ export function PublicNavbar({
     logout,
   } = useAuth();
 
-  const [mobileOpen, setMobileOpen] = useState(false);
-  const [profileOpen, setProfileOpen] = useState(false);
-
-  const [wishlistOpen, setWishlistOpen] = useState(false);
-  const [wishlistLoading, setWishlistLoading] = useState(false);
-  const [saved, setSaved] = useState<SavedCampaignEntry[]>([]);
-
-  const [activeSection, setActiveSection] =
-    useState<SectionKey>("home");
-
-  const [searchValue, setSearchValue] = useState("");
-
-  const profileWrapRef =
-    useRef<HTMLDivElement>(null);
 
   /* ==========================================================
-     PAGE CONTEXT
+     STATE
   ========================================================== */
 
-  const isLandingPage =
-    location.pathname === "/";
+  const [
+    profileOpen,
+    setProfileOpen,
+  ] = useState(false);
 
-  /*
-   * Campaign detail opened from landing:
-   * /campaigns/:id?source=landing
-   *
-   * This should still use the landing/public navbar.
-   */
-  const isPublicHome =
-    isLandingPage ||
-    searchParams.get("source") === "landing";
+  const [
+    wishlistOpen,
+    setWishlistOpen,
+  ] = useState(false);
 
-  const isCampaignsPage =
-    location.pathname === "/campaigns";
+  const [
+    notificationOpen,
+    setNotificationOpen,
+  ] = useState(false);
 
-  const isCreator =
-    user?.role === "creator";
+  const [
+    mobileOpen,
+    setMobileOpen,
+  ] = useState(false);
 
-  const showWishlist = Boolean(
-    !loading &&
-      isAuthenticated &&
-      isCreator &&
-      isPublicHome
+  const [
+    saved,
+    setSaved,
+  ] = useState<SavedCampaignEntry[]>([]);
+
+  const [
+    notifications,
+    setNotifications,
+  ] = useState<Notification[]>([]);
+
+  const [
+    unread,
+    setUnread,
+  ] = useState(0);
+
+  const [
+    search,
+    setSearch,
+  ] = useState(
+    searchParams.get('search') || ''
   );
 
-  const avatarUrl = getAvatarUrl(user);
-  const initials = getInitials(user?.full_name);
+
+  const profileRef =
+    useRef<HTMLDivElement>(null);
+
+
+  /* ==========================================================
+     CONTEXT
+  ========================================================== */
+
+  const isCreator =
+    user?.role === 'creator';
+
+  const isLanding =
+    location.pathname === '/';
+
+  const isCampaigns =
+    location.pathname === '/campaigns';
+
+  const isPublicHome =
+    isLanding ||
+    searchParams.get('source') === 'landing';
+
+  const showWishlist =
+    !loading &&
+    isAuthenticated &&
+    isCreator &&
+    isPublicHome;
+
 
   /* ==========================================================
      WISHLIST
   ========================================================== */
 
-  const loadWishlist = async () => {
-    if (!isAuthenticated || !isCreator) {
-      setSaved([]);
-      return;
-    }
+  const refreshWishlist =
+    async () => {
 
-    setWishlistLoading(true);
+      if (!showWishlist) {
+        setSaved([]);
+        return;
+      }
 
-    try {
-      const result = await getSavedCampaigns();
+      try {
 
-      setSaved(
-        Array.isArray(result) ? result : []
-      );
-    } catch (error) {
-      console.error(
-        "Failed to load wishlist",
-        error
-      );
+        const result =
+          await getSavedCampaigns();
 
-      setSaved([]);
-    } finally {
-      setWishlistLoading(false);
-    }
-  };
+        setSaved(
+          Array.isArray(result)
+            ? result
+            : []
+        );
+
+      } catch {
+
+        setSaved([]);
+
+      }
+    };
+
 
   useEffect(() => {
-    if (showWishlist) {
-      void loadWishlist();
-    } else {
-      setWishlistOpen(false);
-      setSaved([]);
-    }
+
+    void refreshWishlist();
+
   }, [showWishlist]);
 
+
   useEffect(() => {
-    const handleWishlistChanged = () => {
-      if (showWishlist) {
-        void loadWishlist();
-      }
+
+    const handler = () => {
+      void refreshWishlist();
     };
 
     window.addEventListener(
-      "ch:wishlist-changed",
-      handleWishlistChanged
+      'ch:wishlist-changed',
+      handler
     );
 
     return () => {
+
       window.removeEventListener(
-        "ch:wishlist-changed",
-        handleWishlistChanged
+        'ch:wishlist-changed',
+        handler
       );
+
     };
+
   }, [showWishlist]);
 
-  useEffect(() => {
-    if (!wishlistOpen) return;
 
-    const handleKeyDown = (
-      event: KeyboardEvent
-    ) => {
-      if (event.key === "Escape") {
-        setWishlistOpen(false);
+  /* ==========================================================
+     NOTIFICATIONS
+  ========================================================== */
+
+  const refreshNotifications =
+    async () => {
+
+      if (!isAuthenticated) {
+        return;
+      }
+
+      try {
+
+        const [
+          items,
+          count,
+        ] = await Promise.all([
+          getNotifications(false),
+          getUnreadNotificationCount(),
+        ]);
+
+        setNotifications(
+          Array.isArray(items)
+            ? items
+            : []
+        );
+
+        setUnread(
+          Number(count) || 0
+        );
+
+      } catch {
+
+        setNotifications([]);
+        setUnread(0);
+
       }
     };
 
-    document.addEventListener(
-      "keydown",
-      handleKeyDown
-    );
-
-    return () => {
-      document.removeEventListener(
-        "keydown",
-        handleKeyDown
-      );
-    };
-  }, [wishlistOpen]);
 
   useEffect(() => {
-    document.body.style.overflow =
-      wishlistOpen ? "hidden" : "";
 
-    return () => {
-      document.body.style.overflow = "";
-    };
-  }, [wishlistOpen]);
+    if (!isAuthenticated) {
 
-  /* ==========================================================
-     PROFILE MENU
-  ========================================================== */
+      setNotifications([]);
+      setUnread(0);
+      setNotificationOpen(false);
 
-  useEffect(() => {
-    if (!profileOpen) return;
-
-    const handleClickOutside = (
-      event: PointerEvent
-    ) => {
-      if (
-        profileWrapRef.current &&
-        !profileWrapRef.current.contains(
-          event.target as Node
-        )
-      ) {
-        setProfileOpen(false);
-      }
-    };
-
-    const handleKeyDown = (
-      event: KeyboardEvent
-    ) => {
-      if (event.key === "Escape") {
-        setProfileOpen(false);
-      }
-    };
-
-    document.addEventListener(
-      "pointerdown",
-      handleClickOutside
-    );
-
-    document.addEventListener(
-      "keydown",
-      handleKeyDown
-    );
-
-    return () => {
-      document.removeEventListener(
-        "pointerdown",
-        handleClickOutside
-      );
-
-      document.removeEventListener(
-        "keydown",
-        handleKeyDown
-      );
-    };
-  }, [profileOpen]);
-
-  /* ==========================================================
-     LANDING PAGE SECTION SCROLL
-  ========================================================== */
-
-  useEffect(() => {
-    if (!isPublicHome) return;
-
-    const pendingTarget =
-      sessionStorage.getItem(
-        SCROLL_TARGET_KEY
-      );
-
-    const targetId =
-      pendingTarget ||
-      location.hash.replace("#", "");
-
-    if (pendingTarget) {
-      sessionStorage.removeItem(
-        SCROLL_TARGET_KEY
-      );
-    }
-
-    if (!targetId) return;
-
-    const sectionKey: SectionKey =
-      targetId === "campaigns" ||
-      targetId === "for-brands"
-        ? targetId
-        : "home";
-
-    setActiveSection(sectionKey);
-
-    requestAnimationFrame(() => {
-      document
-        .getElementById(targetId)
-        ?.scrollIntoView({
-          behavior: "smooth",
-          block: "start",
-        });
-    });
-  }, [isPublicHome, location.hash]);
-
-  /* ==========================================================
-     ACTIVE NAV STATE
-  ========================================================== */
-
-  useEffect(() => {
-    if (isCampaignsPage) {
-      setActiveSection("campaigns");
       return;
     }
 
-    if (isPublicHome) {
-      const hash =
-        location.hash.replace("#", "");
+    void refreshNotifications();
 
-      if (hash === "for-brands") {
-        setActiveSection("for-brands");
-      } else if (hash === "campaigns") {
-        setActiveSection("campaigns");
-      } else {
-        setActiveSection("home");
-      }
+    const timer =
+      window.setInterval(
+        () => {
+          void refreshNotifications();
+        },
+        15000
+      );
+
+    return () => {
+      window.clearInterval(timer);
+    };
+
+  }, [isAuthenticated]);
+
+
+  /* ==========================================================
+     CLOSE PROFILE WHEN CLICKING OUTSIDE
+  ========================================================== */
+
+  useEffect(() => {
+
+    const close =
+      (event: globalThis.PointerEvent) => {
+
+        if (
+          profileRef.current &&
+          !profileRef.current.contains(
+            event.target as Node
+          )
+        ) {
+
+          setProfileOpen(false);
+
+        }
+
+      };
+
+
+    document.addEventListener(
+      'pointerdown',
+      close
+    );
+
+    return () => {
+
+      document.removeEventListener(
+        'pointerdown',
+        close
+      );
+
+    };
+
+  }, []);
+
+
+  /* ==========================================================
+     LOCK PAGE WHEN PANEL IS OPEN
+  ========================================================== */
+
+  useEffect(() => {
+
+    if (
+      !wishlistOpen &&
+      !notificationOpen
+    ) {
+      return;
     }
+
+    const old =
+      document.body.style.overflow;
+
+    document.body.style.overflow =
+      'hidden';
+
+    return () => {
+
+      document.body.style.overflow =
+        old;
+
+    };
+
   }, [
-    isCampaignsPage,
-    isPublicHome,
-    location.hash,
-    location.pathname,
+    wishlistOpen,
+    notificationOpen,
   ]);
 
-  /* ==========================================================
-     NAVIGATION HELPERS
-  ========================================================== */
-
-  const navLink = (href: string): string => {
-    if (!href.startsWith("#")) {
-      return href;
-    }
-
-    /*
-     * On landing:
-     * #home
-     * #campaigns
-     * #for-brands
-     *
-     * On every other public page:
-     * /#home
-     * /#campaigns
-     * /#for-brands
-     */
-    return isPublicHome
-      ? href
-      : `/${href}`;
-  };
-
-  const isActive = (
-    href: string
-  ): boolean => {
-    if (href === "#home") {
-      return (
-        isPublicHome &&
-        activeSection === "home"
-      );
-    }
-
-    if (href === "#campaigns") {
-      /*
-       * IMPORTANT:
-       * Campaigns page itself must stay active.
-       */
-      return (
-        isCampaignsPage ||
-        (isPublicHome &&
-          activeSection === "campaigns")
-      );
-    }
-
-    if (href === "#for-brands") {
-      return (
-        isPublicHome &&
-        activeSection === "for-brands"
-      );
-    }
-
-    return location.pathname === href;
-  };
 
   /* ==========================================================
-     LANDING SECTION CLICK
+     NAVIGATION
   ========================================================== */
 
-  const handleSectionClick = (
-    event: MouseEvent<HTMLAnchorElement>,
-    section: SectionKey
-  ) => {
-    setActiveSection(section);
+  const goCampaigns = () => {
+
     setMobileOpen(false);
+    setProfileOpen(false);
+    setWishlistOpen(false);
+    setNotificationOpen(false);
 
-    /*
-     * CAMPAIGNS IS A REAL PAGE.
-     *
-     * Never treat it as a landing section from the
-     * main desktop/mobile navigation.
-     */
-    if (section === "campaigns") {
-      event.preventDefault();
-      navigate("/campaigns");
-      return;
-    }
+    navigate('/campaigns');
 
-    const sectionId =
-      section === "home"
-        ? "home"
-        : section;
-
-    if (isPublicHome) {
-      event.preventDefault();
-
-      document
-        .getElementById(sectionId)
-        ?.scrollIntoView({
-          behavior: "smooth",
-          block: "start",
-        });
-
-      window.history.replaceState(
-        null,
-        "",
-        SECTION_HASHES[section]
-      );
-    } else {
-      sessionStorage.setItem(
-        SCROLL_TARGET_KEY,
-        sectionId
-      );
-    }
   };
 
-  /* ==========================================================
-     DIRECT CAMPAIGNS NAVIGATION
-  ========================================================== */
 
-  const handleCampaignsClick = (
-    event?: MouseEvent<HTMLAnchorElement>
+  const goSection = (
+    section: Section
   ) => {
-    event?.preventDefault();
 
     setMobileOpen(false);
     setProfileOpen(false);
 
-    setActiveSection("campaigns");
+    if (
+      section === 'campaigns'
+    ) {
 
-    navigate("/campaigns");
+      goCampaigns();
+      return;
+
+    }
+
+
+    if (!isPublicHome) {
+
+      sessionStorage.setItem(
+        'ch-scroll-target',
+        section === 'for-brands'
+          ? 'for-brands'
+          : 'home'
+      );
+
+      navigate('/');
+
+      return;
+
+    }
+
+
+    const targetId =
+      section === 'for-brands'
+        ? 'for-brands'
+        : 'home';
+
+
+    const element =
+      document.getElementById(
+        targetId
+      );
+
+
+    if (element) {
+
+      element.scrollIntoView({
+        behavior: 'smooth',
+        block: 'start',
+      });
+
+    }
+
+
+    window.history.replaceState(
+      null,
+      '',
+      section === 'for-brands'
+        ? '/#for-brands'
+        : '/#home'
+    );
+
   };
+
 
   /* ==========================================================
      SEARCH
   ========================================================== */
 
-  const handleSearch = (
-    event: React.FormEvent
-  ) => {
-    event.preventDefault();
+  const submitSearch =
+    (event: FormEvent) => {
 
-    const value =
-      searchValue.trim();
+      event.preventDefault();
 
-    setMobileOpen(false);
+      setMobileOpen(false);
 
-    if (!value) {
-      navigate("/campaigns");
-      return;
-    }
+      const value =
+        search.trim();
 
-    navigate(
-      `/campaigns?search=${encodeURIComponent(
+      navigate(
         value
-      )}`
-    );
-  };
+          ? `/campaigns?search=${encodeURIComponent(value)}`
+          : '/campaigns'
+      );
+
+    };
+
 
   /* ==========================================================
      LOGOUT
   ========================================================== */
 
-  const handleLogout = () => {
-    setProfileOpen(false);
-    setMobileOpen(false);
+  const handleLogout =
+    () => {
 
-    logout();
+      setProfileOpen(false);
+      setMobileOpen(false);
 
-    navigate("/");
-  };
+      logout();
+
+      navigate('/');
+
+    };
+
 
   /* ==========================================================
-     WISHLIST ACTIONS
+     NOTIFICATION ACTIONS
   ========================================================== */
 
-  const removeSaved = async (
-    event: MouseEvent<HTMLButtonElement>,
-    campaignId: number
-  ) => {
-    event.stopPropagation();
+  const markOneRead =
+    async (
+      notification: Notification
+    ) => {
 
-    try {
-      await unsaveCampaign(
-        campaignId
-      );
+      try {
 
-      setSaved((items) =>
-        items.filter(
-          (item) =>
-            item.campaign_id !==
-            campaignId
-        )
-      );
-    } catch (error) {
-      console.error(
-        "Failed to remove wishlist item",
-        error
-      );
-    }
-  };
+        if (!notification.is_read) {
 
-  const openCampaign = (
-    campaignId: number
-  ) => {
-    setWishlistOpen(false);
+          await markNotificationRead(
+            notification.id
+          );
 
-    navigate(
-      `/campaigns/${campaignId}?source=landing`
-    );
-  };
+        }
+
+
+        setNotifications(
+          items =>
+            items.map(
+              item =>
+                item.id === notification.id
+                  ? {
+                      ...item,
+                      is_read: true,
+                    }
+                  : item
+            )
+        );
+
+
+        setUnread(
+          value =>
+            Math.max(
+              0,
+              value -
+                (
+                  notification.is_read
+                    ? 0
+                    : 1
+                )
+            )
+        );
+
+
+        setNotificationOpen(false);
+
+
+        if (notification.link) {
+
+          navigate(
+            notification.link
+          );
+
+        }
+
+      } catch {
+
+        // Keep notification visible.
+
+      }
+
+    };
+
+
+  const markEverythingRead =
+    async () => {
+
+      try {
+
+        await markAllNotificationsRead();
+
+        setNotifications(
+          items =>
+            items.map(
+              item => ({
+                ...item,
+                is_read: true,
+              })
+            )
+        );
+
+        setUnread(0);
+
+      } catch {
+
+        // No-op.
+
+      }
+
+    };
+
+
+  /* ==========================================================
+     REMOVE SAVED CAMPAIGN
+  ========================================================== */
+
+  const removeSaved =
+    async (
+      campaignId: number
+    ) => {
+
+      try {
+
+        await unsaveCampaign(
+          campaignId
+        );
+
+        setSaved(
+          items =>
+            items.filter(
+              item =>
+                item.campaign_id !==
+                campaignId
+            )
+        );
+
+      } catch {
+
+        // No-op.
+
+      }
+
+    };
+
+
+  const avatar =
+    avatarFor(user);
+
 
   /* ==========================================================
      RENDER
@@ -575,1270 +663,1527 @@ export function PublicNavbar({
 
   return (
     <>
+
       <style>{`
 
-        /* =====================================================
-           NAVBAR
-        ===================================================== */
+        /* ======================================================
+           MAIN NAVBAR
+        ====================================================== */
 
-        .ch-public-nav {
-          font-size: 16px !important;
-          line-height: normal !important;
-          position: ${sticky ? "fixed" : "relative"};
+        .ch-nav {
+          position: ${sticky ? 'fixed' : 'relative'};
           top: 0;
           left: 0;
           right: 0;
-          width: 100%;
           z-index: 9999;
-          background: #FFFFFF;
-          border-bottom: 1px solid #E5E5E5;
-          box-sizing: border-box;
+
+          background: #ffffff;
+
+          border-bottom:
+            1px solid #e7e7e7;
+
+          font-family:
+            Poppins,
+            sans-serif;
         }
 
-        /* =====================================================
+
+        /* ======================================================
            TOP ROW
-        ===================================================== */
+        ====================================================== */
 
-        .ch-public-top {
-          position: relative;
+        .ch-nav-top {
+          height: 76px;
+
           max-width: 1240px;
-          height: 78px;
+
           margin: 0 auto;
-          padding: 0 38px;
-          display: flex;
+
+          padding:
+            0 36px;
+
+          display: grid;
+
+          grid-template-columns:
+            1fr auto 1fr;
+
           align-items: center;
-          justify-content: space-between;
-          box-sizing: border-box;
+
+          gap: 20px;
         }
 
-        .ch-public-top-left,
-        .ch-public-top-right {
-          width: 330px;
-          display: flex;
-          align-items: center;
-        }
 
-        .ch-public-top-left {
-          justify-content: flex-start;
-        }
-
-        .ch-public-top-right {
-          justify-content: flex-end;
-        }
-
-        /* =====================================================
-           LOGO
-        ===================================================== */
-
-        .ch-public-logo {
-          position: absolute;
-          left: 50%;
-          top: 50%;
-          transform: translate(-50%, -50%);
-          display: flex;
-          align-items: center;
-          gap: 13px;
-          color: #111111;
-          text-decoration: none;
-          white-space: nowrap;
-          z-index: 2;
-        }
-
-        .ch-public-logo-text {
-          font-family: 'League Spartan', sans-serif;
-          font-size: 22px !important;
-          font-weight: 600 !important;
-          letter-spacing: -0.9px;
-          line-height: 1;
-        }
-
-        /* =====================================================
+        /* ======================================================
            SEARCH
-        ===================================================== */
+        ====================================================== */
 
-        .ch-public-search,
-        .ch-public-search * {
-          border: none !important;
-          box-shadow: none !important;
-          outline: none !important;
-        }
-
-        .ch-public-search {
+        .ch-nav-search {
           width: 280px;
           height: 40px;
-          display: flex;
-          align-items: center;
+
           border-radius: 22px;
-          background: #FAFAFA;
+
+          background: #fafafa;
+
+          display: flex;
+          align-items: center;
+
           overflow: hidden;
         }
 
-        .ch-public-search:focus-within {
-          background: #FFFFFF;
-          box-shadow:
-            0 4px 14px rgba(0,0,0,.05) !important;
+
+        .ch-nav-search input {
+          width: 100%;
+          height: 100%;
+
+          border: 0 !important;
+          outline: 0 !important;
+
+          background:
+            transparent !important;
+
+          padding:
+            0 14px 0 8px;
+
+          font:
+            400 13px
+            Poppins,
+            sans-serif;
+
+          color: #222;
         }
 
-        .ch-public-search-icon {
+
+        .ch-nav-search input::placeholder {
+          color: #918b99;
+          opacity: 1;
+        }
+
+
+        .ch-nav-search svg {
           margin-left: 14px;
-          flex-shrink: 0;
-          color: #8A8490;
+          color: #8d8793;
+          flex: none;
         }
 
-        .ch-public-search-input {
-          width: 100%;
-          height: 100%;
-          padding: 0 14px 0 9px;
-          border: none !important;
-          outline: none !important;
-          box-shadow: none !important;
-          background: transparent;
-          caret-color: #222222;
-          color: #222222;
-          font: 400 13px 'Poppins', sans-serif !important;
-        }
 
-        .ch-public-search-input:focus {
-          border: none !important;
-          border-color: transparent !important;
-          outline: none !important;
-          box-shadow: none !important;
-        }
+        /* ======================================================
+           LOGO
+        ====================================================== */
 
-        .ch-public-search-input::placeholder {
-          color: #99939F;
-        }
-
-        /* =====================================================
-           NAV MENU
-        ===================================================== */
-
-        .ch-public-nav-menu-row {
-          height: 48px;
+        .ch-nav-logo {
           display: flex;
+
           align-items: center;
+
           justify-content: center;
+
+          gap: 11px;
+
+          color: #111 !important;
+
+          text-decoration: none !important;
+
+          white-space: nowrap;
+
+          background:
+            transparent !important;
+
+          border: 0 !important;
+
+          box-shadow: none !important;
         }
 
-        .ch-public-nav-links {
+
+        .ch-nav-logo:hover {
+          background:
+            transparent !important;
+
+          color: #111 !important;
+        }
+
+
+        .ch-nav-logo span {
+          font:
+            600 21px
+            'League Spartan',
+            sans-serif;
+
+          letter-spacing:
+            -0.8px;
+        }
+
+
+        /* ======================================================
+           RIGHT ACTIONS
+        ====================================================== */
+
+        .ch-nav-actions {
           display: flex;
-          align-items: center;
-          justify-content: center;
-          gap: 48px;
-        }
 
-        .ch-public-nav-link {
-          position: relative;
-          display: inline-flex;
-          align-items: center;
-          height: 48px;
-          padding: 0;
-          color: #6F6A7C;
-          text-decoration: none;
-          border: 0;
-          background: transparent;
-          font: 500 14px 'Poppins', sans-serif !important;
-          line-height: 1 !important;
-          cursor: pointer;
-          transition: color .18s ease;
-        }
-
-        .ch-public-nav-link:hover,
-        .ch-public-nav-link.active {
-          color: #111111;
-        }
-
-        .ch-public-nav-link.active {
-          font-weight: 600 !important;
-        }
-
-        .ch-public-nav-link::after {
-          content: '';
-          position: absolute;
-          left: 0;
-          right: 0;
-          bottom: 6px;
-          width: 0;
-          height: 2px;
-          margin: auto;
-          border-radius: 2px;
-          background: #111111;
-          transition: width .18s ease;
-        }
-
-        .ch-public-nav-link:hover::after,
-        .ch-public-nav-link.active::after {
-          width: 100%;
-        }
-
-        /* =====================================================
-           ACTIONS
-        ===================================================== */
-
-        .ch-public-nav-actions {
-          display: flex;
-          align-items: center;
           justify-content: flex-end;
-          gap: 10px;
+
+          align-items: center;
+
+          gap: 9px;
         }
 
-        .ch-public-login,
-        .ch-public-register {
-          display: inline-flex;
-          align-items: center;
-          justify-content: center;
-          min-width: 72px;
+
+        /* ======================================================
+           LOGIN / REGISTER
+        ====================================================== */
+
+        .ch-nav-btn {
           height: 38px;
-          box-sizing: border-box;
-          padding: 0 15px;
-          border: 1px solid #111111;
+
+          padding:
+            0 15px;
+
           border-radius: 8px;
-          font-family: 'Poppins', sans-serif;
-          font-size: 13px;
-          font-weight: 500;
-          text-decoration: none;
-          transition: all .18s ease;
+
+          text-decoration: none !important;
+
+          font:
+            500 12px
+            Poppins,
+            sans-serif;
+
+          display: inline-flex;
+
+          align-items: center;
+
+          justify-content: center;
+
+          cursor: pointer;
         }
 
-        .ch-public-login {
-          background: #111111;
-          color: #FFFFFF;
+
+        .ch-nav-login {
+          background:
+            #111 !important;
+
+          color:
+            #fff !important;
+
+          border:
+            1px solid #111 !important;
         }
 
-        .ch-public-register {
-          background: #FFFFFF;
-          color: #111111;
+
+        .ch-nav-register {
+          background:
+            #fff !important;
+
+          color:
+            #111 !important;
+
+          border:
+            1px solid #111 !important;
         }
 
-        .ch-public-login:hover {
-          background: #000000;
-          color: #FFFFFF;
-          transform: translateY(-1px);
+
+        .ch-nav-login:hover {
+          background:
+            #111 !important;
+
+          color:
+            #fff !important;
         }
 
-        .ch-public-register:hover {
-          background: #F5F5F5;
-          color: #111111;
-          transform: translateY(-1px);
+
+        .ch-nav-register:hover {
+          background:
+            #f5f5f5 !important;
+
+          color:
+            #111 !important;
         }
 
-        /* =====================================================
-           ICON BUTTON
-        ===================================================== */
 
-        .ch-public-icon-btn {
+        /* ======================================================
+           ICON BUTTONS
+        ====================================================== */
+
+        .ch-nav-icon {
           position: relative;
+
           width: 38px;
           height: 38px;
-          border: 1px solid #E5E5E5;
-          border-radius: 50%;
-          background: #FFFFFF;
-          color: #111111;
+
+          min-width: 38px;
+
+          padding: 0 !important;
+
+          border:
+            1px solid #e2e2e2 !important;
+
+          border-radius: 50% !important;
+
+          background:
+            #fff !important;
+
+          color:
+            #111 !important;
+
           display: flex;
+
           align-items: center;
+
           justify-content: center;
+
           cursor: pointer;
+
+          appearance: none;
+
+          box-shadow: none !important;
         }
 
-        .ch-public-icon-btn:hover {
-          background: #F5F5F5;
+
+        .ch-nav-icon:hover {
+          background:
+            #f5f5f5 !important;
+
+          color:
+            #111 !important;
         }
 
-        /* =====================================================
+
+        /* ======================================================
+           NOTIFICATION BADGE
+        ====================================================== */
+
+        .ch-nav-badge {
+          position: absolute;
+
+          right: -2px;
+          top: -3px;
+
+          min-width: 16px;
+          height: 16px;
+
+          border-radius: 20px;
+
+          background:
+            #111 !important;
+
+          color:
+            #fff !important;
+
+          font:
+            700 9px/16px
+            Poppins,
+            sans-serif;
+
+          text-align: center;
+
+          padding:
+            0 3px;
+        }
+
+
+        /* ======================================================
            AVATAR
-        ===================================================== */
+        ====================================================== */
 
-        .ch-public-avatar {
+        .ch-nav-avatar {
           width: 38px;
           height: 38px;
-          border-radius: 50%;
-          border: 1px solid #E5E5E5;
-          background: #F3F3F3;
-          color: #111111;
-          display: flex;
-          align-items: center;
-          justify-content: center;
+
+          min-width: 38px;
+
+          padding: 0 !important;
+
+          border-radius: 50% !important;
+
           overflow: hidden;
-          font: 700 12px 'Poppins', sans-serif;
-          padding: 0;
+
+          border:
+            1px solid #ddd !important;
+
+          background:
+            #f3f3f3 !important;
+
+          color:
+            #111 !important;
+
+          display: flex;
+
+          align-items: center;
+
+          justify-content: center;
+
+          font:
+            700 12px
+            Poppins,
+            sans-serif;
+
           cursor: pointer;
+
+          appearance: none;
+
+          box-shadow: none !important;
         }
 
-        .ch-public-avatar img {
+
+        .ch-nav-avatar:hover {
+          background:
+            #f3f3f3 !important;
+        }
+
+
+        .ch-nav-avatar img {
           width: 100%;
           height: 100%;
+
           object-fit: cover;
         }
 
-        /* =====================================================
-           WISHLIST BADGE
-        ===================================================== */
 
-        .ch-wishlist-badge {
-          position: absolute;
-          right: -2px;
-          top: -3px;
-          min-width: 16px;
-          height: 16px;
-          padding: 0 4px;
-          border-radius: 99px;
-          background: #111111;
-          color: #FFFFFF;
-          font: 700 9px/16px 'Poppins', sans-serif;
+        /* ======================================================
+           DESKTOP NAV LINKS
+        ====================================================== */
+
+        .ch-nav-menu {
+          height: 48px;
+
+          display: flex;
+
+          justify-content: center;
+
+          align-items: center;
+
+          gap: 48px;
+
+          background:
+            #fff !important;
         }
 
-        /* =====================================================
-           PROFILE MENU
-        ===================================================== */
 
-        .ch-profile-wrap {
+        /*
+         IMPORTANT:
+         The !important values below prevent any global
+         button styles from turning these links black.
+        */
+
+        .ch-nav-link {
+          height: 48px;
+
+          min-width: auto;
+
+          padding:
+            0 !important;
+
+          margin: 0 !important;
+
+          display: flex;
+
+          align-items: center;
+
+          justify-content: center;
+
+          position: relative;
+
+          border:
+            0 !important;
+
+          outline: none !important;
+
+          background:
+            transparent !important;
+
+          background-color:
+            transparent !important;
+
+          color:
+            #716b7c !important;
+
+          text-decoration: none !important;
+
+          font:
+            500 14px
+            Poppins,
+            sans-serif;
+
+          cursor: pointer;
+
+          appearance: none;
+
+          box-shadow: none !important;
+
+          border-radius: 0 !important;
+        }
+
+
+        .ch-nav-link:hover {
+          background:
+            transparent !important;
+
+          background-color:
+            transparent !important;
+
+          color:
+            #111 !important;
+
+          box-shadow:
+            none !important;
+        }
+
+
+        .ch-nav-link.active {
+          background:
+            transparent !important;
+
+          background-color:
+            transparent !important;
+
+          color:
+            #111 !important;
+
+          font-weight: 600;
+        }
+
+
+        .ch-nav-link.active::after {
+          content: '';
+
+          position: absolute;
+
+          left: 0;
+          right: 0;
+
+          bottom: 6px;
+
+          height: 2px;
+
+          background:
+            #111 !important;
+
+          border-radius: 2px;
+        }
+
+
+        /* ======================================================
+           PROFILE DROPDOWN
+        ====================================================== */
+
+        .ch-profile {
           position: relative;
         }
 
+
         .ch-profile-menu {
           position: absolute;
+
           right: 0;
-          top: calc(100% + 88px);
+
+          top: 48px;
+
           width: 190px;
+
           padding: 7px;
-          background: #FFFFFF;
-          border: 1px solid #E6E6E6;
+
+          background:
+            #fff !important;
+
+          border:
+            1px solid #e5e5e5;
+
           border-radius: 12px;
+
           box-shadow:
-            0 14px 35px rgba(38,28,54,.14);
+            0 14px 35px
+            rgba(0, 0, 0, 0.12);
+
           z-index: 10001;
         }
+
 
         .ch-profile-menu a,
         .ch-profile-menu button {
           width: 100%;
+
           box-sizing: border-box;
-          display: flex;
-          align-items: center;
-          gap: 9px;
-          padding: 10px 11px;
-          border: 0;
+
+          border: 0 !important;
+
+          background:
+            transparent !important;
+
           border-radius: 8px;
-          background: transparent;
-          color: #383240;
-          text-decoration: none;
-          font: 500 13px 'Poppins', sans-serif;
+
+          padding:
+            10px 11px;
+
+          display: flex;
+
+          gap: 9px;
+
+          align-items: center;
+
+          color:
+            #333 !important;
+
+          text-decoration: none !important;
+
+          font:
+            500 12px
+            Poppins,
+            sans-serif;
+
           cursor: pointer;
+
           text-align: left;
+
+          appearance: none;
         }
+
 
         .ch-profile-menu a:hover,
         .ch-profile-menu button:hover {
-          background: #F5F5F5;
-          color: #111111;
+          background:
+            #f5f5f5 !important;
+
+          color:
+            #111 !important;
         }
 
-        /* =====================================================
-           WISHLIST DRAWER
-        ===================================================== */
 
-        .ch-wishlist-drawer {
+        /* ======================================================
+           PANELS
+        ====================================================== */
+
+        .ch-panel {
           position: fixed;
-          inset: 0;
-          z-index: 10000;
-          pointer-events: none;
-        }
 
-        .ch-wishlist-drawer.open {
-          pointer-events: auto;
-        }
+          right: 18px;
 
-        .ch-wishlist-backdrop {
-          position: absolute;
-          inset: 0;
-          background: rgba(25,18,32,.32);
-          opacity: 0;
-          transition: opacity .22s ease;
-        }
+          top: 140px;
 
-        .ch-wishlist-drawer.open
-        .ch-wishlist-backdrop {
-          opacity: 1;
-        }
+          width:
+            min(
+              390px,
+              calc(100vw - 36px)
+            );
 
-        .ch-wishlist-panel {
-          position: absolute;
-          right: 0;
-          top: 0;
-          height: 100%;
-          width: min(410px, 92vw);
-          background: #FFFDFA;
+          max-height: 70vh;
+
+          overflow: auto;
+
+          background:
+            #fff !important;
+
+          border:
+            1px solid #e5e5e5;
+
+          border-radius: 14px;
+
           box-shadow:
-            -15px 0 40px rgba(35,25,45,.16);
-          transform: translateX(100%);
-          transition: transform .24s ease;
-          display: flex;
-          flex-direction: column;
+            0 18px 45px
+            rgba(0, 0, 0, 0.15);
+
+          z-index: 10000;
         }
 
-        .ch-wishlist-drawer.open
-        .ch-wishlist-panel {
-          transform: translateX(0);
-        }
 
-        .ch-wishlist-head {
-          min-height: 72px;
-          box-sizing: border-box;
-          padding: 0 20px;
-          border-bottom: 1px solid #E5E5E5;
+        .ch-panel-head {
+          min-height: 58px;
+
+          padding:
+            0 16px;
+
+          border-bottom:
+            1px solid #eee;
+
           display: flex;
+
           align-items: center;
+
           justify-content: space-between;
         }
 
-        .ch-wishlist-head h3 {
+
+        .ch-panel-head h3 {
           margin: 0;
-          color: #1E1E1E;
-          font: 700 18px 'Poppins', sans-serif;
+
+          font:
+            700 15px
+            Poppins,
+            sans-serif;
         }
 
-        .ch-wishlist-close {
-          width: 36px;
-          height: 36px;
-          border: 0;
-          border-radius: 50%;
-          background: #F0F0F0;
-          color: #111111;
-          display: flex;
-          align-items: center;
-          justify-content: center;
+
+        .ch-panel-head button {
+          border: 0 !important;
+
+          background:
+            transparent !important;
+
+          color:
+            #333 !important;
+
           cursor: pointer;
+
+          appearance: none;
         }
 
-        .ch-wishlist-list {
-          flex: 1;
-          padding: 16px;
-          overflow-y: auto;
+
+        .ch-panel-row {
+          padding:
+            12px 15px;
+
+          border-bottom:
+            1px solid #eee;
+
           display: flex;
-          flex-direction: column;
-          gap: 12px;
-        }
 
-        .ch-wishlist-card {
-          display: flex;
-          gap: 12px;
-          padding: 10px;
-          border: 1px solid #E7E7E7;
-          border-radius: 12px;
-          background: #FFFFFF;
+          gap: 10px;
+
           cursor: pointer;
+
+          background:
+            #fff !important;
         }
 
-        .ch-wishlist-card:hover {
-          border-color: #C7C7C7;
+
+        .ch-panel-row:hover {
+          background:
+            #fafafa !important;
         }
 
-        .ch-wishlist-image {
-          width: 76px;
-          height: 68px;
-          border-radius: 9px;
-          object-fit: cover;
-          background: #F3F3F3;
-          flex: 0 0 auto;
+
+        .ch-panel-row.unread {
+          background:
+            #fafafa !important;
         }
 
-        .ch-wishlist-info {
-          min-width: 0;
-          flex: 1;
+
+        .ch-panel-row strong {
+          display: block;
+
+          font:
+            600 12px
+            Poppins,
+            sans-serif;
         }
 
-        .ch-wishlist-title {
-          margin: 2px 0 5px;
-          color: #212121;
-          font: 600 13px 'Poppins', sans-serif;
-          white-space: nowrap;
-          overflow: hidden;
-          text-overflow: ellipsis;
+
+        .ch-panel-row p {
+          margin:
+            3px 0 0;
+
+          color:
+            #777;
+
+          font:
+            400 11px/1.45
+            Poppins,
+            sans-serif;
         }
 
-        .ch-wishlist-brand {
-          color: #756E7E;
-          font: 500 11px 'Poppins', sans-serif;
-        }
 
-        .ch-wishlist-budget {
-          margin-top: 6px;
-          color: #111111;
-          font: 600 11px 'Poppins', sans-serif;
-        }
+        .ch-empty {
+          padding:
+            35px 18px;
 
-        .ch-wishlist-remove {
-          align-self: flex-start;
-          padding: 4px;
-          border: 0;
-          background: transparent;
-          color: #AAA2B2;
-          cursor: pointer;
-        }
-
-        .ch-wishlist-remove:hover {
-          color: #777777;
-        }
-
-        .ch-wishlist-empty {
-          padding: 50px 24px;
           text-align: center;
-          color: #7B7484;
-          font: 500 13px/1.6 'Poppins', sans-serif;
+
+          color:
+            #888;
+
+          font:
+            400 12px
+            Poppins,
+            sans-serif;
         }
 
-        /* =====================================================
-           MOBILE
-        ===================================================== */
 
-        .ch-public-burger {
-          display: none;
-          width: 38px;
-          height: 38px;
-          align-items: center;
-          justify-content: center;
-          border: 1px solid #E5E5E5;
+        /* ======================================================
+           WISHLIST
+        ====================================================== */
+
+        .ch-wish-work {
+          width: 48px;
+          height: 48px;
+
           border-radius: 8px;
-          background: #FFFFFF;
-          color: #111111;
-          cursor: pointer;
+
+          background:
+            #f3f3f3 !important;
+
+          object-fit: cover;
+
+          flex: none;
         }
 
-        .ch-public-mobile-panel {
+
+        .ch-wish-remove {
+          margin-left: auto;
+
+          border: 0 !important;
+
+          background:
+            transparent !important;
+
+          color:
+            #888 !important;
+
+          cursor: pointer;
+
+          padding: 4px !important;
+
+          appearance: none;
+        }
+
+
+        .ch-wish-remove:hover {
+          background:
+            transparent !important;
+
+          color:
+            #111 !important;
+        }
+
+
+        /* ======================================================
+           MOBILE MENU
+        ====================================================== */
+
+        .ch-mobile {
           display: none;
         }
 
-        .ch-public-nav-spacer {
-          height: ${sticky ? "126px" : "0px"};
-          width: 100%;
+
+        /*
+         DESKTOP:
+         Hamburger is completely hidden.
+        */
+
+        .ch-desktop-menu-button {
+          display: none !important;
         }
 
-        @media (max-width: 900px) {
 
-          .ch-public-top {
-            padding: 0 24px;
-          }
-
-          .ch-public-top-left,
-          .ch-public-top-right {
-            width: 280px;
-          }
-
-          .ch-public-search {
-            width: 235px;
-          }
-
-          .ch-public-nav-links {
-            gap: 34px;
-          }
-        }
+        /* ======================================================
+           MOBILE
+        ====================================================== */
 
         @media (max-width: 760px) {
 
-          .ch-public-top {
+          .ch-nav-top {
             height: 64px;
-            padding: 0 18px;
+
+            padding:
+              0 16px;
+
+            grid-template-columns:
+              auto 1fr auto;
           }
 
-          .ch-public-nav-spacer {
-            height: ${sticky ? "64px" : "0px"};
-          }
 
-          .ch-public-top-left {
+          .ch-nav-search {
             display: none;
           }
 
-          .ch-public-top-right {
-            width: auto;
-            margin-left: auto;
+
+          .ch-nav-logo {
+            justify-self: center;
           }
 
-          .ch-public-logo {
-            position: static;
-            transform: none;
-          }
 
-          .ch-public-logo-text {
-            font-size: 20px !important;
-          }
-
-          .ch-public-nav-menu-row {
+          .ch-nav-logo span {
             display: none;
           }
 
-          .ch-public-nav-actions {
+
+          /*
+           Desktop navigation disappears.
+          */
+
+          .ch-nav-menu {
+            display: none !important;
+          }
+
+
+          /*
+           Desktop Login/Register disappear.
+          */
+
+          .ch-nav-actions
+          .ch-nav-btn {
             display: none;
           }
 
-          .ch-public-burger {
+
+          /*
+           Hamburger appears ONLY on mobile.
+          */
+
+          .ch-desktop-menu-button {
+            display: flex !important;
+          }
+
+
+          .ch-mobile {
             display: flex;
+
+            justify-content: center;
+
+            align-items: center;
+
+            border-top:
+              1px solid #eee;
+
+            padding:
+              8px 14px;
+
+            gap: 20px;
+
+            background:
+              #fff !important;
           }
 
-          .ch-public-mobile-panel {
-            display: block;
-            padding: 12px 18px 16px;
-            border-top: 1px solid #E5E5E5;
-            background: #FFFFFF;
+
+          .ch-mobile .ch-nav-link {
+            height: 40px;
+
+            font-size: 13px;
           }
 
-          .ch-public-mobile-panel a,
-          .ch-public-mobile-panel button.ch-public-mobile-link {
-            display: block;
-            width: 100%;
-            padding: 9px 0;
-            border: 0;
-            background: transparent;
-            color: #6F6A7C;
-            text-decoration: none;
-            font: 500 14px 'Poppins', sans-serif !important;
-            line-height: 1 !important;
-            text-align: left;
-            cursor: pointer;
+
+          .ch-panel {
+            top: 78px;
+
+            right: 10px;
           }
 
-          .ch-public-mobile-panel a.active,
-          .ch-public-mobile-panel
-          button.ch-public-mobile-link.active {
-            color: #111111;
-            font-weight: 600;
-          }
-
-          .ch-public-mobile-actions {
-            display: flex;
-            gap: 8px;
-            padding-top: 8px;
-          }
-
-          .ch-public-mobile-actions > * {
-            flex: 1;
-            text-align: center;
-          }
-
-          .ch-public-mobile-profile {
-            display: block;
-            padding: 9px;
-            border: 0;
-            border-radius: 8px;
-            background: #F3F3F3;
-            color: #111111 !important;
-            font: 600 13px 'Poppins', sans-serif;
-            cursor: pointer;
-          }
-
-          .ch-wishlist-panel {
-            width: min(430px, 96vw);
-          }
         }
+
+
+        /* ======================================================
+           SMALL MOBILE
+        ====================================================== */
+
+        @media (max-width: 430px) {
+
+          .ch-nav-top {
+            padding:
+              0 12px;
+          }
+
+
+          .ch-nav-actions {
+            gap: 6px;
+          }
+
+
+          .ch-nav-icon,
+          .ch-nav-avatar {
+            width: 36px;
+            height: 36px;
+
+            min-width: 36px;
+          }
+
+
+          .ch-mobile {
+            gap: 14px;
+          }
+
+        }
+
       `}</style>
 
-      {/* =====================================================
-          NAVBAR
-      ===================================================== */}
 
-      <nav
-        className="ch-public-nav"
-        aria-label="Main navigation"
-      >
-        {/* ===================================================
+      {/* ======================================================
+          HEADER
+      ====================================================== */}
+
+      <header className="ch-nav">
+
+        {/* ====================================================
             TOP ROW
-        =================================================== */}
+        ==================================================== */}
 
-        <div className="ch-public-top">
+        <div className="ch-nav-top">
 
-          {/* LEFT — SEARCH */}
+          {/* SEARCH */}
 
-          <div className="ch-public-top-left">
-            <form
-              className="ch-public-search"
-              onSubmit={handleSearch}
-            >
-              <Search
-                size={17}
-                className="ch-public-search-icon"
-              />
+          <form
+            className="ch-nav-search"
+            onSubmit={submitSearch}
+          >
 
-              <input
-                type="text"
-                className="ch-public-search-input"
-                placeholder="Search campaigns..."
-                value={searchValue}
-                onChange={(event) =>
-                  setSearchValue(
-                    event.target.value
-                  )
-                }
-                aria-label="Search campaigns"
-              />
-            </form>
-          </div>
+            <Search size={17} />
 
-          {/* CENTER — LOGO */}
+            <input
+              value={search}
+              onChange={(event) =>
+                setSearch(
+                  event.target.value
+                )
+              }
+              placeholder="Search campaigns..."
+            />
+
+          </form>
+
+
+          {/* LOGO */}
 
           <Link
-            to={navLink("#home")}
-            className="ch-public-logo"
-            onClick={(event) =>
-              handleSectionClick(
-                event,
-                "home"
-              )
-            }
+            className="ch-nav-logo"
+            to="/"
+            onClick={() => {
+              setMobileOpen(false);
+              setProfileOpen(false);
+            }}
           >
-            <LogoMark size={27} />
 
-            <span className="ch-public-logo-text">
+            <LogoMark />
+
+            <span>
               creatorhub
             </span>
+
           </Link>
 
-          {/* RIGHT — ACTIONS */}
 
-          <div className="ch-public-top-right">
-            <div className="ch-public-nav-actions">
+          {/* RIGHT SIDE */}
 
-              {!loading &&
-              isAuthenticated ? (
-                <>
-                  {showWishlist && (
+          <div className="ch-nav-actions">
+
+            {isAuthenticated ? (
+              <>
+
+                {/* WISHLIST */}
+
+                {isCreator &&
+                  showWishlist && (
+
                     <button
                       type="button"
-                      className="ch-public-icon-btn"
-                      aria-label="Open wishlist"
-                      onClick={() =>
-                        setWishlistOpen(true)
-                      }
+                      className="ch-nav-icon"
+                      onClick={() => {
+                        setWishlistOpen(
+                          value => !value
+                        );
+
+                        setNotificationOpen(
+                          false
+                        );
+                      }}
+                      aria-label="Wishlist"
                     >
-                      <Heart size={18} />
+
+                      <Heart size={17} />
 
                       {saved.length > 0 && (
-                        <span className="ch-wishlist-badge">
-                          {saved.length > 99
-                            ? "99+"
-                            : saved.length}
+                        <span className="ch-nav-badge">
+                          {saved.length}
                         </span>
                       )}
+
                     </button>
+
                   )}
 
-                  <div
-                    className="ch-profile-wrap"
-                    ref={profileWrapRef}
-                  >
-                    <button
-                      type="button"
-                      className="ch-public-avatar"
-                      aria-label="Open profile menu"
-                      aria-haspopup="menu"
-                      aria-expanded={
-                        profileOpen
-                      }
-                      onClick={() =>
-                        setProfileOpen(
-                          (value) => !value
-                        )
-                      }
-                    >
-                      {avatarUrl ? (
-                        <img
-                          src={avatarUrl}
-                          alt="Profile"
-                          onError={(event) => {
-                            event.currentTarget.style.display =
-                              "none";
-                          }}
-                        />
-                      ) : (
-                        <span>
-                          {initials}
-                        </span>
-                      )}
-                    </button>
 
-                    {profileOpen && (
-                      <div
-                        className="ch-profile-menu"
-                        role="menu"
-                      >
-                        <Link
-                          to="/dashboard"
-                          onClick={() =>
-                            setProfileOpen(
-                              false
-                            )
-                          }
-                        >
-                          <LayoutDashboard
-                            size={16}
-                          />
-                          Dashboard
-                        </Link>
-
-                        <Link
-                          to="/profile"
-                          onClick={() =>
-                            setProfileOpen(
-                              false
-                            )
-                          }
-                        >
-                          <UserRound
-                            size={16}
-                          />
-                          Profile
-                        </Link>
-
-                        <button
-                          type="button"
-                          onClick={
-                            handleLogout
-                          }
-                        >
-                          <LogOut
-                            size={16}
-                          />
-                          Logout
-                        </button>
-                      </div>
-                    )}
-                  </div>
-                </>
-              ) : !loading ? (
-                <>
-                  <Link
-                    to="/login"
-                    className="ch-public-login"
-                  >
-                    Login
-                  </Link>
-
-                  <Link
-                    to="/register"
-                    className="ch-public-register"
-                  >
-                    Register
-                  </Link>
-                </>
-              ) : null}
-            </div>
-          </div>
-
-          {/* MOBILE BUTTON */}
-
-          <button
-            type="button"
-            className="ch-public-burger"
-            aria-label={
-              mobileOpen
-                ? "Close menu"
-                : "Open menu"
-            }
-            onClick={() =>
-              setMobileOpen(
-                (value) => !value
-              )
-            }
-          >
-            {mobileOpen ? (
-              <X size={20} />
-            ) : (
-              <Menu size={20} />
-            )}
-          </button>
-        </div>
-
-        {/* ===================================================
-            DESKTOP NAV MENU
-        =================================================== */}
-
-        <div className="ch-public-nav-menu-row">
-          <div className="ch-public-nav-links">
-
-            {/* HOME */}
-
-            <Link
-              to={navLink("#home")}
-              className={`ch-public-nav-link ${
-                isActive("#home")
-                  ? "active"
-                  : ""
-              }`}
-              onClick={(event) =>
-                handleSectionClick(
-                  event,
-                  "home"
-                )
-              }
-            >
-              Home
-            </Link>
-
-            {/* CAMPAIGNS — REAL PAGE */}
-
-            <Link
-              to="/campaigns"
-              className={`ch-public-nav-link ${
-                isActive("#campaigns")
-                  ? "active"
-                  : ""
-              }`}
-              onClick={
-                handleCampaignsClick
-              }
-            >
-              Campaigns
-            </Link>
-
-            {/* FOR BRANDS */}
-
-            <Link
-              to={navLink("#for-brands")}
-              className={`ch-public-nav-link ${
-                isActive("#for-brands")
-                  ? "active"
-                  : ""
-              }`}
-              onClick={(event) =>
-                handleSectionClick(
-                  event,
-                  "for-brands"
-                )
-              }
-            >
-              For Brands
-            </Link>
-
-          </div>
-        </div>
-
-        {/* ===================================================
-            MOBILE MENU
-        =================================================== */}
-
-        {mobileOpen && (
-          <div className="ch-public-mobile-panel">
-
-            {/* MOBILE SEARCH */}
-
-            <form
-              className="ch-public-search"
-              onSubmit={handleSearch}
-              style={{
-                width: "100%",
-                marginBottom: "8px",
-              }}
-            >
-              <Search
-                size={17}
-                className="ch-public-search-icon"
-              />
-
-              <input
-                type="text"
-                className="ch-public-search-input"
-                placeholder="Search campaigns..."
-                value={searchValue}
-                onChange={(event) =>
-                  setSearchValue(
-                    event.target.value
-                  )
-                }
-              />
-            </form>
-
-            {/* HOME */}
-
-            <Link
-              to={navLink("#home")}
-              className={
-                isActive("#home")
-                  ? "active"
-                  : ""
-              }
-              onClick={(event) =>
-                handleSectionClick(
-                  event,
-                  "home"
-                )
-              }
-            >
-              Home
-            </Link>
-
-            {/* CAMPAIGNS — IMPORTANT */}
-
-            <Link
-              to="/campaigns"
-              className={
-                isActive("#campaigns")
-                  ? "active"
-                  : ""
-              }
-              onClick={
-                handleCampaignsClick
-              }
-            >
-              Campaigns
-            </Link>
-
-            {/* FOR BRANDS */}
-
-            <Link
-              to={navLink("#for-brands")}
-              className={
-                isActive("#for-brands")
-                  ? "active"
-                  : ""
-              }
-              onClick={(event) =>
-                handleSectionClick(
-                  event,
-                  "for-brands"
-                )
-              }
-            >
-              For Brands
-            </Link>
-
-            {/* AUTH ACTIONS */}
-
-            {!loading &&
-            isAuthenticated ? (
-              <div className="ch-public-mobile-actions">
-
-                <Link
-                  to="/dashboard"
-                  className="ch-public-mobile-profile"
-                  onClick={() =>
-                    setMobileOpen(false)
-                  }
-                >
-                  Dashboard
-                </Link>
-
-                <Link
-                  to="/profile"
-                  className="ch-public-mobile-profile"
-                  onClick={() =>
-                    setMobileOpen(false)
-                  }
-                >
-                  Profile
-                </Link>
-
-                {showWishlist && (
-                  <button
-                    type="button"
-                    className="ch-public-mobile-profile"
-                    onClick={() => {
-                      setMobileOpen(false);
-                      setWishlistOpen(
-                        true
-                      );
-                    }}
-                  >
-                    Wishlist ({saved.length})
-                  </button>
-                )}
+                {/* NOTIFICATIONS */}
 
                 <button
                   type="button"
-                  className="ch-public-mobile-profile"
-                  onClick={
-                    handleLogout
-                  }
+                  className="ch-nav-icon"
+                  onClick={() => {
+
+                    setNotificationOpen(
+                      value => !value
+                    );
+
+                    setWishlistOpen(
+                      false
+                    );
+
+                  }}
+                  aria-label="Notifications"
                 >
-                  Logout
+
+                  <Bell size={17} />
+
+                  {unread > 0 && (
+                    <span className="ch-nav-badge">
+                      {unread}
+                    </span>
+                  )}
+
                 </button>
 
-              </div>
-            ) : !loading ? (
-              <div className="ch-public-mobile-actions">
+
+                {/* PROFILE */}
+
+                <div
+                  className="ch-profile"
+                  ref={profileRef}
+                >
+
+                  <button
+                    type="button"
+                    className="ch-nav-avatar"
+                    onClick={() =>
+                      setProfileOpen(
+                        value => !value
+                      )
+                    }
+                    aria-label="Profile"
+                  >
+
+                    {avatar ? (
+
+                      <img
+                        src={avatar}
+                        alt=""
+                      />
+
+                    ) : (
+
+                      initials(
+                        user?.full_name
+                      )
+
+                    )}
+
+                  </button>
+
+
+                  {profileOpen && (
+
+                    <div className="ch-profile-menu">
+
+                      <Link
+                        to="/profile"
+                        onClick={() =>
+                          setProfileOpen(false)
+                        }
+                      >
+
+                        <UserRound
+                          size={14}
+                        />
+
+                        Profile
+
+                      </Link>
+
+
+                      <Link
+                        to={
+                          user?.role === 'admin'
+                            ? '/admin'
+                            : '/dashboard'
+                        }
+                        onClick={() =>
+                          setProfileOpen(false)
+                        }
+                      >
+
+                        <LayoutDashboard
+                          size={14}
+                        />
+
+                        Dashboard
+
+                      </Link>
+
+
+                      <button
+                        type="button"
+                        onClick={handleLogout}
+                      >
+
+                        <LogOut
+                          size={14}
+                        />
+
+                        Logout
+
+                      </button>
+
+                    </div>
+
+                  )}
+
+                </div>
+
+              </>
+
+            ) : (
+
+              <>
 
                 <Link
+                  className="ch-nav-btn ch-nav-login"
                   to="/login"
-                  className="ch-public-login"
-                  onClick={() =>
-                    setMobileOpen(false)
-                  }
                 >
                   Login
                 </Link>
 
+
                 <Link
+                  className="ch-nav-btn ch-nav-register"
                   to="/register"
-                  className="ch-public-register"
-                  onClick={() =>
-                    setMobileOpen(false)
-                  }
                 >
                   Register
                 </Link>
 
-              </div>
-            ) : null}
+              </>
+
+            )}
+
+
+            {/* =================================================
+                HAMBURGER
+
+                Hidden on desktop.
+                Visible ONLY under 760px.
+            ================================================= */}
+
+            <button
+              type="button"
+              className="ch-nav-icon ch-desktop-menu-button"
+              onClick={() =>
+                setMobileOpen(
+                  value => !value
+                )
+              }
+              aria-label="Menu"
+              aria-expanded={mobileOpen}
+            >
+
+              {mobileOpen ? (
+                <X size={18} />
+              ) : (
+                <Menu size={18} />
+              )}
+
+            </button>
 
           </div>
-        )}
-      </nav>
 
-      {/* =====================================================
-          NAVBAR SPACER
-      ===================================================== */}
+        </div>
 
-      {sticky && (
-        <div className="ch-public-nav-spacer" />
-      )}
 
-      {/* =====================================================
-          WISHLIST DRAWER
-      ===================================================== */}
+        {/* ====================================================
+            DESKTOP NAV
+        ==================================================== */}
 
-      {showWishlist && (
-        <div
-          className={`ch-wishlist-drawer ${
-            wishlistOpen ? "open" : ""
-          }`}
-          aria-hidden={!wishlistOpen}
-        >
+        <nav className="ch-nav-menu">
+
           <button
             type="button"
-            className="ch-wishlist-backdrop"
-            aria-label="Close wishlist"
+            className={`ch-nav-link ${
+              isLanding &&
+              !location.hash
+                ? 'active'
+                : ''
+            }`}
             onClick={() =>
-              setWishlistOpen(false)
+              goSection('home')
             }
-          />
-
-          <aside
-            className="ch-wishlist-panel"
-            aria-label="Wishlist"
           >
-            <div className="ch-wishlist-head">
+            Home
+          </button>
+
+
+          <button
+            type="button"
+            className={`ch-nav-link ${
+              isCampaigns
+                ? 'active'
+                : ''
+            }`}
+            onClick={() =>
+              goSection('campaigns')
+            }
+          >
+            Campaigns
+          </button>
+
+
+          <button
+            type="button"
+            className={`ch-nav-link ${
+              isPublicHome &&
+              location.hash ===
+                '#for-brands'
+                ? 'active'
+                : ''
+            }`}
+            onClick={() =>
+              goSection('for-brands')
+            }
+          >
+            For Brands
+          </button>
+
+        </nav>
+
+
+        {/* ====================================================
+            MOBILE NAV
+        ==================================================== */}
+
+        {mobileOpen && (
+
+          <div className="ch-mobile">
+
+            <button
+              type="button"
+              className="ch-nav-link"
+              onClick={() =>
+                goSection('home')
+              }
+            >
+              Home
+            </button>
+
+
+            <button
+              type="button"
+              className="ch-nav-link"
+              onClick={() =>
+                goSection('campaigns')
+              }
+            >
+              Campaigns
+            </button>
+
+
+            <button
+              type="button"
+              className="ch-nav-link"
+              onClick={() =>
+                goSection('for-brands')
+              }
+            >
+              For Brands
+            </button>
+
+          </div>
+
+        )}
+
+      </header>
+
+
+      {/* ======================================================
+          WISHLIST PANEL
+      ====================================================== */}
+
+      {wishlistOpen &&
+        showWishlist && (
+
+          <div className="ch-panel">
+
+            <div className="ch-panel-head">
+
               <h3>
-                Wishlist{" "}
-                <span
-                  style={{
-                    color: "#8C8494",
-                    fontWeight: 500,
-                    fontSize: 13,
-                  }}
-                >
-                  ({saved.length})
-                </span>
+                Saved campaigns
               </h3>
 
               <button
                 type="button"
-                className="ch-wishlist-close"
                 onClick={() =>
                   setWishlistOpen(false)
                 }
                 aria-label="Close wishlist"
               >
-                <X size={18} />
+                <X size={17} />
               </button>
+
             </div>
 
-            <div className="ch-wishlist-list">
 
-              {wishlistLoading ? (
-                <div className="ch-wishlist-empty">
-                  Loading your saved campaigns...
+            {saved.length === 0 ? (
+
+              <div className="ch-empty">
+                No saved campaigns yet.
+              </div>
+
+            ) : (
+
+              saved.map(item => (
+
+                <div
+                  className="ch-panel-row"
+                  key={item.id}
+                  onClick={() => {
+
+                    setWishlistOpen(
+                      false
+                    );
+
+                    navigate(
+                      `/campaigns/${item.campaign_id}?source=landing`
+                    );
+
+                  }}
+                >
+
+                  <div className="ch-wish-work" />
+
+
+                  <div>
+
+                    <strong>
+                      {item.campaign.title}
+                    </strong>
+
+                    <p>
+                      {item.campaign.category}
+                    </p>
+
+                  </div>
+
+
+                  <button
+                    type="button"
+                    className="ch-wish-remove"
+                    onClick={event => {
+
+                      event.stopPropagation();
+
+                      void removeSaved(
+                        item.campaign_id
+                      );
+
+                    }}
+                    aria-label="Remove saved campaign"
+                  >
+
+                    <Trash2 size={15} />
+
+                  </button>
+
                 </div>
-              ) : saved.length === 0 ? (
-                <div className="ch-wishlist-empty">
-                  Your wishlist is empty.
-                  <br />
-                  Save campaigns you like and
-                  they will appear here.
-                </div>
-              ) : (
-                saved.map((entry) => {
-                  const campaign =
-                    entry.campaign;
 
-                  return (
-                    <div
-                      key={entry.id}
-                      className="ch-wishlist-card"
-                      role="button"
-                      tabIndex={0}
-                      onClick={() =>
-                        openCampaign(
-                          campaign.id
-                        )
-                      }
-                      onKeyDown={(event) => {
-                        if (
-                          event.key ===
-                            "Enter" ||
-                          event.key === " "
-                        ) {
-                          event.preventDefault();
+              ))
 
-                          openCampaign(
-                            campaign.id
-                          );
-                        }
-                      }}
-                    >
-                      {campaign.hero_image ? (
-                        <img
-                          className="ch-wishlist-image"
-                          src={mediaUrl(
-                            campaign.hero_image
-                          )}
-                          alt=""
-                        />
-                      ) : (
-                        <div className="ch-wishlist-image" />
-                      )}
+            )}
 
-                      <div className="ch-wishlist-info">
+          </div>
 
-                        <div className="ch-wishlist-title">
-                          {campaign.title}
-                        </div>
+        )}
 
-                        <div className="ch-wishlist-brand">
-                          {(campaign as PublicCampaign)
-                            .brand_name ||
-                            "Creatorhub campaign"}
-                        </div>
 
-                        {campaign.budget != null && (
-                          <div className="ch-wishlist-budget">
-                            NPR{" "}
-                            {Number(
-                              campaign.budget
-                            ).toLocaleString()}
-                          </div>
-                        )}
+      {/* ======================================================
+          NOTIFICATION PANEL
+      ====================================================== */}
 
-                      </div>
+      {notificationOpen &&
+        isAuthenticated && (
 
-                      <button
-                        type="button"
-                        className="ch-wishlist-remove"
-                        aria-label={`Remove ${campaign.title} from wishlist`}
-                        onClick={(event) =>
-                          void removeSaved(
-                            event,
-                            campaign.id
-                          )
-                        }
-                      >
-                        <Trash2 size={16} />
-                      </button>
+          <div className="ch-panel">
+
+            <div className="ch-panel-head">
+
+              <h3>
+                Notifications
+              </h3>
+
+
+              <div
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 8,
+                }}
+              >
+
+                <button
+                  type="button"
+                  onClick={() =>
+                    void markEverythingRead()
+                  }
+                  title="Mark all notifications as read"
+                  style={{
+                    font:
+                      '500 11px Poppins, sans-serif',
+                    padding:
+                      '5px 7px',
+                  }}
+                >
+                  Mark all
+                </button>
+
+
+                <button
+                  type="button"
+                  onClick={() =>
+                    setNotificationOpen(false)
+                  }
+                  aria-label="Close notifications"
+                >
+                  <X size={17} />
+                </button>
+
+              </div>
+
+            </div>
+
+
+            {notifications.length === 0 ? (
+
+              <div className="ch-empty">
+                No notifications yet.
+              </div>
+
+            ) : (
+
+              notifications
+                .slice(0, 20)
+                .map(item => (
+
+                  <div
+                    className={`ch-panel-row ${
+                      item.is_read
+                        ? ''
+                        : 'unread'
+                    }`}
+                    key={item.id}
+                    onClick={() =>
+                      void markOneRead(
+                        item
+                      )
+                    }
+                  >
+
+                    <Bell size={15} />
+
+
+                    <div>
+
+                      <strong>
+                        {item.title}
+                      </strong>
+
+                      <p>
+                        {item.message}
+                      </p>
+
                     </div>
-                  );
-                })
-              )}
 
-            </div>
-          </aside>
-        </div>
-      )}
+                  </div>
+
+                ))
+
+            )}
+
+          </div>
+
+        )}
+
     </>
   );
 }
+
+
+export default PublicNavbar;
