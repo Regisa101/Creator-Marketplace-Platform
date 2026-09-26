@@ -27,6 +27,7 @@ from app.routes import (
     notifications,
     onboarding,
     payments,
+    contracts,
     saved_campaigns,
     uploads,
     admin,
@@ -384,6 +385,10 @@ app.include_router(
 
 app.include_router(
     payments.router
+)
+
+app.include_router(
+    contracts.router
 )
 
 app.include_router(

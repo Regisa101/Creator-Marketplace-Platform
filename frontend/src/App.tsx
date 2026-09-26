@@ -41,6 +41,13 @@ import PaymentReturn from './pages/PaymentReturn';
 import { Dashboard } from './pages/Dashboard';
 import AdminDashboard from './pages/AdminDashboard';
 
+/*
+ * Same component renders both "Contract History" (creator) and
+ * "Collab History" (business) — it reads user.role from useAuth() and
+ * switches the title/copy itself. See pages/Contracthistory.tsx.
+ */
+import { ContractHistory } from './pages/Contracthistory';
+
 
 /* ============================================================
    PROFILE ROUTER
@@ -294,6 +301,32 @@ export default function App() {
             element={
               <ProtectedRoute>
                 <ApplicationsInbox />
+              </ProtectedRoute>
+            }
+          />
+
+
+          {/* ==================================================
+              CONTRACT HISTORY (creator) / COLLAB HISTORY (business)
+
+              Same page, different nav label depending on role — see
+              PublicNavbar.tsx's profile dropdown.
+          ================================================== */}
+
+          <Route
+            path="/contracts"
+            element={
+              <ProtectedRoute>
+                <ContractHistory />
+              </ProtectedRoute>
+            }
+          />
+
+          <Route
+            path="/collab-history"
+            element={
+              <ProtectedRoute>
+                <ContractHistory />
               </ProtectedRoute>
             }
           />

@@ -351,7 +351,7 @@ async def get_public_campaigns(
 # ============================================================
 
 @router.post(
-    "/",
+    "",
     response_model=CampaignResponse,
 )
 async def create_campaign(
@@ -462,7 +462,7 @@ async def create_campaign(
 # ============================================================
 
 @router.get(
-    "/",
+    "",
     response_model=dict,
 )
 async def get_campaigns(

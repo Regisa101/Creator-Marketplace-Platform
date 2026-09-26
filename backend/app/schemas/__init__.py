@@ -58,3 +58,9 @@ from app.schemas.payment import (
     PaymentInitiateResponse,
     PaymentResponse,
 )
+
+from app.schemas.contract import (
+    ContractFinalizeRequest,
+    ContractResponse,
+    ContractSummary,
+)

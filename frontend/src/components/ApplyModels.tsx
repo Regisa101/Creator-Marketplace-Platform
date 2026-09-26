@@ -30,6 +30,7 @@ export function ApplyModal({ isOpen, onClose, campaign, onSuccess }: Props) {
   const [portfolio, setPortfolio] = useState<CreatorPortfolioItemData[]>([]);
   const [selected, setSelected] = useState<number | null>(null);
   const [answers, setAnswers] = useState<Record<number, string>>({});
+  const [rate, setRate] = useState('');
   const [loading, setLoading] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [submitting, setSubmitting] = useState(false);
@@ -47,6 +48,7 @@ export function ApplyModal({ isOpen, onClose, campaign, onSuccess }: Props) {
     setPortfolio([]);
     setSelected(null);
     setAnswers({});
+    setRate('');
     setSuccess(false);
     setError('');
     setLoading(true);
@@ -120,6 +122,7 @@ export function ApplyModal({ isOpen, onClose, campaign, onSuccess }: Props) {
       await createApplication({
         campaign_id: campaign.id,
         proposal: 'Application submitted',
+        rate: rate.trim() ? Number(rate) : null,
         application_answers: questions.map((question, index) => ({
           question,
           answer: answers[index].trim(),
@@ -144,7 +147,7 @@ export function ApplyModal({ isOpen, onClose, campaign, onSuccess }: Props) {
         .apply-eyebrow{font:600 10px/1.2 Poppins,sans-serif;letter-spacing:.12em;text-transform:uppercase;color:#8a8490}.apply-title{margin:5px 0 0;font:700 21px/1.15 Poppins,sans-serif;color:#111}.apply-sub{margin:5px 0 0;font:400 12px/1.5 Poppins,sans-serif;color:#777}
         .apply-close{width:34px;height:34px;border:1px solid #e5e5e5;border-radius:50%;background:#fff;display:flex;align-items:center;justify-content:center;cursor:pointer}
         .apply-body{padding:22px 24px 24px}.apply-section{margin-bottom:22px}.apply-section-title{font:700 13px Poppins,sans-serif;color:#171717;margin-bottom:9px}.apply-help{font:400 11.5px/1.55 Poppins,sans-serif;color:#85818c;margin:0 0 10px}
-        .apply-questions{display:flex;flex-direction:column;gap:14px}.apply-label{font:600 12px Poppins,sans-serif;color:#222;display:block;margin-bottom:6px}.apply-label b{color:#111}.apply-textarea{width:100%;min-height:88px;border:1px solid #ddd;border-radius:10px;padding:10px 11px;resize:vertical;outline:none;font:400 12.5px/1.5 Poppins,sans-serif}.apply-textarea:focus{border-color:#111}
+        .apply-questions{display:flex;flex-direction:column;gap:14px}.apply-label{font:600 12px Poppins,sans-serif;color:#222;display:block;margin-bottom:6px}.apply-label b{color:#111}.apply-rate{width:100%;height:42px;border:1px solid #ddd;border-radius:10px;padding:0 11px;outline:none;font:400 12.5px Poppins,sans-serif}.apply-rate:focus{border-color:#111}.apply-textarea{width:100%;min-height:88px;border:1px solid #ddd;border-radius:10px;padding:10px 11px;resize:vertical;outline:none;font:400 12.5px/1.5 Poppins,sans-serif}.apply-textarea:focus{border-color:#111}
         .apply-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:9px}.apply-work{position:relative;border:1px solid #e2e2e2;border-radius:10px;overflow:hidden;background:#fafafa;cursor:pointer}.apply-work.selected{border:2px solid #111}.apply-work img{display:block;width:100%;aspect-ratio:1;object-fit:cover}.apply-work-name{font:500 9.5px Poppins,sans-serif;padding:6px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.apply-check{position:absolute;right:6px;top:6px;width:22px;height:22px;border-radius:50%;background:#111;color:#fff;display:flex;align-items:center;justify-content:center}
         .apply-upload{border:1px dashed #cfcfcf;border-radius:10px;min-height:90px;display:flex;align-items:center;justify-content:center;gap:8px;cursor:pointer;font:600 11px Poppins,sans-serif;color:#555;margin-top:10px}.apply-upload:hover{border-color:#111;color:#111}.apply-upload input{display:none}
         .apply-error{padding:10px 12px;border-radius:9px;background:#f7eeee;color:#b12828;font:500 11.5px/1.45 Poppins,sans-serif;margin-bottom:14px}.apply-actions{display:flex;justify-content:flex-end;gap:9px;border-top:1px solid #eee;padding-top:17px}.apply-cancel,.apply-submit{height:40px;padding:0 16px;border-radius:9px;font:600 12px Poppins,sans-serif;cursor:pointer}.apply-cancel{background:#fff;border:1px solid #ddd;color:#555}.apply-submit{background:#111;border:1px solid #111;color:#fff;display:flex;align-items:center;gap:7px}.apply-submit:disabled{opacity:.55;cursor:not-allowed}
@@ -204,6 +207,13 @@ export function ApplyModal({ isOpen, onClose, campaign, onSuccess }: Props) {
                     ))}
                   </div>
                 </section>}
+
+                <section className="apply-section">
+                  <div className="apply-section-title">{questions.length > 0 ? '3' : '2'}. Proposed compensation <span style={{fontWeight:400,color:'#999'}}>(optional)</span></div>
+                  <p className="apply-help">If you have a preferred rate, enter it here. For negotiable campaigns you can leave this blank and discuss the final amount with the brand after selection.</p>
+                  <input className="apply-rate" type="number" min="0" step="0.01" value={rate} onChange={(e) => setRate(e.target.value)} placeholder="e.g. 40000" />
+                  <div className="apply-help" style={{marginTop:6}}>Amount in NPR. This is your proposed rate, not a payment to CreatorHub.</div>
+                </section>
 
                 {error && <div className="apply-error">{error}</div>}
                 <div className="apply-actions">

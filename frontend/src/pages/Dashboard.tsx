@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Bell, BriefcaseBusiness, FileText, Plus, Wallet } from 'lucide-react';
 import { Link } from 'react-router-dom';
-import { getApplications, getCampaigns, getPaymentSummary, getNotifications, type Application, type Campaign, type Notification } from '../api/client';
+import { getApplications, getCampaigns, getContractSummary, getNotifications, type Application, type Campaign, type Notification } from '../api/client';
 import { useAuth } from '../context/AuthContext';
 import { AppLayout } from '../components/AppLayout';
 
@@ -9,7 +9,7 @@ export function Dashboard() {
   const { user } = useAuth();
   const [campaigns, setCampaigns] = useState<Campaign[]>([]);
   const [applications, setApplications] = useState<Application[]>([]);
-  const [payments, setPayments] = useState({ lifetime: 0, this_month: 0 });
+  const [contractSummary, setContractSummary] = useState({ lifetime: 0, this_month: 0, active_contracts: 0 });
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -18,12 +18,12 @@ export function Dashboard() {
     Promise.all([
       getCampaigns({ limit: 100 }),
       getApplications(),
-      getPaymentSummary(),
+      getContractSummary(),
       getNotifications(),
-    ]).then(([campaignData, apps, paymentData, notes]) => {
+    ]).then(([campaignData, apps, contractData, notes]) => {
       setCampaigns(campaignData.campaigns);
       setApplications(apps);
-      setPayments({ lifetime: paymentData.lifetime, this_month: paymentData.this_month });
+      setContractSummary({ lifetime: contractData.lifetime, this_month: contractData.this_month, active_contracts: contractData.active_contracts });
       setNotifications(notes);
     }).catch((err) => console.error('Could not load business dashboard:', err)).finally(() => setLoading(false));
   }, [user?.role]);
@@ -45,7 +45,7 @@ export function Dashboard() {
           <div className="bd-stat"><div className="bd-stat-icon"><BriefcaseBusiness size={16}/></div><div className="bd-label">Open campaigns</div><div className="bd-value">{openCampaigns}</div></div>
           <div className="bd-stat"><div className="bd-stat-icon"><FileText size={16}/></div><div className="bd-label">Pending applications</div><div className="bd-value">{pendingApplications}</div></div>
           <div className="bd-stat"><div className="bd-stat-icon"><BriefcaseBusiness size={16}/></div><div className="bd-label">Closed campaigns</div><div className="bd-value">{closedCampaigns}</div></div>
-          <div className="bd-stat"><div className="bd-stat-icon"><Wallet size={16}/></div><div className="bd-label">Paid to Creatorhub</div><div className="bd-value">NPR {payments.lifetime.toLocaleString()}</div><div className="bd-sub">This month: NPR {payments.this_month.toLocaleString()}</div></div>
+          <div className="bd-stat"><div className="bd-stat-icon"><Wallet size={16}/></div><div className="bd-label">CreatorHub service fees</div><div className="bd-value">NPR {contractSummary.lifetime.toLocaleString()}</div><div className="bd-sub">This month: NPR {contractSummary.this_month.toLocaleString()}</div></div>
         </div>
         <div className="bd-grid">
           <section className="bd-card"><h3>Recent applications</h3>{recent.length === 0 ? <div className="bd-note">No applications yet.</div> : recent.map((a) => <div className="bd-row" key={a.id}><div><div className="bd-row-title">{a.creator_name || `Creator #${a.creator_id}`}</div><div className="bd-row-meta">{a.campaign_title || 'Campaign'} · {a.status.replace('_',' ')}</div></div><Link className="bd-link" to={`/applications?campaign=${a.campaign_id}`}>View</Link></div>)}</section>

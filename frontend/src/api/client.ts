@@ -13,6 +13,27 @@ api.interceptors.request.use((config) => {
   return config;
 });
 
+api.interceptors.response.use(
+  (response) => response,
+  (error) => {
+    // Only treat a 401 as "your session is dead" when it comes from the
+    // auth check itself (/auth/me). A 401 from some other, secondary
+    // endpoint (e.g. the wishlist/saved-campaigns call on the public
+    // navbar) should not blow away a perfectly valid login — the caller
+    // that made that request already handles its own failure gracefully.
+    // AuthContext's checkAuth() does the real session-validity check
+    // against /auth/me and clears the session itself if that fails, so
+    // we don't duplicate (and over-trigger) that logic here.
+    const isAuthCheck = error?.config?.url?.includes('/auth/me');
+    if (isAuthCheck && error?.response?.status === 401 && localStorage.getItem('access_token')) {
+      localStorage.removeItem('access_token');
+      localStorage.removeItem('user');
+      if (window.location.pathname !== '/login') window.location.assign('/login');
+    }
+    return Promise.reject(error);
+  },
+);
+
 export interface RegisterData {
   email: string;
   full_name: string;
@@ -276,7 +297,7 @@ export interface PublicBusinessProfile {
 
 export type ApplicationStatus =
   | 'pending'
-  | 'payment_pending'
+  | 'selected'
   | 'accepted'
   | 'rejected'
   | 'withdrawn'
@@ -385,6 +406,64 @@ export interface PaymentSummary {
   completed_payment_count: number;
 }
 
+export interface Contract {
+  id: number;
+  campaign_id: number;
+  application_id: number;
+  business_id: number;
+  creator_id: number;
+  engagement_type?: string | null;
+  duration?: string | null;
+  pricing_model?: string | null;
+  compensation_type?: string | null;
+  compensation_description?: string | null;
+  agreed_rate?: number | null;
+  total_value?: number | null;
+  platform_fee_rate: number;
+  platform_fee_amount?: number | null;
+  start_date?: string | null;
+  end_date?: string | null;
+  status: 'draft' | 'pending_payment' | 'active' | 'completed' | 'cancelled' | string;
+  terms_note?: string | null;
+  // Demo platform-fee payment (see routes/contracts.py::pay_platform_fee).
+  // No real gateway is called — this is separate from the real Khalti
+  // `Payment` flow above.
+  payment_method?: 'wallet' | 'card' | null;
+  payment_reference?: string | null;
+  fee_paid: boolean;
+  fee_paid_at?: string | null;
+  created_at: string;
+  updated_at?: string | null;
+  campaign_title?: string | null;
+  creator_name?: string | null;
+  business_name?: string | null;
+}
+
+export interface ContractFinalizeData {
+  agreed_rate: number;
+  total_value?: number | null;
+  terms_note?: string | null;
+  start_date?: string | null;
+  end_date?: string | null;
+}
+
+export interface ContractPayFeeData {
+  payment_method: 'wallet' | 'card';
+  wallet_number?: string;
+  wallet_pin?: string;
+  card_number?: string;
+  card_expiry?: string;
+  card_cvv?: string;
+  card_holder?: string;
+}
+
+export interface ContractSummary {
+  role: string;
+  this_month: number;
+  lifetime: number;
+  active_contracts: number;
+}
+
 export interface CampaignDefaults {
   default_dos: string[];
   default_donts: string[];
@@ -435,28 +514,36 @@ export const closeCampaign = (id: number | string) => unwrap(api.put<Campaign>(`
 
 export const createApplication = (data: ApplicationCreateData) => unwrap(api.post<Application>('/applications', data));
 export const getApplications = (params?: { campaign_id?: number; status?: string }) => unwrap(api.get<Application[]>('/applications', { params }));
-export interface SelectionPaymentStart {
+export interface SelectionResult {
   application_id: number;
-  payment_url: string;
-  pidx: string;
-  purchase_order_id: string;
-  amount: number;
-  platform_fee: number;
-  creator_payout: number;
-  pricing_term?: string | null;
-  pricing_basis?: 'custom_budget' | 'budget_range_max' | 'creatorhub_standard_rate' | string | null;
+  contract_id: number;
+  contract_status: string;
+  agreed_rate?: number | null;
+  total_value?: number | null;
+  platform_fee?: number | null;
 }
 
 export const selectApplication = (id: number) =>
-  unwrap(api.post<SelectionPaymentStart>(`/applications/${id}/select`));
+  unwrap(api.post<SelectionResult>(`/applications/${id}/select`));
 export const updateApplicationStatus = (id: number, status: 'rejected') => unwrap(api.put<Application>(`/applications/${id}`, { status }));
 export const withdrawApplication = (id: number) => unwrap(api.delete<{ message: string }>(`/applications/${id}`));
+
+export const getContracts = (status?: string) => unwrap(api.get<Contract[]>('/contracts', { params: status ? { status } : undefined }));
+export const getContract = (id: number) => unwrap(api.get<Contract>(`/contracts/${id}`));
+export const finalizeContract = (id: number, data: ContractFinalizeData) => unwrap(api.put<Contract>(`/contracts/${id}/finalize`, data));
+export const completeContract = (id: number) => unwrap(api.put<Contract>(`/contracts/${id}/complete`));
+// Demo-only platform fee payment — replaces the old self-reported
+// markContractFeePaid()/PUT /contracts/{id}/fee-paid. No real gateway is
+// called; the backend just simulates a successful charge and activates
+// the contract.
+export const payContractFee = (id: number, data: ContractPayFeeData) => unwrap(api.post<Contract>(`/contracts/${id}/pay-fee`, data));
+export const getContractSummary = () => unwrap(api.get<ContractSummary>('/contracts/summary/me'));
 
 function notifyWishlistChanged() {
   window.dispatchEvent(new Event('ch:wishlist-changed'));
 }
 export const saveCampaign = async (campaignId: number) => {
-  const result = await unwrap(api.post<SavedCampaignEntry>('/saved-campaigns', { campaign_id: campaignId }));
+  const result = await unwrap(api.post<SavedCampaignEntry>('/saved-campaigns/', { campaign_id: campaignId }));
   notifyWishlistChanged();
   return result;
 };
@@ -464,7 +551,7 @@ export const unsaveCampaign = async (campaignId: number) => {
   await api.delete(`/saved-campaigns/${campaignId}`);
   notifyWishlistChanged();
 };
-export const getSavedCampaigns = () => unwrap(api.get<SavedCampaignEntry[]>('/saved-campaigns'));
+export const getSavedCampaigns = () => unwrap(api.get<SavedCampaignEntry[]>('/saved-campaigns/'));
 
 export const getCreatorProfile = (id: number | string) => unwrap(api.get<PublicCreatorProfile>(`/creators/${id}`));
 

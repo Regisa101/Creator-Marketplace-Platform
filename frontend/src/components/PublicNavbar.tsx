@@ -14,6 +14,7 @@ import {
 
 import {
   Bell,
+  FileSignature,
   Heart,
   LayoutDashboard,
   LogOut,
@@ -1792,6 +1793,46 @@ export function PublicNavbar({
                         Dashboard
 
                       </Link>
+
+
+                      {user?.role === 'creator' && (
+
+                        <Link
+                          to="/contracts"
+                          onClick={() =>
+                            setProfileOpen(false)
+                          }
+                        >
+
+                          <FileSignature
+                            size={14}
+                          />
+
+                          Contract History
+
+                        </Link>
+
+                      )}
+
+
+                      {user?.role === 'business' && (
+
+                        <Link
+                          to="/collab-history"
+                          onClick={() =>
+                            setProfileOpen(false)
+                          }
+                        >
+
+                          <FileSignature
+                            size={14}
+                          />
+
+                          Collab History
+
+                        </Link>
+
+                      )}
 
 
                       <button
