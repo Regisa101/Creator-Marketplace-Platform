@@ -92,7 +92,7 @@ def check_expired_campaign_deadlines(db: Session, business_id: int) -> None:
                     "deadline with no creator selected. Extend the "
                     "deadline or delete the campaign."
                 ),
-                link=f"/campaigns/{campaign.id}/edit",
+                link=f"/campaigns/{campaign.id}?source=dashboard",
                 reference_id=campaign.id,
                 event_key=(
                     f"campaign-deadline-expired:{campaign.id}:"

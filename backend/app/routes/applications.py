@@ -68,10 +68,12 @@ async def create_application(
         raise HTTPException(status_code=400, detail="This campaign is no longer accepting applications.")
 
     if campaign.application_deadline:
-        deadline = campaign.application_deadline
-        if deadline.tzinfo is None:
-            deadline = deadline.replace(tzinfo=timezone.utc)
-        if datetime.now(timezone.utc) > deadline:
+        # Campaign deadlines are date-based. A deadline of Sep 25 remains
+        # open throughout Sep 25 and closes when Sep 26 begins.
+        deadline_date = campaign.application_deadline
+        if deadline_date.tzinfo is not None:
+            deadline_date = deadline_date.astimezone(timezone.utc)
+        if deadline_date.date() < datetime.now(timezone.utc).date():
             raise HTTPException(status_code=400, detail="The application deadline has passed.")
 
     existing = db.query(Application).filter(

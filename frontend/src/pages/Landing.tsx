@@ -2332,7 +2332,7 @@ export function Landing() {
 
             <div className="lp-hero-actions">
               <Link
-                to="/campaigns"
+                to="/campaigns?source=landing"
                 className="lp-hero-btn lp-hero-btn-primary"
               >
                 Explore Campaigns
@@ -2428,7 +2428,7 @@ export function Landing() {
           <div className="lp-section-head">
             <h2 className="lp-h2">Latest Campaigns</h2>
 
-            <Link to="/campaigns" className="lp-view-all lp-latest-view-all">
+            <Link to="/campaigns?source=landing" className="lp-view-all lp-latest-view-all">
               Show more
               <ArrowRight size={14} />
             </Link>

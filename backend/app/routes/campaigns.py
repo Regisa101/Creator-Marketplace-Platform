@@ -149,9 +149,10 @@ async def get_public_campaigns(
     """
     Public campaign marketplace.
 
-    Only published and in-progress campaigns are visible publicly.
-
-    Draft, cancelled, completed, and closed campaigns are private.
+    Only published campaigns whose application deadline is still open and
+    that still need creators are visible here. Closed, expired, in-progress,
+    completed, cancelled, draft, and fully-booked campaigns stay out of the
+    public discovery feed.
     """
 
     # Published campaigns are public. Once a campaign has selected as many
@@ -160,11 +161,8 @@ async def get_public_campaigns(
     # Its collaboration history remains available elsewhere (applications,
     # contracts, etc.) — this filter only affects this discovery listing.
     #
-    # A campaign whose application deadline has passed but that has NOT
-    # selected a creator yet is intentionally left visible here (it still
-    # needs applicants); the owning business is separately notified that
-    # the deadline passed with no creator selected so they can extend the
-    # deadline or delete the campaign (see check_expired_campaign_deadlines).
+    # Application-deadline expiry is enforced here as well as in the frontend
+    # so expired campaigns cannot leak into the public marketplace.
     accepted_count_subquery = (
         db.query(func.count(Application.id))
         .filter(
@@ -178,14 +176,13 @@ async def get_public_campaigns(
     query = (
         db.query(Campaign)
         .filter(
-            Campaign.status.in_(
-                [
-                    CampaignStatus.PUBLISHED,
-                    CampaignStatus.IN_PROGRESS,
-                ]
-            ),
+            Campaign.status == CampaignStatus.PUBLISHED,
             Campaign.is_active.is_(True),
             accepted_count_subquery < Campaign.creators_needed,
+            (
+                Campaign.application_deadline.is_(None)
+                | (Campaign.application_deadline >= func.now())
+            ),
         )
     )
 

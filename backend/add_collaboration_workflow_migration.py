@@ -1,21 +1,25 @@
-"""Idempotent migration for the creator-confirmation workflow.
+"""Idempotent migration for the collaboration confirmation workflow.
 
-Adds the two post-selection gates used by the collaboration hub and a read
-marker for chat messages so unread badges can be calculated per creator.
-Run this once against the same PostgreSQL database used by the app.
+The Application model now contains creator_confirmed and creator_verified.
+Existing PostgreSQL databases need these columns added explicitly because
+SQLAlchemy create_all() does not alter an existing table.
 """
+
 from sqlalchemy import text
 from app.database import engine
 
 STATEMENTS = [
     "ALTER TABLE applications ADD COLUMN IF NOT EXISTS creator_confirmed BOOLEAN NOT NULL DEFAULT FALSE",
     "ALTER TABLE applications ADD COLUMN IF NOT EXISTS creator_verified BOOLEAN NOT NULL DEFAULT FALSE",
-    "ALTER TABLE messages ADD COLUMN IF NOT EXISTS read_at TIMESTAMPTZ",
-    "UPDATE messages SET read_at = created_at WHERE read_at IS NULL",
 ]
+
+print("=" * 60)
+print("Creator collaboration workflow migration")
+print("=" * 60)
 
 with engine.begin() as conn:
     for statement in STATEMENTS:
+        print("Running:", statement)
         conn.execute(text(statement))
 
-print("Collaboration workflow migration complete.")
+print("Migration complete.")

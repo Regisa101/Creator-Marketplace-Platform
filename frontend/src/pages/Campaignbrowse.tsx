@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import type { FormEvent } from 'react';
 import { Link } from 'react-router-dom';
 import {
@@ -21,6 +22,7 @@ import {
 } from '../api/client';
 
 import { useAuth } from '../context/AuthContext';
+import { Campaigns } from './Campaigns';
 
 const CATEGORIES = [
   'Beauty',
@@ -95,7 +97,14 @@ function truncate(text: string, length = 150) {
 }
 
 export function CampaignBrowse() {
+  const [searchParams] = useSearchParams();
   const { user } = useAuth();
+
+  // /campaigns?source=landing is the public/outer campaign marketplace.
+  // Plain /campaigns is intentionally kept for the authenticated dashboard.
+  if (searchParams.get('source') === 'landing') {
+    return <Campaigns />;
+  }
   const isBusiness = user?.role === 'business';
 
   const [campaigns, setCampaigns] = useState<Campaign[]>([]);

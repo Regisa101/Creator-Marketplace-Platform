@@ -414,7 +414,7 @@ export function PublicNavbar({
     setWishlistOpen(false);
     setNotificationOpen(false);
 
-    navigate('/campaigns');
+    navigate('/campaigns?source=landing');
 
   };
 
@@ -436,7 +436,11 @@ export function PublicNavbar({
     }
 
 
-    if (!isPublicHome) {
+    // The public navbar is also used on /campaigns?source=landing
+    // and on public campaign-detail pages. In those pages the landing
+    // sections do not exist in the DOM, so Home / For Brands must first
+    // return to the actual homepage.
+    if (location.pathname !== '/') {
 
       sessionStorage.setItem(
         'ch-scroll-target',
@@ -445,7 +449,11 @@ export function PublicNavbar({
           : 'home'
       );
 
-      navigate('/');
+      navigate(
+        section === 'for-brands'
+          ? '/#for-brands'
+          : '/'
+      );
 
       return;
 
@@ -501,8 +509,8 @@ export function PublicNavbar({
 
       navigate(
         value
-          ? `/campaigns?search=${encodeURIComponent(value)}`
-          : '/campaigns'
+          ? `/campaigns?source=landing&search=${encodeURIComponent(value)}`
+          : '/campaigns?source=landing'
       );
 
     };
@@ -576,12 +584,18 @@ export function PublicNavbar({
         setNotificationOpen(false);
 
 
+        // Deadline-expired notifications must always open the campaign
+        // detail page. Older notifications may still contain the previous
+        // /campaigns/:id/edit URL, so do not trust the stored link for this
+        // notification type. The campaign detail page is where the brand
+        // can choose Extend deadline or Delete campaign.
+        if (notification.type === 'campaign_deadline_expired' && notification.reference_id) {
+          navigate(`/campaigns/${notification.reference_id}?source=dashboard`);
+          return;
+        }
+
         if (notification.link) {
-
-          navigate(
-            notification.link
-          );
-
+          navigate(notification.link);
         }
 
       } catch {
