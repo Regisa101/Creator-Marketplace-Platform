@@ -22,11 +22,11 @@ async def admin_overview(
     month_start = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
 
     total_revenue = float(db.query(func.coalesce(func.sum(Payment.amount), 0)).filter(
-        Payment.payment_type == "selection_fee",
+        Payment.payment_type.in_(["selection_fee", "platform_fee"]),
         Payment.status.in_(["funded", "completed"]),
     ).scalar() or 0)
     month_revenue = float(db.query(func.coalesce(func.sum(Payment.amount), 0)).filter(
-        Payment.payment_type == "selection_fee",
+        Payment.payment_type.in_(["selection_fee", "platform_fee"]),
         Payment.status.in_(["funded", "completed"]),
         Payment.paid_at >= month_start,
     ).scalar() or 0)
@@ -54,7 +54,7 @@ async def admin_overview(
             "total": total_revenue,
             "this_month": month_revenue,
             "transactions": db.query(Payment).filter(
-                Payment.payment_type == "selection_fee",
+                Payment.payment_type.in_(["selection_fee", "platform_fee"]),
                 Payment.status.in_(["funded", "completed"]),
             ).count(),
         },
@@ -67,7 +67,7 @@ async def admin_payments(
     current_user: User = Depends(get_current_admin),
 ):
     rows = db.query(Payment).filter(
-        Payment.payment_type == "selection_fee",
+        Payment.payment_type.in_(["selection_fee", "platform_fee"]),
     ).order_by(Payment.created_at.desc()).limit(100).all()
 
     result = []

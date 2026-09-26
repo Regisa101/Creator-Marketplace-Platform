@@ -217,6 +217,33 @@ async def select_application(
         title="You’ve been selected", message=f"{current_user.profile.get('company_name') if isinstance(current_user.profile, dict) else current_user.full_name} selected you for {campaign.title}.",
         link=f"/campaigns/{campaign.id}", reference_id=application.id, event_key=f"application-accepted:{application.id}",
     )
+
+    # Once every creator slot this campaign needed has been filled, it is
+    # no longer a live opportunity — pull it off the public marketplace
+    # (Campaigns page + Landing page) immediately. It still stays visible
+    # to the business on their own Campaigns dashboard since the query
+    # there is not filtered by status.
+    filled_count = selected_count + 1
+    if filled_count >= int(campaign.creators_needed or 1):
+        campaign.status = CampaignStatus.CLOSED
+        campaign.is_active = False
+        # Reject any applications still pending for this campaign — the
+        # required number of creators has already been selected.
+        still_pending = db.query(Application).filter(
+            Application.campaign_id == campaign.id,
+            Application.id != application.id,
+            Application.status == "pending",
+        ).all()
+        for other in still_pending:
+            other.status = "rejected"
+            create_notification(
+                db, user_id=other.creator_id, type="application_rejected",
+                title="Campaign closed",
+                message=f"The creator(s) for {campaign.title} have been selected. Your application was not selected.",
+                link="/applications", reference_id=other.id,
+                event_key=f"application-rejected-closed:{other.id}",
+            )
+
     db.commit(); db.refresh(contract)
     return {
         "application_id": application.id, "contract_id": contract.id, "contract_status": contract.status,

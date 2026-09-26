@@ -1,11 +1,11 @@
 from __future__ import annotations
 
-from datetime import datetime, timezone, timedelta
+from datetime import datetime, timezone
 from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
-from sqlalchemy import and_, func, or_
+from sqlalchemy import func
 
 from app.database import get_db
 from app.dependencies.auth import (
@@ -20,6 +20,7 @@ from app.schemas.campaign import (
     CampaignUpdate,
     CampaignResponse,
 )
+from app.services.campaign_alerts import check_expired_campaign_deadlines
 
 
 router = APIRouter(
@@ -153,15 +154,19 @@ async def get_public_campaigns(
     Draft, cancelled, completed, and closed campaigns are private.
     """
 
-    # Published campaigns are public. Once a creator is selected, the
-    # campaign stays visible for one day, then disappears from the public
-    # marketplace while its collaboration history remains available.
-    selection_time = func.coalesce(
-        func.max(Application.updated_at),
-        func.max(Application.created_at),
-    )
-    selected_at = (
-        db.query(selection_time)
+    # Published campaigns are public. Once a campaign has selected as many
+    # creators as it needs (creators_needed), it is fully staffed and is
+    # removed from the public marketplace and the landing page right away.
+    # Its collaboration history remains available elsewhere (applications,
+    # contracts, etc.) — this filter only affects this discovery listing.
+    #
+    # A campaign whose application deadline has passed but that has NOT
+    # selected a creator yet is intentionally left visible here (it still
+    # needs applicants); the owning business is separately notified that
+    # the deadline passed with no creator selected so they can extend the
+    # deadline or delete the campaign (see check_expired_campaign_deadlines).
+    accepted_count_subquery = (
+        db.query(func.count(Application.id))
         .filter(
             Application.campaign_id == Campaign.id,
             Application.status.in_(["accepted", "completed"]),
@@ -169,8 +174,6 @@ async def get_public_campaigns(
         .correlate(Campaign)
         .scalar_subquery()
     )
-
-    hide_after_selection = datetime.now(timezone.utc) - timedelta(days=1)
 
     query = (
         db.query(Campaign)
@@ -182,16 +185,7 @@ async def get_public_campaigns(
                 ]
             ),
             Campaign.is_active.is_(True),
-            or_(
-                Campaign.status == CampaignStatus.PUBLISHED,
-                and_(
-                    Campaign.status == CampaignStatus.IN_PROGRESS,
-                    or_(
-                        selected_at.is_(None),
-                        selected_at >= hide_after_selection,
-                    ),
-                ),
-            ),
+            accepted_count_subquery < Campaign.creators_needed,
         )
     )
 
@@ -499,6 +493,13 @@ async def get_campaigns(
         )
 
     elif current_user.role == "business":
+
+        # Lazily flag any published campaigns owned by this business whose
+        # application deadline has passed with no creator selected yet.
+        check_expired_campaign_deadlines(
+            db,
+            current_user.id,
+        )
 
         query = query.filter(
             Campaign.business_id == current_user.id

@@ -10,7 +10,7 @@ from sqlalchemy.orm import Session
 
 from app.database import get_db
 from app.dependencies.auth import get_current_business, get_current_user
-from app.models import User, Campaign, Application, Contract
+from app.models import User, Campaign, Application, Contract, Payment
 from app.schemas.contract import (
     ContractFinalizeRequest,
     ContractPayFeeRequest,
@@ -155,6 +155,35 @@ async def pay_platform_fee(
     contract.payment_reference = f"DEMO-{uuid.uuid4().hex[:10].upper()}"
     contract.fee_paid_at = datetime.now(timezone.utc)
     contract.status = "active"
+
+    # This fee is CreatorHub's own service charge for matching the
+    # brand with the creator — it is not money changing hands between
+    # the brand and the creator, so 100% of it is platform revenue and
+    # is recorded here (rather than split as a creator payout) so it
+    # shows up correctly on the Admin Dashboard.
+    fee_amount = round(float(contract.platform_fee_amount or 0), 2)
+    payment = Payment(
+        application_id=contract.application_id,
+        campaign_id=contract.campaign_id,
+        payment_type="platform_fee",
+        purchase_order_id=contract.payment_reference,
+        transaction_id=contract.payment_reference,
+        amount=fee_amount,
+        platform_fee=fee_amount,
+        creator_payout=0,
+        currency="NPR",
+        status="completed",
+        method=data.payment_method,
+        payment_details={
+            "wallet_number": data.wallet_number,
+            "card_last4": data.card_number[-4:] if data.card_number else None,
+            "note": "Platform service fee — 100% platform revenue, not a brand-to-creator payment.",
+        },
+        initiated_by=current_user.id,
+        paid_at=contract.fee_paid_at,
+    )
+    db.add(payment)
+
     db.commit(); db.refresh(contract)
 
     create_notification(

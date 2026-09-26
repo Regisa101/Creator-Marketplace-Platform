@@ -5,6 +5,7 @@ from app.database import get_db
 from app.models import Notification
 from app.schemas.notification import NotificationResponse, NotificationReadRequest
 from app.dependencies.auth import get_current_user
+from app.services.campaign_alerts import check_expired_campaign_deadlines
 
 router = APIRouter(prefix="/api/notifications", tags=["Notifications"])
 
@@ -16,6 +17,9 @@ async def get_notifications(
     db: Session = Depends(get_db),
     current_user=Depends(get_current_user),
 ):
+    if current_user.role == "business":
+        check_expired_campaign_deadlines(db, current_user.id)
+
     query = db.query(Notification).filter(Notification.user_id == current_user.id)
     if unread_only:
         query = query.filter(Notification.is_read.is_(False))
@@ -27,6 +31,9 @@ async def unread_count(
     db: Session = Depends(get_db),
     current_user=Depends(get_current_user),
 ):
+    if current_user.role == "business":
+        check_expired_campaign_deadlines(db, current_user.id)
+
     count = db.query(Notification).filter(
         Notification.user_id == current_user.id,
         Notification.is_read.is_(False),

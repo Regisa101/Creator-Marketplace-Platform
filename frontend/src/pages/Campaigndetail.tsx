@@ -188,12 +188,15 @@ export function CampaignDetail() {
   const isCreator = user?.role === 'creator';
 
   const deadlinePassed = isDeadlinePassed(campaign?.application_deadline);
+  const hasAcceptedCreator = ownerApplications.some(
+    (a) => a.status === 'accepted' || a.status === 'completed',
+  );
   const canExtendCampaign = Boolean(
     isOwner &&
       campaign?.status === 'published' &&
       deadlinePassed &&
       ownerApplicationsLoaded &&
-      ownerApplications.length === 0,
+      !hasAcceptedCreator,
   );
 
   useEffect(() => {
@@ -883,9 +886,9 @@ export function CampaignDetail() {
                     <strong>Application deadline has passed</strong>
                     <span>
                       {canExtendCampaign
-                        ? 'No creators applied before the deadline. You can extend it.'
+                        ? 'No creator has been selected yet. Extend the deadline to keep accepting applicants, or delete the campaign.'
                         : ownerApplicationsLoaded
-                          ? 'Applications were received before the deadline.'
+                          ? 'A creator was already selected for this campaign.'
                           : 'Checking applications...'}
                     </span>
                   </div>
