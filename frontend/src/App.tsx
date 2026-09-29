@@ -1,3 +1,4 @@
+
 import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom';
 import { AuthProvider, useAuth } from './context/AuthContext';
 
@@ -7,6 +8,9 @@ import { RegisterCreator } from './pages/auth/RegisterCreator';
 import { RegisterBusiness } from './pages/auth/RegisterBusiness';
 
 import { Landing } from './pages/Landing';
+import { Pricing } from './pages/Pricing';
+import { AboutUs } from './pages/AboutUs';
+
 import { ProtectedRoute } from './components/ProtectedRoute';
 
 import { CreatorOnboarding } from './pages/onboarding/CreatorOnboarding';
@@ -25,7 +29,6 @@ import { SavedCampaigns } from './pages/Savedcampaigns';
 import { BrandProfile } from './pages/Brandprofile';
 
 /*
- * IMPORTANT:
  * CreatorPublicProfile.tsx uses:
  *
  * export default function CreatorPublicProfile()
@@ -42,11 +45,11 @@ import { Dashboard } from './pages/Dashboard';
 import AdminDashboard from './pages/AdminDashboard';
 
 /*
- * Same component renders both "Contract History" (creator) and
- * "Collab History" (business) — it reads user.role from useAuth() and
- * switches the title/copy itself. See pages/Contracthistory.tsx.
+ * Same component renders both "Contract History" (creator)
+ * and "Collab History" (business).
  */
 import { ContractHistory } from './pages/Contracthistory';
+import ContractDetail from './pages/ContractDetail';
 
 
 /* ============================================================
@@ -107,6 +110,20 @@ export default function App() {
           />
 
           <Route
+            path="/pricing"
+            element={<Pricing />}
+          />
+
+          {/* ==================================================
+              ABOUT US
+          ================================================== */}
+
+          <Route
+            path="/about"
+            element={<AboutUs />}
+          />
+
+          <Route
             path="/login"
             element={<Login />}
           />
@@ -141,16 +158,6 @@ export default function App() {
             element={
               <Navigate
                 to="/login"
-                replace
-              />
-            }
-          />
-
-          <Route
-            path="/about"
-            element={
-              <Navigate
-                to="/#why-we-exist"
                 replace
               />
             }
@@ -307,11 +314,17 @@ export default function App() {
 
 
           {/* ==================================================
-              CONTRACT HISTORY (creator) / COLLAB HISTORY (business)
-
-              Same page, different nav label depending on role — see
-              PublicNavbar.tsx's profile dropdown.
+              CONTRACT HISTORY
           ================================================== */}
+
+          <Route
+            path="/contracts/:contractId"
+            element={
+              <ProtectedRoute>
+                <ContractDetail />
+              </ProtectedRoute>
+            }
+          />
 
           <Route
             path="/contracts"

@@ -467,11 +467,14 @@ export function CampaignDetail() {
 
     // Dashboard/detail links use source=dashboard. For authenticated users
     // without a source we keep the dashboard shell as the safe fallback.
+    // showSearch is left at its default (true) so the full topbar — search
+    // box, settings gear, notification bell, avatar/profile menu — shows
+    // here exactly like it does on Dashboard/My Campaigns, instead of the
+    // stripped-down bar this page used to render.
     if (fromDashboard || user) {
       return (
         <AppLayout
           title="Campaign details"
-          showSearch={false}
           showNotifications
         >
           {content}
@@ -758,7 +761,7 @@ export function CampaignDetail() {
               {campaign.deliverables?.length ? (
                 <ul className="cd-list">
                   {campaign.deliverables.map(
-                    (item, index) => (
+                    (item: string, index: number) => (
                       <li
                         key={`${item}-${index}`}
                       >
@@ -784,7 +787,7 @@ export function CampaignDetail() {
               {campaign.required_skills?.length ? (
                 <div className="cd-skills">
                   {campaign.required_skills.map(
-                    (skill) => (
+                    (skill: string) => (
                       <span key={skill}>
                         {skill}
                       </span>
@@ -1251,17 +1254,26 @@ function QuickInfo({
 }
 
 const STYLE = `
+/*
+ * Background is transparent everywhere in this page (page shell, header,
+ * sections, sidebar cards). There is no more "white card on grey page"
+ * look — every block sits directly on the same background as the rest of
+ * the dashboard, and separation between blocks comes only from a thin
+ * grey hairline (border-bottom), like a dash divider, instead of boxes.
+ */
+
 .cd-page{
   min-height:100vh;
-  background:#fafafa;
+  background:transparent;
   color:#111;
   font-family:Poppins,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
-  padding:25px 20px 80px;
+  padding:8px 20px 60px;
 }
 
 .cd-shell{
   max-width:1050px;
   margin:0 auto;
+  background:transparent;
 }
 
 /* BACK */
@@ -1287,7 +1299,7 @@ const STYLE = `
   align-items:center;
   gap:7px;
   padding:10px 12px;
-  background:#fff;
+  background:transparent;
   border:1px solid #ddd;
   border-radius:8px;
   font-size:11.5px;
@@ -1296,17 +1308,17 @@ const STYLE = `
 
 .cd-alert--error{
   color:#8b3030;
-  background:#fff8f8;
+  background:transparent;
   border-color:#e5caca;
 }
 
-/* HEADER */
+/* HEADER — no card, just a grey-dash separator underneath */
 
 .cd-header{
-  background:#fff;
-  border-top:1px solid #e3e3e3;
-  border-bottom:1px solid #e3e3e3;
-  padding:25px 0 23px;
+  background:transparent;
+  border-top:0;
+  border-bottom:1px solid #e4e1d9;
+  padding:15px 0 23px;
   margin-bottom:17px;
   display:flex;
   justify-content:space-between;
@@ -1408,7 +1420,7 @@ const STYLE = `
   height:37px;
   border:1px solid #ddd;
   border-radius:8px;
-  background:#fff;
+  background:transparent;
   display:grid;
   place-items:center;
   color:#222;
@@ -1498,14 +1510,23 @@ const STYLE = `
   min-width:0;
 }
 
-/* SECTIONS */
+/* SECTIONS — no card box; grey-dash bottom border between sections */
 
 .cd-section{
-  background:#fff;
-  border:1px solid #e3e3e3;
-  border-radius:10px;
-  padding:21px 23px;
-  margin-bottom:13px;
+  background:transparent;
+  border:0;
+  border-bottom:1px solid #e4e1d9;
+  border-radius:0;
+  padding:21px 0;
+  margin-bottom:0;
+}
+
+.cd-main .cd-section:first-child{
+  padding-top:2px;
+}
+
+.cd-main .cd-section:last-child{
+  border-bottom:0;
 }
 
 .cd-section h2{
@@ -1541,8 +1562,8 @@ const STYLE = `
 
 .cd-detail-item{
   padding:12px;
-  background:#fafafa;
-  border:1px solid #ededed;
+  background:transparent;
+  border:1px solid #e4e1d9;
   border-radius:8px;
 }
 
@@ -1610,7 +1631,7 @@ const STYLE = `
 
 .cd-skills span{
   border:1px solid #ddd;
-  background:#fafafa;
+  background:transparent;
   color:#555;
   border-radius:5px;
   padding:6px 9px;
@@ -1620,7 +1641,7 @@ const STYLE = `
 .cd-platform-box{
   margin-top:15px;
   padding-top:15px;
-  border-top:1px solid #eee;
+  border-top:1px solid #e4e1d9;
 }
 
 .cd-platform-box small{
@@ -1645,8 +1666,8 @@ const STYLE = `
 
 .cd-timeline-item{
   padding:12px;
-  background:#fafafa;
-  border:1px solid #ededed;
+  background:transparent;
+  border:1px solid #e4e1d9;
   border-radius:8px;
 }
 
@@ -1656,7 +1677,7 @@ const STYLE = `
   gap:9px;
   margin-top:10px;
   padding:11px 12px;
-  border:1px solid #eee;
+  border:1px solid #e4e1d9;
   border-radius:8px;
 }
 
@@ -1709,7 +1730,7 @@ const STYLE = `
   font-weight:600;
 }
 
-/* SIDEBAR */
+/* SIDEBAR — same background as everything else, dash separator instead of a boxed card */
 
 .cd-sidebar{
   min-width:0;
@@ -1718,11 +1739,12 @@ const STYLE = `
 .cd-apply-card{
   position:sticky;
   top:18px;
-  padding:21px;
-  background:#fff;
-  border:1px solid #dcdcdc;
-  border-radius:10px;
-  box-shadow:0 5px 20px rgba(0,0,0,.035);
+  padding:0 0 21px;
+  background:transparent;
+  border:0;
+  border-bottom:1px solid #e4e1d9;
+  border-radius:0;
+  box-shadow:none;
 }
 
 .cd-budget-label{
@@ -1766,8 +1788,8 @@ const STYLE = `
   gap:9px;
   margin-top:16px;
   padding:11px;
-  background:#fafafa;
-  border:1px solid #ddd;
+  background:transparent;
+  border:1px solid #e4e1d9;
   border-radius:8px;
 }
 
@@ -1801,7 +1823,7 @@ const STYLE = `
 
 .cd-sidebar-divider{
   height:1px;
-  background:#eee;
+  background:#e4e1d9;
   margin:18px 0 15px;
 }
 
@@ -1841,14 +1863,14 @@ const STYLE = `
   font-weight:600;
 }
 
-/* BUSINESS SIDEBAR */
+/* BUSINESS SIDEBAR — no card, dash separator */
 
 .cd-business-card{
   margin-top:14px;
-  padding:17px;
-  background:#fff;
-  border:1px solid #e3e3e3;
-  border-radius:10px;
+  padding:17px 0 0;
+  background:transparent;
+  border:0;
+  border-radius:0;
 }
 
 .cd-business-card-title{
@@ -1961,9 +1983,9 @@ const STYLE = `
   gap:9px;
   margin-top:15px;
   padding:11px 10px;
-  border:1px solid #e7e7e7;
+  border:1px solid #e4e1d9;
   border-radius:8px;
-  background:#fafafa;
+  background:transparent;
   color:#555;
 }
 
@@ -1991,7 +2013,8 @@ const STYLE = `
 
 /* The extension overlay intentionally starts below the public navbar.
    This prevents the modal from covering the navbar while keeping the
-   rest of the page dimmed. */
+   rest of the page dimmed. The modal itself stays white — it's an
+   overlay/dialog, not a page section, so it keeps its own surface. */
 .cd-extension-backdrop{
   position:fixed;
   top:51px;
@@ -2229,7 +2252,8 @@ const STYLE = `
   cursor:not-allowed;
 }
 
-/* MODAL */
+/* MODAL — stays a white overlay surface; this is a floating dialog, not
+   a page section, so it isn't part of the "same background" change. */
 
 .cd-modal-backdrop{
   position:fixed;
@@ -2502,11 +2526,11 @@ const STYLE = `
 
 
   .cd-page{
-    padding:20px 14px 60px;
+    padding:10px 14px 50px;
   }
 
   .cd-header{
-    padding:19px 0;
+    padding:12px 0;
   }
 
   .cd-header h1{
@@ -2525,7 +2549,7 @@ const STYLE = `
   }
 
   .cd-section{
-    padding:18px;
+    padding:16px 0;
   }
 
   .cd-modal{

@@ -1,4 +1,3 @@
-"""Small wrapper around Khalti KPG-2 Web Checkout APIs."""
 import httpx
 
 from app.core.config import KHALTI_SECRET_KEY, KHALTI_BASE_URL

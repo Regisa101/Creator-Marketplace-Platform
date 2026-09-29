@@ -26,7 +26,8 @@ export default function PaymentReturn() {
       <div style={{width:'min(460px,100%)',background:'#fff',border:'1px solid #e5e5e5',borderRadius:18,padding:35,textAlign:'center'}}>
         {!payment && !error && <><Loader2 size={30} className="spin"/><h2>Confirming payment…</h2></>}
         {error && <><XCircle size={40}/><h2>Payment could not be confirmed</h2><p>{error}</p></>}
-        {success && <><CheckCircle2 size={42}/><h2>Selection confirmed</h2><p>NPR {Number(payment.amount).toLocaleString()} was received by Creatorhub. The campaign is closed and the creator has been notified.</p></>}
+        {success && payment.payment_type === 'platform_fee' && <><CheckCircle2 size={42}/><h2>Service fee paid</h2><p>Your CreatorHub service fee of NPR {Number(payment.amount).toLocaleString()} was verified. The contract is now active and the creator has been notified.</p>{payment.transaction_id && <p style={{fontSize:12,color:'#777'}}>Transaction reference: {payment.transaction_id}</p>}</>}
+        {success && payment.payment_type !== 'platform_fee' && <><CheckCircle2 size={42}/><h2>Selection confirmed</h2><p>NPR {Number(payment.amount).toLocaleString()} was received by Creatorhub. The campaign is closed and the creator has been notified.</p></>}
         {payment && !success && !error && <><XCircle size={40}/><h2>Payment was not completed</h2><p>Please return to your dashboard.</p></>}
         {(error || payment) && <button onClick={() => navigate('/dashboard')} style={{marginTop:20,height:40,padding:'0 18px',border:0,borderRadius:9,background:'#111',color:'#fff',font:'600 12px Poppins'}}>Back to dashboard</button>}
       </div>

@@ -406,6 +406,69 @@ export interface PaymentSummary {
   completed_payment_count: number;
 }
 
+export interface ContractEvidenceSnapshot {
+  version?: number;
+  historical?: boolean;
+  captured_at?: string | null;
+  campaign?: {
+    id?: number;
+    title?: string | null;
+    category?: string | null;
+    description?: string | null;
+    responsibilities?: string | null;
+    creator_types?: string[];
+    experience_level?: string | null;
+    required_skills?: string[];
+    location?: string | null;
+    work_arrangement?: string | null;
+    requirements?: string | null;
+    deliverables?: string[];
+    creators_needed?: number | null;
+    engagement_type?: string | null;
+    duration?: string | null;
+    pricing_model?: string | null;
+    compensation_type?: string | null;
+    budget?: number | null;
+    budget_min?: number | null;
+    budget_max?: number | null;
+    compensation_description?: string | null;
+    start_date?: string | null;
+    end_date?: string | null;
+    application_deadline?: string | null;
+    application_questions?: string[];
+    hero_image?: string | null;
+  };
+  application?: {
+    id?: number;
+    campaign_id?: number;
+    creator_id?: number;
+    creator_name?: string | null;
+    proposal?: string | null;
+    rate?: number | null;
+    message?: string | null;
+    application_answers?: { question: string; answer: string }[];
+    selected_portfolio?: any[];
+    status?: string | null;
+    agreed_rate?: number | null;
+    rate_locked?: boolean;
+    deliverable_deadline?: string | null;
+    creator_confirmed?: boolean;
+    creator_verified?: boolean;
+    created_at?: string | null;
+    updated_at?: string | null;
+  };
+  final_terms?: {
+    agreed_rate?: number | null;
+    total_value?: number | null;
+    platform_fee_rate?: number | null;
+    platform_fee_amount?: number | null;
+    terms_note?: string | null;
+    start_date?: string | null;
+    end_date?: string | null;
+    finalized_at?: string | null;
+  };
+}
+
 export interface Contract {
   id: number;
   campaign_id: number;
@@ -425,10 +488,7 @@ export interface Contract {
   end_date?: string | null;
   status: 'draft' | 'pending_payment' | 'active' | 'completed' | 'cancelled' | string;
   terms_note?: string | null;
-  // Demo platform-fee payment (see routes/contracts.py::pay_platform_fee).
-  // No real gateway is called — this is separate from the real Khalti
-  // `Payment` flow above.
-  payment_method?: 'wallet' | 'card' | null;
+  payment_method?: 'khalti' | 'wallet' | 'card' | 'demo' | null;
   payment_reference?: string | null;
   fee_paid: boolean;
   fee_paid_at?: string | null;
@@ -437,6 +497,7 @@ export interface Contract {
   campaign_title?: string | null;
   creator_name?: string | null;
   business_name?: string | null;
+  evidence_snapshot?: ContractEvidenceSnapshot | null;
 }
 
 export interface ContractFinalizeData {
@@ -447,15 +508,6 @@ export interface ContractFinalizeData {
   end_date?: string | null;
 }
 
-export interface ContractPayFeeData {
-  payment_method: 'wallet' | 'card';
-  wallet_number?: string;
-  wallet_pin?: string;
-  card_number?: string;
-  card_expiry?: string;
-  card_cvv?: string;
-  card_holder?: string;
-}
 
 export interface ContractSummary {
   role: string;
@@ -532,11 +584,9 @@ export const getContracts = (status?: string) => unwrap(api.get<Contract[]>('/co
 export const getContract = (id: number) => unwrap(api.get<Contract>(`/contracts/${id}`));
 export const finalizeContract = (id: number, data: ContractFinalizeData) => unwrap(api.put<Contract>(`/contracts/${id}/finalize`, data));
 export const completeContract = (id: number) => unwrap(api.put<Contract>(`/contracts/${id}/complete`));
-// Demo-only platform fee payment — replaces the old self-reported
-// markContractFeePaid()/PUT /contracts/{id}/fee-paid. No real gateway is
-// called; the backend just simulates a successful charge and activates
-// the contract.
-export const payContractFee = (id: number, data: ContractPayFeeData) => unwrap(api.post<Contract>(`/contracts/${id}/pay-fee`, data));
+// Hosted Khalti checkout for CreatorHub's contract service fee.
+export const initiateContractFeeCheckout = (id: number) =>
+  unwrap(api.post<{ demo: boolean; payment_url: string | null; pidx: string | null; purchase_order_id: string; amount: number; transaction_id?: string; contract?: Contract }>(`/contracts/${id}/checkout`));
 export const getContractSummary = () => unwrap(api.get<ContractSummary>('/contracts/summary/me'));
 
 function notifyWishlistChanged() {

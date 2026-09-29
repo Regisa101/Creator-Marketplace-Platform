@@ -1,50 +1,37 @@
 import { useState } from 'react';
-import { Loader2, Wallet, CreditCard, ShieldCheck } from 'lucide-react';
-import { payContractFee, type Contract, type ContractPayFeeData } from '../api/client';
+import { Loader2, ShieldCheck, CreditCard, Info } from 'lucide-react';
+import { initiateContractFeeCheckout, type Contract } from '../api/client';
 
 type Props = {
   contract: Contract;
-  onSuccess: (updated: Contract) => void;
+  onSuccess?: (updated: Contract) => void;
   onCancel: () => void;
 };
 
-export function DemoPaymentForm({ contract, onSuccess, onCancel }: Props) {
-  const [method, setMethod] = useState<'wallet' | 'card'>('wallet');
-  const [walletNumber, setWalletNumber] = useState('');
-  const [walletPin, setWalletPin] = useState('');
-  const [cardNumber, setCardNumber] = useState('');
-  const [cardExpiry, setCardExpiry] = useState('');
-  const [cardCvv, setCardCvv] = useState('');
-  const [cardHolder, setCardHolder] = useState('');
+/** Hosted checkout selector. Card/wallet details are collected only by Khalti. */
+export function DemoPaymentForm({ contract, onCancel }: Props) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
-
   const fee = Number(contract.platform_fee_amount || 0);
+  const total = Number(contract.total_value || 0);
 
-  const submit = async () => {
+  const continueToPay = async () => {
     setError('');
-
-    if (method === 'wallet') {
-      if (!/^\d{7,10}$/.test(walletNumber)) { setError('Enter a valid wallet/mobile number.'); return; }
-      if (!/^\d{4,6}$/.test(walletPin)) { setError('Enter your PIN.'); return; }
-    } else {
-      if (!/^\d{12,19}$/.test(cardNumber.replace(/\s+/g, ''))) { setError('Enter a valid card number.'); return; }
-      if (!/^\d{2}\/\d{2}$/.test(cardExpiry)) { setError('Expiry should be MM/YY.'); return; }
-      if (!/^\d{3,4}$/.test(cardCvv)) { setError('Enter the CVV.'); return; }
-      if (!cardHolder.trim()) { setError('Enter the cardholder name.'); return; }
-    }
-
-    const payload: ContractPayFeeData = method === 'wallet'
-      ? { payment_method: 'wallet', wallet_number: walletNumber, wallet_pin: walletPin }
-      : { payment_method: 'card', card_number: cardNumber.replace(/\s+/g, ''), card_expiry: cardExpiry, card_cvv: cardCvv, card_holder: cardHolder };
-
     setBusy(true);
     try {
-      const updated = await payContractFee(contract.id, payload);
-      onSuccess(updated);
+      const checkout = await initiateContractFeeCheckout(contract.id);
+
+      // Demo mode: the backend completes the local payment immediately.
+      // No Khalti page, wallet, PIN, OTP, or merchant credentials are needed.
+      if (checkout.demo) {
+        window.location.reload();
+        return;
+      }
+
+      if (!checkout.payment_url) throw new Error('The payment provider did not return a checkout link.');
+      window.location.assign(checkout.payment_url);
     } catch (err: any) {
-      setError(err?.response?.data?.detail || 'Payment could not be completed.');
-    } finally {
+      setError(err?.response?.data?.detail || err?.message || 'Could not start secure checkout.');
       setBusy(false);
     }
   };
@@ -52,87 +39,49 @@ export function DemoPaymentForm({ contract, onSuccess, onCancel }: Props) {
   return (
     <div className="dp-wrap">
       <style>{`
-        .dp-wrap{margin-top:10px}
-        .dp-amount{background:#111;color:#fff;border-radius:12px;padding:16px;text-align:center;margin-bottom:16px}
-        .dp-amount span{display:block;font:500 11px Poppins,sans-serif;opacity:.7;margin-bottom:4px}
-        .dp-amount strong{font:700 24px Poppins,sans-serif}
-        .dp-tabs{display:flex;gap:8px;margin-bottom:14px}
-        .dp-tab{flex:1;height:38px;border-radius:9px;border:1px solid #ddd;background:#fff;font:600 12px Poppins,sans-serif;display:flex;align-items:center;justify-content:center;gap:6px;cursor:pointer;color:#555}
-        .dp-tab.active{border-color:#111;background:#111;color:#fff}
-        .dp-field{margin-bottom:10px}
-        .dp-field label{display:block;font:600 11px Poppins,sans-serif;color:#444;margin-bottom:5px}
-        .dp-field input{width:100%;box-sizing:border-box;border:1px solid #ddd;border-radius:9px;padding:10px 11px;outline:none;font:400 12px Poppins,sans-serif}
-        .dp-field input:focus{border-color:#111}
-        .dp-row{display:flex;gap:10px}
-        .dp-error{padding:9px 11px;background:#f8eeee;color:#ad2929;border-radius:9px;font:500 11px Poppins,sans-serif;margin-bottom:10px}
-        .dp-pay{width:100%;height:44px;border:0;border-radius:9px;background:#111;color:#fff;font:700 13px Poppins,sans-serif;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:8px;margin-top:6px}
+        .dp-wrap{margin-top:12px;color:#111;font-family:Poppins,sans-serif}
+        .dp-summary{border:1px solid #e3e7ed;border-radius:12px;overflow:hidden;margin-bottom:15px}
+        .dp-summary-title{font-size:12px;font-weight:700;padding:13px 14px;border-bottom:1px solid #edf0f3}
+        .dp-row{display:flex;justify-content:space-between;gap:12px;padding:10px 14px;font-size:12px;color:#5e6673}
+        .dp-row strong{color:#111;font-weight:600}
+        .dp-total{border-top:1px solid #e6e9ed;background:#f8fafc;color:#111;font-weight:700;align-items:center}
+        .dp-total strong{font-size:18px}
+        .dp-info{display:flex;gap:10px;background:#f3f7fc;border:1px solid #e0e9f5;border-radius:10px;padding:12px;margin-bottom:15px;font-size:11px;line-height:1.6;color:#536174}
+        .dp-info strong{display:block;color:#152238;font-size:12px;margin-bottom:2px}
+        .dp-method{border:1px solid #d8dee8;border-radius:10px;padding:13px;display:flex;align-items:center;gap:11px;margin:8px 0 15px;background:#fff}
+        .dp-method-icon{width:40px;height:40px;display:grid;place-items:center;background:#f3f5f8;border-radius:50%;flex:none}
+        .dp-method-title{font-size:12px;font-weight:700}
+        .dp-method-sub{font-size:10px;color:#778091;margin-top:3px;line-height:1.4}
+        .dp-error{padding:10px 12px;background:#fff1f1;color:#ad2929;border:1px solid #f3d0d0;border-radius:9px;font-size:11px;margin-bottom:12px}
+        .dp-pay{width:100%;height:44px;border:0;border-radius:9px;background:#111827;color:#fff;font:700 12px Poppins,sans-serif;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:8px}
         .dp-pay:disabled{opacity:.6;cursor:not-allowed}
-        .dp-cancel{width:100%;height:38px;margin-top:8px;border:1px solid #ddd;border-radius:9px;background:#fff;color:#555;font:600 12px Poppins,sans-serif;cursor:pointer}
-        .dp-note{margin-top:10px;font:400 10px/1.5 Poppins,sans-serif;color:#888;display:flex;gap:6px;align-items:flex-start}
-        .dp-spin{animation:dp-spin .8s linear infinite}
-        @keyframes dp-spin{to{transform:rotate(360deg)}}
+        .dp-cancel{width:100%;height:40px;margin-top:8px;border:1px solid #d9dee7;border-radius:9px;background:#fff;color:#374151;font:600 12px Poppins,sans-serif;cursor:pointer}
+        .dp-note{display:flex;gap:6px;justify-content:center;margin-top:11px;font-size:10px;color:#87909e;line-height:1.5;text-align:center}
+        .dp-spin{animation:dp-spin .8s linear infinite}@keyframes dp-spin{to{transform:rotate(360deg)}}
       `}</style>
 
-      <div className="dp-amount">
-        <span>Platform service fee (10%)</span>
-        <strong>NPR {fee.toLocaleString()}</strong>
+      <div className="dp-summary">
+        <div className="dp-summary-title">Payment Summary</div>
+        <div className="dp-row"><span>Total contract value</span><strong>NPR {total.toLocaleString()}</strong></div>
+        <div className="dp-row"><span>CreatorHub service fee (10%)</span><strong>NPR {fee.toLocaleString()}</strong></div>
+        <div className="dp-row dp-total"><span>Total amount due</span><strong>NPR {fee.toLocaleString()}</strong></div>
       </div>
 
-      <div className="dp-tabs">
-        <button type="button" className={`dp-tab ${method === 'wallet' ? 'active' : ''}`} onClick={() => setMethod('wallet')}>
-          <Wallet size={14} /> Wallet
-        </button>
-        <button type="button" className={`dp-tab ${method === 'card' ? 'active' : ''}`} onClick={() => setMethod('card')}>
-          <CreditCard size={14} /> Card
-        </button>
+      <div className="dp-info"><Info size={17} style={{ flex: 'none', marginTop: 1 }} /><div><strong>What is this payment for?</strong>This fee covers CreatorHub's platform service. Creator compensation is paid directly to the creator and is not included in this charge.</div></div>
+
+      <div style={{ fontSize: 12, fontWeight: 700, marginBottom: 7 }}>Choose a payment method</div>
+      <div className="dp-method">
+        <div className="dp-method-icon"><CreditCard size={20} /></div>
+        <div><div className="dp-method-title">Demo payment</div><div className="dp-method-sub">For now, this is a local test payment. No real money is charged and no Khalti account is required.</div></div>
       </div>
 
       {error && <div className="dp-error">{error}</div>}
-
-      {method === 'wallet' ? (
-        <>
-          <div className="dp-field">
-            <label>Wallet / mobile number</label>
-            <input value={walletNumber} onChange={e => setWalletNumber(e.target.value.replace(/\D/g, ''))} placeholder="98XXXXXXXX" maxLength={10} />
-          </div>
-          <div className="dp-field">
-            <label>PIN</label>
-            <input type="password" value={walletPin} onChange={e => setWalletPin(e.target.value.replace(/\D/g, ''))} placeholder="••••" maxLength={6} />
-          </div>
-        </>
-      ) : (
-        <>
-          <div className="dp-field">
-            <label>Card number</label>
-            <input value={cardNumber} onChange={e => setCardNumber(e.target.value.replace(/[^\d\s]/g, ''))} placeholder="4242 4242 4242 4242" maxLength={19} />
-          </div>
-          <div className="dp-row">
-            <div className="dp-field" style={{ flex: 1 }}>
-              <label>Expiry (MM/YY)</label>
-              <input value={cardExpiry} onChange={e => setCardExpiry(e.target.value)} placeholder="09/28" maxLength={5} />
-            </div>
-            <div className="dp-field" style={{ flex: 1 }}>
-              <label>CVV</label>
-              <input value={cardCvv} onChange={e => setCardCvv(e.target.value.replace(/\D/g, ''))} placeholder="123" maxLength={4} />
-            </div>
-          </div>
-          <div className="dp-field">
-            <label>Cardholder name</label>
-            <input value={cardHolder} onChange={e => setCardHolder(e.target.value)} placeholder="As printed on card" />
-          </div>
-        </>
-      )}
-
-      <button type="button" className="dp-pay" disabled={busy} onClick={() => void submit()}>
-        {busy ? <Loader2 size={16} className="dp-spin" /> : null}
-        {busy ? 'Processing…' : `Pay NPR ${fee.toLocaleString()}`}
+      <button type="button" className="dp-pay" disabled={busy || fee <= 0} onClick={() => void continueToPay()}>
+        {busy ? <Loader2 size={15} className="dp-spin" /> : null}
+        {busy ? 'Processing demo payment…' : `Pay Demo Fee · NPR ${fee.toLocaleString()}`}
       </button>
       <button type="button" className="dp-cancel" disabled={busy} onClick={onCancel}>Cancel</button>
-
-      <div className="dp-note">
-        <ShieldCheck size={13} style={{ flex: 'none', marginTop: 1 }} />
-        Demo payment — no real transaction is processed and no gateway (Khalti/eSewa/card network) is contacted.
-      </div>
+      <div className="dp-note"><ShieldCheck size={13} style={{ flex: 'none' }} /> Demo payment is completed locally. The contract activates immediately for testing.</div>
     </div>
   );
 }

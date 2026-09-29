@@ -23,6 +23,7 @@ import {
   ArrowRight,
   MapPin,
   Heart,
+  Check,
 } from "lucide-react";
 
 // ============================================
@@ -108,17 +109,43 @@ const CAT_PAGE_SIZE = 4;
 const CAT_PAGE_STEP = 3;
 
 // ============================================
-// CAMPAIGN HELPERS
+// WHY CREATORHUB ITEMS
 // ============================================
 
-function campaignPlatform(c: PublicCampaign) {
-  return c.required_platforms?.[0] || c.required_platform || "";
-}
+const WHY_ITEMS = [
+  {
+    number: "01",
+    title: "Discover Opportunities",
+    text: "Explore relevant campaigns and creator opportunities that match your skills, interests, and goals.",
+  },
+  {
+    number: "02",
+    title: "Build Meaningful Connections",
+    text: "Creators and businesses can connect around real campaign needs, not just through social media.",
+  },
+  {
+    number: "03",
+    title: "Manage Collaborations with Ease",
+    text: "From applications to approvals and payments, keep your collaborations organized — all in one place.",
+  },
+];
 
-function creatorAudienceLabel(c: PublicCampaign) {
-  const ranges = c.creator_requirements?.follower_ranges || [];
-  return ranges[0] || "";
-}
+// ============================================
+// PRICING
+// ============================================
+
+const PRICING_FEATURES = [
+  { title: "Create campaigns", text: "Set your budget, requirements and deliverables." },
+  { title: "Find creators", text: "Browse creator profiles and portfolios." },
+  { title: "Review applications", text: "Compare creators before making your selection." },
+  { title: "Manage collaborations", text: "Keep campaign work and communication organized." },
+  { title: "Track progress", text: "From application to completion." },
+  { title: "Secure payments", text: "Pay for approved creator work." },
+];
+
+// ============================================
+// CAMPAIGN HELPERS
+// ============================================
 
 function isBooked(c: PublicCampaign) {
   return c.status === "in_progress";
@@ -329,7 +356,6 @@ function CampaignCard({
 }
 
 // ============================================
-// ============================================
 // HERO SLIDES
 // ============================================
 
@@ -396,6 +422,7 @@ const HERO_SLIDES = [
   },
 ];
 
+// ============================================
 // LANDING PAGE
 // ============================================
 
@@ -424,6 +451,32 @@ export function Landing() {
     }, 5500);
 
     return () => window.clearInterval(timer);
+  }, []);
+
+  // ============================================
+  // SCROLL TO SECTION WHEN ARRIVING FROM ANOTHER PAGE
+  // (e.g. clicking "For Brands" in the navbar while on /pricing)
+  // ============================================
+
+  useEffect(() => {
+    const target =
+      sessionStorage.getItem("ch-scroll-target") ||
+      window.location.hash.replace("#", "");
+
+    sessionStorage.removeItem("ch-scroll-target");
+
+    if (!target) {
+      window.scrollTo(0, 0);
+      return;
+    }
+
+    const timer = window.setTimeout(() => {
+      document
+        .getElementById(target)
+        ?.scrollIntoView({ behavior: "smooth", block: "start" });
+    }, 100);
+
+    return () => window.clearTimeout(timer);
   }, []);
 
   // ============================================
@@ -552,10 +605,6 @@ export function Landing() {
   };
 
   // ============================================
-  // CATEGORIES
-  // ============================================
-
-    // ============================================
   // LATEST CAMPAIGNS
   // ============================================
 
@@ -601,13 +650,14 @@ export function Landing() {
   return (
     <div className="lp">
       <style>{`
-        @import url('https://fonts.googleapis.com/css2?family=League+Spartan:wght@500;600;700;800&family=Poppins:wght@300;400;500;600;700&display=swap');
+        @import url('https://fonts.googleapis.com/css2?family=League+Spartan:wght@300;400;500;600;700;800&family=Poppins:wght@300;400;500;600;700&display=swap');
 
         .lp {
           --content-width: 1304px;
           --content-padding: 32px;
           --section-space: 64px;
-          --content-left-space: 56px;
+          --content-left-space: 32px;
+          --heading-size: 34px;
           --navy: ${NAVY};
           --navy-soft: #F3F3F3;
           --coral: #111111;
@@ -641,17 +691,6 @@ export function Landing() {
           font-family: inherit;
           cursor: pointer;
         }
-
-        /* ============================================
-           NAV
-        ============================================ */
-
-
-
-
-
-
-
 
         .lp-card-image-placeholder {
           width: 100%;
@@ -717,13 +756,6 @@ export function Landing() {
           color: var(--coral);
           border-color: #F6C9C6;
         }
-
-
-
-
-
-
-
 
         /* ============================================
            FULL PAGE HERO
@@ -1053,15 +1085,11 @@ export function Landing() {
 
         /* ============================================
            SHARED CONTENT ALIGNMENT
-           Every major section uses the exact same
-           max-width + horizontal padding so headings,
-           cards, grids and footer content line up.
         ============================================ */
         .lp-container,
         .lp-hero-inner,
         .lp-cat-section,
         .lp-how-inner,
-        .lp-brand-cta-inner,
         .lp-footer-inner {
           width: 100%;
           max-width: var(--content-width);
@@ -1070,6 +1098,24 @@ export function Landing() {
           padding-left: var(--content-left-space);
           padding-right: var(--content-padding);
           box-sizing: border-box;
+        }
+
+        /* ============================================
+           SHARED SECTION HEADINGS
+        ============================================ */
+        .lp-h2,
+        .lp-cat-title,
+        .lp-how-title,
+        .lp-why-heading,
+        .lp-price-card-title,
+        .lp-brand-copy h2 {
+          font-family: 'League Spartan', sans-serif;
+          font-size: var(--heading-size);
+          line-height: 1.1;
+          font-weight: 400;
+          letter-spacing: -0.02em;
+          color: #111111;
+          margin: 0;
         }
 
         /* ============================================
@@ -1082,10 +1128,7 @@ export function Landing() {
         }
 
         .lp-cat-title {
-          font-size: 32px;
-          font-weight: 400;
-          color: var(--navy);
-          margin: 0 0 28px;
+          margin: 0 0 32px;
         }
 
         .lp-cat-grid {
@@ -1199,18 +1242,6 @@ export function Landing() {
           outline-offset: 3px;
         }
 
-
-
-
-
-
-
-
-
-
-
-
-
         /* ============================================
            CAMPAIGN SECTION
         ============================================ */
@@ -1221,18 +1252,11 @@ export function Landing() {
 
         .lp-section-head {
           display: flex;
-          align-items: flex-end;
+          align-items: center;
           justify-content: space-between;
-          margin-bottom: 20px;
+          margin-bottom: 32px;
           gap: 20px;
           flex-wrap: wrap;
-        }
-
-        .lp-h2 {
-          font-size: 28px;
-          font-weight: 400;
-          color: var(--navy);
-          margin: 0;
         }
 
         .lp-view-all {
@@ -1262,10 +1286,6 @@ export function Landing() {
           background: #FFFFFF;
         }
 
-        .lp-latest-section .lp-section-head {
-          margin-bottom: 22px;
-        }
-
         .lp-latest-view-all {
           color: #111111;
           transition: transform .16s ease, opacity .16s ease;
@@ -1283,7 +1303,6 @@ export function Landing() {
           align-items: stretch;
         }
 
-        /* Latest campaigns pagination */
         .lp-latest-navigation {
           display: flex;
           justify-content: center;
@@ -1314,9 +1333,6 @@ export function Landing() {
           outline: 2px solid #111111;
           outline-offset: 3px;
         }
-
-
-
 
         /* ============================================
            CAMPAIGN CARD
@@ -1612,17 +1628,7 @@ export function Landing() {
           align-items: center;
           justify-content: space-between;
           gap: 24px;
-          margin-bottom: 42px;
-        }
-
-        .lp-how-title {
-          margin: 0;
-          font-family: 'League Spartan', sans-serif;
-          font-size: 34px;
-          line-height: 1;
-          font-weight: 400;
-          letter-spacing: -0.02em;
-          color: #111111;
+          margin-bottom: 32px;
         }
 
         .lp-how-toggle {
@@ -1658,7 +1664,6 @@ export function Landing() {
           transition: color .18s ease, box-shadow .18s ease;
         }
 
-        /* Selected side: white background with black 2px outline only. */
         .lp-how-toggle-btn.is-active {
           background: #FFFFFF;
           color: #111111;
@@ -1667,14 +1672,12 @@ export function Landing() {
           z-index: 2;
         }
 
-        /* Unselected side remains completely white with no divider/fill. */
         .lp-how-toggle-btn:not(.is-active) {
           background: #FFFFFF;
           box-shadow: none;
           color: #333333;
         }
 
-        /* Hover must never turn either side black. */
         .lp-how-toggle-btn:hover {
           background: #FFFFFF !important;
           color: #333333 !important;
@@ -1682,7 +1685,6 @@ export function Landing() {
           transform: none !important;
         }
 
-        /* Keep the selected outline visible while hovering. */
         .lp-how-toggle-btn.is-active:hover {
           background: #FFFFFF !important;
           color: #111111 !important;
@@ -1753,12 +1755,295 @@ export function Landing() {
         }
 
         /* ============================================
+           WHY CREATORHUB
+        ============================================ */
+
+        .lp-why-section {
+          width: 100%;
+          background: #ffffff;
+          padding: var(--section-space) 0;
+        }
+
+        .lp-why-inner {
+          width: 100%;
+        }
+
+        .lp-why-head {
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          gap: 20px;
+          margin-bottom: 32px;
+        }
+
+        .lp-why-heading {
+          margin: 0;
+          font-family: 'League Spartan', sans-serif;
+          font-size: var(--heading-size);
+          line-height: 1.1;
+          font-weight: 400;
+          letter-spacing: -0.02em;
+          color: #111111;
+        }
+
+        .lp-why-view-all {
+          display: inline-flex;
+          align-items: center;
+          gap: 6px;
+          padding: 0;
+          border: 0;
+          background: transparent;
+          color: #111111;
+          font-size: 14px;
+          font-weight: 400;
+          white-space: nowrap;
+          transition: transform .16s ease, opacity .16s ease;
+        }
+
+        .lp-why-view-all:hover {
+          background: transparent;
+          color: #111111 !important;
+          transform: translateX(3px);
+          opacity: .7;
+        }
+
+        .lp-why-grid {
+          display: grid;
+          grid-template-columns: repeat(3, minmax(0, 1fr));
+          width: 100%;
+          border-top: 1px solid #E5E5E5;
+          border-bottom: 1px solid #E5E5E5;
+        }
+
+        .lp-why-item {
+          min-width: 0;
+          padding: 30px 34px 32px 0;
+        }
+
+        .lp-why-item + .lp-why-item {
+          padding-left: 34px;
+          border-left: 1px solid #E5E5E5;
+        }
+
+        .lp-why-number {
+          display: block;
+          margin-bottom: 22px;
+          font-size: 24px;
+          font-weight: 400;
+          line-height: 1.1;
+          letter-spacing: -0.02em;
+          color: #999999;
+        }
+
+        .lp-why-item-content {
+          min-width: 0;
+        }
+
+        .lp-why-item-title {
+          margin: 0 0 10px;
+          font-family: 'League Spartan', sans-serif;
+          font-size: 24px;
+          line-height: 1.12;
+          font-weight: 400;
+          letter-spacing: -0.02em;
+          color: #111111;
+        }
+
+        .lp-why-item-text {
+          margin: 0;
+          max-width: 360px;
+          font-size: 13px;
+          line-height: 1.65;
+          color: var(--ink-soft);
+        }
+
+        /* ============================================
+           PRICING
+        ============================================ */
+
+        .lp-price-section {
+          width: 100%;
+          background: #ffffff;
+          padding: var(--section-space) 0;
+        }
+
+        .lp-price-head {
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          gap: 20px;
+          margin-bottom: 32px;
+        }
+
+        .lp-price-card-title {
+          margin: 0;
+          font-family: 'League Spartan', sans-serif;
+          font-size: var(--heading-size);
+          line-height: 1.1;
+          font-weight: 400;
+          letter-spacing: -0.02em;
+          color: #111111;
+        }
+
+        .lp-price-view-all {
+          display: inline-flex;
+          align-items: center;
+          gap: 6px;
+          padding: 0;
+          border: 0;
+          background: transparent;
+          color: #111111;
+          font-size: 14px;
+          font-weight: 400;
+          white-space: nowrap;
+          transition: transform .16s ease, opacity .16s ease;
+        }
+
+        .lp-price-view-all:hover {
+          color: #111111 !important;
+          background: transparent;
+          transform: translateX(3px);
+          opacity: .7;
+        }
+
+        .lp-price-content {
+          display: grid;
+          grid-template-columns: minmax(220px, .75fr) minmax(0, 1.15fr) minmax(260px, .8fr);
+          gap: 0;
+          width: 100%;
+          border-top: 1px solid #E5E5E5;
+          border-bottom: 1px solid #E5E5E5;
+        }
+
+        .lp-price-fee {
+          padding: 30px 34px 32px 0;
+        }
+
+        .lp-price-big {
+          font-family: 'League Spartan', sans-serif;
+          font-size: 68px;
+          line-height: .9;
+          font-weight: 300;
+          letter-spacing: -0.045em;
+          color: #111111;
+        }
+
+        .lp-price-big-label {
+          margin-top: 8px;
+          font-family: 'League Spartan', sans-serif;
+          font-size: 22px;
+          line-height: 1.1;
+          font-weight: 300;
+          color: #111111;
+        }
+
+        .lp-price-note {
+          margin: 18px 0 0;
+          font-size: 13px;
+          line-height: 1.6;
+          color: var(--ink-soft);
+        }
+
+        .lp-price-benefits {
+          display: grid;
+          grid-template-columns: repeat(2, minmax(0, 1fr));
+          align-content: center;
+          gap: 24px 30px;
+          padding: 30px 34px;
+          border-left: 1px solid #E5E5E5;
+          border-right: 1px solid #E5E5E5;
+        }
+
+        .lp-price-benefit {
+          display: flex;
+          align-items: flex-start;
+          gap: 10px;
+          min-width: 0;
+        }
+
+        .lp-price-benefit svg {
+          flex-shrink: 0;
+          margin-top: 2px;
+          color: #111111;
+        }
+
+        .lp-price-benefit strong {
+          display: block;
+          font-size: 13px;
+          line-height: 1.4;
+          font-weight: 500;
+          color: #111111;
+        }
+
+        .lp-price-benefit span {
+          display: block;
+          margin-top: 4px;
+          font-size: 11.5px;
+          line-height: 1.5;
+          color: #777777;
+        }
+
+        .lp-price-example {
+          align-self: center;
+          padding: 26px 0 26px 34px;
+        }
+
+        .lp-price-eyebrow {
+          margin: 0 0 13px;
+          font-size: 10px;
+          font-weight: 400;
+          letter-spacing: .2em;
+          text-transform: uppercase;
+          color: #777777;
+        }
+
+        .lp-price-row {
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          gap: 16px;
+          padding: 8px 0;
+          font-size: 13px;
+          color: #777777;
+        }
+
+        .lp-price-row strong {
+          color: #111111;
+          font-weight: 500;
+        }
+
+        .lp-price-total {
+          margin-top: 8px;
+          padding-top: 14px;
+          border-top: 1px solid #E2E2E4;
+          color: #111111;
+        }
+
+        @media (max-width: 900px) {
+          .lp-price-content {
+            grid-template-columns: 1fr 1fr;
+          }
+
+          .lp-price-example {
+            grid-column: 1 / -1;
+            border-top: 1px solid #E5E5E5;
+            padding: 24px 0;
+          }
+        }
+
+        @media (max-width: 760px) {
+          .lp-price-big {
+            font-size: 64px;
+          }
+        }
+
+        /* ============================================
            BRAND CTA
         ============================================ */
 
         .lp-brand-cta {
-          width: calc(100% - 40px);
-          max-width: 1400px;
+          width: calc(100% - 2 * var(--content-padding));
+          max-width: calc(var(--content-width) - 2 * var(--content-padding));
           margin: var(--section-space) auto;
           background:
             linear-gradient(
@@ -1786,7 +2071,6 @@ export function Landing() {
           box-sizing: border-box;
         }
 
-
         .lp-brand-copy {
           min-width: 0;
           width: 100%;
@@ -1798,14 +2082,7 @@ export function Landing() {
 
         .lp-brand-copy h2 {
           margin: 0 0 10px;
-          font-family: 'League Spartan', sans-serif;
-          font-size: 34px;
-          line-height: 1.08;
-          font-weight: 400;
-          letter-spacing: -0.025em;
-          color: #111111;
         }
-
 
         .lp-brand-copy p {
           margin: 0 0 20px;
@@ -1847,7 +2124,7 @@ export function Landing() {
           color: var(--ink);
           padding: var(--section-space) 0 22px;
           margin-top: 0;
-          border-top: 1px solid #EAE3DD;
+          border-top: 0;
         }
 
         .lp-footer-top {
@@ -1938,31 +2215,26 @@ export function Landing() {
           border-color: var(--coral);
         }
 
-        /* ============================================
-           FINAL ALIGNMENT SAFETY
-        ============================================ */
-        .lp-hero-inner,
-        .lp-cat-section,
-        .lp-latest-section > .lp-container,
-        .lp-how-inner,
-        .lp-brand-cta-inner,
-        .lp-footer-inner {
-          width: 100%;
-          max-width: var(--content-width);
-          margin-left: auto;
-          margin-right: auto;
-          padding-left: var(--content-left-space);
-          padding-right: var(--content-padding);
-          box-sizing: border-box;
-        }
-
-        /* All section content starts on the same x-coordinate. */
+        /* All section content spans the same width. */
         .lp-cat-title,
         .lp-section-head,
         .lp-latest-grid,
         .lp-how-head,
         .lp-how-grid {
           width: 100%;
+          box-sizing: border-box;
+        }
+
+        /* ============================================
+           SECTION DIVIDERS
+        ============================================ */
+        .lp-section-divider {
+          width: 100%;
+          height: 1px;
+          margin: 0;
+          padding: 0;
+          border: 0;
+          border-top: 1px solid #D6D6D6;
           box-sizing: border-box;
         }
 
@@ -1995,6 +2267,77 @@ export function Landing() {
             grid-template-columns: repeat(3, 1fr);
           }
 
+          .lp-price-head {
+            margin-bottom: 24px;
+          }
+
+          .lp-price-content {
+            grid-template-columns: 1fr;
+          }
+
+          .lp-price-fee {
+            padding: 26px 0;
+          }
+
+          .lp-price-big {
+            font-size: 58px;
+          }
+
+          .lp-price-big-label {
+            font-size: 20px;
+          }
+
+          .lp-price-benefits {
+            grid-template-columns: 1fr;
+            gap: 18px;
+            padding: 24px 0;
+            border-left: 0;
+            border-right: 0;
+            border-top: 1px solid #E5E5E5;
+            border-bottom: 1px solid #E5E5E5;
+          }
+
+          .lp-price-example {
+            grid-column: auto;
+            padding: 24px 0;
+            border-top: 0;
+          }
+
+          .lp-why-head {
+            margin-bottom: 24px;
+          }
+
+          .lp-why-grid {
+            grid-template-columns: 1fr;
+          }
+
+          .lp-why-item,
+          .lp-why-item + .lp-why-item,
+          .lp-why-item:nth-child(3) {
+            padding: 24px 0;
+            border-left: 0;
+          }
+
+          .lp-why-item + .lp-why-item {
+            border-top: 1px solid #E5E5E5;
+          }
+
+          .lp-why-item:nth-child(3) {
+            grid-column: auto;
+          }
+
+          .lp-why-number {
+            font-size: 22px;
+          }
+
+          .lp-why-item-title {
+            font-size: 21px;
+          }
+
+          .lp-why-item-text {
+            max-width: none;
+          }
+
           .lp-hero {
             min-height: 100vh;
             padding: 56px 0;
@@ -2017,14 +2360,26 @@ export function Landing() {
             font-size: 54px;
           }
 
+          .lp-why-left {
+            padding-right: 36px;
+          }
+
+          .lp-why-right {
+            padding-left: 36px;
+          }
         }
 
         @media (max-width: 760px) {
+          .lp {
+            --content-padding: 18px;
+            --content-left-space: 18px;
+            --heading-size: 28px;
+          }
+
           .lp-how-toggle {
             width: 300px;
             max-width: 100%;
           }
-
 
           .lp-grid {
             grid-template-columns: repeat(2, 1fr);
@@ -2077,8 +2432,23 @@ export function Landing() {
             max-width: none;
           }
 
-          .lp-cat-title {
-            font-size: 26px;
+          .lp-why-grid {
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+          }
+
+          .lp-why-item {
+            padding: 24px 24px 26px 0;
+          }
+
+          .lp-why-item + .lp-why-item {
+            padding-left: 24px;
+          }
+
+          .lp-why-item:nth-child(3) {
+            grid-column: 1 / -1;
+            border-left: 0;
+            border-top: 1px solid #E5E5E5;
+            padding-left: 0;
           }
 
           .lp-hero {
@@ -2091,7 +2461,6 @@ export function Landing() {
             flex-direction: column;
             align-items: stretch;
             gap: 46px;
-            padding: 0 18px;
           }
 
           .lp-hero-inner > div:first-child {
@@ -2164,30 +2533,10 @@ export function Landing() {
             padding: 0 15px;
           }
 
-          .lp-container,
-          .lp-hero-inner,
-          .lp-cat-section,
-          .lp-how-inner,
-          .lp-brand-cta-inner,
-          .lp-footer-inner {
-            --content-padding: 18px;
-            --content-left-space: 18px;
-            padding-left: 18px;
-            padding-right: 18px;
-          }
-
           .lp-brand-cta-inner {
             min-height: 0;
             padding: 34px 18px;
             gap: 26px;
-          }
-
-          .lp-brand-copy {
-            padding-left: 0;
-          }
-
-          .lp-brand-copy h2 {
-            font-size: 28px;
           }
 
           .lp-brand-copy p {
@@ -2200,6 +2549,10 @@ export function Landing() {
         }
 
         @media (max-width: 480px) {
+          .lp {
+            --heading-size: 26px;
+          }
+
           .lp-hero-visual {
             height: 330px;
           }
@@ -2231,10 +2584,6 @@ export function Landing() {
 
           .lp-h1 {
             font-size: 36px;
-          }
-
-          .lp-how-title {
-            font-size: 29px;
           }
 
           .lp-how-toggle-btn {
@@ -2270,22 +2619,18 @@ export function Landing() {
             padding-right: 8px;
           }
         }
+
         @media (max-width: 768px) {
           .lp { --section-space: 48px; }
+
           .lp-brand-cta {
-            width: calc(100% - 24px);
-            margin: 18px auto 24px;
+            margin: var(--section-space) auto;
             border-radius: 14px;
           }
 
           .lp-brand-cta-inner {
             min-height: 210px;
             padding: 30px 20px;
-          }
-
-          .lp-brand-copy h2 {
-            font-size: 27px;
-            line-height: 1.1;
           }
 
           .lp-brand-copy p {
@@ -2295,23 +2640,7 @@ export function Landing() {
             margin-bottom: 18px;
           }
         }
-
-        /* ============================================
-           SECTION DIVIDERS
-           Full-width, straight separators between sections.
-        ============================================ */
-        .lp-section-divider {
-          width: 100%;
-          height: 1px;
-          margin: 0;
-          padding: 0;
-          border: 0;
-          border-top: 1px solid #E3E3E3;
-          box-sizing: border-box;
-        }
-      `}
-
-</style>
+      `}</style>
 
       <PublicNavbar />
 
@@ -2354,7 +2683,7 @@ export function Landing() {
               <div className="lp-hero-image-frame">
                 {HERO_SLIDES.map((slide, index) => (
                   <img
-                    key={slide.category}
+                    key={`${slide.category}-${index}`}
                     className={`lp-hero-slide-image ${index === heroSlide ? "is-visible" : "is-hidden"}`}
                     src={slide.image}
                     alt={slide.alt}
@@ -2405,7 +2734,7 @@ export function Landing() {
             <div className="lp-hero-dots" aria-label="Featured campaign slides">
               {HERO_SLIDES.map((slide, index) => (
                 <button
-                  key={slide.category}
+                  key={`${slide.category}-${index}`}
                   type="button"
                   className={`lp-hero-dot ${index === heroSlide ? "is-active" : ""}`}
                   onClick={() => setHeroSlide(index)}
@@ -2675,6 +3004,98 @@ export function Landing() {
       <div className="lp-section-divider" aria-hidden="true" />
 
       {/* ============================================
+          WHY CREATORHUB
+      ============================================ */}
+
+      <section className="lp-why-section" id="why-creatorhub">
+        <div className="lp-container lp-why-inner">
+          <div className="lp-why-head">
+            <h2 className="lp-why-heading">Why CreatorHub?</h2>
+
+            <Link to="/about" className="lp-why-view-all">
+              Show More
+              <ArrowRight size={15} />
+            </Link>
+          </div>
+
+          <div className="lp-why-grid">
+            {WHY_ITEMS.map((item) => (
+              <article className="lp-why-item" key={item.number}>
+                <span className="lp-why-number">{item.number}</span>
+
+                <div className="lp-why-item-content">
+                  <h3 className="lp-why-item-title">{item.title}</h3>
+                  <p className="lp-why-item-text">{item.text}</p>
+                </div>
+              </article>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      <div className="lp-section-divider" aria-hidden="true" />
+
+      {/* ============================================
+          PRICING
+      ============================================ */}
+
+      <section className="lp-price-section" id="pricing">
+        <div className="lp-container">
+          <div className="lp-price-head">
+            <h2 className="lp-price-card-title">Pricing</h2>
+
+            <Link to="/pricing" className="lp-price-view-all">
+              View pricing
+              <ArrowRight size={14} />
+            </Link>
+          </div>
+
+          <div className="lp-price-content">
+            <div className="lp-price-fee">
+              <div className="lp-price-big">10%</div>
+              <div className="lp-price-big-label">platform fee</div>
+              <p className="lp-price-note">
+                Pay only when you hire a creator.
+              </p>
+            </div>
+
+            <div className="lp-price-benefits">
+              {PRICING_FEATURES.slice(0, 4).map((f) => (
+                <div className="lp-price-benefit" key={f.title}>
+                  <Check size={15} strokeWidth={1.8} />
+                  <div>
+                    <strong>{f.title}</strong>
+                    <span>{f.text}</span>
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            <div className="lp-price-example">
+              <p className="lp-price-eyebrow">EXAMPLE</p>
+
+              <div className="lp-price-row">
+                <span>Creator payment</span>
+                <strong>NPR 10,000</strong>
+              </div>
+
+              <div className="lp-price-row">
+                <span>Platform fee (10%)</span>
+                <strong>NPR 1,000</strong>
+              </div>
+
+              <div className="lp-price-row lp-price-total">
+                <span>Total for brand</span>
+                <strong>NPR 11,000</strong>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <div className="lp-section-divider" aria-hidden="true" />
+
+      {/* ============================================
           JOIN AS A BRAND
       ============================================ */}
 
@@ -2725,9 +3146,10 @@ export function Landing() {
                 <h4>Platform</h4>
 
                 <a href="#home">Home</a>
-                <a href="#campaigns">Campaigns</a>
+                <Link to="/campaigns?source=landing">Campaigns</Link>
+                <Link to="/pricing">Pricing</Link>
                 <a href="#for-brands">For Brands</a>
-                <a href="#for-brands">About</a>
+                <Link to="/about">About</Link>
               </div>
 
               <div className="lp-footer-col">

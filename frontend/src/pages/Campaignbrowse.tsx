@@ -1,6 +1,5 @@
 import { useEffect, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import type { FormEvent } from 'react';
 import { Link } from 'react-router-dom';
 import {
   Building2,
@@ -9,7 +8,6 @@ import {
   Clock3,
   MapPin,
   Plus,
-  Search,
   Users,
   BriefcaseBusiness,
 } from 'lucide-react';
@@ -22,25 +20,8 @@ import {
 } from '../api/client';
 
 import { useAuth } from '../context/AuthContext';
+import { AppLayout } from '../components/AppLayout';
 import { Campaigns } from './Campaigns';
-
-const CATEGORIES = [
-  'Beauty',
-  'Fashion',
-  'Lifestyle',
-  'Food',
-  'Tech',
-  'Fitness',
-  'Travel',
-  'Gaming',
-  'Education',
-  'Finance',
-  'Wellness',
-  'Skincare',
-  'Home Decor',
-  'Parenting',
-  'Entertainment',
-];
 
 const STATUSES = [
   'draft',
@@ -112,10 +93,12 @@ export function CampaignBrowse() {
   const [pages, setPages] = useState(1);
   const [page, setPage] = useState(1);
 
+  // searchInput drives the shared AppLayout topbar search box directly
+  // (no separate submit step) — typing immediately updates `search`,
+  // which the fetch effect below depends on.
   const [searchInput, setSearchInput] = useState('');
   const [search, setSearch] = useState('');
 
-  const [category, setCategory] = useState('');
   const [status, setStatus] = useState('');
 
   const [loading, setLoading] = useState(true);
@@ -136,10 +119,6 @@ export function CampaignBrowse() {
 
         if (search) {
           params.search = search;
-        }
-
-        if (category) {
-          params.category = category;
         }
 
         if (isBusiness && status) {
@@ -191,442 +170,373 @@ export function CampaignBrowse() {
     return () => {
       cancelled = true;
     };
-  }, [page, search, category, status, isBusiness]);
+  }, [page, search, status, isBusiness]);
 
-  const submitSearch = (event: FormEvent) => {
-    event.preventDefault();
-
+  function handleTopbarSearchChange(value: string) {
+    setSearchInput(value);
+    setSearch(value.trim());
     setPage(1);
-    setSearch(searchInput.trim());
-  };
+  }
+
+  const subtitleText = isBusiness
+    ? `${total} campaign${total === 1 ? '' : 's'} posted`
+    : `${total} paid campaign${total === 1 ? '' : 's'} available for creators`;
+
+  // Status filter (business only) now sits directly beside the
+  // "Create campaign" button, both rendered together as headerActions
+  // in AppLayout's topbar title row — instead of the filter living in
+  // its own section above the campaign list.
+  const headerActions = (
+    <div className="cb-header-actions">
+      {isBusiness && (
+        <select
+          className="cb-status-select"
+          value={status}
+          onChange={(e) => {
+            setStatus(e.target.value);
+            setPage(1);
+          }}
+        >
+          <option value="">All statuses</option>
+
+          {STATUSES.map((item) => (
+            <option key={item} value={item}>
+              {formatStatus(item)}
+            </option>
+          ))}
+        </select>
+      )}
+
+      {isBusiness && (
+        <Link className="cb-primary" to="/campaigns/new">
+          <Plus size={16} />
+          Create campaign
+        </Link>
+      )}
+    </div>
+  );
 
   return (
-    <main className="cb-page">
-      <div className="cb-shell">
+    <AppLayout
+      title={isBusiness ? 'My campaigns' : 'Find your next collaboration'}
+      subtitle={subtitleText}
+      headerActions={headerActions}
+      showNotifications
+      searchValue={searchInput}
+      onSearchChange={handleTopbarSearchChange}
+      searchPlaceholder={
+        isBusiness
+          ? 'Search your campaigns'
+          : 'Search campaigns, skills or categories'
+      }
+    >
+      <main className="cb-page">
+        <div className="cb-shell">
 
-        {/* HEADER */}
-        <header className="cb-head">
-          <div className="cb-head-copy">
-            <p className="cb-kicker">
-              {isBusiness
-                ? 'Campaign management'
-                : 'Creator marketplace'}
-            </p>
-
-            <h1>
-              {isBusiness
-                ? 'My campaigns'
-                : 'Find your next collaboration'}
-            </h1>
-
-            <p className="cb-subtitle">
-              {isBusiness
-                ? `${total} campaign${
-                    total === 1 ? '' : 's'
-                  } posted`
-                : `${total} paid campaign${
-                    total === 1 ? '' : 's'
-                  } available for creators`}
-            </p>
-          </div>
-
-          {isBusiness && (
-            <Link
-              className="cb-primary"
-              to="/campaigns/new"
-            >
-              <Plus size={16} />
-              Create campaign
-            </Link>
-          )}
-        </header>
-
-        {/* FILTERS */}
-        <section className="cb-filters">
-          <form
-            onSubmit={submitSearch}
-            className="cb-search"
-          >
-            <Search size={16} />
-
-            <input
-              value={searchInput}
-              onChange={(e) =>
-                setSearchInput(e.target.value)
-              }
-              placeholder={
-                isBusiness
-                  ? 'Search your campaigns'
-                  : 'Search campaigns, skills or categories'
-              }
-            />
-          </form>
-
-          <select
-            value={category}
-            onChange={(e) => {
-              setCategory(e.target.value);
-              setPage(1);
-            }}
-          >
-            <option value="">All categories</option>
-
-            {CATEGORIES.map((item) => (
-              <option key={item} value={item}>
-                {item}
-              </option>
-            ))}
-          </select>
-
-          {isBusiness && (
-            <select
-              value={status}
-              onChange={(e) => {
-                setStatus(e.target.value);
-                setPage(1);
-              }}
-            >
-              <option value="">All statuses</option>
-
-              {STATUSES.map((item) => (
-                <option
-                  key={item}
-                  value={item}
-                >
-                  {formatStatus(item)}
-                </option>
-              ))}
-            </select>
-          )}
-        </section>
-
-        {/* LOADING */}
-        {loading && (
-          <div className="cb-state">
-            <div className="cb-loader" />
-            <span>Loading campaigns…</span>
-          </div>
-        )}
-
-        {/* ERROR */}
-        {!loading && error && (
-          <div className="cb-state cb-error">
-            <strong>{error}</strong>
-          </div>
-        )}
-
-        {/* EMPTY */}
-        {!loading &&
-          !error &&
-          campaigns.length === 0 && (
+          {/* LOADING */}
+          {loading && (
             <div className="cb-state">
-              <div className="cb-empty-icon">
-                <BriefcaseBusiness size={22} />
-              </div>
-
-              <strong>
-                {search || category || status
-                  ? 'No campaigns match your filters.'
-                  : isBusiness
-                    ? 'You have not posted a campaign yet.'
-                    : 'No campaigns are available right now.'}
-              </strong>
-
-              <span>
-                {search || category || status
-                  ? 'Try changing your search or filters.'
-                  : !isBusiness
-                    ? 'Check back soon for new creator opportunities.'
-                    : 'Create your first campaign to start finding creators.'}
-              </span>
-
-              {isBusiness &&
-                !search &&
-                !category &&
-                !status && (
-                  <Link
-                    className="cb-primary"
-                    to="/campaigns/new"
-                  >
-                    <Plus size={15} />
-                    Create your first campaign
-                  </Link>
-                )}
+              <div className="cb-loader" />
+              <span>Loading campaigns…</span>
             </div>
           )}
 
-        {/* MARKETPLACE LIST */}
-        {!loading &&
-          !error &&
-          campaigns.length > 0 && (
-            <>
-              <div className="cb-list">
+          {/* ERROR */}
+          {!loading && error && (
+            <div className="cb-state cb-error">
+              <strong>{error}</strong>
+            </div>
+          )}
 
-                {campaigns.map((campaign) => {
-                  const publicCampaign =
-                    campaign as Campaign & {
-                      brand_name?: string | null;
-                      brand_location?: string | null;
-                      brand_logo?: string | null;
-                      required_platform?: string | null;
-                      required_platforms?: string[] | null;
-                    };
+          {/* EMPTY */}
+          {!loading &&
+            !error &&
+            campaigns.length === 0 && (
+              <div className="cb-state">
+                <div className="cb-empty-icon">
+                  <BriefcaseBusiness size={22} />
+                </div>
 
-                  const platforms =
-                    getPlatforms(publicCampaign);
+                <strong>
+                  {search || status
+                    ? 'No campaigns match your filters.'
+                    : isBusiness
+                      ? 'You have not posted a campaign yet.'
+                      : 'No campaigns are available right now.'}
+                </strong>
 
-                  return (
+                <span>
+                  {search || status
+                    ? 'Try changing your search or filters.'
+                    : !isBusiness
+                      ? 'Check back soon for new creator opportunities.'
+                      : 'Create your first campaign to start finding creators.'}
+                </span>
+
+                {isBusiness &&
+                  !search &&
+                  !status && (
                     <Link
-                      key={campaign.id}
-                      to={`/campaigns/${campaign.id}`}
-                      className="cb-card"
+                      className="cb-primary"
+                      to="/campaigns/new"
                     >
+                      <Plus size={15} />
+                      Create your first campaign
+                    </Link>
+                  )}
+              </div>
+            )}
 
-                      {/* TOP ROW */}
-                      <div className="cb-card-header">
+          {/* MARKETPLACE LIST */}
+          {!loading &&
+            !error &&
+            campaigns.length > 0 && (
+              <>
+                <div className="cb-list">
 
-                        <div className="cb-brand">
-                          <div className="cb-brand-logo">
-                            {publicCampaign.brand_logo ? (
-                              <img
-                                src={
-                                  publicCampaign.brand_logo
-                                }
-                                alt=""
-                              />
-                            ) : (
-                              <Building2 size={17} />
-                            )}
-                          </div>
+                  {campaigns.map((campaign) => {
+                    const publicCampaign =
+                      campaign as Campaign & {
+                        brand_name?: string | null;
+                        brand_location?: string | null;
+                        brand_logo?: string | null;
+                        required_platform?: string | null;
+                        required_platforms?: string[] | null;
+                      };
 
-                          <div>
-                            <span className="cb-brand-name">
-                              {publicCampaign.brand_name ||
-                                'Business'}
-                            </span>
+                    const platforms =
+                      getPlatforms(publicCampaign);
 
-                            {!isBusiness &&
-                              publicCampaign.brand_location && (
-                                <span className="cb-brand-location">
-                                  {publicCampaign.brand_location}
-                                </span>
+                    return (
+                      <Link
+                        key={campaign.id}
+                        to={`/campaigns/${campaign.id}`}
+                        className="cb-card"
+                      >
+
+                        {/* TOP ROW */}
+                        <div className="cb-card-header">
+
+                          <div className="cb-brand">
+                            <div className="cb-brand-logo">
+                              {publicCampaign.brand_logo ? (
+                                <img
+                                  src={
+                                    publicCampaign.brand_logo
+                                  }
+                                  alt=""
+                                />
+                              ) : (
+                                <Building2 size={17} />
                               )}
+                            </div>
+
+                            <div>
+                              <span className="cb-brand-name">
+                                {publicCampaign.brand_name ||
+                                  'Business'}
+                              </span>
+
+                              {!isBusiness &&
+                                publicCampaign.brand_location && (
+                                  <span className="cb-brand-location">
+                                    {publicCampaign.brand_location}
+                                  </span>
+                                )}
+                            </div>
                           </div>
-                        </div>
-
-                        {isBusiness && (
-                          <span
-                            className={`cb-status cb-status--${campaign.status}`}
-                          >
-                            {formatStatus(
-                              campaign.status
-                            )}
-                          </span>
-                        )}
-                      </div>
-
-                      {/* TITLE */}
-                      <h2 className="cb-title">
-                        {campaign.title}
-                      </h2>
-
-                      {/* DESCRIPTION */}
-                      <p className="cb-description">
-                        {truncate(
-                          campaign.description || ''
-                        )}
-                      </p>
-
-                      {/* JOB META */}
-                      <div className="cb-job-meta">
-
-                        {campaign.location && (
-                          <span>
-                            <MapPin size={14} />
-                            {campaign.location}
-                          </span>
-                        )}
-
-                        {campaign.experience_level && (
-                          <span>
-                            <Users size={14} />
-                            {campaign.experience_level}
-                          </span>
-                        )}
-
-                        {campaign.engagement_type && (
-                          <span>
-                            <BriefcaseBusiness size={14} />
-                            {campaign.engagement_type}
-                          </span>
-                        )}
-
-                        {campaign.duration && (
-                          <span>
-                            <Clock3 size={14} />
-                            {campaign.duration}
-                          </span>
-                        )}
-                      </div>
-
-                      {/* SKILLS */}
-                      {(campaign.required_skills?.length ||
-                        campaign.category ||
-                        platforms.length > 0) && (
-                        <div className="cb-tags">
-
-                          {campaign.category && (
-                            <span className="cb-tag cb-tag-main">
-                              {campaign.category}
-                            </span>
-                          )}
-
-                          {campaign.required_skills
-                            ?.slice(0, 4)
-                            .map((skill) => (
-                              <span
-                                className="cb-tag"
-                                key={skill}
-                              >
-                                {skill}
-                              </span>
-                            ))}
-
-                          {platforms
-                            .slice(0, 2)
-                            .map((platform) => (
-                              <span
-                                className="cb-tag"
-                                key={platform}
-                              >
-                                {platform}
-                              </span>
-                            ))}
-                        </div>
-                      )}
-
-                      {/* BOTTOM */}
-                      <div className="cb-card-footer">
-
-                        <div className="cb-budget">
-                          <span className="cb-budget-label">
-                            Budget
-                          </span>
-
-                          <strong>
-                            {formatBudget(campaign)}
-                          </strong>
-                        </div>
-
-                        <div className="cb-footer-right">
-                          <span>
-                            <Users size={14} />
-                            {campaign.creators_needed}{' '}
-                            creator
-                            {campaign.creators_needed ===
-                            1
-                              ? ''
-                              : 's'}
-                          </span>
 
                           {isBusiness && (
-                            <span>
-                              {campaign.application_count ||
-                                0}{' '}
-                              applicants
+                            <span
+                              className={`cb-status cb-status--${campaign.status}`}
+                            >
+                              {formatStatus(
+                                campaign.status
+                              )}
                             </span>
                           )}
                         </div>
-                      </div>
-                    </Link>
-                  );
-                })}
-              </div>
 
-              {/* PAGINATION */}
-              {pages > 1 && (
-                <div className="cb-pagination">
+                        {/* TITLE */}
+                        <h2 className="cb-title">
+                          {campaign.title}
+                        </h2>
 
-                  <button
-                    disabled={page <= 1}
-                    onClick={() =>
-                      setPage((value) => value - 1)
-                    }
-                    aria-label="Previous page"
-                  >
-                    <ChevronLeft size={17} />
-                  </button>
+                        {/* DESCRIPTION */}
+                        <p className="cb-description">
+                          {truncate(
+                            campaign.description || ''
+                          )}
+                        </p>
 
-                  <span>
-                    Page {page} of {pages}
-                  </span>
+                        {/* JOB META */}
+                        <div className="cb-job-meta">
 
-                  <button
-                    disabled={page >= pages}
-                    onClick={() =>
-                      setPage((value) => value + 1)
-                    }
-                    aria-label="Next page"
-                  >
-                    <ChevronRight size={17} />
-                  </button>
+                          {campaign.location && (
+                            <span>
+                              <MapPin size={14} />
+                              {campaign.location}
+                            </span>
+                          )}
 
+                          {campaign.experience_level && (
+                            <span>
+                              <Users size={14} />
+                              {campaign.experience_level}
+                            </span>
+                          )}
+
+                          {campaign.engagement_type && (
+                            <span>
+                              <BriefcaseBusiness size={14} />
+                              {campaign.engagement_type}
+                            </span>
+                          )}
+
+                          {campaign.duration && (
+                            <span>
+                              <Clock3 size={14} />
+                              {campaign.duration}
+                            </span>
+                          )}
+                        </div>
+
+                        {/* SKILLS */}
+                        {(campaign.required_skills?.length ||
+                          campaign.category ||
+                          platforms.length > 0) && (
+                          <div className="cb-tags">
+
+                            {campaign.category && (
+                              <span className="cb-tag cb-tag-main">
+                                {campaign.category}
+                              </span>
+                            )}
+
+                            {campaign.required_skills
+                              ?.slice(0, 4)
+                              .map((skill) => (
+                                <span
+                                  className="cb-tag"
+                                  key={skill}
+                                >
+                                  {skill}
+                                </span>
+                              ))}
+
+                            {platforms
+                              .slice(0, 2)
+                              .map((platform) => (
+                                <span
+                                  className="cb-tag"
+                                  key={platform}
+                                >
+                                  {platform}
+                                </span>
+                              ))}
+                          </div>
+                        )}
+
+                        {/* BOTTOM */}
+                        <div className="cb-card-footer">
+
+                          <div className="cb-budget">
+                            <span className="cb-budget-label">
+                              Budget
+                            </span>
+
+                            <strong>
+                              {formatBudget(campaign)}
+                            </strong>
+                          </div>
+
+                          <div className="cb-footer-right">
+                            <span>
+                              <Users size={14} />
+                              {campaign.creators_needed}{' '}
+                              creator
+                              {campaign.creators_needed ===
+                              1
+                                ? ''
+                                : 's'}
+                            </span>
+
+                            {isBusiness && (
+                              <span>
+                                {campaign.application_count ||
+                                  0}{' '}
+                                applicants
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                      </Link>
+                    );
+                  })}
                 </div>
-              )}
-            </>
-          )}
-      </div>
 
-      <style>{STYLE}</style>
-    </main>
+                {/* PAGINATION */}
+                {pages > 1 && (
+                  <div className="cb-pagination">
+
+                    <button
+                      disabled={page <= 1}
+                      onClick={() =>
+                        setPage((value) => value - 1)
+                      }
+                      aria-label="Previous page"
+                    >
+                      <ChevronLeft size={17} />
+                    </button>
+
+                    <span>
+                      Page {page} of {pages}
+                    </span>
+
+                    <button
+                      disabled={page >= pages}
+                      onClick={() =>
+                        setPage((value) => value + 1)
+                      }
+                      aria-label="Next page"
+                    >
+                      <ChevronRight size={17} />
+                    </button>
+
+                  </div>
+                )}
+              </>
+            )}
+        </div>
+
+        <style>{STYLE}</style>
+      </main>
+    </AppLayout>
   );
 }
 
 const STYLE = `
 .cb-page{
-  min-height:100vh;
-  background:#fafafa;
+  background:transparent;
   color:#111;
   font-family:Poppins,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
-  padding:38px 22px 80px;
+  padding:8px 24px 60px;
 }
 
 .cb-shell{
   max-width:1080px;
   margin:0 auto;
+  background:transparent;
 }
 
-/* HEADER */
+/* HEADER ACTIONS — status select + Create campaign, side by side,
+   rendered inside AppLayout's topbar title row via headerActions. */
 
-.cb-head{
+.cb-header-actions{
   display:flex;
-  justify-content:space-between;
-  align-items:flex-end;
-  gap:24px;
-  margin-bottom:28px;
-}
-
-.cb-kicker{
-  margin:0 0 7px;
-  font-size:10px;
-  font-weight:600;
-  letter-spacing:.13em;
-  text-transform:uppercase;
-  color:#8a8a8a;
-}
-
-.cb-head h1{
-  margin:0 0 7px;
-  font-family:"League Spartan",Poppins,sans-serif;
-  font-size:31px;
-  font-weight:500;
-  letter-spacing:-.035em;
-}
-
-.cb-subtitle{
-  margin:0;
-  color:#777;
-  font-size:13px;
+  align-items:center;
+  gap:10px;
+  flex-wrap:wrap;
 }
 
 /* BUTTON */
@@ -646,39 +556,29 @@ const STYLE = `
   font-size:12px;
   font-weight:600;
   white-space:nowrap;
-  transition:.15s ease;
+  transition:background .15s ease;
+}
+
+/* Explicitly pin the text color on hover/focus/visited so nothing
+   (browser defaults, global link styles, :visited) can turn the label
+   black — only the background darkens. */
+.cb-primary,
+.cb-primary:link,
+.cb-primary:visited,
+.cb-primary:hover,
+.cb-primary:focus,
+.cb-primary:active{
+  color:#fff !important;
 }
 
 .cb-primary:hover{
   background:#2b2b2b;
 }
 
-/* FILTERS */
+/* STATUS SELECT */
 
-.cb-filters{
-  display:flex;
-  gap:9px;
-  margin-bottom:18px;
-  flex-wrap:wrap;
-}
-
-.cb-search{
-  position:relative;
-  display:flex;
-  align-items:center;
-  flex:1;
-  min-width:280px;
-}
-
-.cb-search svg{
-  position:absolute;
-  left:13px;
-  color:#999;
-}
-
-.cb-search input,
-.cb-filters select{
-  height:42px;
+.cb-status-select{
+  height:40px;
   border:1px solid #dedede;
   border-radius:8px;
   background:#fff;
@@ -689,17 +589,7 @@ const STYLE = `
   outline:none;
 }
 
-.cb-search input{
-  width:100%;
-  padding-left:38px;
-}
-
-.cb-search input::placeholder{
-  color:#aaa;
-}
-
-.cb-search input:focus,
-.cb-filters select:focus{
+.cb-status-select:focus{
   border-color:#999;
 }
 
@@ -709,28 +599,33 @@ const STYLE = `
   display:flex;
   flex-direction:column;
   gap:11px;
+  background:transparent;
 }
 
-/* CARD */
+/* CARD — no white background, just a hairline separator */
 
 .cb-card{
   display:block;
-  background:#fff;
-  border:1px solid #e3e3e3;
-  border-radius:10px;
-  padding:21px 23px 18px;
+  background:transparent;
+  border:0;
+  border-bottom:1px solid #e6e6e6;
+  border-radius:0;
+  padding:20px 2px 22px;
   text-decoration:none;
   color:#111;
-  transition:
-    border-color .16s ease,
-    box-shadow .16s ease,
-    transform .16s ease;
+  transition:background .16s ease;
+}
+
+.cb-list .cb-card:first-child{
+  padding-top:2px;
+}
+
+.cb-list .cb-card:last-child{
+  border-bottom:0;
 }
 
 .cb-card:hover{
-  border-color:#c8c8c8;
-  box-shadow:0 8px 25px rgba(0,0,0,.055);
-  transform:translateY(-1px);
+  background:rgba(0,0,0,.02);
 }
 
 /* CARD HEADER */
@@ -1011,33 +906,19 @@ const STYLE = `
 @media(max-width:700px){
 
   .cb-page{
-    padding:27px 14px 60px;
+    padding:10px 14px 50px;
   }
 
-  .cb-head{
-    align-items:flex-start;
-    flex-direction:column;
-  }
-
-  .cb-head h1{
-    font-size:27px;
-  }
-
-  .cb-primary{
+  .cb-header-actions{
     width:100%;
   }
 
-  .cb-search{
-    min-width:100%;
-  }
-
-  .cb-filters select{
+  .cb-status-select{
     flex:1;
-    min-width:140px;
   }
 
   .cb-card{
-    padding:18px;
+    padding:16px 0 18px;
   }
 
   .cb-title{

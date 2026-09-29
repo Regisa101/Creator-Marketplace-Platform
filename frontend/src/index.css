@@ -55,6 +55,25 @@ select:focus {
   box-shadow: 0 0 0 2px rgba(17, 17, 17, 0.08) !important;
 }
 
+/*
+ * The topbar search input in AppLayout.tsx already sits inside its own
+ * bordered pill (.app-search). The global input:focus rule above adds a
+ * second border-color + box-shadow ring directly on the <input> itself,
+ * which visually stacks with the pill's border and shows up as a
+ * "double box" around the search field. Scope focus styling back down
+ * to just the pill wrapper here instead, and neutralize it on the input.
+ */
+.app-search input:focus {
+  border-color: transparent !important;
+  outline: none !important;
+  box-shadow: none !important;
+}
+
+.app-search:focus-within {
+  border-color: #111111;
+  box-shadow: 0 0 0 2px rgba(17, 17, 17, 0.08);
+}
+
 a {
   color: #111111;
 }

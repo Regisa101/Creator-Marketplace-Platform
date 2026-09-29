@@ -208,8 +208,62 @@ async def select_application(
         compensation_type=campaign.compensation_type, compensation_description=campaign.compensation_description,
         agreed_rate=rate, total_value=total, platform_fee_rate=0.10,
         platform_fee_amount=round(total * 0.10, 2) if total is not None else None,
-        start_date=campaign.start_date, end_date=campaign.end_date, status="active" if can_activate else "draft",
+        start_date=campaign.start_date, end_date=campaign.end_date, status="pending_payment" if can_activate else "draft",
     )
+
+    # Immutable collaboration evidence. This is captured at the moment the
+    # business selects the creator so later edits to the campaign/application
+    # cannot silently rewrite what the parties originally agreed to.
+    contract.evidence_snapshot = {
+        "version": 1,
+        "historical": True,
+        "captured_at": datetime.now(timezone.utc).isoformat(),
+        "campaign": {
+            "id": campaign.id,
+            "title": campaign.title,
+            "category": campaign.category,
+            "description": campaign.description,
+            "responsibilities": campaign.responsibilities,
+            "creator_types": campaign.creator_types or [],
+            "experience_level": campaign.experience_level,
+            "required_skills": campaign.required_skills or [],
+            "location": campaign.location,
+            "work_arrangement": campaign.work_arrangement,
+            "requirements": campaign.requirements,
+            "deliverables": campaign.deliverables or [],
+            "creators_needed": campaign.creators_needed,
+            "engagement_type": campaign.engagement_type,
+            "duration": campaign.duration,
+            "pricing_model": campaign.pricing_model,
+            "compensation_type": campaign.compensation_type,
+            "budget": float(campaign.budget) if campaign.budget is not None else None,
+            "budget_min": float(campaign.budget_min) if campaign.budget_min is not None else None,
+            "budget_max": float(campaign.budget_max) if campaign.budget_max is not None else None,
+            "compensation_description": campaign.compensation_description,
+            "start_date": campaign.start_date.isoformat() if campaign.start_date else None,
+            "end_date": campaign.end_date.isoformat() if campaign.end_date else None,
+            "application_deadline": campaign.application_deadline.isoformat() if campaign.application_deadline else None,
+            "application_questions": campaign.application_questions or [],
+            "hero_image": campaign.hero_image,
+        },
+        "application": {
+            "id": application.id,
+            "campaign_id": application.campaign_id,
+            "creator_id": application.creator_id,
+            "creator_name": application.creator_name,
+            "proposal": application.proposal,
+            "rate": float(application.rate) if application.rate is not None else None,
+            "message": application.message,
+            "application_answers": application.application_answers or [],
+            "selected_portfolio": application.selected_portfolio or [],
+            "status": application.status,
+            "agreed_rate": float(rate) if rate is not None else None,
+            "rate_locked": bool(application.rate_locked),
+            "deliverable_deadline": application.deliverable_deadline.isoformat() if application.deliverable_deadline else None,
+            "created_at": application.created_at.isoformat() if application.created_at else None,
+            "updated_at": application.updated_at.isoformat() if application.updated_at else None,
+        },
+    }
     application.status = "accepted"
     application.agreed_rate = rate
     application.rate_locked = 1 if can_activate else 0

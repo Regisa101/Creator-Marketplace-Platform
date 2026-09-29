@@ -1,5 +1,5 @@
 from datetime import datetime
-from typing import Literal, Optional
+from typing import Any, Literal, Optional
 from pydantic import BaseModel, Field
 
 
@@ -47,6 +47,7 @@ class ContractResponse(BaseModel):
     end_date: Optional[datetime] = None
     status: str
     terms_note: Optional[str] = None
+    evidence_snapshot: Optional[dict[str, Any]] = None
     payment_method: Optional[str] = None
     payment_reference: Optional[str] = None
     fee_paid: bool = False

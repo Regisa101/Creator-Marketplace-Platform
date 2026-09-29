@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, DECIMAL, DateTime, ForeignKey, Text
+from sqlalchemy import Column, Integer, String, DECIMAL, DateTime, ForeignKey, Text, JSON
 from sqlalchemy.sql import func
 from sqlalchemy.orm import relationship
 from app.database import Base
@@ -39,13 +39,14 @@ class Contract(Base):
     status = Column(String(30), nullable=False, default="draft", index=True)
     terms_note = Column(Text, nullable=True)
 
-    # --- Platform fee payment (DEMO ONLY, see routes/contracts.py) ---
-    # "wallet" or "card" — whichever tab the business used in the demo
-    # payment form. No real gateway (Khalti/eSewa/card processor) is ever
-    # called; this is purely to make the end-to-end flow testable.
+    # Immutable evidence captured when the collaboration contract is created.
+    # This preserves what the parties agreed to even if the live campaign is
+    # edited, closed, or later removed.
+    evidence_snapshot = Column(JSON, nullable=True)
+
+    # Verified platform-fee checkout metadata.
     payment_method = Column(String(30), nullable=True)
-    # Fake transaction reference generated locally and shown to the
-    # business as a receipt id. Not a real gateway transaction id.
+    # Provider transaction reference returned after successful verification.
     payment_reference = Column(String(64), nullable=True)
     fee_paid_at = Column(DateTime(timezone=True), nullable=True)
 

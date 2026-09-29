@@ -19,6 +19,8 @@ from app.schemas.contract import (
 )
 from app.services.notifications import create_notification
 from app.services.pricing import total_for_rate
+from app.services.khalti import initiate_payment, KhaltiError
+from app.core.config import FRONTEND_URL
 
 router = APIRouter(prefix="/api/contracts", tags=["Contracts"])
 PLATFORM_FEE_RATE = 0.10
@@ -32,6 +34,81 @@ def _name(user: User | None) -> str | None:
         return profile.get("display_name") or user.full_name
     profile = user.profile or {}
     return profile.get("company_name") or user.full_name
+
+
+def _iso(value):
+    return value.isoformat() if value is not None else None
+
+
+def _campaign_snapshot(campaign: Campaign | None) -> dict | None:
+    if not campaign:
+        return None
+    return {
+        "id": campaign.id,
+        "title": campaign.title,
+        "category": campaign.category,
+        "description": campaign.description,
+        "responsibilities": campaign.responsibilities,
+        "creator_types": campaign.creator_types or [],
+        "experience_level": campaign.experience_level,
+        "required_skills": campaign.required_skills or [],
+        "location": campaign.location,
+        "work_arrangement": campaign.work_arrangement,
+        "requirements": campaign.requirements,
+        "deliverables": campaign.deliverables or [],
+        "creators_needed": campaign.creators_needed,
+        "engagement_type": campaign.engagement_type,
+        "duration": campaign.duration,
+        "pricing_model": campaign.pricing_model,
+        "compensation_type": campaign.compensation_type,
+        "budget": float(campaign.budget) if campaign.budget is not None else None,
+        "budget_min": float(campaign.budget_min) if campaign.budget_min is not None else None,
+        "budget_max": float(campaign.budget_max) if campaign.budget_max is not None else None,
+        "compensation_description": campaign.compensation_description,
+        "start_date": _iso(campaign.start_date),
+        "end_date": _iso(campaign.end_date),
+        "application_deadline": _iso(campaign.application_deadline),
+        "application_questions": campaign.application_questions or [],
+        "hero_image": campaign.hero_image,
+        "captured_at": datetime.now(timezone.utc).isoformat(),
+    }
+
+
+def _application_snapshot(application: Application | None) -> dict | None:
+    if not application:
+        return None
+    return {
+        "id": application.id,
+        "campaign_id": application.campaign_id,
+        "creator_id": application.creator_id,
+        "creator_name": _name(application.creator),
+        "proposal": application.proposal,
+        "rate": float(application.rate) if application.rate is not None else None,
+        "message": application.message,
+        "application_answers": application.application_answers or [],
+        "selected_portfolio": application.selected_portfolio or [],
+        "status": application.status,
+        "agreed_rate": float(application.agreed_rate) if application.agreed_rate is not None else None,
+        "rate_locked": bool(application.rate_locked),
+        "deliverable_deadline": _iso(application.deliverable_deadline),
+        "creator_confirmed": bool(application.creator_confirmed),
+        "creator_verified": bool(application.creator_verified),
+        "created_at": _iso(application.created_at),
+        "updated_at": _iso(application.updated_at),
+    }
+
+
+def _build_snapshot(contract: Contract) -> dict:
+    existing = contract.evidence_snapshot if isinstance(contract.evidence_snapshot, dict) else {}
+    snapshot = dict(existing)
+    snapshot.setdefault("version", 1)
+    snapshot.setdefault("historical", True)
+    snapshot.setdefault("captured_at", _iso(contract.created_at) or datetime.now(timezone.utc).isoformat())
+    if "campaign" not in snapshot:
+        snapshot["campaign"] = _campaign_snapshot(contract.campaign)
+    if "application" not in snapshot:
+        snapshot["application"] = _application_snapshot(contract.application)
+    return snapshot
 
 
 def _response(contract: Contract) -> ContractResponse:
@@ -124,81 +201,112 @@ async def finalize_contract(
     return _response(contract)
 
 
-@router.post("/{contract_id}/pay-fee", response_model=ContractResponse)
-async def pay_platform_fee(
-    contract_id: int, data: ContractPayFeeRequest,
-    db: Session = Depends(get_db), current_user: User = Depends(get_current_business),
+@router.post("/{contract_id}/checkout")
+async def initiate_contract_fee_checkout(
+    contract_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_business),
 ):
-    """
-    DEMO PAYMENT ONLY. No real gateway (Khalti, eSewa, a card processor,
-    etc.) is ever called here — this simulates a successful charge for the
-    platform's 10% fee so the rest of the flow (activation + notifying the
-    creator with the contract amount) can be tested end to end. Swap this
-    block out for a real integration before going live.
+    """Complete a local demo payment for the contract's platform fee.
+
+    Real Khalti checkout can be re-enabled later. For now this endpoint
+    intentionally does not contact Khalti or require merchant credentials.
     """
     contract = db.query(Contract).filter(
         Contract.id == contract_id, Contract.business_id == current_user.id
     ).first()
     if not contract:
         raise HTTPException(status_code=404, detail="Contract not found.")
-    if contract.status != "pending_payment":
-        raise HTTPException(status_code=400, detail="This contract isn't awaiting a fee payment.")
-    if not contract.platform_fee_amount:
-        raise HTTPException(status_code=400, detail="This contract has no service fee to pay yet.")
+    if contract.fee_paid_at is not None:
+        raise HTTPException(status_code=400, detail="This contract's service fee is already paid.")
+    if contract.status not in ("pending_payment", "draft"):
+        raise HTTPException(status_code=400, detail="This contract is not awaiting payment.")
+    if not contract.platform_fee_amount or float(contract.platform_fee_amount) <= 0:
+        raise HTTPException(status_code=400, detail="Finalize the contract value before paying the service fee.")
 
-    if data.payment_method == "wallet" and not data.wallet_number:
-        raise HTTPException(status_code=400, detail="Enter the wallet number.")
-    if data.payment_method == "card" and not data.card_number:
-        raise HTTPException(status_code=400, detail="Enter the card number.")
-
-    contract.payment_method = data.payment_method
-    contract.payment_reference = f"DEMO-{uuid.uuid4().hex[:10].upper()}"
-    contract.fee_paid_at = datetime.now(timezone.utc)
-    contract.status = "active"
-
-    # This fee is CreatorHub's own service charge for matching the
-    # brand with the creator — it is not money changing hands between
-    # the brand and the creator, so 100% of it is platform revenue and
-    # is recorded here (rather than split as a creator payout) so it
-    # shows up correctly on the Admin Dashboard.
-    fee_amount = round(float(contract.platform_fee_amount or 0), 2)
+    purchase_order_id = f"CH-FEE-{contract.id}-{uuid.uuid4().hex[:10].upper()}"
     payment = Payment(
         application_id=contract.application_id,
         campaign_id=contract.campaign_id,
         payment_type="platform_fee",
-        purchase_order_id=contract.payment_reference,
-        transaction_id=contract.payment_reference,
-        amount=fee_amount,
-        platform_fee=fee_amount,
+        purchase_order_id=purchase_order_id,
+        amount=round(float(contract.platform_fee_amount), 2),
+        platform_fee=round(float(contract.platform_fee_amount), 2),
         creator_payout=0,
         currency="NPR",
-        status="completed",
-        method=data.payment_method,
-        payment_details={
-            "wallet_number": data.wallet_number,
-            "card_last4": data.card_number[-4:] if data.card_number else None,
-            "note": "Platform service fee — 100% platform revenue, not a brand-to-creator payment.",
-        },
+        status="initiated",
+        method="khalti",
+        payment_details={"contract_id": contract.id, "fee_type": "CreatorHub service fee"},
         initiated_by=current_user.id,
-        paid_at=contract.fee_paid_at,
     )
     db.add(payment)
+    db.commit()
+    db.refresh(payment)
 
-    db.commit(); db.refresh(contract)
+    # DEMO MODE: no real Khalti API call for now.
+    # The payment is marked as completed locally so the full contract flow
+    # can be tested without merchant credentials or an external checkout.
+    now = datetime.now(timezone.utc)
+    demo_reference = f"DEMO-{uuid.uuid4().hex[:12].upper()}"
+
+    payment.status = "completed"
+    payment.method = "demo"
+    payment.transaction_id = demo_reference
+    payment.paid_at = now
+    payment.platform_fee = float(payment.amount)
+    payment.creator_payout = 0
+
+    details = payment.payment_details if isinstance(payment.payment_details, dict) else {}
+    details.update({
+        "demo": True,
+        "provider": "local_demo",
+        "platform_fee_rate": PLATFORM_FEE_RATE,
+    })
+    payment.payment_details = details
+
+    contract.payment_method = "demo"
+    contract.payment_reference = demo_reference
+    contract.fee_paid_at = now
+    contract.status = "active"
 
     create_notification(
         db,
         user_id=contract.creator_id,
+        type="contract_activated",
         title="Contract activated",
-        message=(
-            f"{_name(contract.business) or 'A business'} activated your contract for "
-            f"\"{contract.campaign.title if contract.campaign else 'a campaign'}\" — "
-            f"agreed value NPR {float(contract.total_value or 0):,.0f}."
-        ),
+        message=f"Your contract for {contract.campaign.title if contract.campaign else 'the campaign'} is active. The business completed the CreatorHub service fee payment.",
         link="/contracts",
+        reference_id=contract.id,
+        event_key=f"contract-fee-paid:{contract.id}",
     )
 
-    return _response(contract)
+    db.commit()
+    db.refresh(payment)
+    db.refresh(contract)
+
+    return {
+        "demo": True,
+        "payment_url": None,
+        "pidx": None,
+        "purchase_order_id": purchase_order_id,
+        "amount": float(payment.amount),
+        "transaction_id": demo_reference,
+        "contract": _response(contract),
+    }
+
+
+@router.post("/{contract_id}/pay-fee", response_model=ContractResponse)
+async def pay_platform_fee_legacy(
+    contract_id: int,
+    data: ContractPayFeeRequest,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_business),
+):
+    """Legacy endpoint disabled: payment must use the verified hosted checkout."""
+    raise HTTPException(
+        status_code=410,
+        detail="This demo payment endpoint is disabled. Use the secure /checkout endpoint.",
+    )
 
 
 @router.put("/{contract_id}/complete", response_model=ContractResponse)

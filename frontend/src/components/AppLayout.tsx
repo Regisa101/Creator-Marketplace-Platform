@@ -7,12 +7,10 @@ import { Link, useLocation, useNavigate } from "react-router-dom";
 import {
   LayoutDashboard,
   Megaphone,
-  Compass,
   Inbox,
   Briefcase,
   BarChart3,
   ChevronDown,
-  ChevronRight,
   LogOut,
   Settings,
   ArrowRight,
@@ -25,30 +23,22 @@ import {
 
 import { useAuth } from "../context/AuthContext";
 import { LogoMark } from "./Logo";
-import { getNotifications, getUnreadNotificationCount, markNotificationRead } from "../api/client";
+import { getApplications, getNotifications, getUnreadNotificationCount, markNotificationRead } from "../api/client";
 
 const C = {
   sidebar: "#FFFFFF",
-  sidebarBorder: "#E5E5E5",
+  sidebarBorder: "#e4e1d9",
   surface: "#FFFFFF",
   card: "#FFFFFF",
   ink: "#181818",
   inkSoft: "#6B6478",
   inkFaint: "#A39DB8",
-  line: "#E8E8E8",
+  line: "#e4e1d9",
   navy: "#111111",
   navySoft: "#F3F3F3",
   coral: "#111111",
   coralSoft: "#F5F5F5",
 };
-
-const WORKSPACE_CHILDREN = [
-  {
-    label: "Active Collab",
-    icon: CheckCircle2,
-    to: "/workspace/active",
-  },
-];
 
 const CREATOR_PROFILE_FIELDS: Array<string | string[]> = [
   "display_name",
@@ -153,6 +143,10 @@ type AppLayoutProps = {
   children: ReactNode;
   title?: string;
   subtitle?: string;
+  // Rendered to the right of the title/subtitle, on the same row, so
+  // page-level actions (e.g. "Create campaign") line up with the welcome
+  // heading instead of floating in the page body below it.
+  headerActions?: ReactNode;
   searchValue?: string;
   onSearchChange?: (value: string) => void;
   searchPlaceholder?: string;
@@ -166,6 +160,7 @@ export function AppLayout({
   children,
   title,
   subtitle,
+  headerActions,
   searchValue = "",
   onSearchChange,
   searchPlaceholder,
@@ -225,12 +220,15 @@ export function AppLayout({
   const [menuOpen, setMenuOpen] =
     useState(false);
 
-  const [workspaceOpen, setWorkspaceOpen] =
-    useState(() =>
-      location.pathname.startsWith(
-        "/workspace"
-      )
-    );
+  // If the stored avatar/logo URL is broken or fails to load, fall back
+  // to initials instead of showing a bare broken-image icon on a black
+  // circle.
+  const [avatarError, setAvatarError] =
+    useState(false);
+
+  useEffect(() => {
+    setAvatarError(false);
+  }, [avatarUrl]);
 
   const [defaultsHintDismissed, setDefaultsHintDismissed] =
     useState(
@@ -270,11 +268,7 @@ export function AppLayout({
             typeof response === "object" &&
             response !== null
           ) {
-            const data =
-              response as Record<
-                string,
-                any
-              >;
+            const data = response as Record<string, any>;
 
             count = Number(
               data.count ??
@@ -318,6 +312,63 @@ export function AppLayout({
       window.clearInterval(interval);
     };
   }, []);
+
+
+  /*
+   * =====================================================
+   * APPLICATIONS BADGE (nav sidebar)
+   * =====================================================
+   *
+   * Businesses see the count of applications still waiting on a
+   * decision (status "pending") as a small badge next to the
+   * "Applications" nav link — 5 pending shows "5", 10 pending shows
+   * "10", etc. Creators don't have anything "received" to review here
+   * (their applications page is their own outgoing applications), so
+   * this only fetches/shows for the business role.
+   */
+
+  const [pendingApplicationsCount, setPendingApplicationsCount] =
+    useState(0);
+
+  useEffect(() => {
+    if (role !== "business") {
+      setPendingApplicationsCount(0);
+      return;
+    }
+
+    let mounted = true;
+
+    const loadPendingApplications = async () => {
+      try {
+        const applications = await getApplications({ status: "pending" });
+        if (!mounted) return;
+        setPendingApplicationsCount(
+          Array.isArray(applications) ? applications.length : 0
+        );
+      } catch (error) {
+        console.error(
+          "Failed to load pending applications count:",
+          error
+        );
+      }
+    };
+
+    loadPendingApplications();
+
+    // Refresh alongside the notification count so both badges stay
+    // roughly in sync without hammering the API.
+    const interval = window.setInterval(loadPendingApplications, 30000);
+
+    return () => {
+      mounted = false;
+      window.clearInterval(interval);
+    };
+  }, [role]);
+
+  const applicationsBadge =
+    pendingApplicationsCount > 99
+      ? "99+"
+      : String(pendingApplicationsCount);
 
 
   /*
@@ -374,14 +425,6 @@ export function AppLayout({
 
   useEffect(() => {
     setMenuOpen(false);
-
-    if (
-      location.pathname.startsWith(
-        "/workspace"
-      )
-    ) {
-      setWorkspaceOpen(true);
-    }
   }, [location.pathname]);
 
   /*
@@ -419,11 +462,6 @@ export function AppLayout({
             label: "My Campaigns",
             icon: Megaphone,
             to: "/campaigns",
-          },
-          {
-            label: "Discover Creators",
-            icon: Compass,
-            to: "/creators",
           },
           {
             label: "Applications",
@@ -467,19 +505,48 @@ export function AppLayout({
     <div className="app-layout">
 
       <style>{`
+        @import url('https://fonts.googleapis.com/css2?family=League+Spartan:wght@400;500;600;700&family=Poppins:wght@300;400;500;600&display=swap');
+
 
         /* =================================================
            MAIN LAYOUT
            ================================================= */
 
+        html, body, #root {
+          background: ${C.surface};
+        }
+
         .app-layout {
           min-height: 100vh;
           background: ${C.surface};
           color: ${C.ink};
+          font-family: 'Poppins', sans-serif;
+          font-weight: 400;
         }
 
         .app-layout * {
           box-sizing: border-box;
+        }
+
+        /* Some browsers (notably Safari/WebKit in dark mode) draw native
+           system chrome behind buttons — a dark pill shape that a plain
+           background: transparent alone doesn't fully remove. Strip that
+           native appearance so every button only ever shows the
+           background we actually set. */
+        .app-layout button {
+          appearance: none !important;
+          -webkit-appearance: none !important;
+          -moz-appearance: none !important;
+          background-color: transparent !important;
+          color: inherit !important;
+          border: 0 !important;
+          margin: 0;
+          font: inherit;
+          -webkit-tap-highlight-color: transparent;
+        }
+
+        .app-layout a {
+          -webkit-tap-highlight-color: transparent;
         }
 
         /* =================================================
@@ -523,9 +590,9 @@ export function AppLayout({
 
           font-weight: 600;
 
-          letter-spacing: .03em;
+          letter-spacing: -0.03em;
 
-          font-size: 17px;
+          font-size: 20px;
         }
 
         .app-nav {
@@ -558,12 +625,7 @@ export function AppLayout({
 
           text-decoration: none;
 
-          font:
-            500 13px/1.2
-            -apple-system,
-            BlinkMacSystemFont,
-            'Segoe UI',
-            sans-serif;
+          font: 400 13px/1.2 'Poppins', sans-serif;
 
           cursor: pointer;
 
@@ -579,15 +641,11 @@ export function AppLayout({
         .app-nav-link.active {
           background: ${primarySoft};
           color: ${primary};
-          font-weight: 600;
+          font-weight: 500;
         }
 
         .app-nav-button span {
           flex: 1;
-        }
-
-        .app-nav-child {
-          font-size: 13px;
         }
 
         /* =================================================
@@ -619,7 +677,7 @@ export function AppLayout({
           color: #fff;
 
           font-size: 12px;
-          font-weight: 700;
+          font-weight: 500;
         }
 
         .app-completion-copy {
@@ -681,7 +739,7 @@ export function AppLayout({
           text-decoration: none;
 
           font-size: 10px;
-          font-weight: 700;
+          font-weight: 500;
         }
 
         /* =================================================
@@ -695,7 +753,7 @@ export function AppLayout({
 
           border-radius: 10px;
 
-          background: ${C.navySoft};
+          background: #FFFFFF;
 
           border: 1px solid #DDDDDD;
         }
@@ -722,7 +780,7 @@ export function AppLayout({
 
           font-size: 10.5px;
           line-height: 1.35;
-          font-weight: 700;
+          font-weight: 500;
         }
 
         .app-defaults-copy {
@@ -745,34 +803,40 @@ export function AppLayout({
           text-decoration: none;
 
           font-size: 9.5px;
-          font-weight: 700;
+          font-weight: 500;
         }
 
         /* =================================================
-           USER
+           TOPBAR USER / PROFILE MENU
+           (avatar lives in the top bar, far right)
            ================================================= */
 
         .app-user-wrap {
           position: relative;
+
+          display: inline-flex;
         }
 
-        .app-user {
+        .app-topbar-user {
           display: flex;
           align-items: center;
 
-          gap: 9px;
+          gap: 6px;
 
-          width: 100%;
+          height: 38px;
 
-          padding: 7px 4px;
+          padding: 0 8px 0 4px;
 
           border: 0;
+          border-radius: 999px;
 
           background: transparent;
 
           cursor: pointer;
+        }
 
-          text-align: left;
+        .app-topbar-user:hover {
+          background: #F5F5F7;
         }
 
         .app-avatar {
@@ -788,55 +852,30 @@ export function AppLayout({
 
           border-radius: 50%;
 
-          background: ${primary};
+          background: ${primarySoft};
 
-          color: #fff;
+          color: ${primary};
 
           font-size: 10px;
-          font-weight: 700;
+          font-weight: 500;
         }
 
         .app-avatar img {
+          display: block;
+
           width: 100%;
           height: 100%;
 
           object-fit: cover;
         }
 
-        .app-user-info {
-          min-width: 0;
-
-          flex: 1;
-        }
-
-        .app-user-name {
-          overflow: hidden;
-
-          text-overflow: ellipsis;
-
-          white-space: nowrap;
-
-          color: ${C.ink};
-
-          font-size: 11px;
-          font-weight: 600;
-        }
-
-        .app-user-role {
-          color: ${C.inkFaint};
-
-          font-size: 9.5px;
-
-          text-transform: capitalize;
-        }
-
         .app-user-menu {
           position: absolute;
 
-          left: 0;
-          bottom: 48px;
+          top: calc(100% + 14px);
+          right: 0;
 
-          width: 200px;
+          width: 210px;
 
           padding: 6px;
 
@@ -849,6 +888,53 @@ export function AppLayout({
           box-shadow:
             0 12px 30px
             rgba(20,17,40,.12);
+
+          z-index: 60;
+        }
+
+        /* Small caret so the menu visually connects back to the
+           avatar button it opened from, instead of floating loose. */
+        .app-user-menu::before {
+          content: "";
+
+          position: absolute;
+
+          top: -6px;
+          right: 18px;
+
+          width: 12px;
+          height: 12px;
+
+          background: #fff;
+
+          border-left: 1px solid ${C.line};
+          border-top: 1px solid ${C.line};
+
+          border-radius: 2px 0 0 0;
+
+          transform: rotate(45deg);
+        }
+
+        .app-user-menu-header {
+          padding: 8px 10px 10px;
+          margin-bottom: 4px;
+          border-bottom: 1px solid ${C.line};
+        }
+
+        .app-user-menu-name {
+          color: ${C.ink};
+          font-size: 12.5px;
+          font-weight: 500;
+          overflow: hidden;
+          text-overflow: ellipsis;
+          white-space: nowrap;
+        }
+
+        .app-user-menu-role {
+          margin-top: 2px;
+          color: ${C.inkFaint};
+          font-size: 10px;
+          text-transform: capitalize;
         }
 
         .app-user-menu a,
@@ -895,7 +981,7 @@ export function AppLayout({
           color: #fff;
           font-size: 9px;
           line-height: 1;
-          font-weight: 800;
+          font-weight: 600;
           margin-left: auto;
         }
 
@@ -907,10 +993,17 @@ export function AppLayout({
           min-height: 100vh;
 
           margin-left: 240px;
+
+          background: ${C.surface};
         }
 
         /* =================================================
            TOP BAR
+           Row 1: full-width search + icons/actions/avatar,
+           with a grey divider underneath it.
+           Row 2: welcome title/subtitle on the left, and any
+           page-level header actions (e.g. "Create campaign")
+           on the right of the same row.
            ================================================= */
 
         .app-topbar {
@@ -921,20 +1014,40 @@ export function AppLayout({
           z-index: 40;
 
           display: flex;
-
-          align-items: center;
-
-          justify-content: space-between;
-
-          gap: 20px;
+          flex-direction: column;
 
           padding: 16px 24px;
 
           background: ${C.surface};
         }
 
+        .app-topbar-row {
+          display: flex;
+
+          align-items: center;
+
+          gap: 16px;
+
+          width: 100%;
+
+          padding-bottom: 14px;
+
+          margin-bottom: 14px;
+
+          border-bottom: 1px solid ${C.sidebarBorder};
+        }
+
         .app-topbar-title {
-          min-width: 0;
+          width: 100%;
+
+          display: flex;
+
+          align-items: flex-start;
+          justify-content: space-between;
+
+          gap: 16px;
+
+          flex-wrap: wrap;
         }
 
         .app-topbar-title h1 {
@@ -942,9 +1055,11 @@ export function AppLayout({
 
           color: ${C.ink};
 
-          font-size: 20px;
-          line-height: 1.25;
-          font-weight: 700;
+          font-family: 'League Spartan', sans-serif;
+          font-size: 28px;
+          letter-spacing: -0.02em;
+          line-height: 1.15;
+          font-weight: 400;
         }
 
         .app-topbar-title p {
@@ -952,8 +1067,25 @@ export function AppLayout({
 
           color: ${C.inkSoft};
 
-          font-size: 14px;
+          font-size: 13px;
           line-height: 1.4;
+          font-weight: 400;
+        }
+
+        .app-topbar-title-actions {
+          display: flex;
+
+          align-items: center;
+
+          gap: 9px;
+
+          flex: 0 0 auto;
+          flex-wrap: wrap;
+        }
+
+        .app-topbar-search {
+          flex: 1;
+          min-width: 0;
         }
 
         .app-topbar-actions {
@@ -963,11 +1095,9 @@ export function AppLayout({
 
           justify-content: flex-end;
 
-          gap: 16px;
+          gap: 14px;
 
-          flex: 1;
-
-          min-width: 0;
+          flex: 0 0 auto;
         }
 
         /* =================================================
@@ -981,19 +1111,19 @@ export function AppLayout({
 
           gap: 8px;
 
-          padding: 8px 12px;
+          height: 38px;
+
+          padding: 0 12px;
 
           border: 1px solid ${C.line};
 
-          border-radius: 8px;
+          border-radius: 10px;
 
-          background: ${C.card};
+          background: #ffffff;
 
           color: ${C.inkFaint};
 
-          flex: 1;
-
-          min-width: 0;
+          width: 100%;
         }
 
         .app-search input {
@@ -1001,22 +1131,32 @@ export function AppLayout({
           min-width: 0;
 
           border: 0;
-
           outline: 0;
+          box-shadow: none;
 
           background: transparent;
 
           color: ${C.ink};
 
-          font-size: 14px;
+          font-size: 13px;
         }
 
         .app-search input::placeholder {
           color: ${C.inkFaint};
         }
 
+        .app-search input:focus {
+          outline: none;
+          box-shadow: none;
+        }
+
+        .app-search:focus-within {
+          border-color: #B9B4C4;
+        }
+
         /* =================================================
-           NOTIFICATION
+           NOTIFICATION / ICON BUTTONS
+           (used for both the settings gear and the bell)
            ================================================= */
 
         .app-notification {
@@ -1093,7 +1233,7 @@ export function AppLayout({
 
           font-size: 9px;
 
-          font-weight: 800;
+          font-weight: 600;
 
           line-height: 1;
 
@@ -1117,7 +1257,9 @@ export function AppLayout({
 
           gap: 6px;
 
-          padding: 8px 14px;
+          height: 38px;
+
+          padding: 0 14px;
 
           border-radius: 8px;
 
@@ -1127,9 +1269,9 @@ export function AppLayout({
 
           text-decoration: none;
 
-          font-size: 14px;
+          font-size: 13px;
 
-          font-weight: 600;
+          font-weight: 500;
 
           white-space: nowrap;
 
@@ -1143,6 +1285,7 @@ export function AppLayout({
 
         .app-page-content {
           width: 100%;
+          background: ${C.surface};
         }
 
         /* =================================================
@@ -1170,6 +1313,21 @@ export function AppLayout({
             display: none;
           }
 
+          /* On the collapsed rail, the badge no longer has a label
+             next to it to sit "after" — so it becomes a small dot
+             pinned to the top-right corner of the icon itself,
+             matching how the bell's badge behaves when collapsed. */
+          .app-nav-link {
+            position: relative;
+          }
+
+          .app-nav-link .app-nav-badge {
+            position: absolute;
+            top: 4px;
+            right: 4px;
+            margin-left: 0;
+          }
+
           .app-nav-link,
           .app-nav-button {
             justify-content: center;
@@ -1192,16 +1350,22 @@ export function AppLayout({
 
         @media (max-width: 620px) {
 
+          .app-topbar-title {
+            flex-direction: column;
+
+            align-items: flex-start;
+          }
+
+          .app-topbar-title-actions {
+            width: 100%;
+          }
+
           .app-topbar-title h1 {
-            font-size: 17px;
+            font-size: 24px;
           }
 
           .app-topbar-actions {
             gap: 8px;
-          }
-
-          .app-search {
-            width: 160px;
           }
 
           .app-action {
@@ -1222,10 +1386,10 @@ export function AppLayout({
         .app-payment-modal { position: relative; width: min(430px, 100%); background: #fff; border-radius: 18px; padding: 30px 28px 26px; text-align: center; box-shadow: 0 24px 70px rgba(25, 20, 40, .22); }
         .app-payment-modal-close { position: absolute; top: 12px; right: 12px; width: 34px; height: 34px; border: 0; border-radius: 50%; background: #F5F5F5; color: #6B6478; display: flex; align-items: center; justify-content: center; cursor: pointer; }
         .app-payment-success-icon { width: 62px; height: 62px; margin: 0 auto 12px; border-radius: 50%; background: #F5F5F5; color: #16834A; display: flex; align-items: center; justify-content: center; }
-        .app-payment-success-kicker { color: #16834A; font-size: 10px; font-weight: 800; letter-spacing: .12em; margin-bottom: 7px; }
-        .app-payment-modal h2 { margin: 0 0 9px; color: #181818; font-size: 21px; }
+        .app-payment-success-kicker { color: #16834A; font-size: 10px; font-weight: 600; letter-spacing: .12em; margin-bottom: 7px; }
+        .app-payment-modal h2 { margin: 0 0 9px; color: #181818; font-family: 'League Spartan', sans-serif; font-size: 26px; font-weight: 400; letter-spacing: -0.02em; }
         .app-payment-modal p { margin: 0; color: #6B6478; font-size: 13px; line-height: 1.55; }
-        .app-payment-success-button { width: 100%; margin-top: 19px; border: 0; border-radius: 9px; padding: 11px 14px; background: #111111; color: #fff; font-size: 13px; font-weight: 700; cursor: pointer; }
+        .app-payment-success-button { width: 100%; margin-top: 19px; border: 0; border-radius: 9px; padding: 11px 14px; background: #111111; color: #fff; font-size: 13px; font-weight: 500; cursor: pointer; }
       `}</style>
 
       {/* =================================================
@@ -1249,6 +1413,14 @@ export function AppLayout({
           {nav.map((item) => {
             const Icon = item.icon;
 
+            // Only the business "Applications" link gets a live count
+            // badge — creators use this same route for their own
+            // outgoing applications, which isn't a "received" count.
+            const showApplicationsBadge =
+              role === "business" &&
+              item.to === "/applications" &&
+              pendingApplicationsCount > 0;
+
             return (
               <Link
                 key={item.to}
@@ -1270,78 +1442,20 @@ export function AppLayout({
                 <span>
                   {item.label}
                 </span>
+
+                {showApplicationsBadge && (
+                  <span
+                    className="app-nav-badge"
+                    aria-label={`${pendingApplicationsCount} application${
+                      pendingApplicationsCount === 1 ? "" : "s"
+                    } to review`}
+                  >
+                    {applicationsBadge}
+                  </span>
+                )}
               </Link>
             );
           })}
-
-          {/* WORKSPACE */}
-
-          <div>
-
-            <button
-              type="button"
-              className="app-nav-button"
-              onClick={() =>
-                setWorkspaceOpen(
-                  (value) => !value
-                )
-              }
-              aria-expanded={
-                workspaceOpen
-              }
-            >
-              <Briefcase
-                size={17}
-                className="shrink-0"
-              />
-
-              <span>
-                Workspace
-              </span>
-
-              {workspaceOpen ? (
-                <ChevronDown size={15} />
-              ) : (
-                <ChevronRight size={15} />
-              )}
-            </button>
-
-            {workspaceOpen && (
-              <div>
-                {WORKSPACE_CHILDREN.map(
-                  (child) => {
-                    const ChildIcon =
-                      child.icon;
-
-                    return (
-                      <Link
-                        key={child.to}
-                        to={child.to}
-                        className={`app-nav-link app-nav-child ${
-                          isRouteActive(
-                            location.pathname,
-                            child.to
-                          )
-                            ? "active"
-                            : ""
-                        }`}
-                      >
-                        <ChildIcon
-                          size={15}
-                        />
-
-                        <span>
-                          {child.label}
-                        </span>
-
-                      </Link>
-                    );
-                  }
-                )}
-              </div>
-            )}
-
-          </div>
 
           <Link
             to="/workspace/history"
@@ -1444,97 +1558,6 @@ export function AppLayout({
               </div>
             )}
 
-          {/* USER */}
-
-          <div className="app-user-wrap">
-
-            {menuOpen && (
-              <div className="app-user-menu">
-
-                <Link
-                  to="/profile"
-                  onClick={() =>
-                    setMenuOpen(false)
-                  }
-                >
-                  <Settings size={15} />
-                  Edit profile
-                </Link>
-
-                {role === "business" && (
-                  <Link
-                    to="/settings"
-                    onClick={() =>
-                      setMenuOpen(false)
-                    }
-                  >
-                    <Settings size={15} />
-                    Settings
-                  </Link>
-                )}
-
-                <button
-                  type="button"
-                  onClick={() => {
-                    setMenuOpen(false);
-
-                    logout();
-
-                    navigate("/login");
-                  }}
-                >
-                  <LogOut size={15} />
-                  Log out
-                </button>
-
-              </div>
-            )}
-
-            <button
-              type="button"
-              className="app-user"
-              onClick={() =>
-                setMenuOpen(
-                  (value) => !value
-                )
-              }
-            >
-
-              <div className="app-avatar">
-
-                {avatarUrl ? (
-                  <img
-                    src={avatarUrl}
-                    alt=""
-                  />
-                ) : (
-                  initials
-                )}
-
-              </div>
-
-              <div className="app-user-info">
-
-                <div className="app-user-name">
-                  {user?.full_name ||
-                    "User"}
-                </div>
-
-                <div className="app-user-role">
-                  {user?.role || role}
-                </div>
-
-              </div>
-
-              <ChevronDown
-                size={14}
-                color={C.inkFaint}
-              />
-
-            </button>
-
-          </div>
-
         </div>
 
       </aside>
@@ -1547,83 +1570,197 @@ export function AppLayout({
 
         <header className="app-topbar">
 
-          <div className="app-topbar-title">
+          {/* ROW 1 — big search bar + settings, bell, avatar, with a grey divider under it */}
+          <div className="app-topbar-row">
 
-            {title && (
-              <h1>{title}</h1>
-            )}
+            <div className="app-topbar-search">
+              {showSearch && (
+                <label className="app-search">
 
-            {subtitle && (
-              <p>{subtitle}</p>
-            )}
+                  <Search size={14} />
+
+                  <input
+                    value={searchValue}
+                    onChange={(event) =>
+                      onSearchChange?.(
+                        event.target.value
+                      )
+                    }
+                    placeholder={
+                      searchPlaceholder ||
+                      defaultSearchPlaceholder
+                    }
+                    aria-label="Search"
+                  />
+
+                </label>
+              )}
+            </div>
+
+            <div className="app-topbar-actions">
+
+              {/* SETTINGS ICON */}
+
+              <Link
+                to="/settings"
+                className="app-notification"
+                aria-label="Settings"
+              >
+                <Settings size={20} />
+              </Link>
+
+              {/* NOTIFICATION BELL */}
+
+              {showNotifications && (
+                <Link
+                  to="/notifications"
+                  className="app-notification"
+                  aria-label={
+                    unreadNotifications > 0
+                      ? `${unreadNotifications} unread notifications`
+                      : "Notifications"
+                  }
+                >
+
+                  <Bell size={20} />
+
+                  {unreadNotifications > 0 && (
+                    <span className="app-notification-badge">
+                      {notificationBadge}
+                    </span>
+                  )}
+
+                </Link>
+              )}
+
+              {/* ACTION */}
+
+              {actionLabel &&
+                actionTo && (
+                  <Link
+                    className="app-action"
+                    to={actionTo}
+                  >
+                    <Plus size={15} />
+
+                    {actionLabel}
+                  </Link>
+                )}
+
+              {/* PROFILE / ACCOUNT MENU */}
+
+              <div className="app-user-wrap">
+
+                {menuOpen && (
+                  <div className="app-user-menu">
+
+                    <div className="app-user-menu-header">
+                      <div className="app-user-menu-name">
+                        {user?.full_name || "User"}
+                      </div>
+                      <div className="app-user-menu-role">
+                        {user?.role || role}
+                      </div>
+                    </div>
+
+                    <Link
+                      to="/profile"
+                      onClick={() =>
+                        setMenuOpen(false)
+                      }
+                    >
+                      <Settings size={15} />
+                      Edit profile
+                    </Link>
+
+                    {role === "business" && (
+                      <Link
+                        to="/settings"
+                        onClick={() =>
+                          setMenuOpen(false)
+                        }
+                      >
+                        <Settings size={15} />
+                        Settings
+                      </Link>
+                    )}
+
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setMenuOpen(false);
+
+                        logout();
+
+                        navigate("/login");
+                      }}
+                    >
+                      <LogOut size={15} />
+                      Log out
+                    </button>
+
+                  </div>
+                )}
+
+                <button
+                  type="button"
+                  className="app-topbar-user"
+                  onClick={() =>
+                    setMenuOpen(
+                      (value) => !value
+                    )
+                  }
+                  aria-label="Account menu"
+                >
+
+                  <div className="app-avatar">
+
+                    {avatarUrl && !avatarError ? (
+                      <img
+                        src={avatarUrl}
+                        alt=""
+                        onError={() => setAvatarError(true)}
+                      />
+                    ) : (
+                      initials
+                    )}
+
+                  </div>
+
+                  <ChevronDown
+                    size={14}
+                    color={C.inkFaint}
+                  />
+
+                </button>
+
+              </div>
+
+            </div>
 
           </div>
 
-          <div className="app-topbar-actions">
+          {/* ROW 2 — welcome title/subtitle on the left, headerActions
+              (page-level buttons) on the right, underneath the grey
+              divider. Wraps to a second line on narrow screens. */}
 
-            {/* SEARCH */}
+          <div className="app-topbar-title">
 
-            {showSearch && (
-              <label className="app-search">
-
-                <Search size={14} />
-
-                <input
-                  value={searchValue}
-                  onChange={(event) =>
-                    onSearchChange?.(
-                      event.target.value
-                    )
-                  }
-                  placeholder={
-                    searchPlaceholder ||
-                    defaultSearchPlaceholder
-                  }
-                  aria-label="Search"
-                />
-
-              </label>
-            )}
-
-            {/* =================================================
-                NOTIFICATION BELL
-                ================================================= */}
-
-            {showNotifications && (
-              <Link
-                to="/notifications"
-                className="app-notification"
-                aria-label={
-                  unreadNotifications > 0
-                    ? `${unreadNotifications} unread notifications`
-                    : "Notifications"
-                }
-              >
-
-                <Bell size={20} />
-
-                {unreadNotifications > 0 && (
-                  <span className="app-notification-badge">
-                    {notificationBadge}
-                  </span>
-                )}
-
-              </Link>
-            )}
-
-            {/* ACTION */}
-
-            {actionLabel &&
-              actionTo && (
-                <Link
-                  className="app-action"
-                  to={actionTo}
-                >
-                  <Plus size={15} />
-
-                  {actionLabel}
-                </Link>
+            <div>
+              {title && (
+                <h1>{title}</h1>
               )}
+
+              {subtitle && (
+                <p>{subtitle}</p>
+              )}
+            </div>
+
+            {headerActions && (
+              <div className="app-topbar-title-actions">
+                {headerActions}
+              </div>
+            )}
 
           </div>
 

@@ -9,7 +9,7 @@ from sqlalchemy.orm import Session
 
 from app.database import get_db
 from app.dependencies.auth import get_current_business, get_current_user
-from app.models import User, Payment, Application, Campaign
+from app.models import User, Payment, Application, Campaign, Contract
 from app.schemas.payment import PaymentResponse
 from app.services.khalti import lookup_payment, KhaltiError
 from app.services.notifications import create_notification
@@ -51,12 +51,17 @@ def _authorized_selection_payment(db: Session, current_user: User, pidx: str) ->
     payment = db.query(Payment).filter(Payment.pidx == pidx).first()
     if not payment:
         raise HTTPException(status_code=404, detail="Payment not found.")
-    if payment.payment_type != "selection_fee":
-        raise HTTPException(status_code=400, detail="This payment is not a creator selection payment.")
+    if payment.payment_type not in ("selection_fee", "platform_fee"):
+        raise HTTPException(status_code=400, detail="This payment type cannot be verified here.")
     application = db.query(Application).filter(Application.id == payment.application_id).first()
     campaign = db.query(Campaign).filter(Campaign.id == payment.campaign_id).first()
     if not application or not campaign or campaign.business_id != current_user.id:
         raise HTTPException(status_code=403, detail="Access denied.")
+    if payment.payment_type == "platform_fee":
+        contract_id = (payment.payment_details or {}).get("contract_id") if isinstance(payment.payment_details, dict) else None
+        contract = db.query(Contract).filter(Contract.id == contract_id).first() if contract_id else None
+        if not contract or contract.business_id != current_user.id or contract.application_id != application.id:
+            raise HTTPException(status_code=403, detail="Contract payment access denied.")
     return payment
 
 def _finalize_selection(db: Session, payment: Payment, method: str, metadata: dict | None = None) -> Payment:
@@ -151,17 +156,40 @@ async def verify_payment(
     except KhaltiError as exc:
         raise HTTPException(status_code=502, detail=f"Could not verify payment: {exc.detail or str(exc)}")
 
-    payment.status = _STATUS_MAP.get(result.get("status"), "failed")
+    provider_status = result.get("status")
+    payment.status = _STATUS_MAP.get(provider_status, "failed")
     payment.transaction_id = result.get("transaction_id")
-    if payment.status == "failed":
-        application = db.query(Application).filter(Application.id == payment.application_id).first()
-        if application and application.status == "payment_pending":
-            application.status = "pending"
+
+    if payment.payment_type == "platform_fee":
+        contract_id = (payment.payment_details or {}).get("contract_id") if isinstance(payment.payment_details, dict) else None
+        contract = db.query(Contract).filter(Contract.id == contract_id).first() if contract_id else None
+        # Khalti reports amount in paisa. Do not mark the fee paid unless the
+        # provider confirms completion and the charged amount matches our ledger.
+        provider_amount = result.get("total_amount")
+        expected_paisa = int(round(float(payment.amount) * 100))
+        if payment.status == "funded" and provider_amount is not None and int(provider_amount) != expected_paisa:
+            payment.status = "failed"
+        if payment.status == "funded" and contract:
+            payment.status = "completed"
+            payment.paid_at = payment.paid_at or datetime.now(timezone.utc)
+            payment.platform_fee = float(payment.amount)
+            payment.creator_payout = 0
+            contract.payment_method = "khalti"
+            contract.payment_reference = payment.transaction_id or payment.purchase_order_id
+            contract.fee_paid_at = payment.paid_at
+            contract.status = "active"
+            create_notification(
+                db, user_id=contract.creator_id, type="contract_activated",
+                title="Contract activated",
+                message=f"Your contract for {contract.campaign.title if contract.campaign else 'the campaign'} is active. The business has paid the CreatorHub service fee.",
+                link="/contracts", reference_id=contract.id,
+                event_key=f"contract-fee-paid:{contract.id}",
+            )
+    elif payment.status == "funded":
+        payment = _finalize_selection(db, payment, "khalti", {"provider_status": provider_status})
+
     db.commit()
-
-    if payment.status == "funded":
-        payment = _finalize_selection(db, payment, "khalti", {"provider_status": result.get("status")})
-
+    db.refresh(payment)
     return _payment_to_response(payment)
 
 

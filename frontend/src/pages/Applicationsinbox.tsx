@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Check, FileSignature, Loader2, X, ExternalLink } from 'lucide-react';
-import { Link, useSearchParams } from 'react-router-dom';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { getApplications, selectApplication, updateApplicationStatus, finalizeContract, getContract, type Application, type Contract } from '../api/client';
 import { AppLayout } from '../components/AppLayout';
 import { useAuth } from '../context/AuthContext';
@@ -15,6 +15,7 @@ function mediaUrl(value?: string | null) {
 
 export function ApplicationsInbox() {
   const { user } = useAuth();
+  const navigate = useNavigate();
   const [params] = useSearchParams();
   const campaignFilter = Number(params.get('campaign')) || undefined;
   const [applications, setApplications] = useState<Application[]>([]);
@@ -58,6 +59,7 @@ export function ApplicationsInbox() {
       setTotal(c.total_value != null ? String(c.total_value) : '');
       setNote(c.terms_note || '');
       setApplications(items => items.map(item => item.id === app.id ? { ...item, status: 'accepted', agreed_rate: c.agreed_rate ?? null, rate_locked: c.status !== 'draft' } : item));
+      navigate(`/contracts/${c.id}`);
     } catch (err: any) { setError(err?.response?.data?.detail || 'Could not select this creator.'); }
     finally { setBusy(null); }
   };
