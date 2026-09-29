@@ -18,12 +18,11 @@ from app.schemas.contract import (
     ContractSummary,
 )
 from app.services.notifications import create_notification
-from app.services.pricing import total_for_rate
+from app.services.pricing import PLATFORM_FEE_RATE, campaign_fee_rate, platform_fee_for, total_for_rate
 from app.services.khalti import initiate_payment, KhaltiError
 from app.core.config import FRONTEND_URL
 
 router = APIRouter(prefix="/api/contracts", tags=["Contracts"])
-PLATFORM_FEE_RATE = 0.10
 
 
 def _name(user: User | None) -> str | None:
@@ -185,8 +184,11 @@ async def finalize_contract(
     campaign = contract.campaign
     total = data.total_value if data.total_value is not None else total_for_rate(data.agreed_rate, campaign)
     contract.agreed_rate = round(data.agreed_rate, 2)
+    fee_rate = campaign_fee_rate(campaign)
     contract.total_value = round(total, 2)
-    contract.platform_fee_amount = round(total * PLATFORM_FEE_RATE, 2)
+    # Fee is charged ON TOP of the creator payment (total_value).
+    contract.platform_fee_rate = fee_rate
+    contract.platform_fee_amount = platform_fee_for(total, fee_rate)
     contract.terms_note = data.terms_note
     if data.start_date is not None:
         contract.start_date = data.start_date

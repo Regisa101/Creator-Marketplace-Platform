@@ -170,6 +170,14 @@ def ensure_schema() -> None:
         ADD COLUMN IF NOT EXISTS extra_photos JSON
         """,
 
+        # Platform fee CreatorHub adds on top of the creator payment
+        # (0.10 = 10%). See app/services/pricing.py.
+        """
+        ALTER TABLE campaigns
+        ADD COLUMN IF NOT EXISTS platform_fee_rate
+        NUMERIC(5,4) NOT NULL DEFAULT 0.10
+        """,
+
         # ====================================================
         # FUNDING / PAYMENT COMPATIBILITY
         # ====================================================

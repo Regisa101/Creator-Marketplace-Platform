@@ -160,13 +160,14 @@ class Campaign(Base):
     # COMPENSATION
     # ============================================================
 
-    # fixed / hourly / monthly
+    # Always "Custom budget" now (the fixed CreatorHub standard rates were removed).
     pricing_model = Column(
         String(30),
         nullable=True,
     )
 
-    # fixed / range / negotiable
+    # "Custom amount" / "Budget range" (amounts are the CREATOR payment;
+    # the 10% platform fee is added on top when the brand hires).
     compensation_type = Column(
         String(30),
         nullable=True,
@@ -187,6 +188,16 @@ class Campaign(Base):
     budget_max = Column(
         DECIMAL(12, 2),
         nullable=True,
+    )
+
+    # Platform fee CreatorHub charges the brand ON TOP of the creator payment
+    # (0.10 = 10%). Stored per campaign so the rate a brand saw when creating
+    # the campaign is the rate their contracts use.
+    platform_fee_rate = Column(
+        DECIMAL(5, 4),
+        nullable=False,
+        default=0.10,
+        server_default="0.10",
     )
 
     # Optional additional compensation information.

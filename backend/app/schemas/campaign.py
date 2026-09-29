@@ -2,7 +2,9 @@ from datetime import datetime
 from enum import Enum
 from typing import List, Optional
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, field_validator
+
+from app.services.pricing import is_legacy_standard_rate
 
 
 # ============================================================
@@ -111,6 +113,16 @@ class CampaignBase(BaseModel):
 
     compensation_description: Optional[str] = None
 
+    @field_validator("compensation_type")
+    @classmethod
+    def _no_fixed_standard_rate(cls, value: Optional[str]) -> Optional[str]:
+        if is_legacy_standard_rate(value):
+            raise ValueError(
+                "Fixed CreatorHub standard rates are no longer available. "
+                "Choose 'Custom amount' or 'Budget range'."
+            )
+        return value
+
     # ------------------------------------------------------------
     # Timeline
     # ------------------------------------------------------------
@@ -204,6 +216,16 @@ class CampaignUpdate(BaseModel):
 
     compensation_description: Optional[str] = None
 
+    @field_validator("compensation_type")
+    @classmethod
+    def _no_fixed_standard_rate(cls, value: Optional[str]) -> Optional[str]:
+        if is_legacy_standard_rate(value):
+            raise ValueError(
+                "Fixed CreatorHub standard rates are no longer available. "
+                "Choose 'Custom amount' or 'Budget range'."
+            )
+        return value
+
     start_date: Optional[datetime] = None
 
     end_date: Optional[datetime] = None
@@ -225,6 +247,9 @@ class CampaignUpdate(BaseModel):
 
 class CampaignResponse(CampaignBase):
     id: int
+
+    # Platform fee added on top of the creator payment (0.10 = 10%).
+    platform_fee_rate: float = 0.10
 
     business_id: int
 

@@ -21,6 +21,7 @@ from app.schemas.campaign import (
     CampaignResponse,
 )
 from app.services.campaign_alerts import check_expired_campaign_deadlines
+from app.services.pricing import DEFAULT_PRICING_MODEL, PLATFORM_FEE_RATE, campaign_fee_rate
 
 
 router = APIRouter(
@@ -258,6 +259,7 @@ async def get_public_campaigns(
 
                 "pricing_model": campaign.pricing_model,
                 "compensation_type": campaign.compensation_type,
+                "platform_fee_rate": campaign_fee_rate(campaign),
                 "budget": (
                     float(campaign.budget)
                     if campaign.budget is not None
@@ -412,8 +414,10 @@ async def create_campaign(
         duration=data.duration,
 
         # Compensation
-        pricing_model=data.pricing_model,
+        # Single pricing model: brand's own amount + 10% platform fee on top.
+        pricing_model=DEFAULT_PRICING_MODEL,
         compensation_type=data.compensation_type,
+        platform_fee_rate=PLATFORM_FEE_RATE,
         budget=data.budget,
         budget_min=data.budget_min,
         budget_max=data.budget_max,
@@ -581,6 +585,7 @@ async def get_campaigns(
 
                 "pricing_model": campaign.pricing_model,
                 "compensation_type": campaign.compensation_type,
+                "platform_fee_rate": campaign_fee_rate(campaign),
                 "budget": (
                     float(campaign.budget)
                     if campaign.budget is not None
@@ -920,6 +925,10 @@ async def update_campaign(
     # Update allowed fields
     # --------------------------------------------------------
 
+    # Fixed standard rates are gone: every campaign uses the single
+    # "Custom budget" model (brand amount + 10% platform fee on top).
+    update_data["pricing_model"] = DEFAULT_PRICING_MODEL
+
     for key, value in update_data.items():
 
         if key == "title" and value is not None:
@@ -1128,8 +1137,9 @@ async def duplicate_campaign(
         engagement_type=original.engagement_type,
         duration=original.duration,
 
-        pricing_model=original.pricing_model,
+        pricing_model=DEFAULT_PRICING_MODEL,
         compensation_type=original.compensation_type,
+        platform_fee_rate=PLATFORM_FEE_RATE,
         budget=original.budget,
         budget_min=original.budget_min,
         budget_max=original.budget_max,

@@ -102,26 +102,12 @@ const WORK_ARRANGEMENTS = [
 
 const PRICING_MODELS = [
   "Custom budget",
-  "CreatorHub standard rate",
 ];
 
 const COMPENSATION_TYPES = [
   "Custom amount",
   "Budget range",
-  "CreatorHub standard rate",
 ];
-
-const CREATORHUB_TERM_RATES: Record<string, number | null> = {
-  "One-time": 500,
-  "Weekly": null,
-  "Monthly": 2000,
-  "Long-term": 5000,
-  "Yearly": 5000,
-};
-
-function creatorHubRateForTerm(term: string): number | null {
-  return CREATORHUB_TERM_RATES[term] ?? null;
-}
 
 const EXPERIENCE_LEVELS = [
   "Entry level",
@@ -527,13 +513,6 @@ function CampaignForm({
         if (!form.budget_min || form.budget_min <= 0) nextErrors.budget_min = "Enter the minimum budget.";
         if (!form.budget_max || form.budget_max <= 0) nextErrors.budget_max = "Enter the maximum budget.";
         if (form.budget_min && form.budget_max && form.budget_max < form.budget_min) nextErrors.budget_max = "Maximum budget must be greater than minimum budget.";
-      }
-      if (
-        (form.pricing_model === "CreatorHub standard rate" ||
-          form.compensation_type === "CreatorHub standard rate") &&
-        creatorHubRateForTerm(form.engagement_type) == null
-      ) {
-        nextErrors.compensation_type = "Choose a custom amount for Weekly campaigns because CreatorHub does not have a standard weekly rate.";
       }
     }
 
@@ -1208,7 +1187,7 @@ function CampaignForm({
                   label="Compensation"
                   required
                   error={fieldErrors.compensation_type}
-                  hint="Choose a custom amount, a budget range, or let CreatorHub apply the standard rate for the selected term."
+                  hint="Set a custom creator payment or provide a budget range. A 10% platform fee is added to the creator payment when you hire."
                 >
                   <Options
                     values={
@@ -1235,24 +1214,9 @@ function CampaignForm({
                     <span className="cf-payment-policy-badge">10% platform fee</span>
                   </div>
 
-                  <div className="cf-payment-policy-table">
-                    <div><span>One-time</span><strong>NPR 500</strong></div>
-                    <div><span>Monthly</span><strong>NPR 2,000</strong></div>
-                    <div><span>Long-term</span><strong>NPR 5,000</strong></div>
-                    <div><span>Yearly</span><strong>NPR 5,000</strong></div>
-                  </div>
-
                   <div className="cf-payment-policy-copy">
-                    If you enter a custom budget, that amount is the total the brand pays. CreatorHub keeps 10% and the creator receives 90%. If you choose the CreatorHub standard rate, the amount above is used automatically for the selected engagement term.
+                    Set the amount you want the creator to receive. When you hire a creator, a 10% platform fee is added to that amount and shown in the payment breakdown. For example, a NPR 10,000 creator payment has a NPR 1,000 platform fee, for a brand total of NPR 11,000.
                   </div>
-
-                  {form.pricing_model === "CreatorHub standard rate" && form.engagement_type && (
-                    <div className="cf-payment-policy-selected">
-                      {creatorHubRateForTerm(form.engagement_type) != null
-                        ? `Selected: ${form.engagement_type} — NPR ${creatorHubRateForTerm(form.engagement_type)!.toLocaleString()}`
-                        : `${form.engagement_type} does not have a CreatorHub standard rate yet. Enter a custom amount.`}
-                    </div>
-                  )}
                 </div>
 
                 {form.compensation_type ===
@@ -1698,15 +1662,12 @@ function CreatorPreview({
     });
   };
 
-  const standardRate = creatorHubRateForTerm(form.engagement_type);
   const budgetLabel =
     form.compensation_type === "Custom amount" && form.budget
       ? `Rs. ${form.budget.toLocaleString()}`
       : form.compensation_type === "Budget range" && form.budget_min && form.budget_max
         ? `Rs. ${form.budget_min.toLocaleString()} – Rs. ${form.budget_max.toLocaleString()}`
-        : form.compensation_type === "CreatorHub standard rate" && standardRate != null
-          ? `NPR ${standardRate.toLocaleString()}`
-          : form.compensation_type || "Compensation not specified";
+        : form.compensation_type || "Compensation not specified";
 
   const deliverables = list(form.deliverables);
   const skills = list(form.required_skills);
@@ -1785,9 +1746,6 @@ function CreatorPreview({
               <div className="cf-preview-info-card">
                 <h3>Campaign details</h3>
                 <div className="cf-preview-detail"><span>Compensation</span><strong>{budgetLabel}</strong></div>
-                {form.compensation_type === "CreatorHub standard rate" && form.engagement_type && (
-                  <div className="cf-preview-detail"><span>CreatorHub standard rate</span><strong>{creatorHubRateForTerm(form.engagement_type) != null ? `NPR ${creatorHubRateForTerm(form.engagement_type)!.toLocaleString()}` : "Custom amount required"}</strong></div>
-                )}
                 {form.pricing_model && <div className="cf-preview-detail"><span>Pricing</span><strong>{form.pricing_model}</strong></div>}
                 {form.duration && <div className="cf-preview-detail"><span>Duration</span><strong>{form.duration}</strong></div>}
                 {form.location && <div className="cf-preview-detail"><span>Location</span><strong>{form.location}</strong></div>}

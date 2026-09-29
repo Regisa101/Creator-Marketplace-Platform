@@ -183,6 +183,8 @@ export interface Campaign {
   duration?: string | null;
   pricing_model?: string | null;
   compensation_type?: string | null;
+  /** Platform fee added on top of the creator payment (0.10 = 10%). */
+  platform_fee_rate?: number | null;
   budget?: number | null;
   budget_min?: number | null;
   budget_max?: number | null;

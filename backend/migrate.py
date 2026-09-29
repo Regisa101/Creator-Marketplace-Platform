@@ -30,6 +30,7 @@ statements = [
     "ALTER TABLE campaigns ADD COLUMN IF NOT EXISTS application_questions JSON",
     "ALTER TABLE campaigns ADD COLUMN IF NOT EXISTS creator_requirements JSON",
     "ALTER TABLE campaigns ADD COLUMN IF NOT EXISTS extra_photos JSON",
+    "ALTER TABLE campaigns ADD COLUMN IF NOT EXISTS platform_fee_rate NUMERIC(5,4) NOT NULL DEFAULT 0.10",
 
     "ALTER TABLE business_profiles ADD COLUMN IF NOT EXISTS default_dos JSON",
     "ALTER TABLE business_profiles ADD COLUMN IF NOT EXISTS default_donts JSON",

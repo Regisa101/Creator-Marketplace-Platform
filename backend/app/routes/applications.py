@@ -12,7 +12,13 @@ from app.models import User, Campaign, Application
 from app.models.campaign import CampaignStatus
 from app.schemas.application import ApplicationCreate, ApplicationResponse, ApplicationUpdate
 from app.services.notifications import create_notification
-from app.services.pricing import candidate_rate_and_status, resolve_campaign_rate, total_for_rate
+from app.services.pricing import (
+    campaign_fee_rate,
+    candidate_rate_and_status,
+    platform_fee_for,
+    resolve_campaign_rate,
+    total_for_rate,
+)
 
 router = APIRouter(prefix="/api/applications", tags=["Applications"])
 
@@ -102,8 +108,8 @@ async def create_application(
     if data.rate is not None and float(data.rate) > 0:
         proposed_rate = round(float(data.rate), 2)
     else:
-        # Falls back to the campaign's own fixed rate, when it has one
-        # ("Custom amount" with a budget, or "CreatorHub standard rate").
+        # Falls back to the campaign's own fixed amount, when it has one
+        # ("Custom amount" with a budget).
         # "Budget range" and "Negotiable" campaigns correctly leave this None.
         proposed_rate = resolve_campaign_rate(campaign)
 
@@ -196,18 +202,19 @@ async def select_application(
     db.commit()
 
     # rate/status: if the CAMPAIGN itself fixed the compensation ("Custom
-    # amount" with a budget, or "CreatorHub standard rate"), the contract can
+    # amount" with a budget), the contract can
     # go active immediately. Otherwise a creator's proposed rate is only a
     # starting point for negotiation — the contract stays "draft" until the
     # business finalizes it (see PUT /contracts/{id}/finalize).
     rate, can_activate = candidate_rate_and_status(application, campaign)
     total = total_for_rate(rate, campaign) if rate is not None else None
+    fee_rate = campaign_fee_rate(campaign)
     contract = Contract(
         campaign_id=campaign.id, application_id=application.id, business_id=current_user.id, creator_id=application.creator_id,
         engagement_type=campaign.engagement_type, duration=campaign.duration, pricing_model=campaign.pricing_model,
         compensation_type=campaign.compensation_type, compensation_description=campaign.compensation_description,
-        agreed_rate=rate, total_value=total, platform_fee_rate=0.10,
-        platform_fee_amount=round(total * 0.10, 2) if total is not None else None,
+        agreed_rate=rate, total_value=total, platform_fee_rate=fee_rate,
+        platform_fee_amount=platform_fee_for(total, fee_rate) if total is not None else None,
         start_date=campaign.start_date, end_date=campaign.end_date, status="pending_payment" if can_activate else "draft",
     )
 

@@ -3,51 +3,97 @@ from __future__ import annotations
 import re
 from typing import Optional
 
-# Mirrors CREATORHUB_TERM_RATES in frontend/src/pages/Campaignform.tsx.
-# Keep these two lists in sync if the standard rate schedule changes.
-CREATORHUB_STANDARD_RATES: dict[str, Optional[float]] = {
-    "one-time": 500,
-    "weekly": None,
-    "monthly": 2000,
-    "long-term": 5000,
-    "yearly": 5000,
-}
+# ============================================================
+# CREATORHUB PRICING MODEL
+# ============================================================
+#
+# Brands pay a flat 10% platform fee ON TOP of the creator payment,
+# only when they hire a creator. Example:
+#
+#     Creator payment ........ NPR 10,000
+#     Platform fee (10%) ..... NPR  1,000
+#     Total for brand ........ NPR 11,000
+#
+# Creators join and apply for free and receive 100% of the amount the
+# campaign / contract specifies.
+#
+# This mirrors PLATFORM_FEE_RATE in frontend/src/pages/Campaignform.tsx and
+# the public pricing page (frontend/src/pages/Pricing.tsx). Keep them in sync.
+#
+# The old CreatorHub "standard rate" schedule (fixed NPR 500 / 2,000 / 5,000
+# per engagement term) has been removed. Campaigns now always carry the
+# brand's own amount ("Custom amount") or "Budget range".
+
+PLATFORM_FEE_RATE: float = 0.10
+
+# Every campaign uses this single pricing model now. It is kept as a column
+# for backwards compatibility with existing rows / contracts.
+DEFAULT_PRICING_MODEL = "Custom budget"
+
+# Value the old campaign form used for the removed fixed-rate option.
+LEGACY_STANDARD_RATE = "CreatorHub standard rate"
 
 
-def creatorhub_standard_rate(engagement_type: Optional[str]) -> Optional[float]:
-    """Look up CreatorHub's standard rate for a given engagement term, if any."""
-    if not engagement_type:
-        return None
-    return CREATORHUB_STANDARD_RATES.get(engagement_type.strip().lower())
+def is_legacy_standard_rate(value: Optional[str]) -> bool:
+    return (value or "").strip().lower() == LEGACY_STANDARD_RATE.lower()
+
+
+def campaign_fee_rate(campaign=None) -> float:
+    """Platform fee rate for a campaign (falls back to the default 10%)."""
+    rate = getattr(campaign, "platform_fee_rate", None) if campaign is not None else None
+    try:
+        rate = float(rate) if rate is not None else None
+    except (TypeError, ValueError):
+        rate = None
+    return rate if rate is not None and rate >= 0 else PLATFORM_FEE_RATE
+
+
+def platform_fee_for(creator_payment: float, rate: Optional[float] = None) -> float:
+    """Platform fee charged on top of a creator payment."""
+    rate = PLATFORM_FEE_RATE if rate is None else rate
+    return round(float(creator_payment) * rate, 2)
+
+
+def total_for_brand(creator_payment: float, rate: Optional[float] = None) -> float:
+    """What the brand pays overall: creator payment + platform fee."""
+    return round(float(creator_payment) + platform_fee_for(creator_payment, rate), 2)
+
+
+def split_brand_total(total_charged: float, rate: Optional[float] = None) -> tuple[float, float]:
+    """
+    Reverse of total_for_brand(): given the total the brand was charged
+    (creator payment + fee), return (creator_payment, platform_fee).
+    """
+    rate = PLATFORM_FEE_RATE if rate is None else rate
+    creator_payment = round(float(total_charged) / (1 + rate), 2)
+    fee = round(float(total_charged) - creator_payment, 2)
+    return creator_payment, fee
 
 
 def resolve_campaign_rate(campaign) -> Optional[float]:
     """
-    Return the single rate implied by the campaign's OWN compensation setup,
-    if the campaign itself already fixes it unambiguously.
+    Return the single creator payment implied by the campaign's OWN
+    compensation setup, if the campaign itself fixes it unambiguously.
 
     Returns None for "Budget range" and "Negotiable" (and anything else) —
-    those have no single implied rate and must be negotiated after selection.
+    those have no single implied rate and must be settled after selection.
 
-    NOTE: the campaign's compensation_type values, as actually sent by the
-    frontend (see COMPENSATION_TYPES in Campaignform.tsx), are "Custom amount",
-    "Budget range", and "CreatorHub standard rate" — NOT "Fixed amount"/"Fixed".
+    The campaign's compensation_type values, as sent by the frontend (see
+    COMPENSATION_TYPES in Campaignform.tsx), are "Custom amount" and
+    "Budget range".
     """
     comp_type = (campaign.compensation_type or "").strip().lower()
 
     if comp_type == "custom amount" and campaign.budget is not None:
         return round(float(campaign.budget), 2)
 
-    if comp_type == "creatorhub standard rate":
-        rate = creatorhub_standard_rate(campaign.engagement_type)
-        return round(float(rate), 2) if rate is not None else None
-
     return None
 
 
 def total_for_rate(rate: float, campaign) -> float:
     """
-    Given a per-month (or flat) rate, compute the total contract value.
+    Given a per-month (or flat) rate, compute the total contract value
+    (the creator payment, before the platform fee).
     If the engagement/duration text mentions a number of months, multiply;
     otherwise the rate itself is treated as the total (e.g. one-time work).
     """
@@ -61,14 +107,13 @@ def total_for_rate(rate: float, campaign) -> float:
 def candidate_rate_and_status(application, campaign) -> tuple[Optional[float], bool]:
     """
     Decide the contract's starting rate and whether it can go straight to
-    "active" on selection.
+    "pending_payment" (platform fee due) on selection.
 
-    - If the CAMPAIGN itself fixed the compensation (Custom amount /
-      CreatorHub standard rate), that's authoritative and the contract can
-      activate immediately.
+    - If the CAMPAIGN itself fixed the compensation ("Custom amount"), that's
+      authoritative and the contract can move straight to payment.
     - Otherwise, a creator's proposed rate (application.rate) is only a
       starting point for negotiation — it prefills the finalize form but
-      does NOT auto-activate the contract, since "Budget range" and
+      does NOT move the contract forward, since "Budget range" and
       "Negotiable" campaigns still need the business to confirm final terms.
     """
     campaign_rate = resolve_campaign_rate(campaign)
