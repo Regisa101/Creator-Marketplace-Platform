@@ -179,6 +179,47 @@ async def verify_payment(
             contract.payment_reference = payment.transaction_id or payment.purchase_order_id
             contract.fee_paid_at = payment.paid_at
             contract.status = "active"
+
+            # Payment is the point at which the creator becomes officially selected.
+            application = contract.application
+            campaign = contract.campaign
+            if application and campaign:
+                application.status = "accepted"
+                application.agreed_rate = contract.agreed_rate
+                application.rate = contract.agreed_rate
+                application.rate_locked = 1
+
+                selected_count = db.query(Application).filter(
+                    Application.campaign_id == campaign.id,
+                    Application.status == "accepted",
+                    Application.id != application.id,
+                ).count()
+                if selected_count + 1 >= int(campaign.creators_needed or 1):
+                    campaign.status = "closed"
+                    campaign.is_active = False
+                    other_pending = db.query(Application).filter(
+                        Application.campaign_id == campaign.id,
+                        Application.id != application.id,
+                        Application.status.in_(["pending", "payment_pending"]),
+                    ).all()
+                    for other in other_pending:
+                        other.status = "rejected"
+                        create_notification(
+                            db, user_id=other.creator_id, type="application_rejected",
+                            title="Campaign closed",
+                            message=f"The creator for {campaign.title} has been selected. Your application was not selected.",
+                            link="/applications", reference_id=other.id,
+                            event_key=f"application-rejected-closed:{other.id}",
+                        )
+
+                create_notification(
+                    db, user_id=application.creator_id, type="creator_selected",
+                    title="You were selected! 🎉",
+                    message=f"The brand selected you for {campaign.title}. Your application has been confirmed.",
+                    link=f"/campaigns/{campaign.id}", reference_id=application.id,
+                    event_key=f"creator-selected:{application.id}",
+                )
+
             create_notification(
                 db, user_id=contract.creator_id, type="contract_activated",
                 title="Contract activated",

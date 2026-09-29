@@ -1007,6 +1007,14 @@ async def publish_campaign(
             detail="Access denied.",
         )
 
+    # Publishing an already-published campaign is a no-op, so a stale
+    # client (or a double click) does not get a confusing 400.
+    if campaign.status == CampaignStatus.PUBLISHED:
+        return _campaign_to_response(
+            db,
+            campaign,
+        )
+
     if campaign.status != CampaignStatus.DRAFT:
         raise HTTPException(
             status_code=400,

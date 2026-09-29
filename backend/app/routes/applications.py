@@ -190,7 +190,10 @@ async def select_application(
     if existing:
         return {"application_id": application.id, "contract_id": existing.id, "contract_status": existing.status}
 
-    # One creator is selected at a time unless the campaign explicitly needs more.
+    # Only already-paid/active selections count as selected. Creating a draft
+    # contract must NOT select the creator, close the campaign, reject other
+    # applicants, or notify the creator. Those actions happen only after the
+    # CreatorHub fee payment succeeds.
     selected_count = db.query(Application).filter(
         Application.campaign_id == campaign.id,
         Application.status == "accepted",
@@ -198,15 +201,9 @@ async def select_application(
     if selected_count >= int(campaign.creators_needed or 1):
         raise HTTPException(status_code=400, detail="This campaign has already selected the required number of creators.")
 
-    application.status = "selected"
-    db.commit()
-
-    # rate/status: if the CAMPAIGN itself fixed the compensation ("Custom
-    # amount" with a budget), the contract can
-    # go active immediately. Otherwise a creator's proposed rate is only a
-    # starting point for negotiation — the contract stays "draft" until the
-    # business finalizes it (see PUT /contracts/{id}/finalize).
-    rate, can_activate = candidate_rate_and_status(application, campaign)
+    # The application remains pending while the business creates/finalizes
+    # the contract. The creator is officially selected only after payment.
+    rate, _can_activate = candidate_rate_and_status(application, campaign)
     total = total_for_rate(rate, campaign) if rate is not None else None
     fee_rate = campaign_fee_rate(campaign)
     contract = Contract(
@@ -215,7 +212,7 @@ async def select_application(
         compensation_type=campaign.compensation_type, compensation_description=campaign.compensation_description,
         agreed_rate=rate, total_value=total, platform_fee_rate=fee_rate,
         platform_fee_amount=platform_fee_for(total, fee_rate) if total is not None else None,
-        start_date=campaign.start_date, end_date=campaign.end_date, status="pending_payment" if can_activate else "draft",
+        start_date=campaign.start_date, end_date=campaign.end_date, status="draft",
     )
 
     # Immutable collaboration evidence. This is captured at the moment the
@@ -263,7 +260,7 @@ async def select_application(
             "message": application.message,
             "application_answers": application.application_answers or [],
             "selected_portfolio": application.selected_portfolio or [],
-            "status": application.status,
+            "status": "pending",
             "agreed_rate": float(rate) if rate is not None else None,
             "rate_locked": bool(application.rate_locked),
             "deliverable_deadline": application.deliverable_deadline.isoformat() if application.deliverable_deadline else None,
@@ -271,42 +268,9 @@ async def select_application(
             "updated_at": application.updated_at.isoformat() if application.updated_at else None,
         },
     }
-    application.status = "accepted"
-    application.agreed_rate = rate
-    application.rate_locked = 1 if can_activate else 0
+    # IMPORTANT: do not mutate application status or campaign status here.
+    # Payment completion is the single point that makes the selection official.
     db.add(contract)
-    create_notification(
-        db, user_id=application.creator_id, type="application_accepted",
-        title="You’ve been selected", message=f"{current_user.profile.get('company_name') if isinstance(current_user.profile, dict) else current_user.full_name} selected you for {campaign.title}.",
-        link=f"/campaigns/{campaign.id}", reference_id=application.id, event_key=f"application-accepted:{application.id}",
-    )
-
-    # Once every creator slot this campaign needed has been filled, it is
-    # no longer a live opportunity — pull it off the public marketplace
-    # (Campaigns page + Landing page) immediately. It still stays visible
-    # to the business on their own Campaigns dashboard since the query
-    # there is not filtered by status.
-    filled_count = selected_count + 1
-    if filled_count >= int(campaign.creators_needed or 1):
-        campaign.status = CampaignStatus.CLOSED
-        campaign.is_active = False
-        # Reject any applications still pending for this campaign — the
-        # required number of creators has already been selected.
-        still_pending = db.query(Application).filter(
-            Application.campaign_id == campaign.id,
-            Application.id != application.id,
-            Application.status == "pending",
-        ).all()
-        for other in still_pending:
-            other.status = "rejected"
-            create_notification(
-                db, user_id=other.creator_id, type="application_rejected",
-                title="Campaign closed",
-                message=f"The creator(s) for {campaign.title} have been selected. Your application was not selected.",
-                link="/applications", reference_id=other.id,
-                event_key=f"application-rejected-closed:{other.id}",
-            )
-
     db.commit(); db.refresh(contract)
     return {
         "application_id": application.id, "contract_id": contract.id, "contract_status": contract.status,

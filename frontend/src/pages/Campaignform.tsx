@@ -256,6 +256,9 @@ function CampaignForm({
   const [busy, setBusy] =
     useState<"draft" | "publish" | null>(null);
 
+  // Status of the campaign being edited. Only drafts need the publish call.
+  const [campaignStatus, setCampaignStatus] = useState<string>("draft");
+
   const [error, setError] = useState("");
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
   const [showPreview, setShowPreview] = useState(false);
@@ -270,6 +273,8 @@ function CampaignForm({
         const c = (await getCampaign(id)) as any;
 
         if (cancelled) return;
+
+        setCampaignStatus(c.status || "draft");
 
         setForm({
           title: c.title || "",
@@ -619,7 +624,15 @@ function CampaignForm({
         );
       }
 
-      if (publish) {
+      // The publish endpoint only accepts drafts. A campaign that is already
+      // published (or otherwise past draft) is live as soon as the update
+      // above succeeds, so calling publish again would return
+      // "Only draft campaigns can be published."
+      const needsPublish =
+        publish &&
+        (!editing || campaignStatus === "draft");
+
+      if (needsPublish) {
         saved =
           await publishCampaign(
             saved.id
@@ -1607,7 +1620,9 @@ function CampaignForm({
                     )}
 
                     {editing
-                      ? "Save & publish"
+                      ? campaignStatus === "draft"
+                        ? "Save & publish"
+                        : "Save changes"
                       : "Publish campaign"}
 
                     {busy !== "publish" && (

@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Check, FileSignature, Loader2, X, ExternalLink } from 'lucide-react';
-import { Link, useNavigate, useSearchParams } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 import { getApplications, selectApplication, updateApplicationStatus, finalizeContract, getContract, type Application, type Contract } from '../api/client';
 import { AppLayout } from '../components/AppLayout';
 import { useAuth } from '../context/AuthContext';
@@ -15,7 +15,6 @@ function mediaUrl(value?: string | null) {
 
 export function ApplicationsInbox() {
   const { user } = useAuth();
-  const navigate = useNavigate();
   const [params] = useSearchParams();
   const campaignFilter = Number(params.get('campaign')) || undefined;
   const [applications, setApplications] = useState<Application[]>([]);
@@ -50,18 +49,34 @@ export function ApplicationsInbox() {
   };
 
   const select = async (app: Application) => {
-    setBusy(app.id); setError('');
+    setBusy(app.id);
+    setError('');
+
     try {
+      // IMPORTANT:
+      // This creates ONLY a draft contract. It does not select the creator.
+      // Keep the user on the Applications page and open the contract form
+      // here. The creator becomes accepted only after the platform-fee payment
+      // succeeds.
       const result = await selectApplication(app.id);
-      const c = await getContract(result.contract_id);
-      setContract(c);
-      setRate(c.agreed_rate != null ? String(c.agreed_rate) : '');
-      setTotal(c.total_value != null ? String(c.total_value) : '');
-      setNote(c.terms_note || '');
-      setApplications(items => items.map(item => item.id === app.id ? { ...item, status: 'accepted', agreed_rate: c.agreed_rate ?? null, rate_locked: c.status !== 'draft' } : item));
-      navigate(`/contracts/${c.id}`);
-    } catch (err: any) { setError(err?.response?.data?.detail || 'Could not select this creator.'); }
-    finally { setBusy(null); }
+      const draft = await getContract(result.contract_id);
+
+      setContract(draft);
+      setRate(
+        draft.agreed_rate != null ? String(draft.agreed_rate) : ''
+      );
+      setTotal(
+        draft.total_value != null ? String(draft.total_value) : ''
+      );
+      setNote(draft.terms_note || '');
+    } catch (err: any) {
+      setError(
+        err?.response?.data?.detail ||
+          'Could not create the contract. Please try again.'
+      );
+    } finally {
+      setBusy(null);
+    }
   };
 
   const finalize = async () => {
@@ -76,7 +91,19 @@ export function ApplicationsInbox() {
       // active yet. The modal below then shows the demo payment step.
       const updated = await finalizeContract(contract.id, { agreed_rate: agreed, total_value: totalValue, terms_note: note || undefined });
       setContract(updated);
-      setApplications(items => items.map(item => item.id === updated.application_id ? { ...item, status: 'accepted', agreed_rate: updated.agreed_rate, rate_locked: true } : item));
+      // Still NOT selected. Payment is the point at which the backend changes
+      // the application to "accepted".
+      setApplications(items =>
+        items.map(item =>
+          item.id === updated.application_id
+            ? {
+                ...item,
+                agreed_rate: updated.agreed_rate,
+                rate_locked: true,
+              }
+            : item
+        )
+      );
     } catch (err: any) { setError(err?.response?.data?.detail || 'Could not finalize the contract.'); }
     finally { setBusy(null); }
   };
@@ -105,7 +132,7 @@ export function ApplicationsInbox() {
           {app.campaign_budget != null && <div className="ab-budget">Campaign budget: NPR {Number(app.campaign_budget).toLocaleString()}</div>}
           {app.rate != null && <div className="ab-budget">Creator proposed: NPR {Number(app.rate).toLocaleString()}</div>}
           <div className="ab-grid"><div><div className="ab-heading">Screening answers</div>{(app.application_answers || []).length === 0 ? <div className="ab-answer">No screening questions were added.</div> : (app.application_answers || []).map((answer,i)=><div className="ab-answer" key={i}><strong>{answer.question}</strong><br/>{answer.answer}</div>)}</div><div><div className="ab-heading">Work sample</div>{work?.media_url ? <div className="ab-work"><img src={mediaUrl(work.media_url)} alt={work.title || 'Work sample'}/><div className="ab-work-title">{work.title || 'Work sample'}</div></div> : <div className="ab-answer">No work image attached.</div>}</div></div>
-          {app.status === 'pending' && <div className="ab-actions"><button className="ab-select" disabled={busy === app.id} onClick={() => void select(app)}>{busy === app.id ? <Loader2 size={14} className="ab-spin"/> : <FileSignature size={14}/>} Select creator & create contract</button><button className="ab-reject" disabled={busy === app.id} onClick={() => void reject(app)}><X size={14}/> Reject</button></div>}
+          {app.status === 'pending' && <div className="ab-actions"><button className="ab-select" disabled={busy === app.id} onClick={() => void select(app)}>{busy === app.id ? <Loader2 size={14} className="ab-spin"/> : <FileSignature size={14}/>} Create contract & continue</button><button className="ab-reject" disabled={busy === app.id} onClick={() => void reject(app)}><X size={14}/> Reject</button></div>}
           {app.status === 'accepted' && <div className="ab-success"><Check size={13} style={{verticalAlign:'-2px',marginRight:5}}/> Creator selected. The contract is now being finalized.</div>}
         </article>;
       })}

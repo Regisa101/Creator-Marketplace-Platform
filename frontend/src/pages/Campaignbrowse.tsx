@@ -2,7 +2,6 @@ import { useEffect, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { Link } from 'react-router-dom';
 import {
-  Building2,
   ChevronLeft,
   ChevronRight,
   Clock3,
@@ -308,52 +307,43 @@ export function CampaignBrowse() {
                       getPlatforms(publicCampaign);
 
                     return (
-                      <Link
+                      <div
                         key={campaign.id}
-                        to={`/campaigns/${campaign.id}`}
                         className="cb-card"
                       >
+                        <Link
+                          to={`/campaigns/${campaign.id}`}
+                          className="cb-card-main"
+                        >
 
-                        {/* TOP ROW */}
+                        {/* TOP ROW: tags + Apply now / status */}
                         <div className="cb-card-header">
+                          <div className="cb-header-tags">
+                            <span className="cb-tag cb-tag-main">
+                              {campaign.category}
+                            </span>
 
-                          <div className="cb-brand">
-                            <div className="cb-brand-logo">
-                              {publicCampaign.brand_logo ? (
-                                <img
-                                  src={
-                                    publicCampaign.brand_logo
-                                  }
-                                  alt=""
-                                />
-                              ) : (
-                                <Building2 size={17} />
-                              )}
-                            </div>
-
-                            <div>
-                              <span className="cb-brand-name">
-                                {publicCampaign.brand_name ||
-                                  'Business'}
+                            {campaign.engagement_type && (
+                              <span className="cb-pill">
+                                {campaign.engagement_type}
                               </span>
+                            )}
 
-                              {!isBusiness &&
-                                publicCampaign.brand_location && (
-                                  <span className="cb-brand-location">
-                                    {publicCampaign.brand_location}
-                                  </span>
-                                )}
-                            </div>
+                            {campaign.work_arrangement && (
+                              <span className="cb-pill">
+                                {campaign.work_arrangement}
+                              </span>
+                            )}
                           </div>
 
-                          {isBusiness && (
+                          {isBusiness ? (
                             <span
                               className={`cb-status cb-status--${campaign.status}`}
                             >
-                              {formatStatus(
-                                campaign.status
-                              )}
+                              {formatStatus(campaign.status)}
                             </span>
+                          ) : (
+                            <span className="cb-apply">Apply now</span>
                           )}
                         </div>
 
@@ -364,10 +354,63 @@ export function CampaignBrowse() {
 
                         {/* DESCRIPTION */}
                         <p className="cb-description">
-                          {truncate(
-                            campaign.description || ''
-                          )}
+                          {truncate(campaign.description || '')}
                         </p>
+
+                        </Link>
+
+                        {/* BRAND */}
+                        <div className="cb-brand">
+                          <div className="cb-brand-label">
+                            About the business
+                          </div>
+
+                          <Link
+                            to={`/brands/${campaign.business_id}`}
+                            className="cb-business-profile-link"
+                            onClick={(event) => event.stopPropagation()}
+                            aria-label={`View ${publicCampaign.brand_name || 'Business'} business profile`}
+                          >
+                            <div className="cb-business-avatar">
+                              {publicCampaign.brand_logo ? (
+                                <img
+                                  src={publicCampaign.brand_logo}
+                                  alt={`${publicCampaign.brand_name || 'Business'} logo`}
+                                />
+                              ) : (
+                                <span>
+                                  {(publicCampaign.brand_name || 'Business')
+                                    .trim()
+                                    .slice(0, 1)
+                                    .toUpperCase()}
+                                </span>
+                              )}
+                            </div>
+
+                            <div className="cb-business-copy">
+                              <strong>
+                                {publicCampaign.brand_name || 'Business'}
+                              </strong>
+
+                              {!isBusiness && publicCampaign.brand_location && (
+                                <span className="cb-business-location">
+                                  <MapPin size={11} />
+                                  {publicCampaign.brand_location}
+                                </span>
+                              )}
+                            </div>
+
+                            <ChevronRight
+                              size={15}
+                              className="cb-business-arrow"
+                            />
+                          </Link>
+                        </div>
+
+                        <Link
+                          to={`/campaigns/${campaign.id}`}
+                          className="cb-card-main cb-card-lower"
+                        >
 
                         {/* JOB META */}
                         <div className="cb-job-meta">
@@ -403,15 +446,8 @@ export function CampaignBrowse() {
 
                         {/* SKILLS */}
                         {(campaign.required_skills?.length ||
-                          campaign.category ||
                           platforms.length > 0) && (
                           <div className="cb-tags">
-
-                            {campaign.category && (
-                              <span className="cb-tag cb-tag-main">
-                                {campaign.category}
-                              </span>
-                            )}
 
                             {campaign.required_skills
                               ?.slice(0, 4)
@@ -470,7 +506,9 @@ export function CampaignBrowse() {
                             )}
                           </div>
                         </div>
-                      </Link>
+
+                        </Link>
+                      </div>
                     );
                   })}
                 </div>
@@ -643,6 +681,94 @@ const STYLE = `
   align-items:center;
   gap:10px;
   min-width:0;
+}
+
+.cb-card-main{
+  display:block;
+  color:inherit;
+  text-decoration:none;
+}
+
+/* BUSINESS PROFILE */
+.cb-brand{
+  display:block;
+  min-width:0;
+  margin-bottom:14px;
+}
+
+.cb-brand-label{
+  margin-bottom:10px;
+  color:#111;
+  font-size:11px;
+  font-weight:600;
+}
+
+.cb-business-profile-link{
+  display:flex;
+  align-items:center;
+  gap:10px;
+  min-width:0;
+  color:#111;
+  text-decoration:none;
+  border-radius:8px;
+  padding:2px 0;
+}
+
+.cb-business-profile-link:hover .cb-business-copy strong{
+  text-decoration:underline;
+}
+
+.cb-business-profile-link:hover .cb-business-avatar{
+  border-color:#bbb;
+}
+
+.cb-business-avatar{
+  width:40px;
+  height:40px;
+  flex:0 0 40px;
+  display:grid;
+  place-items:center;
+  overflow:hidden;
+  border-radius:9px;
+  background:#f3f3f3;
+  border:1px solid #e8e8e8;
+  color:#333;
+  font-size:14px;
+  font-weight:600;
+}
+
+.cb-business-avatar img{
+  width:100%;
+  height:100%;
+  object-fit:cover;
+}
+
+.cb-business-copy{
+  min-width:0;
+  flex:1;
+}
+
+.cb-business-copy strong{
+  display:block;
+  color:#111;
+  font-size:11.5px;
+  font-weight:600;
+  line-height:1.35;
+}
+
+.cb-business-location{
+  display:flex;
+  align-items:center;
+  gap:3px;
+  margin-top:3px;
+  color:#777;
+  font-size:10px;
+  line-height:1.35;
+}
+
+.cb-business-arrow{
+  flex:0 0 auto;
+  color:#777;
 }
 
 .cb-brand-logo{
@@ -899,6 +1025,68 @@ const STYLE = `
 .cb-pagination button:disabled{
   opacity:.35;
   cursor:not-allowed;
+}
+
+
+/* ---- Wireframe card: tags + Apply now, title, description ---- */
+
+.cb-card{
+  background:#fff;
+  border:1px solid #e4e1d9;
+  border-radius:14px;
+  padding:18px 20px 18px;
+}
+
+.cb-list{
+  gap:14px;
+}
+
+.cb-list .cb-card:first-child{
+  padding-top:18px;
+}
+
+.cb-list .cb-card:last-child{
+  border-bottom:1px solid #e4e1d9;
+}
+
+.cb-card:hover{
+  background:#fff;
+  border-color:#cfcbc0;
+}
+
+.cb-header-tags{
+  display:flex;
+  flex-wrap:wrap;
+  gap:6px;
+}
+
+.cb-pill{
+  padding:5px 10px;
+  border:1px solid #e0e0e0;
+  border-radius:999px;
+  color:#666;
+  font-size:10px;
+  text-transform:capitalize;
+}
+
+.cb-header-tags .cb-tag-main{
+  border-radius:999px;
+  padding:5px 10px;
+  font-size:10px;
+}
+
+.cb-apply{
+  flex:none;
+  padding:7px 15px;
+  background:#111;
+  color:#fff;
+  border-radius:8px;
+  font-size:11px;
+  font-weight:600;
+}
+
+.cb-card:hover .cb-apply{
+  background:#2b2b2b;
 }
 
 /* RESPONSIVE */
