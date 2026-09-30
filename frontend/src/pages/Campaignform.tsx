@@ -1200,7 +1200,7 @@ function CampaignForm({
                   label="Compensation"
                   required
                   error={fieldErrors.compensation_type}
-                  hint="Set a custom creator payment or provide a budget range. A 10% platform fee is added to the creator payment when you hire."
+                  hint="Set the creator compensation or budget range. When you hire a creator, CreatorHub charges a 10% service fee; the creator is paid directly by the brand."
                 >
                   <Options
                     values={
@@ -1228,7 +1228,7 @@ function CampaignForm({
                   </div>
 
                   <div className="cf-payment-policy-copy">
-                    Set the amount you want the creator to receive. When you hire a creator, a 10% platform fee is added to that amount and shown in the payment breakdown. For example, a NPR 10,000 creator payment has a NPR 1,000 platform fee, for a brand total of NPR 11,000.
+                    Set the amount you want the creator to receive. When you hire a creator, CreatorHub charges a 10% service fee. The creator's compensation is agreed in the contract and paid directly between the brand and creator; only the CreatorHub service fee is paid through the platform.
                   </div>
                 </div>
 

@@ -5,7 +5,7 @@ import { Link, useSearchParams } from 'react-router-dom';
 import { getApplications, selectApplication, updateApplicationStatus, finalizeContract, getContract, type Application, type Contract } from '../api/client';
 import { AppLayout } from '../components/AppLayout';
 import { useAuth } from '../context/AuthContext';
-import { DemoPaymentForm } from '../components/DemoPaymentForm';
+import { KhaltiPaymentForm } from '../components/KhaltiPaymentForm';
 
 function mediaUrl(value?: string | null) {
   if (!value) return '';
@@ -141,7 +141,7 @@ export function ApplicationsInbox() {
     setBusy(contract.application_id); setError('');
     try {
       // Backend moves the contract to "pending_payment" here — it is not
-      // active yet. The modal below then shows the demo payment step.
+      // active yet. The modal below then shows the secure Khalti payment step.
       const updated = await finalizeContract(contract.id, { agreed_rate: agreed, total_value: totalValue, terms_note: note || undefined });
       setContract(updated);
       // Still NOT selected. Payment is the point at which the backend changes
@@ -398,13 +398,9 @@ export function ApplicationsInbox() {
           <div className="ab-foot">CreatorHub calculates the 10% service fee for your records. You'll pay it on the next step.</div>
         </>}
 
-        {contract.status === 'pending_payment' && <DemoPaymentForm
+        {contract.status === 'pending_payment' && <KhaltiPaymentForm
           contract={contract}
           onCancel={() => setContract(null)}
-          onSuccess={(updated: Contract) => {
-            setContract(updated);
-            setApplications(items => items.map(item => item.id === updated.application_id ? { ...item, status: 'accepted', agreed_rate: updated.agreed_rate, rate_locked: true } : item));
-          }}
         />}
 
         {(contract.status === 'active' || contract.status === 'completed') && <>

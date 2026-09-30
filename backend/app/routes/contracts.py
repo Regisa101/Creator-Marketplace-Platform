@@ -210,13 +210,16 @@ async def initiate_contract_fee_checkout(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_business),
 ):
-    """Complete a local demo payment for the contract's platform fee.
+    """Create a real hosted Khalti checkout for the CreatorHub service fee.
 
-    Real Khalti checkout can be re-enabled later. For now this endpoint
-    intentionally does not contact Khalti or require merchant credentials.
+    CreatorHub never collects a Khalti PIN, OTP or card/wallet credentials.
+    Khalti hosts the secure payment screen and redirects back with a pidx.
+    The payment is not treated as complete until /api/payments/verify
+    performs a server-side Khalti lookup.
     """
     contract = db.query(Contract).filter(
-        Contract.id == contract_id, Contract.business_id == current_user.id
+        Contract.id == contract_id,
+        Contract.business_id == current_user.id,
     ).first()
     if not contract:
         raise HTTPException(status_code=404, detail="Contract not found.")
@@ -239,114 +242,66 @@ async def initiate_contract_fee_checkout(
         currency="NPR",
         status="initiated",
         method="khalti",
-        payment_details={"contract_id": contract.id, "fee_type": "CreatorHub service fee"},
+        payment_details={
+            "contract_id": contract.id,
+            "fee_type": "CreatorHub service fee",
+            "provider": "khalti",
+        },
         initiated_by=current_user.id,
     )
     db.add(payment)
     db.commit()
     db.refresh(payment)
 
-    # DEMO MODE: no real Khalti API call for now.
-    # The payment is marked as completed locally so the full contract flow
-    # can be tested without merchant credentials or an external checkout.
-    now = datetime.now(timezone.utc)
-    demo_reference = f"DEMO-{uuid.uuid4().hex[:12].upper()}"
+    profile = current_user.profile or {}
+    customer_name = profile.get("company_name") or current_user.full_name
+    customer_email = getattr(current_user, "email", None)
 
-    payment.status = "completed"
-    payment.method = "demo"
-    payment.transaction_id = demo_reference
-    payment.paid_at = now
-    payment.platform_fee = float(payment.amount)
-    payment.creator_payout = 0
+    try:
+        checkout = await initiate_payment(
+            amount_npr=float(payment.amount),
+            purchase_order_id=purchase_order_id,
+            purchase_order_name=f"CreatorHub service fee - {contract.campaign.title if contract.campaign else 'Campaign'}",
+            return_url=f"{FRONTEND_URL}/payments/return",
+            website_url=FRONTEND_URL,
+            customer_name=customer_name,
+            customer_email=customer_email,
+        )
+    except KhaltiError as exc:
+        payment.status = "failed"
+        details = payment.payment_details if isinstance(payment.payment_details, dict) else {}
+        details["initiation_error"] = exc.detail or str(exc)
+        payment.payment_details = details
+        db.commit()
+        raise HTTPException(
+            status_code=502,
+            detail=exc.detail or "Could not start Khalti checkout. Check the Khalti merchant configuration.",
+        )
 
+    pidx = checkout.get("pidx")
+    payment_url = checkout.get("payment_url")
+    if not pidx or not payment_url:
+        payment.status = "failed"
+        db.commit()
+        raise HTTPException(status_code=502, detail="Khalti did not return a valid checkout session.")
+
+    payment.pidx = pidx
     details = payment.payment_details if isinstance(payment.payment_details, dict) else {}
     details.update({
-        "demo": True,
-        "provider": "local_demo",
-        "platform_fee_rate": PLATFORM_FEE_RATE,
+        "provider": "khalti",
+        "checkout_created": True,
     })
     payment.payment_details = details
-
-    contract.payment_method = "demo"
-    contract.payment_reference = demo_reference
-    contract.fee_paid_at = now
-    contract.status = "active"
-
-    # Payment is the moment the creator becomes officially selected.
-    application = contract.application
-    campaign = contract.campaign
-    if application and campaign:
-        application.status = "accepted"
-        application.agreed_rate = contract.agreed_rate
-        application.rate = contract.agreed_rate
-        application.rate_locked = 1
-
-        selected_count = db.query(Application).filter(
-            Application.campaign_id == campaign.id,
-            Application.status == "accepted",
-            Application.id != application.id,
-        ).count()
-        filled_count = selected_count + 1
-
-        if filled_count >= int(campaign.creators_needed or 1):
-            campaign.status = "closed"
-            campaign.is_active = False
-
-            other_pending = db.query(Application).filter(
-                Application.campaign_id == campaign.id,
-                Application.id != application.id,
-                Application.status.in_(["pending", "payment_pending"]),
-            ).all()
-            for other in other_pending:
-                other.status = "rejected"
-                create_notification(
-                    db, user_id=other.creator_id, type="application_rejected",
-                    title="Campaign closed",
-                    message=f"The creator for {campaign.title} has been selected. Your application was not selected.",
-                    link="/applications", reference_id=other.id,
-                    event_key=f"application-rejected-closed:{other.id}",
-                )
-
-        create_notification(
-            db, user_id=application.creator_id, type="creator_selected",
-            title="You were selected! 🎉",
-            message=f"The brand selected you for {campaign.title}. Your application has been confirmed.",
-            link=f"/campaigns/{campaign.id}", reference_id=application.id,
-            event_key=f"creator-selected:{application.id}",
-        )
-        create_notification(
-            db, user_id=campaign.business_id, type="selection_payment_completed",
-            title="Creator selected",
-            message=f"Payment was completed and {application.creator.full_name if application.creator else 'the creator'} was selected for {campaign.title}.",
-            link=f"/applications?campaign={campaign.id}", reference_id=application.id,
-            event_key=f"selection-payment-completed:{application.id}",
-        )
-
-    create_notification(
-        db,
-        user_id=contract.creator_id,
-        type="contract_activated",
-        title="Contract activated",
-        message=f"Your contract for {contract.campaign.title if contract.campaign else 'the campaign'} is active. The business completed the CreatorHub service fee payment.",
-        link="/contracts",
-        reference_id=contract.id,
-        event_key=f"contract-fee-paid:{contract.id}",
-    )
-
     db.commit()
-    db.refresh(payment)
-    db.refresh(contract)
 
     return {
-        "demo": True,
-        "payment_url": None,
-        "pidx": None,
+        "payment_url": payment_url,
+        "pidx": pidx,
         "purchase_order_id": purchase_order_id,
         "amount": float(payment.amount),
-        "transaction_id": demo_reference,
+        "transaction_id": None,
         "contract": _response(contract),
     }
-
 
 @router.post("/{contract_id}/pay-fee", response_model=ContractResponse)
 async def pay_platform_fee_legacy(
@@ -358,7 +313,7 @@ async def pay_platform_fee_legacy(
     """Legacy endpoint disabled: payment must use the verified hosted checkout."""
     raise HTTPException(
         status_code=410,
-        detail="This demo payment endpoint is disabled. Use the secure /checkout endpoint.",
+        detail="This legacy payment endpoint is disabled. Use the secure Khalti /checkout endpoint.",
     )
 
 

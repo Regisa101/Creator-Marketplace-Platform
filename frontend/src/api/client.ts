@@ -590,7 +590,7 @@ export const finalizeContract = (id: number, data: ContractFinalizeData) => unwr
 export const completeContract = (id: number) => unwrap(api.put<Contract>(`/contracts/${id}/complete`));
 // Hosted Khalti checkout for CreatorHub's contract service fee.
 export const initiateContractFeeCheckout = (id: number) =>
-  unwrap(api.post<{ demo: boolean; payment_url: string | null; pidx: string | null; purchase_order_id: string; amount: number; transaction_id?: string; contract?: Contract }>(`/contracts/${id}/checkout`));
+  unwrap(api.post<{ payment_url: string | null; pidx: string | null; purchase_order_id: string; amount: number; transaction_id?: string; contract?: Contract }>(`/contracts/${id}/checkout`));
 export const getContractSummary = () => unwrap(api.get<ContractSummary>('/contracts/summary/me'));
 
 function notifyWishlistChanged() {

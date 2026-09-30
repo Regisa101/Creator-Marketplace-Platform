@@ -13,7 +13,6 @@ from app.models import User, Payment, Application, Campaign, Contract
 from app.schemas.payment import PaymentResponse
 from app.services.khalti import lookup_payment, KhaltiError
 from app.services.notifications import create_notification
-from app.services.pricing import campaign_fee_rate, split_brand_total
 
 router = APIRouter(prefix="/api/payments", tags=["Payments"])
 
@@ -77,26 +76,20 @@ def _finalize_selection(db: Session, payment: Payment, method: str, metadata: di
     payment.status = "funded"
     payment.method = method
 
-    # The amount stored on the payment is the total charged to the brand:
-    # creator payment + the platform fee added on top (default 10%).
-    # e.g. NPR 11,000 charged = NPR 10,000 creator payout + NPR 1,000 fee.
-    fee_rate = campaign_fee_rate(campaign)
-    creator_payout, platform_fee = split_brand_total(float(payment.amount), fee_rate)
-    payment.platform_fee = platform_fee
-    payment.creator_payout = creator_payout
+    # Legacy selection-payment compatibility path. New platform_fee payments
+    # use the dedicated contract branch below and never process creator money.
+    payment.platform_fee = float(payment.amount)
+    payment.creator_payout = 0
     payment.transaction_id = payment.transaction_id or f"PAY-{uuid4().hex[:12].upper()}"
     payment.paid_at = payment.paid_at or datetime.now(timezone.utc)
 
     details = payment.payment_details if isinstance(payment.payment_details, dict) else {}
     details.update(metadata or {})
-    details["platform_fee_rate"] = fee_rate
-    details["platform_fee"] = platform_fee
-    details["creator_payout"] = creator_payout
+    details["platform_fee"] = float(payment.amount)
+    details["creator_payout"] = 0
     payment.payment_details = details
 
     application.status = "accepted"
-    application.agreed_rate = creator_payout
-    application.rate = creator_payout
     application.rate_locked = 1
 
     campaign.status = "closed"

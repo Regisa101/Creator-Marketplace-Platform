@@ -5,11 +5,13 @@ from app.database import Base
 
 
 class Payment(Base):
-    """
-    A payment the business makes to a creator for an accepted Application
-    (collaboration). One Application can have multiple Payment rows over
-    time (e.g. a first attempt that expired, then a successful retry) —
-    the latest "completed" one is what counts as paid.
+    """CreatorHub payment ledger.
+
+    Current marketplace payments are platform_fee rows: the business pays
+    CreatorHub's 10% service fee through Khalti. Creator compensation is
+    stored on the contract but is settled directly between the business and
+    creator, outside CreatorHub. Older selection_fee/collaboration rows are
+    retained for backwards compatibility.
     """
     __tablename__ = "payments"
 
@@ -17,9 +19,8 @@ class Payment(Base):
     # Nullable because campaign funding happens before an application exists.
     application_id = Column(Integer, ForeignKey("applications.id"), nullable=True)
     campaign_id = Column(Integer, ForeignKey("campaigns.id"), nullable=True, index=True)
-    # campaign_funding = money secured by the brand for the campaign
-    # creator_payout = release ledger row for an accepted creator
-    # collaboration = legacy/application-level payment
+    # platform_fee = CreatorHub service-fee payment (current flow)
+    # selection_fee / collaboration = legacy payment types
     payment_type = Column(String(30), nullable=False, default="collaboration")
 
     # Our own reference, sent to Khalti as purchase_order_id and used to
@@ -39,7 +40,7 @@ class Payment(Base):
     status = Column(String(20), default="initiated")
     method = Column(String(20), default="khalti")
 
-    # Demo checkout metadata (payer/account/reference). Never store passwords, PINs or OTPs.
+    # Checkout metadata. Never store passwords, PINs or OTPs.
     payment_details = Column(JSON, nullable=True)
 
     initiated_by = Column(Integer, ForeignKey("users.id"), nullable=False)

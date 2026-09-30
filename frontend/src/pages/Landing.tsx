@@ -3171,7 +3171,7 @@ export function Landing() {
               <div className="lp-price-big">10%</div>
               <div className="lp-price-big-label">platform fee</div>
               <p className="lp-price-note">
-                Pay only when you hire a creator.
+                Pay only the 10% service fee when you hire a creator.
               </p>
             </div>
 
@@ -3201,8 +3201,8 @@ export function Landing() {
               </div>
 
               <div className="lp-price-row lp-price-total">
-                <span>Total for brand</span>
-                <strong>NPR 11,000</strong>
+                <span>Paid to CreatorHub</span>
+                <strong>NPR 1,000</strong>
               </div>
             </div>
           </div>

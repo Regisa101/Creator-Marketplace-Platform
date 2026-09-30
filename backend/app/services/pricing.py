@@ -7,15 +7,14 @@ from typing import Optional
 # CREATORHUB PRICING MODEL
 # ============================================================
 #
-# Brands pay a flat 10% platform fee ON TOP of the creator payment,
-# only when they hire a creator. Example:
+# CreatorHub charges the brand a flat 10% service fee when a creator is
+# hired. The fee is the ONLY amount processed through CreatorHub/Khalti.
+# The creator's agreed compensation is recorded in the contract, but the
+# actual creator-to-business payment is handled directly by those parties.
+# Example:
 #
-#     Creator payment ........ NPR 10,000
-#     Platform fee (10%) ..... NPR  1,000
-#     Total for brand ........ NPR 11,000
-#
-# Creators join and apply for free and receive 100% of the amount the
-# campaign / contract specifies.
+#     Creator compensation .... NPR 10,000 (recorded, not processed here)
+#     CreatorHub fee (10%) .... NPR  1,000 (paid to CreatorHub)
 #
 # This mirrors PLATFORM_FEE_RATE in frontend/src/pages/Campaignform.tsx and
 # the public pricing page (frontend/src/pages/Pricing.tsx). Keep them in sync.
@@ -55,14 +54,20 @@ def platform_fee_for(creator_payment: float, rate: Optional[float] = None) -> fl
 
 
 def total_for_brand(creator_payment: float, rate: Optional[float] = None) -> float:
-    """What the brand pays overall: creator payment + platform fee."""
-    return round(float(creator_payment) + platform_fee_for(creator_payment, rate), 2)
+    """Return the CreatorHub fee due from the brand.
+
+    The creator compensation is NOT processed by CreatorHub. This helper is
+    retained for compatibility with older callers, but its result now means
+    the platform fee only.
+    """
+    return platform_fee_for(creator_payment, rate)
 
 
 def split_brand_total(total_charged: float, rate: Optional[float] = None) -> tuple[float, float]:
-    """
-    Reverse of total_for_brand(): given the total the brand was charged
-    (creator payment + fee), return (creator_payment, platform_fee).
+    """Compatibility helper for legacy payment records.
+
+    New CreatorHub payments should never call this because the payment amount
+    is already the 10% service fee and creator payouts are outside the platform.
     """
     rate = PLATFORM_FEE_RATE if rate is None else rate
     creator_payment = round(float(total_charged) / (1 + rate), 2)

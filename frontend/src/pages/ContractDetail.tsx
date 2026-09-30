@@ -23,7 +23,7 @@ import {
   type Contract,
 } from '../api/client';
 import { AppLayout } from '../components/AppLayout';
-import { DemoPaymentForm } from '../components/DemoPaymentForm';
+import { KhaltiPaymentForm } from '../components/KhaltiPaymentForm';
 import { useAuth } from '../context/AuthContext';
 
 const STATUS_LABEL: Record<string, string> = {
@@ -527,10 +527,9 @@ export function ContractDetail() {
 
                   {canPay && (
                     <div style={{ marginTop: 14 }}>
-                      <DemoPaymentForm
+                      <KhaltiPaymentForm
                         contract={contract}
                         onCancel={() => undefined}
-                        onSuccess={(updated: Contract) => setContract(updated)}
                       />
                     </div>
                   )}

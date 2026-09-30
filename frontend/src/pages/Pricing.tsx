@@ -149,8 +149,8 @@ export function Pricing() {
                 </div>
 
                 <div className="pricing-example-row pricing-example-total">
-                  <span>Total for brand</span>
-                  <strong>NPR 11,000</strong>
+                  <span>Paid to CreatorHub</span>
+                  <strong>NPR 1,000</strong>
                 </div>
               </div>
             </div>
