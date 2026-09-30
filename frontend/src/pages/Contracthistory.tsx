@@ -4,7 +4,6 @@ import {
   BriefcaseBusiness,
   CheckCircle2,
   Clock3,
-  Search,
   XCircle,
   FileText,
   UserRound,
@@ -252,6 +251,50 @@ export function ContractHistory() {
     });
   }, [contracts, filter, search]);
 
+  // Tab list + counts (counts respect the search box, like the other pages)
+  const tabList: { key: FilterType; label: string }[] = [
+    { key: 'all', label: 'All collaborations' },
+    { key: 'active', label: 'Active' },
+    { key: 'completed', label: 'Completed' },
+    { key: 'cancelled', label: 'Cancelled' },
+  ];
+
+  const tabCounts = useMemo(() => {
+    const query = search.trim().toLowerCase();
+    const counts: Record<FilterType, number> = {
+      all: 0,
+      active: 0,
+      completed: 0,
+      cancelled: 0,
+      pending_payment: 0,
+    };
+
+    contracts.forEach((contract) => {
+      if (query) {
+        const haystack = [
+          contract.campaign_title,
+          contract.creator_name,
+          contract.business_name,
+          contract.engagement_type,
+          contract.pricing_model,
+          contract.status,
+          String(contract.id),
+        ]
+          .filter(Boolean)
+          .join(' ')
+          .toLowerCase();
+        if (!haystack.includes(query)) return;
+      }
+
+      counts.all += 1;
+      if (contract.status in counts) {
+        counts[contract.status as FilterType] += 1;
+      }
+    });
+
+    return counts;
+  }, [contracts, search]);
+
   const handleComplete = async () => {
     if (!completeModal) return;
 
@@ -288,16 +331,23 @@ export function ContractHistory() {
           ? 'View your contracts, active collaborations and completed work.'
           : 'Manage your active and completed collaborations with creators.'
       }
-      showSearch={false}
+      showNotifications
+      searchValue={search}
+      onSearchChange={setSearch}
+      searchPlaceholder={
+        isCreator
+          ? 'Search by campaign or business'
+          : 'Search by campaign, business or creator'
+      }
     >
       <div className="collab-history-page">
         <style>{`
           .collab-history-page {
             width: 100%;
-            max-width: 1280px;
+            max-width: 1040px;
             margin: 0 auto;
-            padding: 4px 0 60px;
-            color: #111217;
+            padding: 0 0 50px;
+            color: #111;
             font-family: Poppins, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
           }
 
@@ -305,398 +355,233 @@ export function ContractHistory() {
             box-sizing: border-box;
           }
 
-          .ch-top {
-            display: flex;
-            align-items: center;
-            justify-content: flex-end;
-            gap: 24px;
-            margin-bottom: 22px;
-          }
-
-          .ch-search {
-            width: min(430px, 100%);
-            height: 43px;
-            display: flex;
-            align-items: center;
-            gap: 9px;
-            border: 1px solid #e0e3e8;
-            border-radius: 9px;
-            background: #fff;
-            padding: 0 13px;
-          }
-
-          .ch-search svg {
-            color: #858d99;
-            flex-shrink: 0;
-          }
-
-          .ch-search input {
-            width: 100%;
-            border: 0;
-            outline: none;
-            background: transparent;
-            color: #111217;
-            font: 400 12px Poppins, sans-serif;
-          }
-
-          .ch-search input::placeholder {
-            color: #9ba1aa;
-          }
-
-          .ch-tabs {
-            display: flex;
-            align-items: center;
-            gap: 8px;
-            flex-wrap: wrap;
-            margin-bottom: 20px;
-          }
-
-          .ch-tab {
-            height: 38px;
-            padding: 0 17px;
-            border: 1px solid #e0e3e8;
-            border-radius: 8px;
-            background: #fff;
-            color: #444b55;
-            font: 500 11px Poppins, sans-serif;
-            cursor: pointer;
-          }
-
-          .ch-tab:hover {
-            border-color: #111;
-          }
-
-          .ch-tab.active {
-            background: #111;
-            color: #fff;
-            border-color: #111;
-          }
-
-          .ch-list-title {
-            margin: 0 0 13px;
-            font-size: 15px;
-            font-weight: 700;
-          }
-
           .ch-list {
             display: flex;
             flex-direction: column;
-            gap: 10px;
+            gap: 8px;
           }
 
-          /* ---- Collaboration card (redesigned) ---- */
-
           .ch-card {
-            display: flex;
+            position: relative;
+            display: grid;
+            grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr) minmax(0, 1fr) 292px;
+            gap: 16px;
             align-items: center;
-            gap: 22px;
-            min-height: 92px;
-            padding: 16px 20px;
-            border: 1px solid #e4e6ea;
-            border-radius: 11px;
+            padding: 12px 14px;
+            border: 1px solid #e5e5e5;
+            border-radius: 12px;
             background: #fff;
             cursor: pointer;
-            transition: border-color .16s ease, box-shadow .16s ease;
+            transition: border-color .15s ease;
           }
 
           .ch-card:hover {
-            border-color: #c9cdd4;
-            box-shadow: 0 5px 18px rgba(0,0,0,.035);
+            border-color: #cfcfcf;
           }
 
-          /* business */
-
-          .ch-card-business {
-            flex: 1.6 1 0;
-            min-width: 0;
-            display: flex;
-            align-items: flex-start;
-            gap: 12px;
-          }
-
-          .ch-biz-icon {
-            flex-shrink: 0;
-            width: 40px;
-            height: 40px;
-            border-radius: 10px;
-            display: grid;
-            place-items: center;
-            overflow: hidden;
-          }
-
-          .ch-biz-icon img {
-            width: 100%;
-            height: 100%;
-            object-fit: cover;
-          }
-
-          .ch-biz-info {
-            min-width: 0;
-          }
-
-          .ch-biz-name {
-            font-size: 13px;
-            font-weight: 700;
-            color: #111;
-            line-height: 1.3;
-            white-space: nowrap;
-            overflow: hidden;
-            text-overflow: ellipsis;
-          }
-
-          .ch-biz-subtitle {
-            margin-top: 3px;
-            font-size: 11px;
-            color: #6b7078;
-            white-space: nowrap;
-            overflow: hidden;
-            text-overflow: ellipsis;
-          }
-
-          .ch-biz-tag {
-            display: inline-block;
-            margin-top: 8px;
-            padding: 4px 9px;
-            border-radius: 99px;
-            background: #F1EEFC;
-            color: #6B5FBE;
-            font-size: 9.5px;
-            font-weight: 600;
-            white-space: nowrap;
-          }
-
-          /* creator */
-
+          .ch-card-business,
           .ch-card-creator {
-            flex: 1.3 1 0;
-            min-width: 0;
             display: flex;
             align-items: center;
             gap: 10px;
+            min-width: 0;
           }
 
-          .ch-creator-avatar-link {
-            display: inline-flex;
-            flex-shrink: 0;
-            border-radius: 50%;
-          }
-
-          .ch-creator-avatar-link:hover .ch-creator-avatar {
-            outline: 2px solid #d8dbe0;
-          }
-
+          .ch-biz-icon,
           .ch-creator-avatar {
-            width: 40px;
-            height: 40px;
+            width: 36px;
+            height: 36px;
             border-radius: 50%;
-            display: grid;
-            place-items: center;
+            flex: none;
+            display: flex;
+            align-items: center;
+            justify-content: center;
             overflow: hidden;
-            background: #eceef1;
-            color: #555;
-            font-size: 12px;
-            font-weight: 700;
+            background: #111;
+            color: #fff;
+            font: 600 12px Poppins, sans-serif;
           }
 
+          .ch-biz-icon img,
           .ch-creator-avatar img {
             width: 100%;
             height: 100%;
             object-fit: cover;
           }
 
+          .ch-creator-avatar-link {
+            display: flex;
+            text-decoration: none;
+          }
+
+          .ch-creator-avatar-link:hover .ch-creator-avatar {
+            box-shadow: 0 0 0 2px #e5e5e5;
+          }
+
+          .ch-biz-info,
           .ch-creator-info {
             min-width: 0;
           }
 
+          .ch-biz-name,
           .ch-creator-name {
-            font-size: 12.5px;
-            font-weight: 700;
+            font: 600 13px Poppins, sans-serif;
             color: #111;
             white-space: nowrap;
             overflow: hidden;
             text-overflow: ellipsis;
           }
 
+          .ch-biz-subtitle,
           .ch-creator-role {
-            margin-top: 2px;
-            font-size: 10px;
-            color: #838a94;
+            margin-top: 1px;
+            font: 400 11px Poppins, sans-serif;
+            color: #777;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
           }
 
+          .ch-biz-tag,
           .ch-creator-link {
-            display: inline-flex;
-            align-items: center;
-            gap: 4px;
-            margin-top: 5px;
-            color: #5B5FE0;
-            font-size: 10px;
-            font-weight: 500;
-            text-decoration: none;
+            display: none;
           }
-
-          .ch-creator-link:hover {
-            text-decoration: underline;
-          }
-
-          /* meta (period + compensation) */
 
           .ch-card-meta {
-            flex: 1.6 1 0;
-            min-width: 0;
             display: flex;
             flex-direction: column;
-            gap: 10px;
-            border-left: 1px solid #eceef1;
-            padding-left: 18px;
+            gap: 6px;
+            min-width: 0;
           }
 
           .ch-meta-row {
             display: flex;
-            align-items: flex-start;
-            gap: 9px;
+            align-items: center;
+            gap: 7px;
+            min-width: 0;
+            color: #888;
           }
 
           .ch-meta-row svg {
-            flex-shrink: 0;
-            margin-top: 2px;
-            color: #98A1AC;
+            flex: none;
+          }
+
+          .ch-meta-row > div {
+            min-width: 0;
           }
 
           .ch-meta-label {
-            font-size: 9.5px;
-            color: #8992A0;
+            font: 400 10px Poppins, sans-serif;
+            color: #999;
           }
 
           .ch-meta-value {
-            margin-top: 2px;
-            font-size: 11.5px;
-            font-weight: 600;
-            color: #262B33;
+            font: 500 12px Poppins, sans-serif;
+            color: #111;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
           }
-
-          /* actions */
 
           .ch-card-actions {
             position: relative;
-            flex: 0 0 150px;
             display: flex;
-            flex-direction: column;
-            align-items: flex-end;
-            gap: 9px;
+            align-items: center;
+            gap: 10px;
+            justify-content: flex-end;
           }
 
           .ch-card-actions-buttons {
             display: flex;
-            gap: 8px;
-            width: 100%;
+            align-items: center;
+            gap: 6px;
           }
 
           .ch-status {
             display: inline-flex;
             align-items: center;
             justify-content: center;
+            width: 138px;
+            flex: none;
             gap: 5px;
-            padding: 6px 10px;
-            border-radius: 99px;
-            font-size: 9px;
-            font-weight: 600;
+            padding: 4px 10px;
+            border-radius: 999px;
+            background: #f3f3f3;
+            color: #555;
+            font: 500 11px Poppins, sans-serif;
             white-space: nowrap;
           }
 
           .ch-status.active {
-            color: #14753b;
-            background: #e6f7ed;
+            background: #e9f6ee;
+            color: #1e8a4c;
           }
 
           .ch-status.completed {
-            color: #14753b;
-            background: #e6f7ed;
+            background: #e8f0fb;
+            color: #2a5aa5;
           }
 
           .ch-status.cancelled {
-            color: #b33b3b;
-            background: #fdecec;
+            background: #f3f2f4;
+            color: #77717e;
           }
 
           .ch-status.pending_payment,
           .ch-status.draft {
-            color: #8a641b;
-            background: #fff5dd;
-          }
-
-          .ch-view-btn {
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            flex: 1;
-            min-height: 34px;
-            border: 1px solid #cfd4dc;
-            border-radius: 7px;
-            background: #fff;
-            color: #252a31;
-            text-decoration: none;
-            font-size: 9px;
-            font-weight: 600;
-            white-space: nowrap;
-          }
-
-          .ch-view-btn:hover {
-            background: #111;
-            color: #fff;
-            border-color: #111;
-          }
-
-          .ch-more-btn {
-            flex-shrink: 0;
-            width: 34px;
-            min-height: 34px;
-            display: grid;
-            place-items: center;
-            border: 1px solid #cfd4dc;
-            border-radius: 7px;
-            background: #fff;
-            color: #333;
-            cursor: pointer;
-          }
-
-          .ch-more-btn:hover {
-            border-color: #111;
-            color: #111;
+            background: #fff6e5;
+            color: #9a6a08;
           }
 
           .ch-more-menu {
             position: absolute;
-            top: 100%;
+            top: calc(100% + 6px);
             right: 0;
-            margin-top: 6px;
-            width: 170px;
-            border: 1px solid #e2e4e8;
-            border-radius: 9px;
-            background: #fff;
-            box-shadow: 0 12px 28px rgba(0,0,0,.1);
-            overflow: hidden;
             z-index: 20;
+            min-width: 170px;
+            padding: 5px;
+            border: 1px solid #e5e5e5;
+            border-radius: 10px;
+            background: #fff;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, .12);
           }
 
           .ch-more-menu button {
             display: block;
             width: 100%;
-            text-align: left;
-            padding: 10px 13px;
+            padding: 9px 10px;
             border: 0;
-            background: none;
-            font: 600 10px Poppins, sans-serif;
-            color: #222;
+            border-radius: 7px;
+            background: transparent;
+            color: #111;
+            text-align: left;
+            font: 500 12px Poppins, sans-serif;
             cursor: pointer;
           }
 
           .ch-more-menu button:hover:not(:disabled) {
-            background: #f5f5f6;
+            background: #f5f5f5;
           }
 
           .ch-more-menu button:disabled {
             color: #aaa;
             cursor: default;
+          }
+
+          @media (max-width: 900px) {
+            .ch-card {
+              grid-template-columns: minmax(0, 1fr);
+            }
+
+            .ch-card-creator,
+            .ch-card-meta {
+              grid-column: 1 / -1;
+            }
+
+            .ch-card-actions {
+              grid-column: 1 / -1;
+              justify-content: flex-start;
+            }
           }
 
           .ch-empty {
@@ -1142,82 +1027,7 @@ export function ContractHistory() {
             cursor: not-allowed;
           }
 
-          @media (max-width: 900px) {
-            .ch-card {
-              flex-wrap: wrap;
-              row-gap: 14px;
-            }
-
-            .ch-card-business {
-              flex: 1 1 60%;
-            }
-
-            .ch-card-creator {
-              flex: 1 1 35%;
-            }
-
-            .ch-card-meta {
-              flex: 1 1 100%;
-              flex-direction: row;
-              gap: 26px;
-              border-left: 0;
-              padding-left: 0;
-              order: 3;
-            }
-
-            .ch-card-actions {
-              flex: 1 1 100%;
-              flex-direction: row;
-              align-items: center;
-              justify-content: space-between;
-              order: 4;
-            }
-
-            .ch-card-actions-buttons {
-              width: auto;
-              flex: 1;
-              margin-left: 14px;
-            }
-          }
-
-          @media (max-width: 800px) {
-            .ch-top {
-              justify-content: stretch;
-            }
-
-            .ch-search {
-              width: 100%;
-            }
-          }
-
           @media (max-width: 560px) {
-            .ch-card {
-              flex-direction: column;
-              align-items: stretch;
-            }
-
-            .ch-card-business,
-            .ch-card-creator,
-            .ch-card-meta,
-            .ch-card-actions {
-              flex: 1 1 100%;
-            }
-
-            .ch-card-meta {
-              flex-direction: column;
-              gap: 10px;
-            }
-
-            .ch-card-actions {
-              flex-direction: column;
-              align-items: stretch;
-            }
-
-            .ch-card-actions-buttons {
-              width: 100%;
-              margin-left: 0;
-            }
-
             .ch-detail-row {
               grid-template-columns: 20px 1fr;
             }
@@ -1230,65 +1040,23 @@ export function ContractHistory() {
           }
         `}</style>
 
-        <div className="ch-top">
-          <div className="ch-search">
-            <Search size={16} />
-
-            <input
-              value={search}
-              onChange={(event) => setSearch(event.target.value)}
-              placeholder={
-                isCreator
-                  ? 'Search by campaign or business...'
-                  : 'Search by campaign, business or creator...'
-              }
-            />
+        {!loading && contracts.length > 0 && (
+          <div className="tab-row" role="tablist" aria-label="Collaboration status">
+            {tabList.map((item) => (
+              <button
+                key={item.key}
+                type="button"
+                role="tab"
+                aria-selected={filter === item.key}
+                className={`tab-pill ${filter === item.key ? 'active' : ''}`}
+                onClick={() => setFilter(item.key)}
+              >
+                {item.label}
+                <span className="tab-count">{tabCounts[item.key]}</span>
+              </button>
+            ))}
           </div>
-        </div>
-
-        <div className="ch-tabs">
-          <button
-            type="button"
-            className={`ch-tab ${filter === 'all' ? 'active' : ''}`}
-            onClick={() => setFilter('all')}
-          >
-            All
-          </button>
-
-          <button
-            type="button"
-            className={`ch-tab ${filter === 'active' ? 'active' : ''}`}
-            onClick={() => setFilter('active')}
-          >
-            Active
-          </button>
-
-          <button
-            type="button"
-            className={`ch-tab ${filter === 'completed' ? 'active' : ''}`}
-            onClick={() => setFilter('completed')}
-          >
-            Completed
-          </button>
-
-          <button
-            type="button"
-            className={`ch-tab ${filter === 'cancelled' ? 'active' : ''}`}
-            onClick={() => setFilter('cancelled')}
-          >
-            Cancelled
-          </button>
-
-          {isBusiness && (
-            <button
-              type="button"
-              className={`ch-tab ${filter === 'pending_payment' ? 'active' : ''}`}
-              onClick={() => setFilter('pending_payment')}
-            >
-              Pending Payment
-            </button>
-          )}
-        </div>
+        )}
 
         {error && <div className="ch-error">{error}</div>}
 
@@ -1296,17 +1064,21 @@ export function ContractHistory() {
           <div className="ch-loading">Loading collaboration history…</div>
         ) : (
           <section>
-            <h2 className="ch-list-title">
-              {filter === 'all'
-                ? 'Past & Current Collaborations'
-                : `${statusLabel(filter)} Collaborations`}
-            </h2>
-
             {filteredContracts.length === 0 ? (
               <div className="ch-empty">
                 <BriefcaseBusiness size={28} strokeWidth={1.4} />
-                <h3>No collaborations found</h3>
-                <p>Try another search or filter.</p>
+                <h3>
+                  {search.trim()
+                    ? 'No collaborations match your search'
+                    : filter === 'all'
+                      ? 'No collaborations yet'
+                      : `No ${statusLabel(filter).toLowerCase()} collaborations`}
+                </h3>
+                <p>
+                  {search.trim()
+                    ? 'Try changing your search.'
+                    : 'They will show up here once they start.'}
+                </p>
               </div>
             ) : (
               <div className="ch-list">
@@ -1491,15 +1263,15 @@ function CollaborationCard({
         <div className="ch-card-actions-buttons">
           <Link
             to={`/contracts/${contract.id}`}
-            className="ch-view-btn"
+            className="btn btn-secondary btn-sm"
             onClick={(event) => event.stopPropagation()}
           >
-            View Details
+            View details
           </Link>
 
           <button
             type="button"
-            className="ch-more-btn"
+            className="btn btn-ghost btn-sm btn-icon"
             onClick={(event) => {
               event.stopPropagation();
               onToggleMenu();
@@ -1681,15 +1453,17 @@ function CollaborationDetail({
 
         <DetailRow
           icon={<CircleDollarSign size={15} />}
-          label="Total contract value"
+          label={isCreator ? 'Total you will receive' : 'Total contract value'}
           value={money(contract.total_value)}
         />
 
-        <DetailRow
-          icon={<ShieldCheck size={15} />}
-          label="CreatorHub service fee (10%)"
-          value={money(contract.platform_fee_amount)}
-        />
+        {!isCreator && (
+          <DetailRow
+            icon={<ShieldCheck size={15} />}
+            label="CreatorHub service fee (10%)"
+            value={money(contract.platform_fee_amount)}
+          />
+        )}
 
         <div className="ch-detail-divider" />
 
@@ -1716,25 +1490,34 @@ function CollaborationDetail({
             Payment details
           </div>
 
-          <div className="ch-payment-note">
-            <strong>Creator payment</strong>
-            Creator compensation is handled directly between the business and
-            creator.
-            <br />
-            CreatorHub processes only the platform service fee.
-            <br />
-            <br />
-            <strong>Platform fee</strong>
-            {money(contract.platform_fee_amount)}
-            <br />
-            Status: {contract.fee_paid ? 'Paid' : 'Pending'}
-            {contract.payment_reference && (
-              <>
-                <br />
-                Receipt: {contract.payment_reference}
-              </>
-            )}
-          </div>
+          {isCreator ? (
+            <div className="ch-payment-note">
+              <strong>Your compensation</strong>
+              {contract.total_value ? money(contract.total_value) : 'Not finalized yet'}
+              <br />
+              Compensation is arranged directly between you and the business.
+            </div>
+          ) : (
+            <div className="ch-payment-note">
+              <strong>Creator payment</strong>
+              Creator compensation is handled directly between the business and
+              creator.
+              <br />
+              CreatorHub processes only the platform service fee.
+              <br />
+              <br />
+              <strong>Platform fee</strong>
+              {money(contract.platform_fee_amount)}
+              <br />
+              Status: {contract.fee_paid ? 'Paid' : 'Pending'}
+              {contract.payment_reference && (
+                <>
+                  <br />
+                  Receipt: {contract.payment_reference}
+                </>
+              )}
+            </div>
+          )}
         </div>
 
         {isBusiness && contract.status === 'active' && (
@@ -1819,8 +1602,8 @@ function CollaborationDetail({
 
             <Link
               to={`/contracts/${contract.id}`}
-              className="ch-view-btn"
-              style={{ marginTop: 12 }}
+              className="btn btn-primary"
+              style={{ marginTop: 12, width: '100%' }}
             >
               Open Contract & Pay
             </Link>
@@ -1829,8 +1612,8 @@ function CollaborationDetail({
 
         <Link
           to={`/contracts/${contract.id}`}
-          className="ch-view-btn"
-          style={{ marginTop: 14, minHeight: 38 }}
+          className="btn btn-secondary"
+          style={{ marginTop: 14, width: '100%' }}
         >
           <FileText size={13} style={{ marginRight: 6 }} />
           View Full Contract Record

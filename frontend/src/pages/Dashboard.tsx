@@ -177,7 +177,7 @@ export function Dashboard() {
   // "Welcome, {firstName}" title — not in the page body — so it lines up
   // with the title instead of floating below it.
   const headerActions = (
-    <Link className="brand-btn primary" to="/campaigns/new">
+    <Link className="btn btn-primary" to="/campaigns/new">
       <Plus size={14} />
       Create campaign
     </Link>
@@ -198,19 +198,17 @@ export function Dashboard() {
          * the search box, settings/bell icons, and avatar above it.
          */
         .brand-home{max-width:1180px;margin:0;padding:18px 24px 54px;color:#17151d;background:#ffffff;font-family:'Poppins',sans-serif;font-weight:400}
-        .brand-btn{height:36px;padding:0 15px;border-radius:9px;border:1px solid #ddd9e3;background:#fff;color:#27232f;font-size:13px;font-weight:500;text-decoration:none;display:inline-flex;align-items:center;gap:7px;cursor:pointer;white-space:nowrap}
-        .brand-btn.primary{background:#111;color:#fff;border-color:#111}
         .brand-error{margin:0 0 14px;padding:10px 12px;border:1px solid #ead7d7;background:#fff8f8;border-radius:9px;color:#9b4545;font-size:12px}
         .brand-empty{padding:28px 14px;text-align:center;background:#ffffff;border-radius:9px;color:#8d8792;font-size:12px}
 
         /* =================================================
-           OVERVIEW — flat stat row, no card box
+           OVERVIEW — clickable stat cards
            ================================================= */
 
-        .overview-row{display:flex;flex-wrap:wrap;margin:0 0 24px;padding:18px 0;background:#ffffff;border-top:1px solid #e4e1d9;border-bottom:1px solid #e4e1d9}
-        .overview-item{flex:1;min-width:120px;padding:0 20px;border-left:1px solid #e4e1d9;display:block;text-decoration:none;color:inherit;background:transparent;border-top:0;border-right:0;border-bottom:0;text-align:left;cursor:pointer;border-radius:6px;transition:background .12s ease}
-        .overview-item:first-child{border-left:0;padding-left:0}
-        .overview-item:hover{background:rgba(0,0,0,.035)}
+        .overview-row{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;margin:0 0 28px;padding:0;background:#fff}
+        .overview-item{display:block;padding:16px 18px;border:1px solid #e5e5e5;border-radius:12px;background:#fff;text-decoration:none;color:inherit;text-align:left;cursor:pointer;transition:border-color .15s ease,box-shadow .15s ease,background-color .15s ease}
+        .overview-item:hover{border-color:#111;box-shadow:0 2px 8px rgba(0,0,0,.06)}
+        .overview-item:focus-visible{outline:2px solid #111;outline-offset:2px}
         .overview-value{font-family:'League Spartan',sans-serif;font-size:28px;font-weight:400;letter-spacing:-0.02em;color:#111;line-height:1.1}
         .overview-label{font-size:12px;color:#6b6b6b;margin-top:6px;font-weight:400}
 
@@ -220,9 +218,10 @@ export function Dashboard() {
 
         .campaigns-section{background:#ffffff;padding:8px 0 0}
         .campaigns-heading{font-family:'League Spartan',sans-serif;font-size:24px;font-weight:400;letter-spacing:-0.02em;margin:0 0 16px;color:#111}
-        .campaigns-tabs{display:flex;gap:20px;border-bottom:1px solid #e4e1d9;margin-bottom:0}
-        .campaigns-tabs .campaigns-tab{background:transparent;border:0;padding:0 0 9px;font-size:13px;font-weight:400;color:#6b6b6b;cursor:pointer;border-bottom:1.5px solid transparent}
-        .campaigns-tabs .campaigns-tab.active{color:#111111;font-weight:500;border-bottom-color:#111111}
+        .campaigns-tabs{display:flex;gap:8px;margin:0 0 8px}
+        .campaigns-tabs .campaigns-tab{height:32px;padding:0 14px;border:1px solid #dedede;border-radius:999px;background:#fff;color:#111;font:500 12.5px 'Poppins',sans-serif;cursor:pointer;transition:background-color .15s ease,border-color .15s ease}
+        .campaigns-tabs .campaigns-tab:hover{background:#f5f5f5;border-color:#c4c4c4}
+        .campaigns-tabs .campaigns-tab.active{background:#111;color:#fff;border-color:#111}
         .campaigns-row{display:grid;grid-template-columns:minmax(0,1.7fr) 110px 120px 100px 28px;gap:12px;align-items:center;padding:18px 0;border-top:1px solid #e4e1d9;text-decoration:none;color:inherit}
         .campaigns-row:first-of-type{border-top:0}
         .campaigns-row:hover{background:rgba(0,0,0,.02)}
@@ -238,7 +237,8 @@ export function Dashboard() {
         .campaign-arrow{color:#a29cae;display:flex;align-items:center;justify-content:center}
 
         @media(max-width:720px){.campaigns-row{grid-template-columns:minmax(0,1fr) 28px}.campaigns-row>.campaign-col{display:none}}
-        @media(max-width:560px){.brand-home{padding:14px 16px 40px}.overview-item{min-width:45%;border-left:0;margin-bottom:14px}}
+        @media(max-width:760px){.overview-row{grid-template-columns:repeat(2,minmax(0,1fr))}}
+        @media(max-width:560px){.brand-home{padding:14px 16px 40px}}
 
         /* =================================================
            APPLICATIONS — plain text section, no box
@@ -246,9 +246,6 @@ export function Dashboard() {
 
         .applications-section{margin-top:26px;padding-top:22px;border-top:1px solid #e4e1d9}
         .applications-heading{font-family:'League Spartan',sans-serif;font-size:24px;font-weight:400;letter-spacing:-0.02em;margin:0 0 8px;color:#111}
-        .applications-review{display:inline-flex;align-items:center;gap:6px;font-size:13px;color:#5b5564;text-decoration:none}
-        .applications-review:hover{color:#17151d}
-        .applications-review .review-arrow{display:inline-flex;align-items:center}
       `}</style>
 
       <main className="brand-home">
@@ -271,7 +268,7 @@ export function Dashboard() {
             <div className="overview-value">{loading ? '—' : inProgressCount}</div>
             <div className="overview-label">In Progress</div>
           </Link>
-          <Link className="overview-item" to="/workspace/history">
+          <Link className="overview-item" to="/collab-history">
             <div className="overview-value">{loading ? '—' : money(totalSpent)}</div>
             <div className="overview-label">Total Spent</div>
           </Link>
@@ -372,7 +369,7 @@ export function Dashboard() {
         */}
         <section className="applications-section" aria-label="Applications">
           <h2 className="applications-heading">Applications</h2>
-          <Link className="applications-review" to="/applications">
+          <Link className="btn btn-secondary" to="/applications">
             {loading ? '—' : pendingCount} application{pendingCount === 1 ? '' : 's'} to review
             <span className="review-arrow">
               <ArrowRight size={13} />

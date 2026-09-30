@@ -25,6 +25,9 @@ class Application(Base):
     application_answers = Column(JSON, nullable=True)
     selected_portfolio = Column(JSON, nullable=True)
 
+    # Creator's Instagram / TikTok / Facebook profile link (required on new applications).
+    social_link = Column(String(500), nullable=True)
+
     # Optional collaboration-specific deadline. If blank, the campaign
     # deliverable deadline is used.
     deliverable_deadline = Column(DateTime(timezone=True), nullable=True)

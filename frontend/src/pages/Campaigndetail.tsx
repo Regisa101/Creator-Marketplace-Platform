@@ -146,6 +146,7 @@ export function CampaignDetail() {
 
   const [ownerApplications, setOwnerApplications] = useState<Application[]>([]);
   const [ownerApplicationsLoaded, setOwnerApplicationsLoaded] = useState(false);
+  const [ownerApplicationsFailed, setOwnerApplicationsFailed] = useState(false);
   const [showExtend, setShowExtend] = useState(false);
   const [extensionDate, setExtensionDate] = useState('');
   const [extending, setExtending] = useState(false);
@@ -174,6 +175,39 @@ export function CampaignDetail() {
       ownerApplicationsLoaded &&
       !hasAcceptedCreator,
   );
+
+  // Say the REAL reason the deadline can or can't be extended, instead of
+  // always claiming "a creator was already selected".
+  const acceptedCount = ownerApplications.filter(
+    (a) => a.status === 'accepted' || a.status === 'completed',
+  ).length;
+
+  let deadlineNoticeText = '';
+  if (campaign?.status === 'draft') {
+    deadlineNoticeText =
+      'This deadline is in the past. Edit the campaign and choose a new deadline before publishing.';
+  } else if (
+    campaign?.status === 'closed' ||
+    campaign?.status === 'completed' ||
+    campaign?.status === 'cancelled'
+  ) {
+    deadlineNoticeText = `This campaign is ${campaign.status}, so its deadline can no longer be extended.`;
+  } else if (ownerApplicationsFailed) {
+    deadlineNoticeText = 'Could not check applications. Refresh the page to try again.';
+  } else if (!ownerApplicationsLoaded) {
+    deadlineNoticeText = 'Checking applications...';
+  } else if (canExtendCampaign) {
+    deadlineNoticeText =
+      'No creator has been selected yet. Extend the deadline to keep accepting applicants, or delete the campaign.';
+  } else if (hasAcceptedCreator) {
+    const needed = Number(campaign?.creators_needed || 1);
+    deadlineNoticeText =
+      acceptedCount < needed
+        ? `${acceptedCount} of ${needed} creators selected. The campaign is already in progress, so the deadline can't be extended.`
+        : 'A creator was already selected for this campaign.';
+  } else {
+    deadlineNoticeText = 'This campaign is already in progress.';
+  }
 
   useEffect(() => {
     if (!id) return;
@@ -204,6 +238,7 @@ export function CampaignDetail() {
         }
 
         setOwnerApplicationsLoaded(false);
+        setOwnerApplicationsFailed(false);
         setOwnerApplications([]);
 
         if (user?.role === 'business' && data.business_id === user.id) {
@@ -219,6 +254,7 @@ export function CampaignDetail() {
             // that the campaign has no applications.
             if (!cancelled) {
               setOwnerApplicationsLoaded(false);
+              setOwnerApplicationsFailed(true);
             }
           }
         }
@@ -547,23 +583,29 @@ export function CampaignDetail() {
                 ) : null}
               </div>
             )}
-
-            {isOwner && deadlinePassed && (
-              <div className="cd-deadline-notice">
-                <CalendarDays size={15} />
-                <div>
-                  <strong>Application deadline has passed</strong>
-                  <span>
-                    {canExtendCampaign
-                      ? 'No creator has been selected yet. Extend the deadline to keep accepting applicants, or delete the campaign.'
-                      : ownerApplicationsLoaded
-                        ? 'A creator was already selected for this campaign.'
-                        : 'Checking applications...'}
-                  </span>
-                </div>
-              </div>
-            )}
           </div>
+
+          {isOwner && deadlinePassed && (
+            <div className="cd-deadline-notice" role="status">
+              <CalendarDays size={16} />
+              <div className="cd-deadline-notice-text">
+                <strong>Application deadline has passed</strong>
+                <span>{deadlineNoticeText}</span>
+              </div>
+
+              {canExtendCampaign && (
+                <button
+                  type="button"
+                  className="btn btn-primary btn-sm"
+                  onClick={openExtensionModal}
+                  disabled={!!manageAction}
+                >
+                  <CalendarDays size={14} />
+                  Extend deadline
+                </button>
+              )}
+            </div>
+          )}
 
           {isOwner && (
             <div className="cd-owner-actions">
@@ -574,17 +616,6 @@ export function CampaignDetail() {
                   disabled={!!manageAction}
                 >
                   {manageAction === 'publish' ? 'Publishing...' : 'Publish'}
-                </button>
-              )}
-
-              {canExtendCampaign && (
-                <button
-                  className="cd-dark cd-extend-owner-button"
-                  onClick={openExtensionModal}
-                  disabled={!!manageAction}
-                >
-                  <CalendarDays size={14} />
-                  Extend deadline
                 </button>
               )}
 
@@ -970,7 +1001,8 @@ const STYLE = `
   position:relative;
   display:grid;
   grid-template-columns:minmax(0,1fr) auto;
-  gap:28px;
+  column-gap:28px;
+  row-gap:16px;
   padding:14px 0 25px;
   border-bottom:1px solid #dedbd4;
   margin-bottom:0;
@@ -1110,17 +1142,19 @@ const STYLE = `
 .cd-deadline-notice{
   grid-column:1 / -1;
   display:flex;
-  align-items:flex-start;
-  gap:8px;
-  margin-top:2px;
-  padding:10px 11px;
-  border:1px solid #e1ded7;
-  border-radius:7px;
-  color:#555;
+  align-items:center;
+  gap:12px;
+  padding:14px 16px;
+  border:1px solid #e6dfcf;
+  border-radius:10px;
+  background:#faf8f2;
+  color:#444;
 }
-.cd-deadline-notice>svg{flex:none;margin-top:1px}
-.cd-deadline-notice strong{display:block;font-size:10.5px;font-weight:600}
-.cd-deadline-notice span{display:block;margin-top:3px;color:#888;font-size:9px;line-height:1.45}
+.cd-deadline-notice>svg{flex:none;color:#8a7a4a}
+.cd-deadline-notice-text{flex:1;min-width:0}
+.cd-deadline-notice strong{display:block;font-size:13px;font-weight:600;color:#222}
+.cd-deadline-notice span{display:block;margin-top:3px;color:#666;font-size:12px;line-height:1.5}
+.cd-deadline-notice .btn{flex:none}
 
 /* EXACT TWO-COLUMN CONTENT STRUCTURE */
 .cd-layout{
@@ -1355,6 +1389,8 @@ const STYLE = `
   .cd-header-apply{padding-top:0}
   .cd-apply--header{width:100%}
   .cd-owner-actions{justify-content:flex-start}
+  .cd-deadline-notice{flex-wrap:wrap}
+  .cd-deadline-notice .btn{width:100%}
   .cd-layout{grid-template-columns:1fr;column-gap:0}
   .cd-column .cd-section:last-child{border-bottom:1px solid #e3e0d9}
   .cd-column:last-child .cd-section:last-child{border-bottom:0}

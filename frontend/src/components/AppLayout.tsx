@@ -528,20 +528,16 @@ export function AppLayout({
           box-sizing: border-box;
         }
 
-        /* Some browsers (notably Safari/WebKit in dark mode) draw native
-           system chrome behind buttons — a dark pill shape that a plain
-           background: transparent alone doesn't fully remove. Strip that
-           native appearance so every button only ever shows the
-           background we actually set. */
-        .app-layout button {
-          appearance: none !important;
-          -webkit-appearance: none !important;
-          -moz-appearance: none !important;
-          background-color: transparent !important;
-          color: inherit !important;
-          border: 0 !important;
+        /* Only strip the native OS look. Colors, borders and backgrounds
+           are NOT forced here any more (the old rule used !important and
+           turned every real button into plain text). :where() keeps this
+           at zero specificity so each button's own class controls its look. */
+        :where(.app-layout) button {
+          appearance: none;
+          -webkit-appearance: none;
+          -moz-appearance: none;
           margin: 0;
-          font: inherit;
+          font-family: inherit;
           -webkit-tap-highlight-color: transparent;
         }
 
@@ -1458,11 +1454,16 @@ export function AppLayout({
           })}
 
           <Link
-            to="/workspace/history"
-            className={`app-nav-link ${isRouteActive(location.pathname, "/workspace/history") ? "active" : ""}`}
+            to={role === "creator" ? "/contracts" : "/collab-history"}
+            className={`app-nav-link ${
+              isRouteActive(location.pathname, "/contracts") ||
+              isRouteActive(location.pathname, "/collab-history")
+                ? "active"
+                : ""
+            }`}
           >
             <Briefcase size={17} className="shrink-0" />
-            <span>Collab History</span>
+            <span>{role === "creator" ? "Contract History" : "Collab History"}</span>
           </Link>
         </nav>
 
@@ -1638,7 +1639,7 @@ export function AppLayout({
               {actionLabel &&
                 actionTo && (
                   <Link
-                    className="app-action"
+                    className="btn btn-primary"
                     to={actionTo}
                   >
                     <Plus size={15} />

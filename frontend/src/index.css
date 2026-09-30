@@ -33,17 +33,86 @@ section,
   color: #111111;
 }
 
-/* Global monochrome design system */
-button:not(:disabled) {
-  background-color: #111111;
-  color: #ffffff;
-  border-color: #111111;
+/* =====================================================================
+   BUTTON SYSTEM  (single source of truth - use these everywhere)
+   .btn            base shape shared by every button
+   .btn-primary    main action        (black, white text)
+   .btn-secondary  secondary action   (white, bordered)
+   .btn-ghost      quiet action       (no border until hover)
+   .btn-sm / .btn-icon   size modifiers
+   Works on <button> AND <Link>/<a>.
+   ===================================================================== */
+:root {
+  --btn-ink: #111111;
+  --btn-line: #dedede;
+  --btn-soft: #f5f5f5;
+  --btn-radius: 8px;
 }
 
-button:not(:disabled):hover {
-  background-color: #000000;
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  height: 36px;
+  padding: 0 14px;
+  border: 1px solid transparent;
+  border-radius: var(--btn-radius);
+  font: 500 13px/1 'Poppins', -apple-system, sans-serif;
+  text-decoration: none;
+  white-space: nowrap;
+  cursor: pointer;
+  user-select: none;
+  transition: background-color .15s ease, border-color .15s ease, color .15s ease, box-shadow .15s ease;
+}
+.btn:focus-visible { outline: 2px solid var(--btn-ink); outline-offset: 2px; }
+.btn:disabled,
+.btn[aria-disabled='true'] { opacity: .45; cursor: not-allowed; pointer-events: none; }
+
+.btn-primary { background: var(--btn-ink); color: #fff; border-color: var(--btn-ink); }
+.btn-primary:hover { background: #000; color: #fff; border-color: #000; }
+
+.btn-secondary { background: #fff; color: var(--btn-ink); border-color: var(--btn-line); }
+.btn-secondary:hover { background: var(--btn-soft); color: var(--btn-ink); border-color: #c4c4c4; }
+
+.btn-ghost { background: transparent; color: var(--btn-ink); }
+.btn-ghost:hover { background: var(--btn-soft); color: var(--btn-ink); }
+
+.btn-sm { height: 30px; padding: 0 11px; font-size: 12px; }
+.btn-icon { width: 36px; padding: 0; }
+
+/* Shared status tabs (pill buttons with a count) - used on My campaigns,
+   Applications, etc. */
+.tab-row { display:flex; gap:8px; flex-wrap:wrap; margin:0 0 18px; }
+.tab-pill {
+  display:inline-flex; align-items:center; gap:8px; height:34px; padding:0 14px;
+  border:1px solid var(--btn-line); border-radius:999px; background:#fff; color:var(--btn-ink);
+  font:500 12.5px 'Poppins',sans-serif; cursor:pointer;
+  transition:background-color .15s ease, border-color .15s ease, color .15s ease;
+}
+.tab-pill:hover { background:var(--btn-soft); border-color:#c4c4c4; }
+.tab-pill.active { background:var(--btn-ink); color:#fff; border-color:var(--btn-ink); }
+.tab-count {
+  min-width:20px; height:18px; padding:0 6px; display:inline-flex; align-items:center; justify-content:center;
+  border-radius:999px; background:#f0f0f0; color:#555; font-size:10.5px; font-weight:600;
+}
+.tab-pill.active .tab-count { background:rgba(255,255,255,.2); color:#fff; }
+@media (max-width:640px) {
+  .tab-row { flex-wrap:nowrap; overflow-x:auto; padding-bottom:4px; }
+  .tab-pill { flex:0 0 auto; }
+}
+
+/* Safety net only: a <button> with NO class at all still looks like a
+   button. :where() gives it zero specificity, so any class (.btn, or a
+   page's own class) always wins. This replaces the old global
+   `button:not(:disabled)` rule, which beat every page's own styles. */
+:where(button:not([class]):not(:disabled)) {
+  background-color: #111111;
   color: #ffffff;
-  border-color: #000000;
+  border: 1px solid #111111;
+  border-radius: var(--btn-radius);
+  padding: 8px 14px;
+  cursor: pointer;
 }
 
 /* Keep form controls and links monochrome instead of purple/pink accents. */

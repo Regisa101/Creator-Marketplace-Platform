@@ -130,6 +130,7 @@ def _response(contract: Contract) -> ContractResponse:
         campaign_title=contract.campaign.title if contract.campaign else None,
         creator_name=_name(contract.creator),
         business_name=_name(contract.business),
+        evidence_snapshot=_build_snapshot(contract),
     )
 
 

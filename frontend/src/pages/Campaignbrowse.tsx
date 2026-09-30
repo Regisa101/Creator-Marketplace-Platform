@@ -22,14 +22,38 @@ import { useAuth } from '../context/AuthContext';
 import { AppLayout } from '../components/AppLayout';
 import { Campaigns } from './Campaigns';
 
-const STATUSES = [
-  'draft',
-  'published',
-  'in_progress',
-  'completed',
-  'cancelled',
-  'closed',
+type CampaignTabKey = 'all' | 'current' | 'draft' | 'completed' | 'closed';
+
+const TABS: { key: CampaignTabKey; label: string }[] = [
+  { key: 'all', label: 'All campaigns' },
+  { key: 'current', label: 'Current' },
+  { key: 'draft', label: 'Drafts' },
+  { key: 'completed', label: 'Completed' },
+  { key: 'closed', label: 'Closed' },
 ];
+
+// Which tab a campaign belongs to, based on its status.
+// current   = published + in_progress
+// closed    = closed + cancelled
+function tabOf(status?: string | null): CampaignTabKey {
+  switch (status) {
+    case 'published':
+    case 'in_progress':
+      return 'current';
+    case 'draft':
+      return 'draft';
+    case 'completed':
+      return 'completed';
+    case 'closed':
+    case 'cancelled':
+      return 'closed';
+    default:
+      return 'all';
+  }
+}
+
+const BUSINESS_PAGE_SIZE = 12;
+
 
 function formatBudget(campaign: Campaign) {
   const min = campaign.budget_min;
@@ -82,12 +106,10 @@ export function CampaignBrowse() {
 
   // /campaigns?source=landing is the public/outer campaign marketplace.
   // Plain /campaigns is intentionally kept for the authenticated dashboard.
-  if (searchParams.get('source') === 'landing') {
-    return <Campaigns />;
-  }
+  const isLanding = searchParams.get('source') === 'landing';
   const isBusiness = user?.role === 'business';
 
-  const [campaigns, setCampaigns] = useState<Campaign[]>([]);
+  const [fetched, setFetched] = useState<Campaign[]>([]);
   const [total, setTotal] = useState(0);
   const [pages, setPages] = useState(1);
   const [page, setPage] = useState(1);
@@ -98,12 +120,17 @@ export function CampaignBrowse() {
   const [searchInput, setSearchInput] = useState('');
   const [search, setSearch] = useState('');
 
-  const [status, setStatus] = useState('');
+  const [tab, setTab] = useState<CampaignTabKey>('all');
 
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
 
+  // Only creators refetch when the page changes; business paging is local.
+  const creatorPage = isBusiness ? 0 : page;
+
   useEffect(() => {
+    if (isLanding) return;
+
     let cancelled = false;
 
     const loadCampaigns = async () => {
@@ -111,51 +138,48 @@ export function CampaignBrowse() {
       setError('');
 
       try {
-        const params: CampaignListParams = {
-          page,
-          limit: 12,
-        };
+        if (isBusiness) {
+          // Businesses: load ALL of their campaigns (the API allows 50 per
+          // page) so the tabs can show counts and switch instantly.
+          let all: Campaign[] = [];
+          let pageNo = 1;
+          let lastPage = 1;
 
-        if (search) {
-          params.search = search;
+          do {
+            const params: CampaignListParams = { page: pageNo, limit: 50 };
+            if (search) params.search = search;
+
+            const data = await getCampaigns(params);
+            all = all.concat(data.campaigns);
+            lastPage = Math.max(1, data.pages ?? 1);
+            pageNo += 1;
+          } while (pageNo <= lastPage && pageNo <= 20);
+
+          if (cancelled) return;
+          setFetched(all);
+          return;
         }
 
-        if (isBusiness && status) {
-          params.status = status;
-        }
+        // Creators: unchanged public marketplace flow.
+        const params: CampaignListParams = { page: creatorPage, limit: 12 };
+        if (search) params.search = search;
 
-        const data = isBusiness
-          ? await getCampaigns(params)
-          : await getPublicCampaigns(params);
-
+        const data = await getPublicCampaigns(params);
         if (cancelled) return;
 
-        let visibleCampaigns = data.campaigns;
+        // Creators should never see internal states (draft, cancelled, closed).
+        const visibleCampaigns = data.campaigns.filter(
+          (campaign) =>
+            campaign.status === 'published' ||
+            campaign.status === 'in_progress'
+        );
 
-        /*
-         * Creators should never see internal campaign states such as
-         * draft, cancelled, or closed.
-         *
-         * Public campaigns are still allowed to be:
-         * published
-         * in_progress
-         */
-        if (!isBusiness) {
-          visibleCampaigns = data.campaigns.filter(
-            (campaign) =>
-              campaign.status === 'published' ||
-              campaign.status === 'in_progress'
-          );
-        }
-
-        setCampaigns(visibleCampaigns);
+        setFetched(visibleCampaigns);
         setTotal(data.total ?? visibleCampaigns.length);
         setPages(Math.max(1, data.pages ?? 1));
-      } catch (err) {
+      } catch {
         if (!cancelled) {
-          setError(
-            'Could not load campaigns. Please try again.'
-          );
+          setError('Could not load campaigns. Please try again.');
         }
       } finally {
         if (!cancelled) {
@@ -169,7 +193,8 @@ export function CampaignBrowse() {
     return () => {
       cancelled = true;
     };
-  }, [page, search, status, isBusiness]);
+    // Business list is fetched once per search; paging/tabs work locally.
+  }, [isLanding, isBusiness, search, creatorPage]);
 
   function handleTopbarSearchChange(value: string) {
     setSearchInput(value);
@@ -177,8 +202,40 @@ export function CampaignBrowse() {
     setPage(1);
   }
 
+  // ---- Business tabs: counts, filtered list, local pagination ----
+  const tabCounts: Record<CampaignTabKey, number> = {
+    all: fetched.length,
+    current: 0,
+    draft: 0,
+    completed: 0,
+    closed: 0,
+  };
+  fetched.forEach((c) => {
+    const key = tabOf(c.status);
+    if (key !== 'all') tabCounts[key] += 1;
+  });
+
+  const tabCampaigns = isBusiness
+    ? fetched.filter((c) => tab === 'all' || tabOf(c.status) === tab)
+    : fetched;
+
+  const pageCount = isBusiness
+    ? Math.max(1, Math.ceil(tabCampaigns.length / BUSINESS_PAGE_SIZE))
+    : pages;
+
+  const campaigns = isBusiness
+    ? tabCampaigns.slice(
+        (page - 1) * BUSINESS_PAGE_SIZE,
+        page * BUSINESS_PAGE_SIZE
+      )
+    : fetched;
+
+  if (isLanding) {
+    return <Campaigns />;
+  }
+
   const subtitleText = isBusiness
-    ? `${total} campaign${total === 1 ? '' : 's'} posted`
+    ? `${fetched.length} campaign${fetched.length === 1 ? '' : 's'} posted`
     : `${total} paid campaign${total === 1 ? '' : 's'} available for creators`;
 
   // Status filter (business only) now sits directly beside the
@@ -188,26 +245,7 @@ export function CampaignBrowse() {
   const headerActions = (
     <div className="cb-header-actions">
       {isBusiness && (
-        <select
-          className="cb-status-select"
-          value={status}
-          onChange={(e) => {
-            setStatus(e.target.value);
-            setPage(1);
-          }}
-        >
-          <option value="">All statuses</option>
-
-          {STATUSES.map((item) => (
-            <option key={item} value={item}>
-              {formatStatus(item)}
-            </option>
-          ))}
-        </select>
-      )}
-
-      {isBusiness && (
-        <Link className="cb-primary" to="/campaigns/new">
+        <Link className="btn btn-primary" to="/campaigns/new">
           <Plus size={16} />
           Create campaign
         </Link>
@@ -231,6 +269,28 @@ export function CampaignBrowse() {
     >
       <main className="cb-page">
         <div className="cb-shell">
+
+          {/* TABS (business only) */}
+          {isBusiness && !error && (
+            <div className="cb-tabs" role="tablist" aria-label="Campaign status">
+              {TABS.map((item) => (
+                <button
+                  key={item.key}
+                  type="button"
+                  role="tab"
+                  aria-selected={tab === item.key}
+                  className={`cb-tab ${tab === item.key ? 'active' : ''}`}
+                  onClick={() => {
+                    setTab(item.key);
+                    setPage(1);
+                  }}
+                >
+                  {item.label}
+                  <span className="cb-tab-count">{tabCounts[item.key]}</span>
+                </button>
+              ))}
+            </div>
+          )}
 
           {/* LOADING */}
           {loading && (
@@ -257,16 +317,18 @@ export function CampaignBrowse() {
                 </div>
 
                 <strong>
-                  {search || status
-                    ? 'No campaigns match your filters.'
-                    : isBusiness
-                      ? 'You have not posted a campaign yet.'
-                      : 'No campaigns are available right now.'}
+                  {isBusiness && fetched.length > 0 && !search
+                    ? `No ${TABS.find((t) => t.key === tab)?.label.toLowerCase()} yet.`
+                    : search
+                      ? 'No campaigns match your search.'
+                      : isBusiness
+                        ? 'You have not posted a campaign yet.'
+                        : 'No campaigns are available right now.'}
                 </strong>
 
                 <span>
-                  {search || status
-                    ? 'Try changing your search or filters.'
+                  {search
+                    ? 'Try changing your search.'
                     : !isBusiness
                       ? 'Check back soon for new creator opportunities.'
                       : 'Create your first campaign to start finding creators.'}
@@ -274,9 +336,9 @@ export function CampaignBrowse() {
 
                 {isBusiness &&
                   !search &&
-                  !status && (
+                  fetched.length === 0 && (
                     <Link
-                      className="cb-primary"
+                      className="btn btn-primary"
                       to="/campaigns/new"
                     >
                       <Plus size={15} />
@@ -514,7 +576,7 @@ export function CampaignBrowse() {
                 </div>
 
                 {/* PAGINATION */}
-                {pages > 1 && (
+                {pageCount > 1 && (
                   <div className="cb-pagination">
 
                     <button
@@ -528,11 +590,11 @@ export function CampaignBrowse() {
                     </button>
 
                     <span>
-                      Page {page} of {pages}
+                      Page {page} of {pageCount}
                     </span>
 
                     <button
-                      disabled={page >= pages}
+                      disabled={page >= pageCount}
                       onClick={() =>
                         setPage((value) => value + 1)
                       }
@@ -613,22 +675,58 @@ const STYLE = `
   background:#2b2b2b;
 }
 
-/* STATUS SELECT */
+/* TABS */
 
-.cb-status-select{
-  height:40px;
-  border:1px solid #dedede;
-  border-radius:8px;
-  background:#fff;
-  padding:0 12px;
-  font:inherit;
-  font-size:12px;
-  color:#222;
-  outline:none;
+.cb-tabs{
+  display:flex;
+  gap:8px;
+  flex-wrap:wrap;
+  margin:0 0 22px;
 }
 
-.cb-status-select:focus{
-  border-color:#999;
+.cb-tab{
+  display:inline-flex;
+  align-items:center;
+  gap:8px;
+  height:34px;
+  padding:0 14px;
+  border:1px solid #dedede;
+  border-radius:999px;
+  background:#fff;
+  color:#111;
+  font:500 12.5px Poppins,sans-serif;
+  cursor:pointer;
+  transition:background-color .15s ease,border-color .15s ease,color .15s ease;
+}
+
+.cb-tab:hover{
+  background:#f5f5f5;
+  border-color:#c4c4c4;
+}
+
+.cb-tab.active{
+  background:#111;
+  color:#fff;
+  border-color:#111;
+}
+
+.cb-tab-count{
+  min-width:20px;
+  height:18px;
+  padding:0 6px;
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  border-radius:999px;
+  background:#f0f0f0;
+  color:#555;
+  font-size:10.5px;
+  font-weight:600;
+}
+
+.cb-tab.active .cb-tab-count{
+  background:rgba(255,255,255,.2);
+  color:#fff;
 }
 
 /* LIST */
@@ -822,6 +920,23 @@ const STYLE = `
 .cb-status--published{
   color:#222;
   border-color:#cfcfcf;
+}
+
+.cb-status--draft{
+  background:#f5f5f5;
+  color:#555;
+}
+
+.cb-status--completed{
+  background:#e9f6ee;
+  color:#1e8a4c;
+  border-color:#cfe8d9;
+}
+
+.cb-status--closed,
+.cb-status--cancelled{
+  background:#f3f2f4;
+  color:#77717e;
 }
 
 .cb-status--in_progress{
@@ -1101,8 +1216,14 @@ const STYLE = `
     width:100%;
   }
 
-  .cb-status-select{
-    flex:1;
+  .cb-tabs{
+    flex-wrap:nowrap;
+    overflow-x:auto;
+    padding-bottom:4px;
+  }
+
+  .cb-tab{
+    flex:0 0 auto;
   }
 
   .cb-card{

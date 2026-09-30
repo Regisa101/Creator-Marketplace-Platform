@@ -22,6 +22,10 @@ from app.services.pricing import (
 
 router = APIRouter(prefix="/api/applications", tags=["Applications"])
 
+# Maximum number of work images a creator can submit with one application.
+# Keep this in sync with MAX_WORKS in ApplyModal.tsx.
+MAX_WORKS = 5
+
 
 def _creator_name(app: Application) -> str | None:
     if app.creator and app.creator.role == "creator":
@@ -46,6 +50,7 @@ def _response(app: Application, campaign: Campaign | None = None) -> Application
         message=app.message,
         application_answers=app.application_answers or [],
         selected_portfolio=app.selected_portfolio or [],
+        social_link=app.social_link,  # FIX: was missing, so the API always returned null
         creator_name=_creator_name(app),
         creator_avatar=_creator_avatar(app),
         campaign_title=campaign.title if campaign else (app.campaign.title if app.campaign else None),
@@ -58,6 +63,32 @@ def _response(app: Application, campaign: Campaign | None = None) -> Application
         updated_at=app.updated_at,
     )
 
+
+
+_SOCIAL_HOSTS = ("instagram.com", "instagr.am", "tiktok.com", "facebook.com", "fb.com")
+
+
+def _clean_social_link(value):
+    """Require a real Instagram / TikTok / Facebook profile link and return a clean https URL."""
+    from urllib.parse import urlparse
+
+    raw = (value or "").strip()
+    if not raw or any(ch.isspace() for ch in raw):
+        raise HTTPException(status_code=400, detail="Please add your Instagram, TikTok or Facebook profile link.")
+    if not raw.lower().startswith(("http://", "https://")):
+        raw = "https://" + raw
+    parsed = urlparse(raw)
+    host = (parsed.hostname or "").lower()
+    for prefix in ("www.", "m.", "web.", "mbasic."):
+        if host.startswith(prefix):
+            host = host[len(prefix):]
+    path_parts = [p for p in parsed.path.split("/") if p]
+    if host not in _SOCIAL_HOSTS or not path_parts:
+        raise HTTPException(
+            status_code=400,
+            detail="Enter a valid Instagram, TikTok or Facebook profile link (for example instagram.com/yourname).",
+        )
+    return f"https://{parsed.hostname}{parsed.path}" + (f"?{parsed.query}" if parsed.query else "")
 
 
 @router.post("", response_model=ApplicationResponse)
@@ -97,12 +128,18 @@ async def create_application(
     if missing:
         raise HTTPException(status_code=400, detail="Please answer every screening question before applying.")
 
+    # FIX: accept 1 to MAX_WORKS work images (was: exactly one).
     selected = data.selected_portfolio or []
-    if len(selected) != 1:
-        raise HTTPException(status_code=400, detail="Please submit exactly one work image with your application.")
-    item = selected[0] if isinstance(selected[0], dict) else {}
-    if not str(item.get("media_url", "")).strip():
-        raise HTTPException(status_code=400, detail="The work image is required.")
+    items = [
+        i for i in selected
+        if isinstance(i, dict) and str(i.get("media_url", "")).strip()
+    ]
+    if not items:
+        raise HTTPException(status_code=400, detail="Please submit at least one work image with your application.")
+    if len(items) > MAX_WORKS:
+        raise HTTPException(status_code=400, detail=f"You can submit up to {MAX_WORKS} work images.")
+
+    social_link = _clean_social_link(data.social_link)
 
     proposed_rate = None
     if data.rate is not None and float(data.rate) > 0:
@@ -122,7 +159,8 @@ async def create_application(
         rate_locked=0,
         message=data.message,
         application_answers=[{"question": q, "answer": answer_by_question[q]} for q in questions],
-        selected_portfolio=[item],
+        selected_portfolio=items,  # FIX: was [item]
+        social_link=social_link,
         status="pending",
     )
     db.add(application)
@@ -260,6 +298,7 @@ async def select_application(
             "message": application.message,
             "application_answers": application.application_answers or [],
             "selected_portfolio": application.selected_portfolio or [],
+            "social_link": application.social_link,
             "status": "pending",
             "agreed_rate": float(rate) if rate is not None else None,
             "rate_locked": bool(application.rate_locked),

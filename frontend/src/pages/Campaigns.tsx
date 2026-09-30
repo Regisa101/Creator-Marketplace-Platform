@@ -4,7 +4,7 @@ import {
   ArrowLeft,
   ArrowRight,
   ChevronDown,
-  Heart,
+  Bookmark,
   MapPin,
   Search,
 } from "lucide-react";
@@ -314,7 +314,7 @@ function CampaignCard({
                   : "Save campaign"
               }
             >
-              <Heart
+              <Bookmark
                 size={17}
                 fill={isSaved ? "currentColor" : "none"}
               />
@@ -488,7 +488,7 @@ export function Campaigns() {
     useState("");
 
   const [category, setCategory] =
-    useState("");
+    useState(searchParams.get("category") || "");
 
   const [location, setLocation] =
     useState("");

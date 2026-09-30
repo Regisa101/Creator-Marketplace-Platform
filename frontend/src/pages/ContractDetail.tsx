@@ -1,1382 +1,605 @@
 import { useEffect, useState } from 'react';
-import type { ReactNode } from 'react';
-import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom';
-
+import { Link, useNavigate, useParams } from 'react-router-dom';
 import {
   ArrowLeft,
-  Bookmark,
-  BookmarkCheck,
-  CalendarDays,
   Check,
-  ChevronRight,
-  Clock,
+  CheckCircle2,
+  Clock3,
+  ExternalLink,
+  FileText,
   Loader2,
-  MapPin,
-  Send,
-  Users,
-  X,
+  PlayCircle,
+  ShieldCheck,
+  XCircle,
 } from 'lucide-react';
 
 import {
-  deleteCampaign,
-  duplicateCampaign,
-  getApplications,
+  completeContract,
+  getContract,
   getCampaign,
-  getPublicBusinessProfile,
   getPublicCampaign,
-  getSavedCampaigns,
-  publishCampaign,
-  saveCampaign,
-  unsaveCampaign,
-  updateCampaign,
-  type Application,
-  type Campaign,
-  type PublicBusinessProfile,
-  type PublicCampaign,
+  getPublicBusinessProfile,
+  getCreatorProfile,
+  type Contract,
 } from '../api/client';
-
-import { useAuth } from '../context/AuthContext';
-import { PublicNavbar } from '../components/PublicNavbar';
 import { AppLayout } from '../components/AppLayout';
-import { ApplyModal } from '../components/ApplyModels';
+import { DemoPaymentForm } from '../components/DemoPaymentForm';
+import { useAuth } from '../context/AuthContext';
 
-function money(value?: number | null) {
-  if (value == null) return null;
+const STATUS_LABEL: Record<string, string> = {
+  draft: 'Draft',
+  pending_payment: 'Pending payment',
+  active: 'Active',
+  completed: 'Completed',
+  cancelled: 'Cancelled',
+};
 
-  return `NPR ${Number(value).toLocaleString('en-NP')}`;
+function statusLabel(status?: string | null) {
+  if (!status) return '—';
+  return (
+    STATUS_LABEL[status] ||
+    status.replace(/_/g, ' ').replace(/\b\w/g, (l) => l.toUpperCase())
+  );
 }
 
-function dateLabel(value?: string | null) {
-  if (!value) return null;
+function money(value?: number | null) {
+  return `NPR ${Number(value || 0).toLocaleString()}`;
+}
 
-  const date = new Date(value);
-
-  if (Number.isNaN(date.getTime())) {
-    return null;
-  }
-
-  return date.toLocaleDateString('en-US', {
+function dateLabel(value?: string | null, withTime = false) {
+  if (!value) return 'Not set';
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) return 'Not set';
+  return parsed.toLocaleDateString(undefined, {
+    year: 'numeric',
     month: 'short',
     day: 'numeric',
-    year: 'numeric',
+    ...(withTime ? { hour: 'numeric', minute: '2-digit' } : {}),
   });
 }
 
-function getBudgetLabel(campaign: Campaign) {
-  if (campaign.compensation_type === 'Budget range') {
-    if (campaign.budget_min != null && campaign.budget_max != null) {
-      return `${money(campaign.budget_min)} – ${money(campaign.budget_max)}`;
-    }
-
-    if (campaign.budget_min != null) {
-      return `From ${money(campaign.budget_min)}`;
-    }
-
-    if (campaign.budget_max != null) {
-      return `Up to ${money(campaign.budget_max)}`;
-    }
-  }
-
-  if (campaign.compensation_type === 'Negotiable') {
-    return 'Negotiable';
-  }
-
-  return money(campaign.budget) || 'Budget not specified';
-}
-
-function getPlatform(campaign: Campaign) {
-  const publicCampaign = campaign as PublicCampaign;
-
-  if (publicCampaign.required_platforms?.length) {
-    return publicCampaign.required_platforms.join(' · ');
-  }
-
-  return publicCampaign.required_platform || null;
-}
-
-
-
-function localDateInputValue(value?: string | null) {
+function mediaUrl(value?: string | null) {
   if (!value) return '';
-  return value.slice(0, 10);
+  if (/^(https?:)?\/\//i.test(value) || value.startsWith('data:') || value.startsWith('blob:')) return value;
+  if (value.startsWith('/api/')) return `http://localhost:8000${value}`;
+  return `http://localhost:8000/${value.replace(/^\/+/, '')}`;
 }
 
-function isDeadlinePassed(value?: string | null) {
-  if (!value) return false;
-
-  // Date-only deadlines represent the whole local calendar day.
-  if (/^\d{4}-\d{2}-\d{2}$/.test(value)) {
-    const endOfDay = new Date(`${value}T23:59:59.999`);
-    return endOfDay.getTime() < Date.now();
-  }
-
-  const date = new Date(value);
-  return !Number.isNaN(date.getTime()) && date.getTime() < Date.now();
+function initials(name?: string | null, fallback = 'C') {
+  const value = (name || fallback)
+    .split(' ')
+    .map((part) => part[0])
+    .join('')
+    .slice(0, 2)
+    .toUpperCase();
+  return value || fallback;
 }
 
-function tomorrowInputValue() {
-  const date = new Date();
-  date.setDate(date.getDate() + 1);
-  const year = date.getFullYear();
-  const month = String(date.getMonth() + 1).padStart(2, '0');
-  const day = String(date.getDate()).padStart(2, '0');
-  return `${year}-${month}-${day}`;
+function StatusIcon({ status, size = 13 }: { status: string; size?: number }) {
+  if (status === 'active') return <PlayCircle size={size} />;
+  if (status === 'completed') return <CheckCircle2 size={size} />;
+  if (status === 'cancelled') return <XCircle size={size} />;
+  if (status === 'pending_payment') return <Clock3 size={size} />;
+  return <FileText size={size} />;
 }
 
-export function CampaignDetail() {
-  const { id } = useParams<{ id: string }>();
-  const navigate = useNavigate();
-  const [searchParams] = useSearchParams();
-
-  // The detail page keeps the exact navigation of the place that opened it.
-  // Landing/home -> PublicNavbar. Dashboard -> AppLayout.
-  const fromLanding = searchParams.get('source') === 'landing';
-  const fromDashboard = searchParams.get('source') === 'dashboard';
-  const backHref = fromLanding ? '/#campaigns' : '/campaigns';
-  const { user } = useAuth();
-
-  const [campaign, setCampaign] = useState<Campaign | PublicCampaign | null>(null);
-  const [business, setBusiness] = useState<PublicBusinessProfile | null>(null);
-
-  const [application, setApplication] = useState<Application | null>(null);
-
-  const [saved, setSaved] = useState(false);
-
-  const [showApply, setShowApply] = useState(false);
-
-  const [ownerApplications, setOwnerApplications] = useState<Application[]>([]);
-  const [ownerApplicationsLoaded, setOwnerApplicationsLoaded] = useState(false);
-  const [showExtend, setShowExtend] = useState(false);
-  const [extensionDate, setExtensionDate] = useState('');
-  const [extending, setExtending] = useState(false);
-
-  const [loading, setLoading] = useState(true);
-  const [saving, setSaving] = useState(false);
-
-  const [manageAction, setManageAction] = useState('');
-  const [error, setError] = useState('');
-  const [notice, setNotice] = useState('');
-
-  const isOwner = Boolean(
-    user?.role === 'business' && campaign && campaign.business_id === user.id,
-  );
-
-  const isCreator = user?.role === 'creator';
-
-  const deadlinePassed = isDeadlinePassed(campaign?.application_deadline);
-  const hasAcceptedCreator = ownerApplications.some(
-    (a) => a.status === 'accepted' || a.status === 'completed',
-  );
-  const canExtendCampaign = Boolean(
-    isOwner &&
-      campaign?.status === 'published' &&
-      deadlinePassed &&
-      ownerApplicationsLoaded &&
-      !hasAcceptedCreator,
-  );
-
-  useEffect(() => {
-    if (!id) return;
-
-    let cancelled = false;
-
-    (async () => {
-      setLoading(true);
-      setError('');
-      setNotice('');
-
-      try {
-        const data =
-          user?.role === 'business'
-            ? await getCampaign(id)
-            : await getPublicCampaign(id);
-
-        if (cancelled) return;
-
-        setCampaign(data);
-        setBusiness(null);
-
-        try {
-          const profile = await getPublicBusinessProfile(data.business_id);
-          if (!cancelled) setBusiness(profile);
-        } catch {
-          // Business profile is supplementary; campaign details still work without it.
-        }
-
-        setOwnerApplicationsLoaded(false);
-        setOwnerApplications([]);
-
-        if (user?.role === 'business' && data.business_id === user.id) {
-          try {
-            const applications = await getApplications({ campaign_id: data.id });
-
-            if (!cancelled) {
-              setOwnerApplications(applications);
-              setOwnerApplicationsLoaded(true);
-            }
-          } catch {
-            // Do not show the extension action unless we successfully verified
-            // that the campaign has no applications.
-            if (!cancelled) {
-              setOwnerApplicationsLoaded(false);
-            }
-          }
-        }
-
-        if (user?.role === 'creator') {
-          try {
-            const applications = await getApplications({
-              campaign_id: data.id,
-            });
-
-            if (!cancelled) {
-              setApplication(
-                applications.find((item) => item.creator_id === user.id) || null,
-              );
-            }
-          } catch {
-            // Application state is optional.
-          }
-
-          try {
-            const savedItems = await getSavedCampaigns();
-
-            if (!cancelled) {
-              setSaved(savedItems.some((item) => item.campaign_id === data.id));
-            }
-          } catch {
-            // Save state is optional.
-          }
-        }
-      } catch (err: any) {
-        if (!cancelled) {
-          setError(err?.response?.data?.detail || 'Could not load this campaign.');
-        }
-      } finally {
-        if (!cancelled) {
-          setLoading(false);
-        }
-      }
-    })();
-
-    return () => {
-      cancelled = true;
-    };
-  }, [id, user?.id, user?.role]);
-
-  const toggleSave = async () => {
-    if (!campaign || !user) {
-      navigate('/login');
-      return;
-    }
-
-    if (user.role !== 'creator') return;
-
-    const previous = saved;
-
-    setSaved(!previous);
-    setSaving(true);
-    setError('');
-
-    try {
-      if (previous) {
-        await unsaveCampaign(campaign.id);
-      } else {
-        await saveCampaign(campaign.id);
-      }
-    } catch (err: any) {
-      setSaved(previous);
-
-      setError(err?.response?.data?.detail || 'Could not update saved status.');
-    } finally {
-      setSaving(false);
-    }
-  };
-
-  const publish = async () => {
-    if (!campaign) return;
-
-    setManageAction('publish');
-    setError('');
-
-    try {
-      setCampaign(await publishCampaign(campaign.id));
-
-      setNotice('Campaign published.');
-    } catch (err: any) {
-      setError(err?.response?.data?.detail || 'Could not publish the campaign.');
-    } finally {
-      setManageAction('');
-    }
-  };
-
-  const duplicate = async () => {
-    if (!campaign) return;
-
-    setManageAction('duplicate');
-    setError('');
-
-    try {
-      const copy = await duplicateCampaign(campaign.id);
-
-      navigate(`/campaigns/${copy.id}/edit`);
-    } catch (err: any) {
-      setError(err?.response?.data?.detail || 'Could not duplicate the campaign.');
-
-      setManageAction('');
-    }
-  };
-
-  const remove = async () => {
-    if (!campaign) return;
-
-    if (!window.confirm(`Delete "${campaign.title}"?`)) {
-      return;
-    }
-
-    setManageAction('delete');
-    setError('');
-
-    try {
-      await deleteCampaign(campaign.id);
-      navigate('/campaigns');
-    } catch (err: any) {
-      setError(err?.response?.data?.detail || 'Could not delete the campaign.');
-
-      setManageAction('');
-    }
-  };
-
-  const extendCampaign = async () => {
-    if (!campaign || !canExtendCampaign || !extensionDate) return;
-
-    if (
-      campaign.application_deadline &&
-      extensionDate <= localDateInputValue(campaign.application_deadline)
-    ) {
-      setError('Choose a new deadline after the current deadline.');
-      return;
-    }
-
-    setExtending(true);
-    setManageAction('extend');
-    setError('');
-
-    try {
-      const updated = await updateCampaign(campaign.id, {
-        application_deadline: extensionDate,
-      });
-
-      setCampaign(updated);
-      setShowExtend(false);
-      setExtensionDate('');
-      setNotice(
-        `Campaign deadline extended to ${
-          dateLabel(updated.application_deadline) || extensionDate
-        }.`,
-      );
-    } catch (err: any) {
-      setError(
-        err?.response?.data?.detail || 'Could not extend the campaign deadline.',
-      );
-    } finally {
-      setExtending(false);
-      setManageAction('');
-    }
-  };
-
-  const openExtensionModal = () => {
-    if (!campaign) return;
-
-    setError('');
-    setNotice('');
-    setExtensionDate('');
-    setShowExtend(true);
-  };
-
-  const renderFrame = (content: ReactNode) => {
-    if (fromLanding) {
-      // Reuse the exact navbar used by the home page. Do not duplicate or
-      // restyle the navbar here.
-      return (
-        <>
-          <PublicNavbar />
-          {/* PublicNavbar is position:fixed (68px, 64px on mobile), so reserve its space */}
-          <div className="cd-navbar-spacer" aria-hidden="true" />
-          <style>{`.cd-navbar-spacer{height:68px}@media(max-width:700px){.cd-navbar-spacer{height:64px}}`}</style>
-          {content}
-        </>
-      );
-    }
-
-    // Dashboard/detail links use source=dashboard. For authenticated users
-    // without a source we keep the dashboard shell as the safe fallback.
-    if (fromDashboard || user) {
-      return (
-        <AppLayout title="Campaign details" showNotifications>
-          {content}
-        </AppLayout>
-      );
-    }
-
-    return content;
-  };
-
-  if (loading) {
-    return renderFrame(
-      <div className="cd-state">
-        <Loader2 className="spin" size={20} />
-        Loading campaign...
-        <style>{STYLE}</style>
-      </div>,
-    );
-  }
-
-  if (!campaign) {
-    return renderFrame(
-      <div className="cd-state">
-        <strong>{error || 'Campaign not found.'}</strong>
-
-        <Link to={backHref}>Back to campaigns</Link>
-
-        <style>{STYLE}</style>
-      </div>,
-    );
-  }
-
-  const budgetLabel = getBudgetLabel(campaign);
-  const platform = getPlatform(campaign);
-  const publicCampaign = campaign as PublicCampaign;
-  const businessName = business?.company_name || publicCampaign.brand_name || 'Business';
-
-  return renderFrame(
-    <main className="cd-page">
-      <style>{STYLE}</style>
-      <div className="cd-shell">
-        {/* BACK */}
-        <Link to={backHref} className="cd-back">
-          <ArrowLeft size={15} />
-          Back to campaigns
-        </Link>
-
-        {/* ALERTS */}
-        {error && (
-          <div className="cd-alert cd-alert--error">
-            <X size={15} />
-            {error}
-          </div>
-        )}
-
-        {notice && (
-          <div className="cd-alert">
-            <Check size={15} />
-            {notice}
-          </div>
-        )}
-
-        {/* HEADER */}
-        <header className="cd-header">
-          <div className="cd-header-main">
-            <div className="cd-tags">
-              {campaign.category && <span>{campaign.category}</span>}
-              {campaign.engagement_type && <span>{campaign.engagement_type}</span>}
-              {campaign.work_arrangement && <span>{campaign.work_arrangement}</span>}
-            </div>
-
-            <div className="cd-title-row">
-              <h1>{campaign.title}</h1>
-
-              {isCreator && (
-                <button
-                  className="cd-save"
-                  onClick={() => void toggleSave()}
-                  disabled={saving}
-                  aria-label={saved ? 'Unsave campaign' : 'Save campaign'}
-                >
-                  {saved ? <BookmarkCheck size={18} /> : <Bookmark size={18} />}
-                </button>
-              )}
-            </div>
-
-            <p className="cd-intro">{campaign.description}</p>
-
-            <div className="cd-header-meta">
-              <span>
-                <MapPin size={13} />
-                {campaign.location || 'Remote / flexible'}
-              </span>
-              <span>
-                <Users size={13} />
-                {campaign.creators_needed || 1} creators needed
-              </span>
-              <span>
-                <Clock size={13} />
-                {campaign.duration || 'Flexible duration'}
-              </span>
-              {campaign.application_deadline && (
-                <span>
-                  <CalendarDays size={13} />
-                  Apply by {dateLabel(campaign.application_deadline)}
-                </span>
-              )}
-            </div>
-
-            {!isOwner && campaign.status === 'published' && (
-              <div className="cd-header-apply">
-                {isCreator && !application ? (
-                  <button
-                    className="cd-apply cd-apply--header"
-                    onClick={() => {
-                      setError('');
-                      setShowApply(true);
-                    }}
-                  >
-                    <Send size={14} />
-                    Apply now
-                  </button>
-                ) : !user ? (
-                  <button className="cd-apply cd-apply--header" onClick={() => navigate('/login')}>
-                    <Send size={14} />
-                    Apply now
-                  </button>
-                ) : application ? (
-                  <div className="cd-header-applied">
-                    <Check size={14} />
-                    Application submitted
-                  </div>
-                ) : null}
-              </div>
-            )}
-
-            {isOwner && deadlinePassed && (
-              <div className="cd-deadline-notice">
-                <CalendarDays size={15} />
-                <div>
-                  <strong>Application deadline has passed</strong>
-                  <span>
-                    {canExtendCampaign
-                      ? 'No creator has been selected yet. Extend the deadline to keep accepting applicants, or delete the campaign.'
-                      : ownerApplicationsLoaded
-                        ? 'A creator was already selected for this campaign.'
-                        : 'Checking applications...'}
-                  </span>
-                </div>
-              </div>
-            )}
-          </div>
-
-          {isOwner && (
-            <div className="cd-owner-actions">
-              {campaign.status === 'draft' && (
-                <button
-                  className="cd-dark"
-                  onClick={() => void publish()}
-                  disabled={!!manageAction}
-                >
-                  {manageAction === 'publish' ? 'Publishing...' : 'Publish'}
-                </button>
-              )}
-
-              {canExtendCampaign && (
-                <button
-                  className="cd-dark cd-extend-owner-button"
-                  onClick={openExtensionModal}
-                  disabled={!!manageAction}
-                >
-                  <CalendarDays size={14} />
-                  Extend deadline
-                </button>
-              )}
-
-              <Link className="cd-light" to={`/campaigns/${campaign.id}/edit`}>
-                Edit
-              </Link>
-
-              <button
-                className="cd-light"
-                onClick={() => void duplicate()}
-                disabled={!!manageAction}
-              >
-                Duplicate
-              </button>
-
-              <button
-                className="cd-dark"
-                onClick={() => void remove()}
-                disabled={!!manageAction}
-              >
-                {campaign.status === 'draft' ? 'Delete' : 'Delete campaign'}
-              </button>
-            </div>
-          )}
-        </header>
-
-        {/* BODY: exact two-column campaign information structure */}
-        <div className="cd-layout">
-          <div className="cd-column">
-            <Section title="About the campaign">
-              <p className="cd-copy">
-                {campaign.description ||
-                  'The business has not provided additional campaign details yet.'}
-              </p>
-            </Section>
-
-            <Section title="What you'll do">
-              <p className="cd-copy">
-                {campaign.responsibilities ||
-                  campaign.description ||
-                  'The selected creator will work with the business to complete the campaign requirements.'}
-              </p>
-            </Section>
-
-            <Section title="Deliverables">
-              {campaign.deliverables?.length ? (
-                <ul className="cd-list">
-                  {campaign.deliverables.map((item: string, index: number) => (
-                    <li key={`${item}-${index}`}>
-                      <span className="cd-check"><Check size={13} /></span>
-                      <span>{item}</span>
-                    </li>
-                  ))}
-                </ul>
-              ) : (
-                <p className="cd-muted">Deliverables will be agreed with the selected creator.</p>
-              )}
-            </Section>
-
-            <Section title="Requirements">
-              {campaign.requirements ? (
-                <p className="cd-copy">{campaign.requirements}</p>
-              ) : (
-                <div className="cd-info-list cd-info-list--compact">
-                  <DetailItem label="Work arrangement" value={campaign.work_arrangement || 'Not specified'} />
-                  <DetailItem label="Location" value={campaign.location || 'Remote / flexible'} />
-                </div>
-              )}
-            </Section>
-          </div>
-
-          <div className="cd-column">
-            <Section title="Campaign details">
-              <div className="cd-info-list">
-                <DetailItem label="Compensation" value={campaign.compensation_type || 'Not specified'} />
-                <DetailItem label="Pricing" value={budgetLabel} />
-                <DetailItem label="Location" value={campaign.location || 'Remote / flexible'} />
-                <DetailItem label="Experience" value={campaign.experience_level || 'Not specified'} />
-                <DetailItem label="Creators needed" value={String(campaign.creators_needed || 1)} />
-              </div>
-            </Section>
-
-            <Section title="Creator type">
-              {campaign.creator_types?.length ? (
-                <div className="cd-choice-list">
-                  {campaign.creator_types.map((type: string) => (
-                    <span key={type}>{type}</span>
-                  ))}
-                </div>
-              ) : (
-                <p className="cd-muted">Open to any creator type</p>
-              )}
-            </Section>
-
-            <Section title="Skills">
-              {campaign.required_skills?.length ? (
-                <div className="cd-skills">
-                  {campaign.required_skills.map((skill: string) => (
-                    <span key={skill}>{skill}</span>
-                  ))}
-                </div>
-              ) : (
-                <p className="cd-muted">No specific skills were listed.</p>
-              )}
-
-              {platform && (
-                <div className="cd-platform-box">
-                  <small>Required platform</small>
-                  <strong>{platform}</strong>
-                </div>
-              )}
-            </Section>
-
-            <Section title="Timeline">
-              <div className="cd-timeline">
-                <TimelineItem label="Campaign starts" value={dateLabel(campaign.start_date)} />
-                <TimelineItem label="Campaign ends" value={dateLabel(campaign.end_date)} />
-                <TimelineItem label="Applications close" value={dateLabel(campaign.application_deadline)} />
-              </div>
-            </Section>
-
-            <div className="cd-business-card">
-              <div className="cd-business-card-title">About the business</div>
-
-              <Link
-                to={`/brands/${campaign.business_id}`}
-                className="cd-business-profile-link"
-                aria-label={`View ${businessName} business profile`}
-              >
-                <div className="cd-business-card-avatar">
-                  {business?.logo_url ? (
-                    <img src={business.logo_url} alt={`${businessName} logo`} />
-                  ) : (
-                    <span>{(businessName.trim()[0] || 'B').toUpperCase()}</span>
-                  )}
-                </div>
-
-                <div className="cd-business-profile-copy">
-                  <strong>{businessName}</strong>
-                  {business?.industry && <span>{business.industry}</span>}
-                  {business?.location && (
-                    <span className="cd-business-location">
-                      <MapPin size={11} />
-                      {business.location}
-                    </span>
-                  )}
-                </div>
-
-                <ChevronRight size={15} className="cd-business-profile-arrow" />
-              </Link>
-
-              <Link to={`/brands/${campaign.business_id}`} className="cd-business-see-more">
-                See business profile
-                <ChevronRight size={13} />
-              </Link>
-            </div>
-          </div>
-        </div>
-
-      {showApply && (
-        <ApplyModal
-          isOpen={showApply}
-          campaign={campaign}
-          onClose={() => setShowApply(false)}
-          onSuccess={async () => {
-            try {
-              const applications = await getApplications({ campaign_id: campaign.id });
-              setApplication(
-                applications.find((item) => item.creator_id === user?.id) || null,
-              );
-            } catch {
-              // The success state is still shown even if the refresh is unavailable.
-            }
-          }}
-        />
-      )}
-
-      {showExtend && canExtendCampaign && (
-        <div
-          className="cd-extension-backdrop"
-          role="dialog"
-          aria-modal="true"
-          aria-labelledby="cd-extension-title"
-          onMouseDown={(event) => {
-            if (event.target === event.currentTarget && !extending) {
-              setShowExtend(false);
-            }
-          }}
-        >
-          <div className="cd-extension-modal">
-            <div className="cd-extension-header">
-              <div className="cd-extension-header-content">
-                <div className="cd-extension-eyebrow">Extend campaign</div>
-                <h2 id="cd-extension-title" className="cd-extension-title">
-                  Extend the application deadline
-                </h2>
-                <p className="cd-extension-description">
-                  No creators applied before the previous deadline. Choose a new date to keep this campaign open for applications.
-                </p>
-              </div>
-
-              <button
-                type="button"
-                className="cd-extension-close"
-                onClick={() => setShowExtend(false)}
-                disabled={extending}
-                aria-label="Close"
-              >
-                <X size={15} />
-              </button>
-            </div>
-
-            <div className="cd-extension-date-comparison">
-              <div className="cd-extension-date-block">
-                <div className="cd-extension-date-label">Current deadline</div>
-                <div className="cd-extension-date-value">
-                  {dateLabel(campaign.application_deadline) || 'Not specified'}
-                </div>
-              </div>
-
-              <div className="cd-extension-date-arrow">
-                <ChevronRight size={18} />
-              </div>
-
-              <div className="cd-extension-date-block">
-                <div className="cd-extension-date-label">New deadline</div>
-                <div className="cd-extension-date-value">
-                  {extensionDate ? dateLabel(extensionDate) : 'Choose a date'}
-                </div>
-              </div>
-            </div>
-
-            <div className="cd-extension-form">
-              <label className="cd-extension-field">
-                <span className="cd-extension-field-label">
-                  Extend applications until
-                </span>
-
-                <input
-                  className="cd-extension-date-input"
-                  type="date"
-                  value={extensionDate}
-                  min={tomorrowInputValue()}
-                  onChange={(event) => setExtensionDate(event.target.value)}
-                  disabled={extending}
-                  required
-                />
-
-                <span className="cd-extension-help">
-                  Choose any future date for the new application deadline.
-                </span>
-              </label>
-
-              <div className="cd-extension-confirmation">
-                <Check size={15} />
-                <span>
-                  Once extended, creators will be able to apply again until the new deadline.
-                </span>
-              </div>
-
-              <div className="cd-extension-actions">
-                <button
-                  type="button"
-                  className="cd-extension-cancel"
-                  onClick={() => setShowExtend(false)}
-                  disabled={extending}
-                >
-                  Cancel
-                </button>
-
-                <button
-                  type="button"
-                  className="cd-extension-submit"
-                  onClick={() => void extendCampaign()}
-                  disabled={!extensionDate || extending}
-                >
-                  {extending ? (
-                    <>
-                      <Loader2 size={14} className="spin" />
-                      Extending...
-                    </>
-                  ) : (
-                    <>
-                      <CalendarDays size={14} />
-                      Extend campaign
-                    </>
-                  )}
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-      </div>
-    </main>,
-  );
-}
-
-function Section({
-  title,
-  children,
-}: {
-  title: string;
-  children: ReactNode;
-}) {
+function Row({ label, value }: { label: string; value?: React.ReactNode }) {
   return (
-    <section className="cd-section">
-      <h2>{title}</h2>
-      {children}
-    </section>
-  );
-}
-
-function DetailItem({
-  label,
-  value,
-}: {
-  label: string;
-  value: string;
-}) {
-  return (
-    <div className="cd-detail-item">
-      <small>{label}</small>
-      <strong>{value}</strong>
-    </div>
-  );
-}
-
-function TimelineItem({
-  label,
-  value,
-}: {
-  label: string;
-  value: string | null;
-}) {
-  return (
-    <div className="cd-timeline-item">
-      <small>{label}</small>
+    <div className="cdt-row">
+      <span>{label}</span>
       <strong>{value || 'Not specified'}</strong>
     </div>
   );
 }
 
-const STYLE = `
-.cd-page{
-  min-height:100vh;
-  background:transparent;
-  color:#111;
-  font-family:Poppins,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
-  padding:8px 20px 70px;
+export function ContractDetail() {
+  const { contractId } = useParams<{ contractId: string }>();
+  const navigate = useNavigate();
+  const { user } = useAuth();
+
+  const isBusiness = user?.role === 'business';
+  const isCreator = user?.role === 'creator';
+
+  const [contract, setContract] = useState<Contract | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+
+  const [confirmComplete, setConfirmComplete] = useState(false);
+  const [completing, setCompleting] = useState(false);
+  const [actionError, setActionError] = useState('');
+
+  // Profile pictures + live campaign details (fallback for old contracts
+  // that have no saved snapshot).
+  const [businessLogo, setBusinessLogo] = useState('');
+  const [creatorAvatar, setCreatorAvatar] = useState('');
+  const [liveCampaign, setLiveCampaign] = useState<any>(null);
+
+  useEffect(() => {
+    const numericId = Number(contractId);
+
+    if (!contractId || Number.isNaN(numericId)) {
+      setError('This contract link is not valid.');
+      setLoading(false);
+      return;
+    }
+
+    let cancelled = false;
+    setLoading(true);
+    setError('');
+
+    getContract(numericId)
+      .then((data) => {
+        if (!cancelled) setContract(data);
+      })
+      .catch((err: any) => {
+        if (cancelled) return;
+        const status = err?.response?.status;
+        setError(
+          status === 404
+            ? 'We could not find this contract, or you do not have access to it.'
+            : err?.response?.data?.detail ||
+                'Could not load this contract. Please try again.',
+        );
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [contractId]);
+
+  useEffect(() => {
+    if (!contract) return;
+    let cancelled = false;
+
+    getPublicBusinessProfile(contract.business_id)
+      .then((profile) => {
+        if (!cancelled && profile.logo_url) setBusinessLogo(mediaUrl(profile.logo_url));
+      })
+      .catch(() => undefined);
+
+    getCreatorProfile(contract.creator_id)
+      .then((profile) => {
+        if (!cancelled && profile.profile_image) setCreatorAvatar(mediaUrl(profile.profile_image));
+      })
+      .catch(() => undefined);
+
+    // Only needed when the contract has no saved campaign details.
+    if (!contract.evidence_snapshot?.campaign) {
+      const load = user?.role === 'business' ? getCampaign : getPublicCampaign;
+      load(contract.campaign_id)
+        .then((data) => {
+          if (!cancelled) setLiveCampaign(data);
+        })
+        .catch(() => undefined);
+    }
+
+    return () => {
+      cancelled = true;
+    };
+  }, [contract?.id, contract?.evidence_snapshot?.campaign, user?.role]);
+
+  const handleComplete = async () => {
+    if (!contract) return;
+    setCompleting(true);
+    setActionError('');
+
+    try {
+      const updated = await completeContract(contract.id);
+      setContract(updated);
+      setConfirmComplete(false);
+    } catch (err: any) {
+      setActionError(
+        err?.response?.data?.detail || 'Could not complete this collaboration.',
+      );
+    } finally {
+      setCompleting(false);
+    }
+  };
+
+  // Saved snapshot first (what was agreed), live campaign as a fallback.
+  const campaign: any = contract?.evidence_snapshot?.campaign ?? liveCampaign ?? undefined;
+  const application = contract?.evidence_snapshot?.application;
+  const finalTerms = contract?.evidence_snapshot?.final_terms;
+  const heroImage = mediaUrl(campaign?.hero_image || campaign?.image_url);
+
+  const feeAmount =
+    contract?.platform_fee_amount ??
+    (contract?.total_value
+      ? Number(contract.total_value) * Number(contract.platform_fee_rate || 0)
+      : 0);
+  const feeRatePct = Math.round(Number(contract?.platform_fee_rate || 0) * 1000) / 10;
+
+  const canPay = isBusiness && contract?.status === 'pending_payment';
+  const canComplete = isBusiness && contract?.status === 'active';
+
+  // Timeline built only from dates the API actually returns.
+  const timeline: { label: string; date?: string | null; done: boolean }[] = contract
+    ? [
+        { label: 'Contract created', date: contract.created_at, done: true },
+        {
+          label: 'Terms finalized',
+          date: finalTerms?.finalized_at,
+          done: Boolean(finalTerms?.finalized_at) || contract.status !== 'draft',
+        },
+        {
+          label: isCreator ? 'Contract activated' : 'Service fee paid',
+          date: contract.fee_paid_at,
+          done: contract.fee_paid,
+        },
+        {
+          label: 'Collaboration completed',
+          date: contract.status === 'completed' ? contract.updated_at : null,
+          done: contract.status === 'completed',
+        },
+      ]
+    : [];
+
+  return (
+    <AppLayout
+      title="Contract details"
+      subtitle="Campaign, terms and payment for this collaboration."
+      showNotifications
+      showSearch={false}
+    >
+      <style>{`
+        .cdt-page{max-width:1040px;margin:0 auto;padding:0 0 50px;color:#111;font-family:Poppins,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}
+        .cdt-back{display:inline-flex;align-items:center;gap:6px;margin-bottom:14px;color:#555;font:500 12px Poppins,sans-serif;text-decoration:none}
+        .cdt-back:hover{color:#111}
+        .cdt-state{padding:56px 20px;text-align:center;color:#777;font:500 13px Poppins,sans-serif;background:#fff;border:1px solid #e5e5e5;border-radius:12px}
+        .cdt-state h3{margin:0 0 6px;color:#111;font:600 15px Poppins,sans-serif}
+        .cdt-state p{margin:0 0 16px}
+        .cdt-spin{animation:cdt-spin .8s linear infinite}@keyframes cdt-spin{to{transform:rotate(360deg)}}
+
+        .cdt-head{display:flex;gap:16px;align-items:center;justify-content:space-between;flex-wrap:wrap;padding:16px 18px;background:#fff;border:1px solid #e5e5e5;border-radius:12px;margin-bottom:14px}
+        .cdt-head-main{display:flex;align-items:center;gap:14px;min-width:0}
+        .cdt-thumb{width:56px;height:56px;border-radius:10px;overflow:hidden;background:#f3f3f3;flex:none;display:flex;align-items:center;justify-content:center;color:#aaa}
+        .cdt-thumb img{width:100%;height:100%;object-fit:cover}
+        .cdt-title{margin:0;font:600 16px Poppins,sans-serif;color:#111}
+        .cdt-sub{margin-top:3px;font:400 12px Poppins,sans-serif;color:#777}
+        .cdt-status{display:inline-flex;align-items:center;gap:5px;padding:5px 12px;border-radius:999px;background:#f3f3f3;color:#555;font:500 11.5px Poppins,sans-serif;white-space:nowrap}
+        .cdt-status.active{background:#e9f6ee;color:#1e8a4c}
+        .cdt-status.completed{background:#e8f0fb;color:#2a5aa5}
+        .cdt-status.cancelled{background:#f3f2f4;color:#77717e}
+        .cdt-status.pending_payment,.cdt-status.draft{background:#fff6e5;color:#9a6a08}
+
+        .cdt-grid{display:grid;grid-template-columns:minmax(0,1.5fr) minmax(0,1fr);gap:14px;align-items:start}
+        .cdt-col{display:flex;flex-direction:column;gap:14px;min-width:0}
+        .cdt-card{background:#fff;border:1px solid #e5e5e5;border-radius:12px;padding:16px 18px}
+        .cdt-card h2{margin:0 0 12px;font:600 11px Poppins,sans-serif;color:#888;text-transform:uppercase;letter-spacing:.08em}
+        .cdt-row{display:flex;justify-content:space-between;gap:16px;padding:8px 0;border-bottom:1px solid #f0f0f0;font:400 12.5px Poppins,sans-serif}
+        .cdt-row:last-child{border-bottom:0}
+        .cdt-row span{color:#777;flex:none}
+        .cdt-row strong{font-weight:500;color:#111;text-align:right;min-width:0;overflow-wrap:anywhere}
+        .cdt-text{margin:0 0 10px;font:400 12.5px/1.65 Poppins,sans-serif;color:#444;white-space:pre-line}
+        .cdt-list{margin:0;padding-left:18px;font:400 12.5px/1.7 Poppins,sans-serif;color:#444}
+        .cdt-link{display:inline-flex;align-items:center;gap:5px;color:#111;font:500 12px Poppins,sans-serif;text-decoration:underline;text-underline-offset:3px}
+
+        .cdt-party{display:flex;align-items:center;gap:10px;padding:8px 0}
+        .cdt-party+.cdt-party{border-top:1px solid #f0f0f0}
+        .cdt-avatar{width:36px;height:36px;border-radius:50%;background:#111;color:#fff;display:flex;align-items:center;justify-content:center;font:600 12px Poppins,sans-serif;flex:none;overflow:hidden}
+        .cdt-avatar img{width:100%;height:100%;object-fit:cover}
+        .cdt-party-name{font:600 13px Poppins,sans-serif;color:#111}
+        .cdt-party-role{font:400 11px Poppins,sans-serif;color:#888}
+        .cdt-party a{margin-left:auto}
+
+        .cdt-earn{display:flex;flex-direction:column;gap:4px;padding:14px 16px;border-radius:10px;background:#f7f7f7;margin-bottom:10px}
+        .cdt-earn span{font:500 11.5px Poppins,sans-serif;color:#777}
+        .cdt-earn strong{font:600 20px Poppins,sans-serif;color:#111}
+        .cdt-fee{display:flex;align-items:center;gap:8px;padding:10px 12px;border-radius:9px;font:500 12px Poppins,sans-serif;margin-bottom:10px}
+        .cdt-fee.paid{background:#e9f6ee;color:#1e8a4c}
+        .cdt-fee.unpaid{background:#fff6e5;color:#9a6a08}
+
+        .cdt-timeline{list-style:none;margin:0;padding:0}
+        .cdt-timeline li{display:flex;gap:10px;padding:0 0 14px 0;font:400 12.5px Poppins,sans-serif;color:#aaa}
+        .cdt-timeline li:last-child{padding-bottom:0}
+        .cdt-dot{width:18px;height:18px;border-radius:50%;border:1.5px solid #ccc;display:flex;align-items:center;justify-content:center;flex:none;background:#fff;color:#fff}
+        .cdt-timeline li.done{color:#111}
+        .cdt-timeline li.done .cdt-dot{background:#111;border-color:#111}
+        .cdt-timeline small{display:block;margin-top:1px;color:#888;font-size:11px}
+
+        .cdt-confirm{padding:12px;border:1px solid #e5e5e5;border-radius:10px;background:#fafafa;font:400 12px/1.6 Poppins,sans-serif;color:#444}
+        .cdt-confirm-actions{display:flex;gap:8px;margin-top:10px}
+        .cdt-error{padding:10px 12px;border-radius:9px;background:#f8eeee;color:#ad2929;font:500 12px Poppins,sans-serif;margin-top:10px}
+
+        @media(max-width:860px){.cdt-grid{grid-template-columns:1fr}}
+      `}</style>
+
+      <div className="cdt-page">
+        <Link className="cdt-back" to="/contracts">
+          <ArrowLeft size={14} /> Back to {isCreator ? 'contract history' : 'collaboration history'}
+        </Link>
+
+        {loading && (
+          <div className="cdt-state">
+            <Loader2 size={22} className="cdt-spin" />
+            <p style={{ marginTop: 10, marginBottom: 0 }}>Loading contract…</p>
+          </div>
+        )}
+
+        {!loading && error && (
+          <div className="cdt-state">
+            <h3>Contract unavailable</h3>
+            <p>{error}</p>
+            <button
+              type="button"
+              className="btn btn-primary"
+              onClick={() => navigate('/contracts')}
+            >
+              Back to history
+            </button>
+          </div>
+        )}
+
+        {!loading && !error && contract && (
+          <>
+            {/* HEADER */}
+            <div className="cdt-head">
+              <div className="cdt-head-main">
+                <div className="cdt-thumb">
+                  {heroImage ? <img src={heroImage} alt="" /> : <FileText size={22} />}
+                </div>
+                <div style={{ minWidth: 0 }}>
+                  <h1 className="cdt-title">
+                    {contract.campaign_title || campaign?.title || `Contract #${contract.id}`}
+                  </h1>
+                  <div className="cdt-sub">
+                    Contract #{contract.id} · {contract.business_name || 'Business'} ×{' '}
+                    {contract.creator_name || 'Creator'}
+                  </div>
+                </div>
+              </div>
+
+              <span className={`cdt-status ${contract.status}`}>
+                <StatusIcon status={contract.status} />
+                {statusLabel(contract.status)}
+              </span>
+            </div>
+
+            <div className="cdt-grid">
+              {/* LEFT: campaign + agreement */}
+              <div className="cdt-col">
+                <section className="cdt-card">
+                  <h2>Campaign</h2>
+
+                  <Row
+                    label="Campaign"
+                    value={
+                      <Link className="cdt-link" to={`/campaigns/${contract.campaign_id}`}>
+                        {contract.campaign_title || campaign?.title || `Campaign #${contract.campaign_id}`}
+                        <ExternalLink size={11} />
+                      </Link>
+                    }
+                  />
+                  <Row label="Category" value={campaign?.category} />
+                  <Row
+                    label="Location"
+                    value={
+                      [campaign?.location, campaign?.work_arrangement]
+                        .filter(Boolean)
+                        .join(' · ') || undefined
+                    }
+                  />
+                  <Row label="Creators needed" value={campaign?.creators_needed} />
+
+                  {campaign?.description && (
+                    <div style={{ marginTop: 12 }}>
+                      <p className="cdt-text">{campaign.description}</p>
+                    </div>
+                  )}
+
+                  {campaign?.deliverables && campaign.deliverables.length > 0 && (
+                    <div style={{ marginTop: 6 }}>
+                      <div className="cdt-sub" style={{ marginBottom: 6 }}>Deliverables</div>
+                      <ul className="cdt-list">
+                        {campaign.deliverables.map((item: string, i: number) => (
+                          <li key={`${item}-${i}`}>{item}</li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+                </section>
+
+                <section className="cdt-card">
+                  <h2>Agreement</h2>
+                  <Row label="Engagement" value={contract.engagement_type} />
+                  <Row label="Duration" value={contract.duration} />
+                  <Row label="Pricing model" value={contract.pricing_model} />
+                  <Row label="Compensation type" value={contract.compensation_type} />
+                  <Row
+                    label="Collaboration period"
+                    value={`${dateLabel(contract.start_date)} – ${dateLabel(contract.end_date)}`}
+                  />
+                  {!isCreator && (
+                    <>
+                      <Row label="Agreed rate" value={money(contract.agreed_rate)} />
+                      <Row label="Total contract value" value={money(contract.total_value)} />
+                    </>
+                  )}
+
+                  {contract.compensation_description && (
+                    <p className="cdt-text" style={{ marginTop: 10 }}>
+                      {contract.compensation_description}
+                    </p>
+                  )}
+                  {contract.terms_note && (
+                    <div style={{ marginTop: 10 }}>
+                      <div className="cdt-sub" style={{ marginBottom: 4 }}>Terms note</div>
+                      <p className="cdt-text">{contract.terms_note}</p>
+                    </div>
+                  )}
+                </section>
+
+                {(application?.message || (application?.application_answers?.length ?? 0) > 0) && (
+                  <section className="cdt-card">
+                    <h2>Creator's application</h2>
+                    {application?.message && <p className="cdt-text">{application.message}</p>}
+                    {application?.application_answers?.map((a, i) => (
+                      <p className="cdt-text" key={i}>
+                        <strong>{a.question}</strong>
+                        {'\n'}
+                        {a.answer}
+                      </p>
+                    ))}
+                  </section>
+                )}
+              </div>
+
+              {/* RIGHT: parties, payment, timeline */}
+              <div className="cdt-col">
+                <section className="cdt-card">
+                  <h2>Parties</h2>
+                  <div className="cdt-party">
+                    <div className="cdt-avatar">
+                      {businessLogo ? <img src={businessLogo} alt="" /> : initials(contract.business_name, 'B')}
+                    </div>
+                    <div>
+                      <div className="cdt-party-name">{contract.business_name || 'Business'}</div>
+                      <div className="cdt-party-role">Business</div>
+                    </div>
+                  </div>
+                  <div className="cdt-party">
+                    <div className="cdt-avatar">
+                      {creatorAvatar ? <img src={creatorAvatar} alt="" /> : initials(contract.creator_name, 'C')}
+                    </div>
+                    <div>
+                      <div className="cdt-party-name">{contract.creator_name || 'Creator'}</div>
+                      <div className="cdt-party-role">Creator</div>
+                    </div>
+                    <Link className="cdt-link" to={`/creators/${contract.creator_id}`}>
+                      Profile <ExternalLink size={11} />
+                    </Link>
+                  </div>
+                </section>
+
+                {isCreator ? (
+                  <section className="cdt-card">
+                    <h2>Your compensation</h2>
+
+                    <div className="cdt-earn">
+                      <span>You will receive</span>
+                      <strong>
+                        {contract.total_value ? money(contract.total_value) : 'Not finalized yet'}
+                      </strong>
+                    </div>
+
+                    <Row
+                      label="Agreed rate"
+                      value={contract.agreed_rate ? money(contract.agreed_rate) : 'Not finalized yet'}
+                    />
+
+                    <p className="cdt-text" style={{ marginTop: 10, marginBottom: 0, color: '#777', fontSize: 12 }}>
+                      Compensation is arranged directly between you and the business.
+                    </p>
+                  </section>
+                ) : (
+                <section className="cdt-card">
+                  <h2>CreatorHub service fee</h2>
+
+                  <div className={`cdt-fee ${contract.fee_paid ? 'paid' : 'unpaid'}`}>
+                    {contract.fee_paid ? <Check size={15} /> : <Clock3 size={15} />}
+                    {contract.fee_paid
+                      ? `Paid on ${dateLabel(contract.fee_paid_at)}`
+                      : contract.status === 'draft'
+                        ? 'Not due yet. Terms are still being finalized.'
+                        : contract.status === 'cancelled'
+                          ? 'Not paid. This contract was cancelled.'
+                          : 'Awaiting payment'}
+                  </div>
+
+                  <Row label="Fee rate" value={feeRatePct ? `${feeRatePct}%` : undefined} />
+                  <Row
+                    label="Fee amount"
+                    value={contract.total_value ? money(feeAmount) : 'Set when finalized'}
+                  />
+                  <Row label="Contract value" value={money(contract.total_value)} />
+                  {contract.fee_paid && (
+                    <>
+                      <Row
+                        label="Method"
+                        value={contract.payment_method ? statusLabel(contract.payment_method) : undefined}
+                      />
+                      <Row label="Reference" value={contract.payment_reference} />
+                    </>
+                  )}
+
+                  {canPay && (
+                    <div style={{ marginTop: 14 }}>
+                      <DemoPaymentForm
+                        contract={contract}
+                        onCancel={() => undefined}
+                        onSuccess={(updated: Contract) => setContract(updated)}
+                      />
+                    </div>
+                  )}
+                </section>
+                )}
+
+                <section className="cdt-card">
+                  <h2>Timeline</h2>
+                  <ul className="cdt-timeline">
+                    {timeline.map((step) => (
+                      <li key={step.label} className={step.done ? 'done' : ''}>
+                        <span className="cdt-dot">{step.done && <Check size={11} />}</span>
+                        <span>
+                          {step.label}
+                          {step.done && step.date && <small>{dateLabel(step.date, true)}</small>}
+                        </span>
+                      </li>
+                    ))}
+                  </ul>
+                </section>
+
+                {canComplete && (
+                  <section className="cdt-card">
+                    <h2>Manage</h2>
+                    {!confirmComplete ? (
+                      <button
+                        type="button"
+                        className="btn btn-primary"
+                        style={{ width: '100%' }}
+                        onClick={() => setConfirmComplete(true)}
+                      >
+                        Mark as complete
+                      </button>
+                    ) : (
+                      <div className="cdt-confirm">
+                        <ShieldCheck size={14} style={{ verticalAlign: '-2px', marginRight: 6 }} />
+                        Confirm that {contract.creator_name || 'the creator'} has delivered the
+                        agreed work. This closes the collaboration.
+                        <div className="cdt-confirm-actions">
+                          <button
+                            type="button"
+                            className="btn btn-primary btn-sm"
+                            disabled={completing}
+                            onClick={() => void handleComplete()}
+                          >
+                            {completing ? <Loader2 size={14} className="cdt-spin" /> : <Check size={14} />}
+                            Confirm
+                          </button>
+                          <button
+                            type="button"
+                            className="btn btn-secondary btn-sm"
+                            disabled={completing}
+                            onClick={() => setConfirmComplete(false)}
+                          >
+                            Cancel
+                          </button>
+                        </div>
+                      </div>
+                    )}
+                    {actionError && <div className="cdt-error">{actionError}</div>}
+                  </section>
+                )}
+              </div>
+            </div>
+          </>
+        )}
+      </div>
+    </AppLayout>
+  );
 }
 
-.cd-shell{
-  max-width:1080px;
-  margin:0 auto;
-}
-
-.cd-back{
-  display:inline-flex;
-  align-items:center;
-  gap:7px;
-  color:#777;
-  text-decoration:none;
-  font-size:11px;
-  margin-bottom:18px;
-}
-.cd-back:hover{color:#111}
-
-.cd-alert{
-  display:flex;
-  align-items:center;
-  gap:7px;
-  padding:10px 12px;
-  border:1px solid #dedede;
-  border-radius:7px;
-  color:#444;
-  font-size:11px;
-  margin-bottom:12px;
-}
-.cd-alert--error{color:#8b3030;border-color:#e5caca}
-
-.cd-header{
-  position:relative;
-  display:grid;
-  grid-template-columns:minmax(0,1fr) auto;
-  gap:28px;
-  padding:14px 0 25px;
-  border-bottom:1px solid #dedbd4;
-  margin-bottom:0;
-}
-.cd-header-main{min-width:0}
-
-.cd-company-line{
-  display:flex;
-  align-items:center;
-  gap:9px;
-  margin-bottom:13px;
-}
-.cd-company-avatar{
-  width:32px;
-  height:32px;
-  border-radius:7px;
-  background:#f2f2f2;
-  color:#555;
-  display:grid;
-  place-items:center;
-  overflow:hidden;
-}
-.cd-company-name{display:block;font-size:11px;font-weight:600}
-.cd-company-category{display:block;color:#999;font-size:9.5px;margin-top:2px}
-
-.cd-tags{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:8px}
-.cd-tags span{
-  padding:4px 8px;
-  border:1px solid #dedede;
-  border-radius:999px;
-  color:#666;
-  font-size:9px;
-  text-transform:capitalize;
-}
-
-.cd-title-row{display:flex;align-items:flex-start;gap:12px}
-.cd-header h1{
-  margin:0;
-  max-width:760px;
-  font-size:30px;
-  line-height:1.18;
-  letter-spacing:-.035em;
-  font-weight:500;
-}
-.cd-save{
-  flex:none;
-  width:35px;
-  height:35px;
-  border:1px solid #ddd;
-  border-radius:7px;
-  background:#fff;
-  color:#222;
-  display:grid;
-  place-items:center;
-  cursor:pointer;
-}
-.cd-save:hover{border-color:#aaa}
-.cd-save:disabled{opacity:.5;cursor:not-allowed}
-
-.cd-intro{
-  max-width:760px;
-  margin:11px 0 14px;
-  color:#666;
-  font-size:11.5px;
-  line-height:1.7;
-}
-.cd-header-meta{
-  display:flex;
-  flex-wrap:wrap;
-  gap:12px;
-  color:#777;
-  font-size:10px;
-}
-.cd-header-meta span{display:inline-flex;align-items:center;gap:5px}
-
-.cd-header-apply{
-  display:flex;
-  align-items:flex-start;
-  padding-top:0;
-}
-.cd-apply--header{
-  width:auto;
-  min-width:116px;
-  height:40px;
-  margin:0;
-  padding:0 17px;
-}
-.cd-header-applied{
-  min-height:40px;
-  padding:0 13px;
-  display:flex;
-  align-items:center;
-  gap:6px;
-  border:1px solid #ddd;
-  border-radius:7px;
-  color:#555;
-  font-size:10px;
-}
-
-.cd-owner-actions{
-  grid-column:1 / -1;
-  display:flex;
-  flex-wrap:wrap;
-  justify-content:flex-end;
-  gap:6px;
-  padding-top:1px;
-}
-
-.cd-light,.cd-dark,.cd-apply{
-  border-radius:7px;
-  font-family:inherit;
-  cursor:pointer;
-  display:inline-flex;
-  align-items:center;
-  justify-content:center;
-  gap:6px;
-  text-decoration:none;
-}
-.cd-light{
-  min-height:34px;
-  padding:0 11px;
-  border:1px solid #ddd;
-  background:#fff;
-  color:#222;
-  font-size:10.5px;
-}
-.cd-dark{
-  min-height:34px;
-  padding:0 12px;
-  border:1px solid #111;
-  background:#111;
-  color:#fff;
-  font-size:10.5px;
-}
-.cd-light:disabled,.cd-dark:disabled{opacity:.5;cursor:not-allowed}
-
-.cd-deadline-notice{
-  grid-column:1 / -1;
-  display:flex;
-  align-items:flex-start;
-  gap:8px;
-  margin-top:2px;
-  padding:10px 11px;
-  border:1px solid #e1ded7;
-  border-radius:7px;
-  color:#555;
-}
-.cd-deadline-notice>svg{flex:none;margin-top:1px}
-.cd-deadline-notice strong{display:block;font-size:10.5px;font-weight:600}
-.cd-deadline-notice span{display:block;margin-top:3px;color:#888;font-size:9px;line-height:1.45}
-
-/* EXACT TWO-COLUMN CONTENT STRUCTURE */
-.cd-layout{
-  display:grid;
-  grid-template-columns:minmax(0,1.55fr) minmax(260px,.82fr);
-  column-gap:34px;
-  align-items:start;
-}
-
-.cd-column{
-  min-width:0;
-}
-
-.cd-section{
-  padding:24px 0;
-  border-bottom:1px solid #e3e0d9;
-}
-
-.cd-column .cd-section:first-child{
-  padding-top:23px;
-}
-
-.cd-column .cd-section:last-child{
-  border-bottom:0;
-}
-
-.cd-section h2{
-  margin:0 0 13px;
-  color:#111;
-  font-size:13px;
-  line-height:1.3;
-  font-weight:600;
-  letter-spacing:-.01em;
-}
-.cd-copy{
-  margin:0;
-  color:#5c5c5c;
-  font-size:11.5px;
-  line-height:1.8;
-  white-space:pre-wrap;
-}
-.cd-muted{margin:0;color:#999;font-size:10.5px;line-height:1.6}
-
-.cd-info-list{display:flex;flex-direction:column;gap:11px}
-.cd-info-list--compact{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
-.cd-detail-item{min-width:0}
-.cd-detail-item small{display:block;color:#999;font-size:9px;margin-bottom:3px}
-.cd-detail-item strong{display:block;color:#333;font-size:10.5px;font-weight:500;line-height:1.5}
-
-.cd-choice-list{display:flex;flex-direction:column;gap:9px}
-.cd-choice-list span{
-  display:block;
-  color:#444;
-  font-size:10.5px;
-  line-height:1.4;
-}
-
-.cd-list{display:flex;flex-direction:column;gap:10px;padding:0;margin:0;list-style:none}
-.cd-list li{display:flex;align-items:flex-start;gap:8px;color:#555;font-size:11px;line-height:1.55}
-.cd-check{
-  width:19px;height:19px;flex:none;
-  display:grid;place-items:center;
-  background:#f0f0f0;border-radius:50%;color:#222;
-}
-
-.cd-skills{display:flex;flex-wrap:wrap;gap:6px}
-.cd-skills span{
-  padding:6px 9px;
-  border:1px solid #ddd;
-  border-radius:5px;
-  color:#555;
-  font-size:9.5px;
-}
-.cd-platform-box{margin-top:12px;padding-top:11px;border-top:1px solid #e6e3dd}
-.cd-platform-box small{display:block;color:#999;font-size:8.5px;margin-bottom:3px}
-.cd-platform-box strong{font-size:10px;font-weight:600}
-
-.cd-timeline{display:flex;flex-direction:column;gap:11px}
-.cd-timeline-item{display:flex;align-items:baseline;justify-content:space-between;gap:12px}
-.cd-timeline-item small{color:#999;font-size:9px}
-.cd-timeline-item strong{color:#333;font-size:10.5px;font-weight:500;text-align:right}
-
-/* BUSINESS PROFILE */
-.cd-business-card{
-  margin-top:14px;
-  padding:17px 0 0;
-  border-top:1px solid #e3e0d9;
-}
-.cd-business-card-title{
-  margin-bottom:12px;
-  color:#111;
-  font-size:12px;
-  font-weight:600;
-}
-.cd-business-profile-link{
-  display:flex;
-  align-items:center;
-  gap:10px;
-  color:#111;
-  text-decoration:none;
-  border-radius:8px;
-}
-.cd-business-profile-link:hover .cd-business-profile-copy strong{
-  text-decoration:underline;
-}
-.cd-business-profile-link:hover .cd-business-card-avatar{
-  border-color:#bbb;
-}
-.cd-business-card-avatar{
-  width:40px;
-  height:40px;
-  flex:0 0 40px;
-  display:grid;
-  place-items:center;
-  overflow:hidden;
-  border:1px solid #e1e1e1;
-  border-radius:9px;
-  background:#f3f3f3;
-  color:#333;
-  font-size:14px;
-  font-weight:600;
-}
-.cd-business-card-avatar img{
-  width:100%;
-  height:100%;
-  object-fit:cover;
-}
-.cd-business-profile-copy{
-  min-width:0;
-  flex:1;
-}
-.cd-business-profile-copy strong{
-  display:block;
-  color:#111;
-  font-size:11.5px;
-  font-weight:600;
-  line-height:1.35;
-}
-.cd-business-profile-copy span{
-  display:block;
-  margin-top:3px;
-  color:#777;
-  font-size:10px;
-  line-height:1.35;
-}
-.cd-business-profile-copy .cd-business-location{
-  display:flex;
-  align-items:center;
-  gap:3px;
-}
-.cd-business-profile-arrow{
-  flex:0 0 auto;
-  color:#999;
-}
-.cd-business-see-more{
-  display:inline-flex;
-  align-items:center;
-  gap:3px;
-  margin-top:10px;
-  color:#777;
-  font-size:9.5px;
-  text-decoration:none;
-}
-.cd-business-see-more:hover{
-  color:#111;
-  text-decoration:underline;
-}
-
-/* Header / shared buttons */
-.cd-extend-owner-button{white-space:nowrap}
-.cd-apply{
-  border:1px solid #111;
-  background:#111;
-  color:#fff;
-  font-size:11px;
-  font-weight:600;
-}
-.cd-apply:hover{background:#252525}
-
-/* States */
-.cd-state{
-  min-height:70vh;
-  display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;
-  color:#666;font-family:Poppins,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;font-size:12px;
-}
-.cd-state a{color:#111;font-size:11px}
-.spin{animation:cd-spin 1s linear infinite}
-@keyframes cd-spin{to{transform:rotate(360deg)}}
-
-/* Apply / extension modal */
-.cd-extension-backdrop{
-  position:fixed;top:51px;right:0;bottom:0;left:0;z-index:2000;
-  display:flex;align-items:center;justify-content:center;padding:24px;box-sizing:border-box;
-  background:rgba(0,0,0,.42);backdrop-filter:blur(2px);-webkit-backdrop-filter:blur(2px);overflow-y:auto;
-}
-.cd-extension-modal{
-  width:min(500px,calc(100vw - 48px));max-height:calc(100vh - 99px);overflow-y:auto;
-  background:#fff;border-radius:14px;box-shadow:0 24px 70px rgba(0,0,0,.20),0 4px 20px rgba(0,0,0,.08);position:relative;
-  animation:cd-extension-in .18s ease-out;
-}
-@keyframes cd-extension-in{from{opacity:0;transform:translateY(8px) scale(.985)}to{opacity:1;transform:translateY(0) scale(1)}}
-.cd-extension-header{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;padding:20px 24px 8px}
-.cd-extension-header-content{min-width:0}
-.cd-extension-eyebrow{margin-bottom:7px;color:#999;font-size:9px;font-weight:700;letter-spacing:.13em;text-transform:uppercase}
-.cd-extension-title{margin:0;color:#111;font-size:20px;line-height:1.2;font-weight:700}
-.cd-extension-description{margin:7px 0 0;color:#777;font-size:12px;line-height:1.55}
-.cd-extension-close{flex:0 0 auto;width:30px;height:30px;margin-left:12px;display:flex;align-items:center;justify-content:center;border:0;border-radius:50%;background:#111;color:#fff;cursor:pointer}
-.cd-extension-close:disabled{opacity:.5;cursor:not-allowed}
-.cd-extension-date-comparison{margin:12px 24px 18px;display:grid;grid-template-columns:1fr 32px 1fr;align-items:center;padding:14px;border:1px solid #e4e4e4;border-radius:10px;background:#fafafa}
-.cd-extension-date-block{min-width:0}
-.cd-extension-date-label{margin-bottom:5px;color:#999;font-size:9px;font-weight:500}
-.cd-extension-date-value{color:#222;font-size:12px;font-weight:700}
-.cd-extension-date-arrow{display:flex;align-items:center;justify-content:center;color:#aaa}
-.cd-extension-form{padding:0 24px 22px}
-.cd-extension-field{display:flex;flex-direction:column;gap:7px}
-.cd-extension-field-label{color:#333;font-size:12px;font-weight:700}
-.cd-extension-date-input{width:100%;height:43px;padding:0 12px;box-sizing:border-box;border:1px solid #d8d8d8;border-radius:8px;background:#fff;color:#222;font-family:inherit;font-size:13px;outline:none}
-.cd-extension-date-input:focus{border-color:#111;box-shadow:0 0 0 2px rgba(0,0,0,.05)}
-.cd-extension-date-input:disabled{opacity:.65}
-.cd-extension-help{color:#999;font-size:10px;line-height:1.4}
-.cd-extension-confirmation{display:flex;align-items:center;gap:9px;margin-top:14px;padding:10px 12px;border-radius:7px;background:#f7f7f7;color:#777;font-size:10px;line-height:1.4}
-.cd-extension-confirmation svg{flex:0 0 auto;color:#333}
-.cd-extension-actions{display:flex;justify-content:flex-end;align-items:center;gap:7px;margin-top:18px}
-.cd-extension-cancel,.cd-extension-submit{height:37px;padding:0 15px;display:inline-flex;align-items:center;justify-content:center;gap:7px;border-radius:7px;font-family:inherit;font-size:11px;font-weight:600;cursor:pointer}
-.cd-extension-cancel{border:1px solid #ddd;background:#fff;color:#222}
-.cd-extension-submit{border:1px solid #111;background:#111;color:#fff}
-.cd-extension-submit:disabled,.cd-extension-cancel:disabled{opacity:.5;cursor:not-allowed}
-
-@media(max-width:760px){
-  .cd-page{padding:10px 16px 55px}
-  .cd-header{grid-template-columns:1fr;gap:15px}
-  .cd-header-apply{padding-top:0}
-  .cd-apply--header{width:100%}
-  .cd-owner-actions{justify-content:flex-start}
-  .cd-layout{grid-template-columns:1fr;column-gap:0}
-  .cd-column .cd-section:last-child{border-bottom:1px solid #e3e0d9}
-  .cd-column:last-child .cd-section:last-child{border-bottom:0}
-  .cd-info-list--compact{grid-template-columns:1fr}
-  .cd-timeline-item{justify-content:flex-start;flex-direction:column;gap:3px}
-  .cd-timeline-item strong{text-align:left}
-}
-
-@media(max-width:600px){
-  .cd-header h1{font-size:25px}
-  .cd-header-meta{flex-direction:column;gap:7px}
-  .cd-extension-backdrop{top:51px;padding:14px}
-  .cd-extension-modal{width:calc(100vw - 28px);max-height:calc(100vh - 79px);border-radius:12px}
-  .cd-extension-header{padding:18px 18px 8px}
-  .cd-extension-title{font-size:18px}
-  .cd-extension-description{font-size:11px}
-  .cd-extension-date-comparison{margin:10px 18px 16px;padding:12px}
-  .cd-extension-form{padding:0 18px 18px}
-  .cd-extension-actions{flex-direction:column-reverse;width:100%}
-  .cd-extension-cancel,.cd-extension-submit{width:100%}
-}
-`;
-
-
-export default CampaignDetail;
+export default ContractDetail;

@@ -10,6 +10,7 @@ class ApplicationBase(BaseModel):
     message: Optional[str] = None
     application_answers: Optional[list[dict[str, Any]]] = None
     selected_portfolio: Optional[list[Any]] = None
+    social_link: Optional[str] = None
 
 
 class ApplicationCreate(ApplicationBase):

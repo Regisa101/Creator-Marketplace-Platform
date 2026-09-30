@@ -22,7 +22,7 @@ import {
   Calendar,
   ArrowRight,
   MapPin,
-  Heart,
+  Bookmark,
   Check,
 } from "lucide-react";
 
@@ -102,6 +102,24 @@ const CAMPAIGN_CATEGORY_TILES: CategoryTile[] = [
   { label: "Music", category: "Music", image: "https://images.unsplash.com/photo-1511379938547-c1f69419868d?auto=format&fit=crop&w=900&q=80" },
   { label: "Parenting", category: "Parenting", image: "https://images.unsplash.com/photo-1491013516836-7db643ee125a?auto=format&fit=crop&w=900&q=80" },
 ];
+
+// Some tile names differ from the category names businesses pick when they
+// create a campaign (Campaignform). This maps a tile to every campaign
+// category value that belongs to it.
+const CATEGORY_ALIASES: Record<string, string[]> = {
+  Technology: ["Technology", "Tech"],
+  "Home & Living": ["Home & Living", "Home Decor"],
+  Health: ["Health", "Wellness"],
+};
+
+function campaignMatchesTile(campaignCategory: string | undefined | null, tileCategory: string) {
+  if (!campaignCategory) return false;
+  const value = campaignCategory.trim().toLowerCase();
+  const accepted = CATEGORY_ALIASES[tileCategory] ?? [tileCategory];
+  return accepted.some((name) => name.toLowerCase() === value);
+}
+
+const CATEGORY_PREVIEW_COUNT = 4;
 
 // Show 4 category tiles at a time. Pages advance by 3 so they overlap:
 // 1–4, 4–7, 7–10, and so on.
@@ -253,7 +271,7 @@ function CampaignCard({
                 isSaved ? "Remove from wishlist" : "Save to wishlist"
               }
             >
-              <Heart
+              <Bookmark
                 size={17}
                 fill={isSaved ? "currentColor" : "none"}
               />
@@ -440,6 +458,7 @@ export function Landing() {
 
   // Category pagination.
   const [catPage, setCatPage] = useState(0);
+  const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
   const [heroSlide, setHeroSlide] = useState(0);
   const [howWorksRole, setHowWorksRole] = useState<"creator" | "business">(
     "creator"
@@ -580,11 +599,43 @@ export function Landing() {
   // CATEGORY TILE CLICK
   // ============================================
 
-  const handleCategoryTileClick = (_categoryValue: string) => {
-    document
-      .getElementById("latest-campaigns")
-      ?.scrollIntoView({ behavior: "smooth", block: "start" });
+  const handleCategoryTileClick = (categoryValue: string) => {
+    setSelectedCategory((current) =>
+      current === categoryValue ? null : categoryValue
+    );
   };
+
+  const selectedTile = useMemo(
+    () => CAMPAIGN_CATEGORY_TILES.find((tile) => tile.category === selectedCategory) ?? null,
+    [selectedCategory]
+  );
+
+  // Every live campaign in the chosen category; the page shows the first 4.
+  const categoryMatches = useMemo(
+    () =>
+      selectedTile
+        ? campaigns.filter((c) => campaignMatchesTile(c.category, selectedTile.category))
+        : [],
+    [campaigns, selectedTile]
+  );
+
+  const categoryPreview = categoryMatches.slice(0, CATEGORY_PREVIEW_COUNT);
+
+  // "Show more" opens the campaigns page already filtered. It uses the real
+  // category value stored on the campaigns (e.g. "Tech" for the Technology tile).
+  const categoryShowMoreHref = selectedTile
+    ? `/campaigns?source=landing&category=${encodeURIComponent(
+        categoryMatches[0]?.category?.trim() || selectedTile.category
+      )}`
+    : "/campaigns?source=landing";
+
+  // Bring the results into view when a category is picked.
+  useEffect(() => {
+    if (!selectedCategory) return;
+    document
+      .getElementById("category-results")
+      ?.scrollIntoView({ behavior: "smooth", block: "nearest" });
+  }, [selectedCategory]);
 
   // ============================================
   // CATEGORY PAGINATION
@@ -1203,6 +1254,28 @@ export function Landing() {
           line-height: 1.3;
           color: #ffffff;
           text-shadow: 0 1px 8px rgba(0,0,0,.22);
+        }
+
+        .lp-cat-card.is-selected {
+          outline: 2px solid #111111;
+          outline-offset: 3px;
+        }
+
+        .lp-cat-results {
+          margin-top: 34px;
+          padding-top: 28px;
+          border-top: 1px solid #ececec;
+        }
+
+        .lp-cat-results .lp-section-head {
+          margin-bottom: 22px;
+        }
+
+        .lp-cat-results-title {
+          margin: 0;
+          font-size: 22px;
+          font-weight: 500;
+          color: #111111;
         }
 
         .lp-cat-pagination {
@@ -2838,7 +2911,10 @@ export function Landing() {
             return (
               <button
                 type="button"
-                className="lp-cat-card"
+                className={`lp-cat-card${
+                  selectedCategory === tile.category ? " is-selected" : ""
+                }`}
+                aria-pressed={selectedCategory === tile.category}
                 key={tile.category}
                 onClick={() =>
                   handleCategoryTileClick(tile.category)
@@ -2877,6 +2953,46 @@ export function Landing() {
                 aria-current={catPage === page ? "page" : undefined}
               />
             ))}
+          </div>
+        )}
+
+        {selectedTile && (
+          <div className="lp-cat-results" id="category-results">
+            <div className="lp-section-head">
+              <h3 className="lp-cat-results-title">
+                {selectedTile.label} campaigns
+              </h3>
+
+              {categoryMatches.length > 0 && (
+                <Link to={categoryShowMoreHref} className="lp-view-all lp-latest-view-all">
+                  Show more
+                  <ArrowRight size={14} />
+                </Link>
+              )}
+            </div>
+
+            {campaignLoading ? (
+              <p style={{ color: "var(--ink-soft)", fontSize: 14.5 }}>
+                Loading campaigns…
+              </p>
+            ) : categoryPreview.length > 0 ? (
+              <div className="lp-grid lp-latest-grid">
+                {categoryPreview.map((c) => (
+                  <CampaignCard
+                    c={c}
+                    key={c.id}
+                    isCreator={isCreator}
+                    isAuthenticated={!!user}
+                    isSaved={savedIds.has(c.id)}
+                    onToggleSave={handleToggleSave}
+                  />
+                ))}
+              </div>
+            ) : (
+              <p style={{ color: "var(--ink-soft)", fontSize: 14.5 }}>
+                No {selectedTile.label} campaigns are live right now.
+              </p>
+            )}
           </div>
         )}
       </section>

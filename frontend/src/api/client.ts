@@ -323,6 +323,7 @@ export interface Application {
   message?: string | null;
   application_answers?: ApplicationAnswer[] | null;
   selected_portfolio?: any[] | null;
+  social_link?: string | null;
   creators_needed?: number | null;
   status: ApplicationStatus;
   agreed_rate?: number | null;
@@ -338,6 +339,7 @@ export interface ApplicationCreateData {
   message?: string | null;
   application_answers?: ApplicationAnswer[];
   selected_portfolio?: any[];
+  social_link: string;
 }
 
 export interface SavedCampaignEntry {

@@ -15,7 +15,7 @@ import {
 import {
   Bell,
   FileSignature,
-  Heart,
+  Bookmark,
   LayoutDashboard,
   LogOut,
   Menu,
@@ -1167,7 +1167,7 @@ export function PublicNavbar({
                       aria-label="Wishlist"
                     >
 
-                      <Heart size={17} />
+                      <Bookmark size={17} />
 
                       {saved.length > 0 && (
                         <span className="ch-nav-badge">
