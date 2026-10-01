@@ -3,15 +3,17 @@ from __future__ import annotations
 from datetime import datetime, timezone
 from uuid import uuid4
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query
 from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from app.database import get_db
 from app.dependencies.auth import get_current_business, get_current_user
-from app.models import User, Payment, Application, Campaign, Contract
+from app.core.config import FRONTEND_URL
+from app.models import User, Payment, Application, Campaign, Contract, Notification
 from app.schemas.payment import PaymentResponse
 from app.services.khalti import lookup_payment, KhaltiError
+from app.services.email_service import send_creator_selected_email
 from app.services.notifications import create_notification
 
 router = APIRouter(prefix="/api/payments", tags=["Payments"])
@@ -63,6 +65,28 @@ def _authorized_selection_payment(db: Session, current_user: User, pidx: str) ->
         if not contract or contract.business_id != current_user.id or contract.application_id != application.id:
             raise HTTPException(status_code=403, detail="Contract payment access denied.")
     return payment
+
+def _business_display_name(campaign: Campaign) -> str:
+    business = campaign.business
+    if not business:
+        return "the brand"
+    return (business.profile or {}).get("company_name") or business.full_name or "the brand"
+
+
+def _creator_selected_email_payload(application: Application, campaign: Campaign) -> dict | None:
+    """Plain-data payload for the "you were selected" email (None if no creator email)."""
+    creator = application.creator
+    if not creator or not creator.email:
+        return None
+    return {
+        "to_email": creator.email,
+        "creator_name": (creator.profile or {}).get("display_name") or creator.full_name,
+        "campaign_title": campaign.title,
+        "business_name": _business_display_name(campaign),
+        "campaign_url": f"{FRONTEND_URL}/campaigns/{campaign.id}",
+        "application_id": application.id,
+    }
+
 
 def _finalize_selection(db: Session, payment: Payment, method: str, metadata: dict | None = None) -> Payment:
     application = db.query(Application).filter(Application.id == payment.application_id).first()
@@ -140,6 +164,7 @@ def _finalize_selection(db: Session, payment: Payment, method: str, metadata: di
 
 @router.get("/verify", response_model=PaymentResponse)
 async def verify_payment(
+    background_tasks: BackgroundTasks,
     pidx: str = Query(...),
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_business),
@@ -153,6 +178,7 @@ async def verify_payment(
     provider_status = result.get("status")
     payment.status = _STATUS_MAP.get(provider_status, "failed")
     payment.transaction_id = result.get("transaction_id")
+    selected_email = None  # set only the first time this selection is confirmed
 
     if payment.payment_type == "platform_fee":
         contract_id = (payment.payment_details or {}).get("contract_id") if isinstance(payment.payment_details, dict) else None
@@ -205,13 +231,25 @@ async def verify_payment(
                             event_key=f"application-rejected-closed:{other.id}",
                         )
 
+                # The in-app notification is de-duplicated by event_key. Use that
+                # same key as the "first time?" guard so a repeated verify call
+                # (page refresh, double click) never sends a second email.
+                selected_key = f"creator-selected:{application.id}"
+                first_time = db.query(Notification).filter(Notification.event_key == selected_key).first() is None
+                business_name = _business_display_name(campaign)
+
                 create_notification(
                     db, user_id=application.creator_id, type="creator_selected",
                     title="You were selected! 🎉",
-                    message=f"The brand selected you for {campaign.title}. Your application has been confirmed.",
+                    message=(
+                        f"🎉 You have been selected for the campaign: {campaign.title}. "
+                        f"{business_name} confirmed your application. Open the campaign to continue."
+                    ),
                     link=f"/campaigns/{campaign.id}", reference_id=application.id,
-                    event_key=f"creator-selected:{application.id}",
+                    event_key=selected_key,
                 )
+                if first_time:
+                    selected_email = _creator_selected_email_payload(application, campaign)
 
             create_notification(
                 db, user_id=contract.creator_id, type="contract_activated",
@@ -225,6 +263,13 @@ async def verify_payment(
 
     db.commit()
     db.refresh(payment)
+
+    # Email only AFTER the selection is committed. It runs as a background task
+    # (after the response is sent) and never raises, so SMTP trouble cannot fail
+    # or undo the selection.
+    if selected_email:
+        background_tasks.add_task(send_creator_selected_email, **selected_email)
+
     return _payment_to_response(payment)
 
 

@@ -51,20 +51,82 @@ def _as_date(value: Optional[datetime]):
     return value.astimezone(timezone.utc).date()
 
 
+# Engagement types whose campaign has a defined active period.
+# Everything is compared in a normalised form so "One-time", "one_time"
+# and "one-time" are treated the same.
+_FIXED_DATE_ENGAGEMENTS = {"one_time", "weekly", "monthly"}
+_OPEN_ENDED_ENGAGEMENTS = {"long_term", "yearly"}
+
+
+def _normalize_engagement(value: Optional[str]) -> Optional[str]:
+    if not value or not value.strip():
+        return None
+
+    return value.strip().lower().replace("-", "_").replace(" ", "_")
+
+
+def _is_open_ended(engagement_type: Optional[str]) -> bool:
+    return _normalize_engagement(engagement_type) in _OPEN_ENDED_ENGAGEMENTS
+
+
 def _validate_campaign_dates(
     application_deadline: Optional[datetime],
     start_date: Optional[datetime],
     end_date: Optional[datetime],
+    engagement_type: Optional[str] = None,
+    require_complete: bool = False,
 ) -> None:
     """
-    Validate campaign timeline.
+    Validate the campaign timeline for the given engagement type.
 
-    Rules:
+    Engagement rules:
+    - One-time / Weekly / Monthly: start_date, end_date and
+      application_deadline are all required.
+    - Long-term / Yearly: only application_deadline is required.
+      start_date and end_date are ignored (they are stored as NULL).
+
+    Date rules:
     - Application deadline cannot be in the past.
-    - Start date cannot be before today.
+    - Start date cannot be in the past.
     - End date cannot be before start date.
-    - Application deadline should not be after the campaign end date.
+    - Application deadline cannot be after the start date.
+
+    `require_complete` switches the "required" checks on. Drafts may be
+    saved half-finished, so create / draft updates pass False; publishing
+    and editing a live campaign pass True. The date-relationship rules
+    always run on whatever values are present.
     """
+
+    engagement = _normalize_engagement(engagement_type)
+    open_ended = engagement in _OPEN_ENDED_ENGAGEMENTS
+    fixed_dates = engagement in _FIXED_DATE_ENGAGEMENTS
+
+    # Open-ended campaigns have no fixed active period: never look at
+    # start / end, even if a stale value is still sitting on the record.
+    if open_ended:
+        start_date = None
+        end_date = None
+
+    if require_complete:
+        label = (engagement or "").replace("_", "-")
+
+        if fixed_dates and start_date is None:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Start date is required for {label} campaigns.",
+            )
+
+        if fixed_dates and end_date is None:
+            raise HTTPException(
+                status_code=400,
+                detail=f"End date is required for {label} campaigns.",
+            )
+
+        if application_deadline is None:
+            raise HTTPException(
+                status_code=400,
+                detail="Application deadline is required.",
+            )
 
     today = datetime.now(timezone.utc).date()
 
@@ -92,12 +154,12 @@ def _validate_campaign_dates(
 
     if (
         application_date is not None
-        and end is not None
-        and application_date > end
+        and start is not None
+        and application_date > start
     ):
         raise HTTPException(
             status_code=400,
-            detail="Application deadline cannot be after the campaign end date.",
+            detail="Application deadline cannot be after the campaign start date.",
         )
 
 
@@ -358,11 +420,20 @@ async def create_campaign(
     New campaigns always start as drafts.
     """
 
+    # New campaigns are drafts, so required-ness is enforced when the
+    # campaign is published; the date rules still apply to what is sent.
     _validate_campaign_dates(
         application_deadline=data.application_deadline,
         start_date=data.start_date,
         end_date=data.end_date,
+        engagement_type=data.engagement_type,
+        require_complete=False,
     )
+
+    # Long-term / Yearly campaigns are open-ended: store NULL dates.
+    if _is_open_ended(data.engagement_type):
+        data.start_date = None
+        data.end_date = None
 
     if (
         data.budget_min is not None
@@ -915,11 +986,27 @@ async def update_campaign(
         campaign.end_date,
     )
 
+    # The engagement type may be changing in this same request.
+    engagement_type = update_data.get(
+        "engagement_type",
+        campaign.engagement_type,
+    )
+
+    # Drafts can still be saved half-finished; a campaign that is already
+    # live must always have a complete, valid timeline.
     _validate_campaign_dates(
         application_deadline=application_deadline,
         start_date=start_date,
         end_date=end_date,
+        engagement_type=engagement_type,
+        require_complete=campaign.status != CampaignStatus.DRAFT,
     )
+
+    # Switching to Long-term / Yearly removes the date requirement and
+    # clears any previously stored start / end dates (stored as NULL).
+    if _is_open_ended(engagement_type):
+        update_data["start_date"] = None
+        update_data["end_date"] = None
 
     # --------------------------------------------------------
     # Update allowed fields
@@ -1071,6 +1158,8 @@ async def publish_campaign(
         application_deadline=campaign.application_deadline,
         start_date=campaign.start_date,
         end_date=campaign.end_date,
+        engagement_type=campaign.engagement_type,
+        require_complete=True,
     )
 
     campaign.status = CampaignStatus.PUBLISHED

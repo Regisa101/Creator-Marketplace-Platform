@@ -203,6 +203,9 @@ function todayInputDate() {
   return `${year}-${month}-${day}`;
 }
 
+// Engagements with a defined active period: Start Date, End Date and
+// Application Deadline are all required. Every other engagement type
+// (Long-term, Yearly) is open-ended and only needs an Application Deadline.
 const DATE_BASED_ENGAGEMENTS = [
   "One-time",
   "Weekly",
@@ -462,11 +465,17 @@ function CampaignForm({
       application_questions:
         list(questions),
 
+      // Open-ended engagements (Long-term / Yearly) have no fixed dates;
+      // send null so a previously saved start/end date is cleared.
       start_date:
-        apiDate(form.start_date),
+        DATE_BASED_ENGAGEMENTS.includes(form.engagement_type)
+          ? apiDate(form.start_date)
+          : null,
 
       end_date:
-        apiDate(form.end_date),
+        DATE_BASED_ENGAGEMENTS.includes(form.engagement_type)
+          ? apiDate(form.end_date)
+          : null,
 
       application_deadline:
         apiDate(
@@ -530,14 +539,24 @@ function CampaignForm({
     }
 
     if (s === 5) {
+      // Start / End dates only exist (and are only validated) for
+      // One-time, Weekly and Monthly campaigns. Hidden fields are never required.
       if (DATE_BASED_ENGAGEMENTS.includes(form.engagement_type)) {
-        if (form.start_date && form.start_date < today) nextErrors.start_date = "Start date cannot be before today.";
-        if (form.end_date && form.end_date < today) nextErrors.end_date = "End date cannot be before today.";
-        if (form.start_date && form.end_date && form.end_date < form.start_date) nextErrors.end_date = "End date cannot be before the start date.";
-        if (form.application_deadline && form.start_date && form.application_deadline > form.start_date) nextErrors.application_deadline = "Deadline should be on or before the start date.";
+        if (!form.start_date) nextErrors.start_date = "Choose the date the campaign starts.";
+        else if (form.start_date < today) nextErrors.start_date = "Start date cannot be before today.";
+
+        if (!form.end_date) nextErrors.end_date = "Choose the date the campaign ends.";
+        else if (form.end_date < today) nextErrors.end_date = "End date cannot be before today.";
+        else if (form.start_date && form.end_date < form.start_date) nextErrors.end_date = "End date cannot be before the start date.";
       }
+
       if (!form.application_deadline) nextErrors.application_deadline = "Choose the last day creators can apply.";
       else if (form.application_deadline < today) nextErrors.application_deadline = "Application deadline cannot be before today.";
+      else if (
+        DATE_BASED_ENGAGEMENTS.includes(form.engagement_type) &&
+        form.start_date &&
+        form.application_deadline > form.start_date
+      ) nextErrors.application_deadline = "Application deadline cannot be after the campaign start date.";
     }
 
     setFieldErrors(nextErrors);
@@ -1531,12 +1550,21 @@ function CampaignForm({
                 <Field
                   label="Last day to apply"
                   required
-                  hint="It cannot be before today, and should be on or before the start date."
+                  hint={
+                    DATE_BASED_ENGAGEMENTS.includes(form.engagement_type)
+                      ? "It cannot be before today, and cannot be after the start date."
+                      : "It cannot be before today. The creator starts once they are selected."
+                  }
                   error={fieldErrors.application_deadline}
                 >
                   <input
                     type="date"
                     min={today}
+                    max={
+                      DATE_BASED_ENGAGEMENTS.includes(form.engagement_type) && form.start_date
+                        ? form.start_date
+                        : undefined
+                    }
                     value={form.application_deadline}
                     onChange={(e) => set("application_deadline", e.target.value)}
                   />
@@ -1549,7 +1577,7 @@ function CampaignForm({
                   <p>
                     {DATE_BASED_ENGAGEMENTS.includes(form.engagement_type)
                       ? "Set when the creator should start and finish."
-                      : "Long-term campaigns do not need fixed start or end dates."}
+                      : "This is an ongoing engagement, so it does not need a fixed start or end date. The creator begins once they are selected."}
                   </p>
                 </div>
 
@@ -1557,6 +1585,7 @@ function CampaignForm({
                   <div className="cf-grid-2">
                     <Field
                       label="Start date"
+                      required
                       hint="Example: choose the date the creator should begin."
                       error={fieldErrors.start_date}
                     >
@@ -1570,6 +1599,7 @@ function CampaignForm({
 
                     <Field
                       label="End date"
+                      required
                       hint="Example: choose the final delivery date."
                       error={fieldErrors.end_date}
                     >

@@ -32,6 +32,11 @@ statements = [
     "ALTER TABLE campaigns ADD COLUMN IF NOT EXISTS extra_photos JSON",
     "ALTER TABLE campaigns ADD COLUMN IF NOT EXISTS platform_fee_rate NUMERIC(5,4) NOT NULL DEFAULT 0.10",
 
+    # Long-term / Yearly campaigns have no fixed start or end date.
+    # No-op if the columns are already nullable.
+    "ALTER TABLE campaigns ALTER COLUMN start_date DROP NOT NULL",
+    "ALTER TABLE campaigns ALTER COLUMN end_date DROP NOT NULL",
+
     "ALTER TABLE business_profiles ADD COLUMN IF NOT EXISTS default_dos JSON",
     "ALTER TABLE business_profiles ADD COLUMN IF NOT EXISTS default_donts JSON",
     "ALTER TABLE business_profiles ADD COLUMN IF NOT EXISTS default_video_spec JSON",

@@ -731,8 +731,14 @@ export function CampaignDetail() {
 
             <Section title="Timeline">
               <div className="cd-timeline">
-                <TimelineItem label="Campaign starts" value={dateLabel(campaign.start_date)} />
-                <TimelineItem label="Campaign ends" value={dateLabel(campaign.end_date)} />
+                {campaign.start_date || campaign.end_date ? (
+                  <>
+                    <TimelineItem label="Campaign starts" value={dateLabel(campaign.start_date)} />
+                    <TimelineItem label="Campaign ends" value={dateLabel(campaign.end_date)} />
+                  </>
+                ) : (
+                  <TimelineItem label="Campaign duration" value="Ongoing – starts once selected" />
+                )}
                 <TimelineItem label="Applications close" value={dateLabel(campaign.application_deadline)} />
               </div>
             </Section>
