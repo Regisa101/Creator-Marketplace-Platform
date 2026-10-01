@@ -51,18 +51,18 @@ const businessSettingsBaseStyles = `
   .bs-input:focus { outline: none; border-color: var(--violet); }
   .bs-btn-draft {
     padding: 10px 18px; border-radius: 9px; border: 1px solid var(--line); background: #fff;
-    color: var(--ink); font: 600 13px 'Poppins', sans-serif; cursor: pointer;
+    color: var(--ink); font: 500 13px 'Poppins', sans-serif; cursor: pointer;
   }
   .bs-btn-draft:hover { border-color: var(--violet); color: var(--violet); }
   .bs-btn-publish {
     padding: 10px 20px; border-radius: 9px; border: 1px solid var(--violet); background: var(--violet);
-    color: #fff; font: 600 13px 'Poppins', sans-serif; cursor: pointer;
+    color: #fff; font: 500 13px 'Poppins', sans-serif; cursor: pointer;
   }
   .bs-btn-publish:hover { background: var(--violet-dark); border-color: var(--violet-dark); }
   .bs-btn-publish:disabled { opacity: .6; cursor: not-allowed; }
   .bs-preset-chip {
     padding: 7px 12px; border-radius: 999px; border: 1px solid var(--line); background: #fff;
-    color: var(--ink-soft); font: 600 12px 'Poppins', sans-serif; cursor: pointer;
+    color: var(--ink-soft); font: 500 12px 'Poppins', sans-serif; cursor: pointer;
   }
   .bs-preset-chip:hover { border-color: var(--violet); color: var(--violet); }
   .bs-hint { font-size: 12.5px; color: var(--ink-soft); }
@@ -712,7 +712,7 @@ export function CampaignForm({ mode }: { mode: 'create' | 'edit' }) {
           border-bottom: 1px solid var(--line);
           background: #fff;
         }
-        .cc-logo { display: inline-flex; align-items: center; gap: 8px; font-weight: 700; font-size: 17px; }
+        .cc-logo { display: inline-flex; align-items: center; gap: 8px; font-weight: 500; font-size: 17px; }
 
         /* --- Two-pane shell: persistent sidebar + scrolling main --- */
         .cc-shell { display: flex; min-height: 100vh; align-items: stretch; }
@@ -730,11 +730,11 @@ export function CampaignForm({ mode }: { mode: 'create' | 'edit' }) {
           .cc-sidebar { width: 100%; border-right: none; border-bottom: 1px solid rgba(17,17,17,0.14); }
         }
 
-        .cc-sidebar-brand { display: inline-flex; align-items: center; gap: 8px; font-weight: 700; font-size: 16px; }
+        .cc-sidebar-brand { display: inline-flex; align-items: center; gap: 8px; font-weight: 500; font-size: 16px; }
         .cc-sidebar-tagline { font-size: 12px; color: var(--ink-soft); margin: 4px 0 0 28px; }
         .cc-sidebar-divider { border: none; border-top: 1px solid rgba(17,17,17,0.16); margin: 22px 0; }
 
-        .cc-sidebar-eyebrow { font-size: 11px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; color: var(--violet-dark); margin-bottom: 4px; }
+        .cc-sidebar-eyebrow { font-size: 11px; font-weight: 500; letter-spacing: 0.06em; text-transform: uppercase; color: var(--violet-dark); margin-bottom: 4px; }
         .cc-sidebar-meta { font-size: 12px; color: var(--ink-soft); margin-bottom: 20px; }
 
         .cc-sidebar-steps { display: flex; flex-direction: column; }
@@ -762,16 +762,16 @@ export function CampaignForm({ mode }: { mode: 'create' | 'edit' }) {
         .cc-sidebar-line--done { background: #16a34a; }
 
         .cc-sidebar-step-text { display: flex; flex-direction: column; padding-bottom: 18px; }
-        .cc-sidebar-step-title { font-size: 13.5px; font-weight: 600; color: var(--ink-soft); }
+        .cc-sidebar-step-title { font-size: 13.5px; font-weight: 500; color: var(--ink-soft); }
         .cc-sidebar-step-title--active, .cc-sidebar-step-title--done { color: var(--ink); }
         .cc-sidebar-step-caption { font-size: 11.5px; color: var(--ink-soft); margin-top: 2px; }
-        .cc-sidebar-step-caption--active { color: var(--violet-dark); font-weight: 600; }
-        .cc-sidebar-step-caption--done { color: #16a34a; font-weight: 600; }
+        .cc-sidebar-step-caption--active { color: var(--violet-dark); font-weight: 500; }
+        .cc-sidebar-step-caption--done { color: #16a34a; font-weight: 500; }
 
         .cc-main { flex: 1; max-width: 720px; padding: 40px 32px 80px; }
         @media (max-width: 560px) { .cc-main { padding: 28px 20px 60px; } }
 
-        .cc-eyebrow { font-size: 11px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; color: var(--violet-dark); margin-bottom: 10px; }
+        .cc-eyebrow { font-size: 11px; font-weight: 500; letter-spacing: 0.06em; text-transform: uppercase; color: var(--violet-dark); margin-bottom: 10px; }
         .cc-h1-serif {
           font-family: Georgia, 'Iowan Old Style', 'Palatino Linotype', serif;
           font-size: 30px;
@@ -797,9 +797,9 @@ export function CampaignForm({ mode }: { mode: 'create' | 'edit' }) {
         }
         .cc-back:hover { color: var(--ink); }
 
-        .cc-title { font-size: 24px; font-weight: 700; margin: 0 0 4px; }
+        .cc-title { font-size: 24px; font-weight: 500; margin: 0 0 4px; }
         .cc-sub { font-size: 13.5px; color: var(--ink-soft); margin: 0 0 28px; }
-        .cc-h2 { font-size: 19px; font-weight: 700; margin: 0 0 5px; }
+        .cc-h2 { font-size: 19px; font-weight: 500; margin: 0 0 5px; }
 
         .cc-steps { display: flex; align-items: center; margin-bottom: 22px; }
         .cc-step { display: flex; align-items: center; flex: 1; }
@@ -808,14 +808,14 @@ export function CampaignForm({ mode }: { mode: 'create' | 'edit' }) {
         .cc-step-dot {
           width: 26px; height: 26px; border-radius: 50%;
           display: flex; align-items: center; justify-content: center;
-          font-size: 12px; font-weight: 700; flex-shrink: 0;
+          font-size: 12px; font-weight: 500; flex-shrink: 0;
           border: none; cursor: pointer; padding: 0;
         }
         .cc-step-upcoming { background: #fff; color: var(--ink-soft); border: 1.5px solid var(--line); }
         .cc-step-active { background: var(--violet); color: #fff; }
         .cc-step-done { background: #16a34a; color: #fff; }
 
-        .cc-step-label { font-size: 11.5px; font-weight: 600; margin-left: 8px; white-space: nowrap; color: var(--ink-soft); cursor: default; }
+        .cc-step-label { font-size: 11.5px; font-weight: 500; margin-left: 8px; white-space: nowrap; color: var(--ink-soft); cursor: default; }
         .cc-step-label-active, .cc-step-label-done { color: var(--ink); }
 
         .cc-step-line { flex: 1; height: 1.5px; background: var(--line); margin: 0 10px; }
@@ -827,9 +827,9 @@ export function CampaignForm({ mode }: { mode: 'create' | 'edit' }) {
 
         .cc-footer { display: flex; align-items: center; justify-content: space-between; margin-top: 4px; flex-wrap: wrap; gap: 12px; }
         .cc-footer-right { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
-        .cc-back-step { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; font-weight: 600; color: var(--ink-soft); background: none; border: none; cursor: pointer; padding: 8px 4px; }
+        .cc-back-step { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; font-weight: 500; color: var(--ink-soft); background: none; border: none; cursor: pointer; padding: 8px 4px; }
         .cc-back-step:hover { color: var(--ink); }
-        .cc-next-step { display: inline-flex; align-items: center; gap: 8px; font-size: 14px; font-weight: 600; color: #fff; background: var(--violet); border: none; padding: 12px 24px; border-radius: 8px; cursor: pointer; }
+        .cc-next-step { display: inline-flex; align-items: center; gap: 8px; font-size: 14px; font-weight: 500; color: #fff; background: var(--violet); border: none; padding: 12px 24px; border-radius: 8px; cursor: pointer; }
         .cc-next-step:disabled { background: #C2C2C2; cursor: not-allowed; }
         .cc-next-step--secondary { background: #fff; color: var(--violet-dark); border: 1px solid #D9D9D9; padding: 11px 20px; }
         .cc-next-step--secondary:disabled { background: #FAFAFA; color: var(--ink-soft); border-color: var(--line); }
@@ -842,7 +842,7 @@ export function CampaignForm({ mode }: { mode: 'create' | 'edit' }) {
         }
 
         .cc-field { margin-bottom: 18px; }
-        .cc-label { display: block; font-size: 13px; font-weight: 600; margin-bottom: 7px; }
+        .cc-label { display: block; font-size: 13px; font-weight: 500; margin-bottom: 7px; }
         .cc-input, .cc-textarea, .cc-select {
           width: 100%;
           border: 1px solid var(--line);
@@ -887,7 +887,7 @@ export function CampaignForm({ mode }: { mode: 'create' | 'edit' }) {
           align-items: center;
           gap: 7px;
           font-size: 13px;
-          font-weight: 600;
+          font-weight: 500;
           color: var(--violet-dark);
           background: #F3F3F3;
           border: 1px solid #D9D9D9;
@@ -922,7 +922,7 @@ export function CampaignForm({ mode }: { mode: 'create' | 'edit' }) {
           border: 1px solid var(--line);
           background: #fff;
           font-size: 13.5px;
-          font-weight: 600;
+          font-weight: 500;
           color: var(--ink-soft);
           cursor: pointer;
           text-align: center;
@@ -944,7 +944,7 @@ export function CampaignForm({ mode }: { mode: 'create' | 'edit' }) {
           padding: 13px;
           border-radius: 10px;
           font-size: 14px;
-          font-weight: 600;
+          font-weight: 500;
           cursor: pointer;
           display: flex;
           align-items: center;
@@ -962,7 +962,7 @@ export function CampaignForm({ mode }: { mode: 'create' | 'edit' }) {
           border-top: 1px solid var(--line);
           margin: 8px 0 24px;
         }
-        .cc-section-heading { font-size: 15px; font-weight: 700; margin: 0 0 4px; }
+        .cc-section-heading { font-size: 15px; font-weight: 500; margin: 0 0 4px; }
         .cc-section-sub { font-size: 12.5px; color: var(--ink-soft); margin: 0 0 16px; }
 
         .cc-taglist-input-row { display: flex; gap: 8px; }
@@ -1031,7 +1031,7 @@ export function CampaignForm({ mode }: { mode: 'create' | 'edit' }) {
           align-items: center;
           gap: 6px;
           font-size: 13px;
-          font-weight: 600;
+          font-weight: 500;
           color: var(--violet-dark);
           background: #F3F3F3;
           border: 1px dashed var(--violet);
@@ -1055,7 +1055,7 @@ export function CampaignForm({ mode }: { mode: 'create' | 'edit' }) {
           align-items: center;
           gap: 8px;
           font-size: 13px;
-          font-weight: 600;
+          font-weight: 500;
           color: var(--violet-dark);
           background: none;
           border: none;
@@ -1066,7 +1066,7 @@ export function CampaignForm({ mode }: { mode: 'create' | 'edit' }) {
         .cc-defaults-panel { padding: 4px 16px 18px; border-top: 1px solid var(--line); }
         .cc-defaults-save {
           font-size: 13px;
-          font-weight: 600;
+          font-weight: 500;
           color: #fff;
           background: var(--violet);
           border: none;
@@ -1088,13 +1088,13 @@ export function CampaignForm({ mode }: { mode: 'create' | 'edit' }) {
           align-items: center;
           gap: 6px;
           font-size: 12.5px;
-          font-weight: 700;
+          font-weight: 500;
           color: var(--violet-dark);
           margin-bottom: 10px;
         }
         .cc-suggest-group { margin-bottom: 8px; }
         .cc-suggest-group:last-child { margin-bottom: 0; }
-        .cc-suggest-group-label { font-size: 11px; font-weight: 600; color: var(--ink-soft); margin-bottom: 6px; text-transform: uppercase; letter-spacing: 0.02em; }
+        .cc-suggest-group-label { font-size: 11px; font-weight: 500; color: var(--ink-soft); margin-bottom: 6px; text-transform: uppercase; letter-spacing: 0.02em; }
         .cc-suggest-list { display: flex; flex-wrap: wrap; gap: 6px; }
         .cc-suggest-chip, .cc-preset-chip {
           font-size: 12px;
@@ -1168,7 +1168,7 @@ export function CampaignForm({ mode }: { mode: 'create' | 'edit' }) {
                       <Info size={13} style={{ marginTop: 1, flexShrink: 0 }} />
                       These prefill new campaigns automatically. Editing them here won't change campaigns you've
                       already created. You can also manage these anytime from{' '}
-                      <Link to="/settings" style={{ color: 'var(--violet-dark)', fontWeight: 600 }}>
+                      <Link to="/settings" style={{ color: 'var(--violet-dark)', fontWeight: 500 }}>
                         Settings → Campaign Defaults
                       </Link>
                       .
@@ -1781,7 +1781,7 @@ function SettingsMultiSelect({ label, options, values, onChange }: { label: stri
   const toggle = (value: string) => onChange(values.includes(value) ? values.filter((v) => v !== value) : [...values, value]);
   return (
     <div style={{ marginBottom: 16 }}>
-      <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 8 }}>{label}</div>
+      <div style={{ fontSize: 13, fontWeight: 500, marginBottom: 8 }}>{label}</div>
       <div style={{ display: 'flex', flexWrap: 'wrap', gap: 7 }}>
         {options.map((option) => (
           <button
@@ -1792,7 +1792,7 @@ function SettingsMultiSelect({ label, options, values, onChange }: { label: stri
               border: `1px solid ${values.includes(option) ? '#111111' : '#DEDEDE'}`,
               background: values.includes(option) ? '#F3F3F3' : '#fff',
               color: '#181818', borderRadius: 999, padding: '8px 12px',
-              cursor: 'pointer', fontSize: 12, fontWeight: values.includes(option) ? 700 : 500,
+              cursor: 'pointer', fontSize: 12, fontWeight: values.includes(option) ? 500 : 500,
             }}
           >
             {option}
@@ -1905,10 +1905,10 @@ export function BusinessSettings() {
       <style>{businessSettingsBaseStyles}</style>
       <style>{`
         .cc-settings { max-width: 820px; margin: 0 auto; padding: 36px 20px 60px; }
-        .cc-settings h1 { font-size: 28px; font-weight: 700; margin: 0 0 8px; }
+        .cc-settings h1 { font-size: 28px; font-weight: 500; margin: 0 0 8px; }
         .cc-settings .sub { color: var(--ink-soft); margin: 0 0 24px; }
         .cc-settings-card { background: #fff; border: 1px solid var(--line); border-radius: 16px; padding: 24px; margin-bottom: 18px; }
-        .cc-settings-card h3 { font-size: 16px; font-weight: 700; margin: 0 0 5px; }
+        .cc-settings-card h3 { font-size: 16px; font-weight: 500; margin: 0 0 5px; }
         .cc-settings-card p { color: var(--ink-soft); font-size: 13px; margin: 0 0 18px; line-height: 1.5; }
         .cc-settings-row { display:flex; gap:10px; align-items:center; margin-bottom:10px; }
         .cc-settings-row input { flex:1; }

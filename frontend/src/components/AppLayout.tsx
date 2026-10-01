@@ -584,7 +584,7 @@ export function AppLayout({
             'League Spartan',
             sans-serif;
 
-          font-weight: 600;
+          font-weight: 500;
 
           letter-spacing: -0.03em;
 
@@ -977,7 +977,7 @@ export function AppLayout({
           color: #fff;
           font-size: 9px;
           line-height: 1;
-          font-weight: 600;
+          font-weight: 500;
           margin-left: auto;
         }
 
@@ -1229,7 +1229,7 @@ export function AppLayout({
 
           font-size: 9px;
 
-          font-weight: 600;
+          font-weight: 500;
 
           line-height: 1;
 
@@ -1382,7 +1382,7 @@ export function AppLayout({
         .app-payment-modal { position: relative; width: min(430px, 100%); background: #fff; border-radius: 18px; padding: 30px 28px 26px; text-align: center; box-shadow: 0 24px 70px rgba(25, 20, 40, .22); }
         .app-payment-modal-close { position: absolute; top: 12px; right: 12px; width: 34px; height: 34px; border: 0; border-radius: 50%; background: #F5F5F5; color: #6B6478; display: flex; align-items: center; justify-content: center; cursor: pointer; }
         .app-payment-success-icon { width: 62px; height: 62px; margin: 0 auto 12px; border-radius: 50%; background: #F5F5F5; color: #16834A; display: flex; align-items: center; justify-content: center; }
-        .app-payment-success-kicker { color: #16834A; font-size: 10px; font-weight: 600; letter-spacing: .12em; margin-bottom: 7px; }
+        .app-payment-success-kicker { color: #16834A; font-size: 10px; font-weight: 500; letter-spacing: .12em; margin-bottom: 7px; }
         .app-payment-modal h2 { margin: 0 0 9px; color: #181818; font-family: 'League Spartan', sans-serif; font-size: 26px; font-weight: 400; letter-spacing: -0.02em; }
         .app-payment-modal p { margin: 0; color: #6B6478; font-size: 13px; line-height: 1.55; }
         .app-payment-success-button { width: 100%; margin-top: 19px; border: 0; border-radius: 9px; padding: 11px 14px; background: #111111; color: #fff; font-size: 13px; font-weight: 500; cursor: pointer; }

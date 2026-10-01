@@ -201,7 +201,7 @@ export default function AdminDashboard() {
         .admin-value {
           margin-top: 3px;
           color: #111;
-          font: 700 24px Poppins, sans-serif;
+          font: 500 24px Poppins, sans-serif;
         }
 
         .admin-columns {
@@ -218,7 +218,7 @@ export default function AdminDashboard() {
         .admin-card h3 {
           margin: 0 0 14px;
           color: #111;
-          font: 700 14px Poppins, sans-serif;
+          font: 500 14px Poppins, sans-serif;
         }
 
         .admin-line {
@@ -241,7 +241,7 @@ export default function AdminDashboard() {
 
         .admin-revenue {
           color: #111;
-          font: 800 28px Poppins, sans-serif;
+          font: 500 28px Poppins, sans-serif;
         }
 
         .admin-sub {

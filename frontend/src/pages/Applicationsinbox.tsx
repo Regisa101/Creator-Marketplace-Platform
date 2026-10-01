@@ -1,8 +1,9 @@
 import { useEffect, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { parseSocialLink } from '../utils/social';
 import { Check, ChevronDown, FileSignature, Loader2, X, ExternalLink, ZoomIn } from 'lucide-react';
 import { Link, useSearchParams } from 'react-router-dom';
-import { getApplications, selectApplication, updateApplicationStatus, finalizeContract, getContract, type Application, type Contract } from '../api/client';
+import { getApplications, selectApplication, updateApplicationStatus, finalizeContract, getContract, getCreatorProfile, getPublicBusinessProfile, type Application, type Contract } from '../api/client';
 import { AppLayout } from '../components/AppLayout';
 import { useAuth } from '../context/AuthContext';
 import { KhaltiPaymentForm } from '../components/KhaltiPaymentForm';
@@ -54,6 +55,23 @@ function statusLabel(status?: string | null) {
   }
 }
 
+function shortDate(value?: string | null) {
+  if (!value) return 'Not set';
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) return 'Not set';
+  return parsed.toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' });
+}
+
+// The campaign fixed the amount when it was created ("Custom amount"), so the
+// brand cannot change it while finalizing the contract.
+function isAmountLocked(contract: Contract) {
+  return (
+    (contract.compensation_type || '').trim().toLowerCase() === 'custom amount' &&
+    contract.agreed_rate != null &&
+    Number(contract.agreed_rate) > 0
+  );
+}
+
 export function ApplicationsInbox() {
   const { user } = useAuth();
   const [params] = useSearchParams();
@@ -63,6 +81,25 @@ export function ApplicationsInbox() {
   const [busy, setBusy] = useState<number | null>(null);
   const [error, setError] = useState('');
   const [contract, setContract] = useState<Contract | null>(null);
+  const [creatorPic, setCreatorPic] = useState('');
+  const [brandPic, setBrandPic] = useState('');
+
+  // Load profile pictures for the checkout popup (shown when they exist).
+  useEffect(() => {
+    setCreatorPic('');
+    setBrandPic('');
+    if (!contract) return;
+    let cancelled = false;
+
+    getCreatorProfile(contract.creator_id)
+      .then(p => { if (!cancelled && p.profile_image) setCreatorPic(mediaUrl(p.profile_image)); })
+      .catch(() => undefined);
+    getPublicBusinessProfile(contract.business_id)
+      .then(p => { if (!cancelled && p.logo_url) setBrandPic(mediaUrl(p.logo_url)); })
+      .catch(() => undefined);
+
+    return () => { cancelled = true; };
+  }, [contract?.id]);
   const [rate, setRate] = useState('');
   const [total, setTotal] = useState('');
   const [note, setNote] = useState('');
@@ -134,8 +171,11 @@ export function ApplicationsInbox() {
 
   const finalize = async () => {
     if (!contract) return;
-    const agreed = Number(rate);
-    const totalValue = Number(total);
+    // Amount fixed when the campaign was created -> use the contract's own
+    // numbers, never what is typed into the form.
+    const locked = isAmountLocked(contract);
+    const agreed = locked ? Number(contract.agreed_rate) : Number(rate);
+    const totalValue = locked ? Number(contract.total_value) : Number(total);
     if (!agreed || agreed <= 0) { setError('Enter the final agreed compensation.'); return; }
     if (!totalValue || totalValue <= 0) { setError('Enter the total contract value.'); return; }
     setBusy(contract.application_id); setError('');
@@ -235,13 +275,65 @@ export function ApplicationsInbox() {
       .ab-work-zoom{position:absolute;top:8px;right:8px;display:inline-flex;align-items:center;gap:4px;padding:4px 8px;border-radius:999px;background:rgba(17,17,17,.78);color:#fff;font:500 10.5px Poppins,sans-serif;opacity:0;transition:opacity .15s ease}
       .ab-work:hover .ab-work-zoom,.ab-work:focus-visible .ab-work-zoom{opacity:1}
       .ab-work-title{display:block;font:600 10px Poppins,sans-serif;padding:6px 8px;color:#555}
-      .ab-lightbox{position:fixed;inset:0;z-index:10060;background:rgba(0,0,0,.78);display:flex;align-items:center;justify-content:center;padding:24px;cursor:zoom-out}
+      .ab-lightbox{position:fixed;inset:0;z-index:20010;background:rgba(0,0,0,.78);display:flex;align-items:center;justify-content:center;padding:24px;cursor:zoom-out}
       .ab-lightbox-inner{position:relative;max-width:min(960px,100%);max-height:100%;display:flex;flex-direction:column;align-items:center;gap:10px;cursor:default}
       .ab-lightbox img{display:block;max-width:100%;max-height:calc(100vh - 110px);border-radius:12px;background:#fff;object-fit:contain}
       .ab-lightbox-title{color:#fff;font:500 12px Poppins,sans-serif}
       .ab-lightbox-close{position:absolute;top:-12px;right:-12px;width:34px;height:34px;border-radius:50%;border:0;background:#fff;color:#111;display:flex;align-items:center;justify-content:center;cursor:pointer;box-shadow:0 2px 10px rgba(0,0,0,.25)}
       .ab-selected-note{display:inline-flex;align-items:center;gap:5px;font:500 11px Poppins,sans-serif;color:#1e8a4c}
-      .ab-modal-backdrop{position:fixed;inset:0;z-index:10050;background:rgba(0,0,0,.42);display:flex;align-items:center;justify-content:center;padding:20px;backdrop-filter:blur(2px)}.ab-modal{width:min(500px,100%);background:#fff;border:1px solid #e7e7e7;border-radius:18px;box-shadow:0 24px 70px rgba(0,0,0,.22);padding:24px;position:relative;max-height:90vh;overflow:auto}.ab-close{position:absolute;right:14px;top:14px;width:32px;height:32px;border:1px solid #e6e6e6;background:#fff;border-radius:50%;display:flex;align-items:center;justify-content:center;cursor:pointer}.ab-icon{width:42px;height:42px;border-radius:12px;background:#111;color:#fff;display:flex;align-items:center;justify-content:center;margin-bottom:14px}.ab-title{font:700 18px Poppins,sans-serif;color:#111}.ab-sub{font:400 11px/1.5 Poppins,sans-serif;color:#777;margin-top:4px}.ab-box{margin-top:20px;border:1px solid #e8e8e8;border-radius:13px;overflow:hidden}.ab-row{display:flex;justify-content:space-between;gap:12px;padding:12px 14px;border-bottom:1px solid #eee;font:500 12px Poppins,sans-serif;color:#555}.ab-row:last-child{border-bottom:0}.ab-row strong{color:#111}.ab-total{background:#f7f7f7;font-weight:700}.ab-total strong{font-size:15px}.ab-field{margin-top:14px}.ab-field label{display:block;font:600 11px Poppins,sans-serif;color:#444;margin-bottom:6px}.ab-field input,.ab-field textarea{width:100%;box-sizing:border-box;border:1px solid #ddd;border-radius:9px;padding:10px 11px;outline:none;font:400 12px Poppins,sans-serif}.ab-field textarea{min-height:75px;resize:vertical}.ab-field input:focus,.ab-field textarea:focus{border-color:#111}.ab-actions-modal{display:flex;gap:8px;margin-top:18px}.ab-primary{flex:1;height:42px;border:0;border-radius:9px;background:#111;color:#fff;font:700 12px Poppins,sans-serif;cursor:pointer}.ab-secondary{height:42px;padding:0 15px;border:1px solid #ddd;border-radius:9px;background:#fff;color:#555;font:600 12px Poppins,sans-serif;cursor:pointer}.ab-foot{margin-top:12px;font:400 10px/1.5 Poppins,sans-serif;color:#888}.ab-success{padding:10px 12px;border-radius:9px;background:#f5f5f5;border:1px solid #e5e5e5;font:500 11px/1.5 Poppins,sans-serif;color:#555;margin-top:12px}
+      .ab-modal-backdrop{position:fixed;inset:0;z-index:20000;background:rgba(15,15,18,.52);display:flex;align-items:center;justify-content:center;padding:24px;backdrop-filter:blur(3px)}
+      .ab-modal{width:min(900px,100%);max-height:calc(100vh - 48px);display:flex;flex-direction:column;background:#fff;border:1px solid #e7e7e7;border-radius:20px;box-shadow:0 28px 80px rgba(0,0,0,.26);position:relative;overflow:hidden;font-family:Poppins,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}
+      .ab-modal-head{display:flex;align-items:center;justify-content:space-between;gap:16px;padding:20px 28px;border-bottom:1px solid #eee}
+      .ab-title{font:600 19px Poppins,sans-serif;color:#111}
+      .ab-sub{margin-top:3px;font:400 13px/1.5 Poppins,sans-serif;color:#777}
+      .ab-close{flex:none;width:34px;height:34px;border:1px solid #e6e6e6;background:#fff;border-radius:50%;display:flex;align-items:center;justify-content:center;cursor:pointer;color:#555}
+      .ab-close:hover{background:#f5f5f5}
+      .ab-checkout{display:grid;grid-template-columns:minmax(0,.9fr) minmax(0,1.1fr);min-height:0;overflow:auto}
+      .ab-side{padding:24px 28px 28px;background:#fafafa;border-right:1px solid #eee}
+      .ab-main{padding:24px 28px 28px;min-width:0}
+      .ab-eyebrow{margin-bottom:10px;font:600 10.5px Poppins,sans-serif;letter-spacing:.09em;text-transform:uppercase;color:#999}
+      .ab-hero{width:100%;aspect-ratio:16/8;border-radius:12px;overflow:hidden;background:#ececee;display:flex;align-items:center;justify-content:center;color:#b5b5ba}
+      .ab-hero img{width:100%;height:100%;object-fit:cover;display:block}
+      .ab-camp-title{margin-top:14px;font:600 16px/1.35 Poppins,sans-serif;color:#111}
+      .ab-camp-sub{margin-top:3px;font:400 12.5px Poppins,sans-serif;color:#777}
+      .ab-people{margin-top:16px;border:1px solid #e8e8e8;border-radius:12px;background:#fff}
+      .ab-person-row{display:flex;align-items:center;gap:11px;padding:11px 14px}
+      .ab-person-row+.ab-person-row{border-top:1px solid #f0f0f0}
+      .ab-person-row .ab-avatar{width:34px;height:34px}
+      .ab-person-name{font:600 13px Poppins,sans-serif;color:#111}
+      .ab-person-role{font:400 11.5px Poppins,sans-serif;color:#888}
+      .ab-facts{margin-top:14px;border:1px solid #e8e8e8;border-radius:12px;background:#fff;overflow:hidden}
+      .ab-fact{display:flex;justify-content:space-between;align-items:flex-start;gap:16px;padding:11px 14px;border-bottom:1px solid #f0f0f0;font:400 12.5px Poppins,sans-serif;color:#777}
+      .ab-fact:last-child{border-bottom:0}
+      .ab-fact span{flex:none}
+      .ab-fact strong{color:#111;font-weight:500;text-align:right;min-width:0;overflow-wrap:anywhere}
+      .ab-section-title{font:600 15px Poppins,sans-serif;color:#111;margin:0 0 4px}
+      .ab-section-sub{font:400 12.5px/1.55 Poppins,sans-serif;color:#777;margin:0 0 6px}
+      .ab-fields{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:16px}
+      .ab-field{margin-top:14px}
+      .ab-fields .ab-field{margin-top:0}
+      .ab-field label{display:block;font:600 12px Poppins,sans-serif;color:#444;margin-bottom:6px}
+      .ab-field input,.ab-field textarea{width:100%;box-sizing:border-box;border:1px solid #dcdcdc;border-radius:10px;padding:12px 13px;outline:none;font:400 14px Poppins,sans-serif;background:#fff}
+      .ab-field textarea{min-height:96px;resize:vertical}
+      .ab-field input:focus,.ab-field textarea:focus{border-color:#111}
+      .ab-locked{display:flex;align-items:center;justify-content:space-between;gap:8px;box-sizing:border-box;width:100%;border:1px solid #e5e5e5;border-radius:10px;padding:12px 13px;background:#f5f5f5;color:#444;font:500 14px Poppins,sans-serif;cursor:not-allowed}
+      .ab-actions-modal{display:flex;gap:10px;margin-top:22px}
+      .ab-primary{flex:1;height:46px;border:1px solid #111;border-radius:10px;background:#111;color:#fff;font:600 13.5px Poppins,sans-serif;cursor:pointer;transition:background-color .15s ease}
+      .ab-primary:hover:not(:disabled){background:#000}
+      .ab-primary:disabled{opacity:.55;cursor:not-allowed}
+      .ab-secondary{height:46px;padding:0 22px;border:1px solid #dcdcdc;border-radius:10px;background:#fff;color:#333;font:600 13.5px Poppins,sans-serif;cursor:pointer}
+      .ab-secondary:hover{background:#f5f5f5;border-color:#c4c4c4}
+      .ab-foot{margin-top:14px;font:400 12px/1.55 Poppins,sans-serif;color:#888}
+      .ab-done{text-align:center;padding:10px 0 4px}
+      .ab-done-icon{width:56px;height:56px;margin:0 auto 12px;border-radius:50%;background:#e9f6ee;color:#1e8a4c;display:flex;align-items:center;justify-content:center}
+      .ab-done h3{margin:0;font:600 17px Poppins,sans-serif;color:#111}
+      .ab-done p{margin:6px auto 0;max-width:340px;font:400 13px/1.6 Poppins,sans-serif;color:#666}
+      .ab-table{margin-top:20px;border:1px solid #e8e8e8;border-radius:12px;overflow:hidden}
+      .ab-line{display:flex;justify-content:space-between;gap:16px;padding:12px 14px;border-bottom:1px solid #f0f0f0;font:400 13px Poppins,sans-serif;color:#666}
+      .ab-line:last-child{border-bottom:0}
+      .ab-line strong{color:#111;font-weight:500;text-align:right;overflow-wrap:anywhere}
+      @media(max-width:820px){.ab-checkout{grid-template-columns:1fr}.ab-side{border-right:0;border-bottom:1px solid #eee}.ab-modal{max-height:calc(100vh - 24px)}.ab-modal-backdrop{padding:12px}}
+      @media(max-width:480px){.ab-fields{grid-template-columns:1fr}.ab-actions-modal{flex-direction:column-reverse}.ab-secondary{padding:0}.ab-side,.ab-main{padding:20px}.ab-modal-head{padding:16px 20px}}
       @media(max-width:860px){.ab-row-card{grid-template-columns:minmax(0,1fr) auto}.ab-info{grid-column:1 / -1;order:3}.ab-actions{grid-column:1 / -1;order:4;justify-content:flex-start;flex-wrap:wrap}}
       @media(max-width:760px){.ab-details{grid-template-columns:1fr}.ab-work{max-width:140px}}
     `}</style>
@@ -364,52 +456,118 @@ export function ApplicationsInbox() {
       </div>
     </div>
 
-    {preview && <div className="ab-lightbox" role="dialog" aria-modal="true" aria-label="Work sample preview" onClick={() => setPreview(null)}>
+    {preview && createPortal(<div className="ab-lightbox" role="dialog" aria-modal="true" aria-label="Work sample preview" onClick={() => setPreview(null)}>
       <div className="ab-lightbox-inner" onClick={e => e.stopPropagation()}>
         <button type="button" className="ab-lightbox-close" onClick={() => setPreview(null)} aria-label="Close preview"><X size={16}/></button>
         <img src={preview.src} alt={preview.title}/>
         <div className="ab-lightbox-title">{preview.title}</div>
       </div>
-    </div>}
+    </div>, document.body)}
 
-    {contract && <div className="ab-modal-backdrop" role="dialog" aria-modal="true">
-      <div className="ab-modal">
-        <button type="button" className="ab-close" onClick={() => setContract(null)}><X size={16}/></button>
-        <div className="ab-icon"><FileSignature size={20}/></div>
-        <div className="ab-title">
-          {contract.status === 'draft' && 'Finalize contract'}
-          {contract.status === 'pending_payment' && 'Pay platform fee'}
-          {(contract.status === 'active' || contract.status === 'completed') && 'Contract active'}
-        </div>
-        <div className="ab-sub">{contract.creator_name || 'Selected creator'} · {contract.campaign_title || 'Campaign'}</div>
+    {contract && createPortal(<div className="ab-modal-backdrop" role="dialog" aria-modal="true">
+      {(() => {
+        const snap: any = contract.evidence_snapshot?.campaign;
+        const creatorApp = applications.find(a => a.id === contract.application_id);
+        const creatorName = contract.creator_name || creatorApp?.creator_name || 'Selected creator';
+        const meta = [snap?.category, snap?.location].filter(Boolean).join(' · ');
+        return <div className="ab-modal">
+          <div className="ab-modal-head">
+            <div>
+              <div className="ab-title">
+                {contract.status === 'draft' && 'Finalize contract'}
+                {contract.status === 'pending_payment' && 'Checkout · Pay platform fee'}
+                {(contract.status === 'active' || contract.status === 'completed') && 'Contract active'}
+              </div>
+              <div className="ab-sub">
+                {contract.status === 'draft' && 'Confirm the terms, then continue to payment.'}
+                {contract.status === 'pending_payment' && 'Review the collaboration and pay the CreatorHub service fee to activate it.'}
+                {(contract.status === 'active' || contract.status === 'completed') && 'Payment received. The collaboration is underway.'}
+              </div>
+            </div>
+            <button type="button" className="ab-close" onClick={() => setContract(null)} aria-label="Close"><X size={16}/></button>
+          </div>
 
-        <div className="ab-box">
-          <div className="ab-row"><span>Engagement</span><strong>{contract.engagement_type || 'Not specified'}</strong></div>
-          <div className="ab-row"><span>Duration</span><strong>{contract.duration || 'Not specified'}</strong></div>
-          <div className="ab-row"><span>Compensation</span><strong>{contract.compensation_type || 'Negotiable'}</strong></div>
-          {contract.status !== 'draft' && <><div className="ab-row"><span>Contract value</span><strong>NPR {Number(contract.total_value || 0).toLocaleString()}</strong></div><div className="ab-row"><span>CreatorHub service fee (10%)</span><strong>NPR {Number(contract.platform_fee_amount || 0).toLocaleString()}</strong></div></>}
-        </div>
+          <div className="ab-checkout">
+            {/* LEFT: which campaign / who / what */}
+            <aside className="ab-side">
+              <div className="ab-eyebrow">Campaign</div>
+              <div className="ab-camp-title" style={{marginTop:0}}>{contract.campaign_title || snap?.title || `Campaign #${contract.campaign_id}`}</div>
+              {meta && <div className="ab-camp-sub">{meta}</div>}
 
-        {contract.status === 'draft' && <>
-          <div className="ab-field"><label>Final agreed rate (NPR)</label><input type="number" min="0" step="0.01" value={rate} onChange={e => setRate(e.target.value)} placeholder="e.g. 40000"/></div>
-          <div className="ab-field"><label>Total contract value (NPR)</label><input type="number" min="0" step="0.01" value={total} onChange={e => setTotal(e.target.value)} placeholder="e.g. 240000"/></div>
-          <div className="ab-field"><label>Terms note (optional)</label><textarea value={note} onChange={e => setNote(e.target.value)} placeholder="Add any agreed terms, deliverables or payment arrangement notes..."/></div>
-          <div className="ab-actions-modal"><button className="ab-secondary" onClick={() => setContract(null)}>Later</button><button className="ab-primary" disabled={busy === contract.application_id} onClick={() => void finalize()}>{busy === contract.application_id ? 'Saving…' : 'Continue to payment'}</button></div>
-          <div className="ab-foot">CreatorHub calculates the 10% service fee for your records. You'll pay it on the next step.</div>
-        </>}
+              <div className="ab-people">
+                <div className="ab-person-row">
+                  <div className="ab-avatar">{(creatorPic || creatorApp?.creator_avatar) ? <img src={creatorPic || mediaUrl(creatorApp?.creator_avatar)} alt=""/> : creatorName.slice(0,1).toUpperCase()}</div>
+                  <div><div className="ab-person-name">{creatorName}</div><div className="ab-person-role">Creator</div></div>
+                </div>
+                <div className="ab-person-row">
+                  <div className="ab-avatar">{brandPic ? <img src={brandPic} alt=""/> : (contract.business_name || 'B').slice(0,1).toUpperCase()}</div>
+                  <div><div className="ab-person-name">{contract.business_name || 'Your business'}</div><div className="ab-person-role">Brand (you)</div></div>
+                </div>
+              </div>
 
-        {contract.status === 'pending_payment' && <KhaltiPaymentForm
-          contract={contract}
-          onCancel={() => setContract(null)}
-        />}
+              <div className="ab-eyebrow" style={{marginTop:20}}>Timeline</div>
+              <div className="ab-facts" style={{marginTop:0}}>
+                <div className="ab-fact"><span>Applications close</span><strong>{shortDate(snap?.application_deadline)}</strong></div>
+                <div className="ab-fact"><span>Start date</span><strong>{shortDate(contract.start_date)}</strong></div>
+                <div className="ab-fact"><span>End date</span><strong>{shortDate(contract.end_date)}</strong></div>
+                <div className="ab-fact"><span>Duration</span><strong>{contract.duration || 'Not specified'}</strong></div>
+              </div>
 
-        {(contract.status === 'active' || contract.status === 'completed') && <>
-          <div className="ab-success"><Check size={13} style={{verticalAlign:'-2px',marginRight:5}}/> Payment received. This contract is active and the creator has been notified with the contract amount.</div>
-          {contract.payment_reference && <div className="ab-foot">Receipt: {contract.payment_reference}{contract.fee_paid_at ? ` · ${new Date(contract.fee_paid_at).toLocaleDateString()}` : ''}</div>}
-          <div className="ab-actions-modal"><button className="ab-primary" onClick={() => setContract(null)}>Done</button></div>
-        </>}
-      </div>
-    </div>}
+              <div className="ab-eyebrow" style={{marginTop:20}}>Terms</div>
+              <div className="ab-facts" style={{marginTop:0}}>
+                <div className="ab-fact"><span>Engagement</span><strong>{contract.engagement_type || 'Not specified'}</strong></div>
+                <div className="ab-fact"><span>Compensation</span><strong>{contract.compensation_type || 'Negotiable'}</strong></div>
+              </div>
+            </aside>
+
+            {/* RIGHT: the action */}
+            <section className="ab-main">
+              {contract.status === 'draft' && <>
+                <h3 className="ab-section-title">Contract terms</h3>
+                <p className="ab-section-sub">These are the final terms for {creatorName}.</p>
+
+                {isAmountLocked(contract) ? <>
+                  <div className="ab-fields">
+                    <div className="ab-field"><label>Agreed rate (NPR)</label><div className="ab-locked"><span>{Number(contract.agreed_rate).toLocaleString()}</span></div></div>
+                    <div className="ab-field"><label>Total contract value (NPR)</label><div className="ab-locked"><span>{Number(contract.total_value || 0).toLocaleString()}</span></div></div>
+                  </div>
+                  <div className="ab-foot" style={{marginTop:10}}>This amount was confirmed when you created the campaign, so it can't be changed here.</div>
+                </> : <div className="ab-fields">
+                  <div className="ab-field"><label>Final agreed rate (NPR)</label><input type="number" min="0" step="0.01" value={rate} onChange={e => setRate(e.target.value)} placeholder="e.g. 40000"/></div>
+                  <div className="ab-field"><label>Total contract value (NPR)</label><input type="number" min="0" step="0.01" value={total} onChange={e => setTotal(e.target.value)} placeholder="e.g. 240000"/></div>
+                </div>}
+
+                <div className="ab-field"><label>Terms note (optional)</label><textarea value={note} onChange={e => setNote(e.target.value)} placeholder="Add any agreed terms, deliverables or payment arrangement notes..."/></div>
+
+                <div className="ab-actions-modal"><button type="button" className="ab-secondary" onClick={() => setContract(null)}>Later</button><button type="button" className="ab-primary" disabled={busy === contract.application_id} onClick={() => void finalize()}>{busy === contract.application_id ? 'Saving…' : 'Continue to payment'}</button></div>
+                <div className="ab-foot">CreatorHub calculates the 10% service fee for your records. You'll pay it on the next step.</div>
+              </>}
+
+              {contract.status === 'pending_payment' && <>
+                <h3 className="ab-section-title">Payment</h3>
+                <p className="ab-section-sub">Review the amount and pay securely with Khalti.</p>
+                <KhaltiPaymentForm contract={contract} onCancel={() => setContract(null)} />
+              </>}
+
+              {(contract.status === 'active' || contract.status === 'completed') && <>
+                <div className="ab-done">
+                  <div className="ab-done-icon"><Check size={28}/></div>
+                  <h3>Payment received</h3>
+                  <p>This contract is active and the creator has been notified of the contract amount.</p>
+                </div>
+                <div className="ab-table">
+                  <div className="ab-line"><span>Contract value</span><strong>NPR {Number(contract.total_value || 0).toLocaleString()}</strong></div>
+                  <div className="ab-line"><span>CreatorHub service fee (10%)</span><strong>NPR {Number(contract.platform_fee_amount || 0).toLocaleString()}</strong></div>
+                  {contract.fee_paid_at && <div className="ab-line"><span>Paid on</span><strong>{new Date(contract.fee_paid_at).toLocaleDateString()}</strong></div>}
+                  {contract.payment_reference && <div className="ab-line"><span>Receipt</span><strong>{contract.payment_reference}</strong></div>}
+                </div>
+                <div className="ab-actions-modal"><button type="button" className="ab-primary" onClick={() => setContract(null)}>Done</button></div>
+              </>}
+            </section>
+          </div>
+        </div>;
+      })()}
+    </div>, document.body)}
   </AppLayout>;
 }
 

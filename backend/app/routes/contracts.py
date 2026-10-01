@@ -18,7 +18,7 @@ from app.schemas.contract import (
     ContractSummary,
 )
 from app.services.notifications import create_notification
-from app.services.pricing import PLATFORM_FEE_RATE, campaign_fee_rate, platform_fee_for, total_for_rate
+from app.services.pricing import PLATFORM_FEE_RATE, campaign_fee_rate, platform_fee_for, resolve_campaign_rate, total_for_rate
 from app.services.khalti import initiate_payment, KhaltiError
 from app.core.config import FRONTEND_URL
 
@@ -183,8 +183,19 @@ async def finalize_contract(
         raise HTTPException(status_code=400, detail="This contract cannot be finalized.")
 
     campaign = contract.campaign
-    total = data.total_value if data.total_value is not None else total_for_rate(data.agreed_rate, campaign)
-    contract.agreed_rate = round(data.agreed_rate, 2)
+
+    # If the campaign itself fixed the amount ("Custom amount"), that amount was
+    # confirmed when the campaign was created and cannot be changed here, no
+    # matter what the client sends.
+    fixed_rate = resolve_campaign_rate(campaign)
+    if fixed_rate is not None:
+        agreed_rate = fixed_rate
+        total = total_for_rate(fixed_rate, campaign)
+    else:
+        agreed_rate = data.agreed_rate
+        total = data.total_value if data.total_value is not None else total_for_rate(data.agreed_rate, campaign)
+
+    contract.agreed_rate = round(agreed_rate, 2)
     fee_rate = campaign_fee_rate(campaign)
     contract.total_value = round(total, 2)
     # Fee is charged ON TOP of the creator payment (total_value).

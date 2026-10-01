@@ -599,7 +599,7 @@ export function PublicNavbar({
         }
 
         .ch-nav-logo span {
-          font: 600 21px 'League Spartan', sans-serif;
+          font: 400 21px 'League Spartan', sans-serif;
           letter-spacing: -0.8px;
         }
 
@@ -646,7 +646,7 @@ export function PublicNavbar({
           background: transparent !important;
           background-color: transparent !important;
           color: #111 !important;
-          font-weight: 600;
+          font-weight: 500;
         }
 
         .ch-nav-link.active::after {
@@ -777,7 +777,7 @@ export function PublicNavbar({
           border-radius: 20px;
           background: #111 !important;
           color: #fff !important;
-          font: 700 9px/16px Poppins, sans-serif;
+          font: 500 9px/16px Poppins, sans-serif;
           text-align: center;
           padding: 0 3px;
         }
@@ -795,7 +795,7 @@ export function PublicNavbar({
           display: flex;
           align-items: center;
           justify-content: center;
-          font: 700 12px Poppins, sans-serif;
+          font: 500 12px Poppins, sans-serif;
           cursor: pointer;
           appearance: none;
           box-shadow: none !important;
@@ -878,7 +878,7 @@ export function PublicNavbar({
 
         .ch-panel-head h3 {
           margin: 0;
-          font: 700 15px Poppins, sans-serif;
+          font: 500 15px Poppins, sans-serif;
         }
 
         .ch-panel-head button {
@@ -908,7 +908,7 @@ export function PublicNavbar({
 
         .ch-panel-row strong {
           display: block;
-          font: 600 12px Poppins, sans-serif;
+          font: 500 12px Poppins, sans-serif;
         }
 
         .ch-panel-row p {

@@ -119,8 +119,11 @@ const STEPS = [
   ["Basics", "Campaign essentials"],
   ["Work", "Responsibilities & deliverables"],
   ["Engagement & Budget", "Working relationship & pay"],
-  ["Requirements", "Skills & timeline"],
+  ["Requirements", "Skills & screening"],
+  ["Timeline", "Dates & application deadline"],
 ] as const;
+
+const LAST_STEP = 5;
 
 type CampaignFormData = {
   title: string;
@@ -524,13 +527,17 @@ function CampaignForm({
     if (s === 4) {
       if (!form.experience_level) nextErrors.experience_level = "Please select the experience level you need.";
       if (!form.required_skills.length) nextErrors.required_skills = "Select at least one required skill.";
+    }
+
+    if (s === 5) {
       if (DATE_BASED_ENGAGEMENTS.includes(form.engagement_type)) {
         if (form.start_date && form.start_date < today) nextErrors.start_date = "Start date cannot be before today.";
         if (form.end_date && form.end_date < today) nextErrors.end_date = "End date cannot be before today.";
         if (form.start_date && form.end_date && form.end_date < form.start_date) nextErrors.end_date = "End date cannot be before the start date.";
         if (form.application_deadline && form.start_date && form.application_deadline > form.start_date) nextErrors.application_deadline = "Deadline should be on or before the start date.";
       }
-      if (form.application_deadline && form.application_deadline < today) nextErrors.application_deadline = "Application deadline cannot be before today.";
+      if (!form.application_deadline) nextErrors.application_deadline = "Choose the last day creators can apply.";
+      else if (form.application_deadline < today) nextErrors.application_deadline = "Application deadline cannot be before today.";
     }
 
     setFieldErrors(nextErrors);
@@ -548,7 +555,7 @@ function CampaignForm({
     setError("");
 
     setStep((s) =>
-      Math.min(4, s + 1)
+      Math.min(LAST_STEP, s + 1)
     );
 
     window.scrollTo({
@@ -584,7 +591,7 @@ function CampaignForm({
     publish: boolean
   ) {
     if (publish) {
-      for (let s = 1; s <= 4; s++) {
+      for (let s = 1; s <= LAST_STEP; s++) {
         const e = validate(s);
 
         if (e) {
@@ -659,8 +666,10 @@ function CampaignForm({
   function submit(
     e: FormEvent<HTMLFormElement>
   ) {
+    // Publishing only happens from the Publish button on the last step.
+    // Enter key or any stray submit just moves to the next step.
     e.preventDefault();
-    void save(true);
+    if (step < LAST_STEP) next();
   }
 
   if (loading) {
@@ -743,7 +752,7 @@ function CampaignForm({
             </div>
 
             <span>
-              {step} / 4
+              {step} / {LAST_STEP}
             </span>
 
           </div>
@@ -779,7 +788,7 @@ function CampaignForm({
 
                     <span>
                       {item[0]} ·{" "}
-                      {number === 1
+                      {number === 1 || number === LAST_STEP
                         ? "Required"
                         : "Optional"}
                     </span>
@@ -1325,7 +1334,7 @@ function CampaignForm({
               <Card
                 number="04"
                 title="Requirements"
-                description="Define who can apply and add any practical timeline or screening details."
+                description="Define who can apply and add optional screening questions."
               >
 
                 <Field
@@ -1407,60 +1416,6 @@ function CampaignForm({
                   </Field>
 
                 </div>
-
-                <div className="cf-divider" />
-
-                <div className="cf-subheading">
-                  <h3>Timeline</h3>
-                  <p>
-                    {DATE_BASED_ENGAGEMENTS.includes(form.engagement_type)
-                      ? "Set the campaign dates for this engagement."
-                      : "Long-term campaigns do not need fixed start or end dates."}
-                  </p>
-                </div>
-
-                {DATE_BASED_ENGAGEMENTS.includes(form.engagement_type) && (
-                  <div className="cf-grid-2">
-                    <Field
-                      label="Start date"
-                      hint="Example: choose the date the creator should begin."
-                      error={fieldErrors.start_date}
-                    >
-                      <input
-                        type="date"
-                        min={today}
-                        value={form.start_date}
-                        onChange={(e) => set("start_date", e.target.value)}
-                      />
-                    </Field>
-
-                    <Field
-                      label="End date"
-                      hint="Example: choose the final delivery date."
-                      error={fieldErrors.end_date}
-                    >
-                      <input
-                        type="date"
-                        min={form.start_date || today}
-                        value={form.end_date}
-                        onChange={(e) => set("end_date", e.target.value)}
-                      />
-                    </Field>
-                  </div>
-                )}
-
-                <Field
-                  label="Application deadline"
-                  hint="Example: the last day creators can apply. It cannot be before today."
-                  error={fieldErrors.application_deadline}
-                >
-                  <input
-                    type="date"
-                    min={today}
-                    value={form.application_deadline}
-                    onChange={(e) => set("application_deadline", e.target.value)}
-                  />
-                </Field>
 
                 <div className="cf-divider" />
 
@@ -1555,6 +1510,83 @@ function CampaignForm({
             )}
 
             {/* =========================
+                STEP 5
+            ========================== */}
+
+            {step === 5 && (
+              <Card
+                number="05"
+                title="Timeline"
+                description="Choose when creators can apply and, if it applies, when the work starts and ends."
+              >
+
+                <div className="cf-subheading">
+                  <h3>Application deadline</h3>
+                  <p>
+                    Creators can apply until this date. After it passes, the
+                    campaign stops accepting applications.
+                  </p>
+                </div>
+
+                <Field
+                  label="Last day to apply"
+                  required
+                  hint="It cannot be before today, and should be on or before the start date."
+                  error={fieldErrors.application_deadline}
+                >
+                  <input
+                    type="date"
+                    min={today}
+                    value={form.application_deadline}
+                    onChange={(e) => set("application_deadline", e.target.value)}
+                  />
+                </Field>
+
+                <div className="cf-divider" />
+
+                <div className="cf-subheading">
+                  <h3>Campaign dates</h3>
+                  <p>
+                    {DATE_BASED_ENGAGEMENTS.includes(form.engagement_type)
+                      ? "Set when the creator should start and finish."
+                      : "Long-term campaigns do not need fixed start or end dates."}
+                  </p>
+                </div>
+
+                {DATE_BASED_ENGAGEMENTS.includes(form.engagement_type) && (
+                  <div className="cf-grid-2">
+                    <Field
+                      label="Start date"
+                      hint="Example: choose the date the creator should begin."
+                      error={fieldErrors.start_date}
+                    >
+                      <input
+                        type="date"
+                        min={today}
+                        value={form.start_date}
+                        onChange={(e) => set("start_date", e.target.value)}
+                      />
+                    </Field>
+
+                    <Field
+                      label="End date"
+                      hint="Example: choose the final delivery date."
+                      error={fieldErrors.end_date}
+                    >
+                      <input
+                        type="date"
+                        min={form.start_date || today}
+                        value={form.end_date}
+                        onChange={(e) => set("end_date", e.target.value)}
+                      />
+                    </Field>
+                  </div>
+                )}
+
+              </Card>
+            )}
+
+            {/* =========================
                 FOOTER
             ========================== */}
 
@@ -1593,8 +1625,9 @@ function CampaignForm({
                   Save draft
                 </button>
 
-                {step < 4 ? (
+                {step < LAST_STEP ? (
                   <button
+                    key="continue"
                     type="button"
                     className="cf-btn black"
                     disabled={!!busy}
@@ -1608,9 +1641,11 @@ function CampaignForm({
                   </button>
                 ) : (
                   <button
-                    type="submit"
+                    key="publish"
+                    type="button"
                     className="cf-btn black"
                     disabled={!!busy}
+                    onClick={() => void save(true)}
                   >
                     {busy === "publish" && (
                       <Loader2
@@ -2617,7 +2652,7 @@ const CSS = `
   display:grid;
 
   grid-template-columns:
-    repeat(4,1fr);
+    repeat(5,1fr);
 
   gap:7px;
 

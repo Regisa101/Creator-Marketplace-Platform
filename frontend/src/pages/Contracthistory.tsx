@@ -399,7 +399,7 @@ export function ContractHistory() {
             overflow: hidden;
             background: #111;
             color: #fff;
-            font: 600 12px Poppins, sans-serif;
+            font: 500 12px Poppins, sans-serif;
           }
 
           .ch-biz-icon img,
@@ -425,7 +425,7 @@ export function ContractHistory() {
 
           .ch-biz-name,
           .ch-creator-name {
-            font: 600 13px Poppins, sans-serif;
+            font: 500 13px Poppins, sans-serif;
             color: #111;
             white-space: nowrap;
             overflow: hidden;
@@ -703,7 +703,7 @@ export function ContractHistory() {
             margin: 4px 0 4px;
             font-size: 19px;
             line-height: 1.25;
-            font-weight: 700;
+            font-weight: 500;
           }
 
           .ch-detail-business {
@@ -766,7 +766,7 @@ export function ContractHistory() {
             background: #eceef1;
             color: #555;
             font-size: 15px;
-            font-weight: 700;
+            font-weight: 500;
           }
 
           .ch-detail-creator-avatar img {
@@ -777,7 +777,7 @@ export function ContractHistory() {
 
           .ch-detail-creator-name {
             font-size: 13px;
-            font-weight: 600;
+            font-weight: 500;
           }
 
           .ch-detail-creator-role {
@@ -822,7 +822,7 @@ export function ContractHistory() {
             gap: 8px;
             margin-bottom: 9px;
             font-size: 12px;
-            font-weight: 700;
+            font-weight: 500;
           }
 
           .ch-deliverables {
@@ -863,7 +863,7 @@ export function ContractHistory() {
             gap: 10px;
             margin-bottom: 12px;
             font-size: 11px;
-            font-weight: 700;
+            font-weight: 500;
           }
 
           .ch-manage-grid {
@@ -888,7 +888,7 @@ export function ContractHistory() {
             margin-top: 3px;
             color: #222;
             font-size: 10px;
-            font-weight: 600;
+            font-weight: 500;
           }
 
           .ch-complete-btn {
@@ -899,7 +899,7 @@ export function ContractHistory() {
             border-radius: 8px;
             background: #111;
             color: #fff;
-            font: 600 10px Poppins, sans-serif;
+            font: 500 10px Poppins, sans-serif;
             cursor: pointer;
           }
 
@@ -978,7 +978,7 @@ export function ContractHistory() {
           .ch-modal-record-value {
             text-align: right;
             color: #222;
-            font-weight: 600;
+            font-weight: 500;
           }
 
           .ch-confirm {
@@ -1006,7 +1006,7 @@ export function ContractHistory() {
             min-height: 36px;
             padding: 0 15px;
             border-radius: 8px;
-            font: 600 10px Poppins, sans-serif;
+            font: 500 10px Poppins, sans-serif;
             cursor: pointer;
           }
 

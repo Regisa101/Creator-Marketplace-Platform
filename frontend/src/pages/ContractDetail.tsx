@@ -527,10 +527,7 @@ export function ContractDetail() {
 
                   {canPay && (
                     <div style={{ marginTop: 14 }}>
-                      <KhaltiPaymentForm
-                        contract={contract}
-                        onCancel={() => undefined}
-                      />
+                      <KhaltiPaymentForm contract={contract} variant="inline" />
                     </div>
                   )}
                 </section>
