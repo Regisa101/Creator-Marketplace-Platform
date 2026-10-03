@@ -45,6 +45,7 @@ import { Notifications } from './pages/Notifications';
 import PaymentReturn from './pages/PaymentReturn';
 
 import { Dashboard } from './pages/Dashboard';
+import { Analytics } from './pages/Analytics';
 import { CreatorDashboard } from './pages/CreatorDashboard';
 import AdminDashboard from './pages/AdminDashboard';
 
@@ -117,6 +118,25 @@ function DashboardRouter() {
   }
 
   return <Navigate to="/" replace />;
+}
+
+
+/* ============================================================
+   ANALYTICS ROUTER
+============================================================ */
+
+function AnalyticsRouter() {
+  const { user } = useAuth();
+
+  if (user?.role === 'business') {
+    return <Analytics />;
+  }
+
+  /*
+   * Only brands have an analytics page. Everyone else keeps the
+   * behaviour /analytics always had: go to /dashboard.
+   */
+  return <Navigate to="/dashboard" replace />;
 }
 
 
@@ -417,10 +437,9 @@ export default function App() {
           <Route
             path="/analytics"
             element={
-              <Navigate
-                to="/dashboard"
-                replace
-              />
+              <ProtectedRoute>
+                <AnalyticsRouter />
+              </ProtectedRoute>
             }
           />
 

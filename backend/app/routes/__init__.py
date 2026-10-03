@@ -10,6 +10,7 @@ from app.routes import contracts
 from app.routes import saved_campaigns
 from app.routes import uploads
 from app.routes import admin
+from app.routes import analytics
 
 
 __all__ = [
@@ -25,4 +26,5 @@ __all__ = [
     "saved_campaigns",
     "uploads",
     "admin",
+    "analytics",
 ]

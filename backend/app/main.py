@@ -36,6 +36,7 @@ from app.routes import (
     saved_campaigns,
     uploads,
     admin,
+    analytics,
 )
 
 
@@ -414,6 +415,10 @@ app.include_router(
 
 app.include_router(
     admin.router
+)
+
+app.include_router(
+    analytics.router
 )
 
 

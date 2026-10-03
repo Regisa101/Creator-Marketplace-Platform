@@ -608,6 +608,74 @@ export const initiateContractFeeCheckout = (id: number) =>
   unwrap(api.post<{ payment_url: string | null; pidx: string | null; purchase_order_id: string; amount: number; transaction_id?: string; contract?: Contract }>(`/contracts/${id}/checkout`));
 export const getContractSummary = () => unwrap(api.get<ContractSummary>('/contracts/summary/me'));
 
+// ---------------------------------------------------------------------------
+// Brand analytics (GET /api/analytics/business) - calculated by the backend
+// from the brand's real campaigns, applications, contracts and payments.
+// ---------------------------------------------------------------------------
+export type AnalyticsRange = '7d' | '30d' | '90d' | 'all';
+
+export interface BusinessAnalytics {
+  range: AnalyticsRange;
+  range_start: string | null;
+  generated_at: string;
+  has_campaigns: boolean;
+  summary: {
+    total_applications: number;
+    creators_hired: number;
+    total_spent: number;
+    platform_fees: number;
+    completion_rate: number;
+  };
+  funnel: {
+    applications: number;
+    selected: number;
+    paid: number;
+    completed: number;
+    selected_pct: number | null;
+    paid_pct: number | null;
+    completed_pct: number | null;
+  };
+  spend_over_time: {
+    granularity: 'day' | 'month';
+    points: { period: string; amount: number }[];
+  };
+  campaigns: {
+    id: number;
+    title: string;
+    status: string;
+    creators_needed: number;
+    applications: number;
+    hired: number;
+  }[];
+  attention: {
+    count: number;
+    pending_applications: {
+      count: number;
+      older_than_days: number;
+      oldest_days: number | null;
+      link: string;
+    };
+    unpaid_selected: {
+      count: number;
+      items: {
+        contract_id: number;
+        campaign_id: number;
+        campaign_title: string | null;
+        creator_name: string | null;
+        status: string;
+        fee_amount: number | null;
+        link: string;
+      }[];
+    };
+    closing_soon: {
+      items: { campaign_id: number; title: string; deadline: string | null; link: string }[];
+    };
+  };
+}
+
+export const getBusinessAnalytics = (range: AnalyticsRange) =>
+  unwrap(api.get<BusinessAnalytics>('/analytics/business', { params: { range } }));
+
 function notifyWishlistChanged() {
   window.dispatchEvent(new Event('ch:wishlist-changed'));
 }
