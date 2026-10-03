@@ -23,7 +23,7 @@ class CreatorOnboardingComplete(BaseModel):
     username: str = Field(..., min_length=3, max_length=24, pattern=r'^[a-zA-Z0-9_]+$')
     location: str = Field(..., min_length=1, max_length=100)
     creator_type: str = Field(..., min_length=1, max_length=255)
-    profile_image: str = Field(..., min_length=1)
+    profile_image: Optional[str] = None
 
     bio: Optional[str] = Field(None, max_length=500)
     niches: List[str] = Field(default_factory=list)
@@ -35,6 +35,7 @@ class CreatorOnboardingComplete(BaseModel):
     socials: List[CreatorSocialBase] = Field(default_factory=list)
     portfolio: List[CreatorPortfolioItem] = Field(default_factory=list)
     availability: Optional[str] = None
+    starting_price: Optional[float] = Field(None, ge=0)
 
 
 class CreatorOnboardingProgress(BaseModel):
@@ -54,3 +55,4 @@ class CreatorOnboardingProgress(BaseModel):
     audience_age_range: Optional[List[str]] = None
     audience_location: Optional[List[str]] = None
     audience_interests: Optional[List[str]] = None
+    starting_price: Optional[float] = Field(None, ge=0)

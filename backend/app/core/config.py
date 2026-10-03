@@ -36,3 +36,9 @@ SMTP_PORT = _int_env("SMTP_PORT", 587)
 SMTP_USERNAME = os.getenv("SMTP_USERNAME", "").strip()
 SMTP_PASSWORD = os.getenv("SMTP_PASSWORD", "").strip()
 SMTP_FROM_EMAIL = os.getenv("SMTP_FROM_EMAIL", "").strip() or SMTP_USERNAME
+
+# Google sign-in ("Continue with Google")
+GOOGLE_CLIENT_ID = os.getenv("GOOGLE_CLIENT_ID", "").strip()
+
+# Forgot password: how long an emailed reset link stays valid (minutes)
+PASSWORD_RESET_EXPIRE_MINUTES = _int_env("PASSWORD_RESET_EXPIRE_MINUTES", 30)

@@ -14,13 +14,16 @@ import {
 
 import {
   Bell,
-  FileSignature,
+  FileText,
   Bookmark,
+  History,
   LayoutDashboard,
   LogOut,
+  Megaphone,
   Menu,
   Search,
   Trash2,
+  Trophy,
   UserRound,
   X,
 } from 'lucide-react';
@@ -819,7 +822,7 @@ export function PublicNavbar({
           position: absolute;
           right: 0;
           top: 48px;
-          width: 190px;
+          width: 230px;
           padding: 7px;
           background: #fff !important;
           border: 1px solid #e5e5e5;
@@ -845,6 +848,46 @@ export function PublicNavbar({
           cursor: pointer;
           text-align: left;
           appearance: none;
+        }
+
+        .ch-profile-menu-head {
+          display: flex;
+          flex-direction: column;
+          gap: 2px;
+          padding: 9px 11px 11px;
+          margin-bottom: 5px;
+          border-bottom: 1px solid #eee;
+          min-width: 0;
+        }
+
+        .ch-profile-menu-head span {
+          font: 400 11px Poppins, sans-serif;
+          color: #777;
+        }
+
+        .ch-profile-menu-head strong {
+          font: 600 13px Poppins, sans-serif;
+          color: #111;
+          overflow: hidden;
+          text-overflow: ellipsis;
+          white-space: nowrap;
+        }
+
+        .ch-profile-menu-head small {
+          font: 500 9.5px Poppins, sans-serif;
+          letter-spacing: .04em;
+          text-transform: uppercase;
+          color: #777;
+        }
+
+        .ch-profile-menu-divider {
+          height: 1px;
+          background: #eee;
+          margin: 5px 0;
+        }
+
+        .ch-profile-menu-signout {
+          color: #777 !important;
         }
 
         .ch-profile-menu a:hover,
@@ -1226,56 +1269,87 @@ export function PublicNavbar({
 
                       <div className="ch-profile-menu">
 
-                        <Link
-                          to="/profile"
-                          onClick={() => setProfileOpen(false)}
-                        >
-                          <UserRound size={14} />
-                          Profile
-                        </Link>
-
+                        <div className="ch-profile-menu-head">
+                          <span>Signed in as</span>
+                          <strong>{user?.email}</strong>
+                          <small>
+                            {user?.role === 'business' ? 'Brand' : user?.role}
+                          </small>
+                        </div>
 
                         <Link
                           to={user?.role === 'admin' ? '/admin' : '/dashboard'}
                           onClick={() => setProfileOpen(false)}
                         >
-                          <LayoutDashboard size={14} />
+                          <LayoutDashboard size={15} />
                           Dashboard
                         </Link>
 
-
                         {user?.role === 'creator' && (
+                          <>
+                            <Link
+                              to="/applications"
+                              onClick={() => setProfileOpen(false)}
+                            >
+                              <FileText size={15} />
+                              My Applications
+                            </Link>
 
-                          <Link
-                            to="/contracts"
-                            onClick={() => setProfileOpen(false)}
-                          >
-                            <FileSignature size={14} />
-                            Contract History
-                          </Link>
-
+                            <Link
+                              to="/contracts"
+                              onClick={() => setProfileOpen(false)}
+                            >
+                              <Trophy size={15} />
+                              Selected Campaigns
+                            </Link>
+                          </>
                         )}
-
 
                         {user?.role === 'business' && (
+                          <>
+                            <Link
+                              to="/campaigns"
+                              onClick={() => setProfileOpen(false)}
+                            >
+                              <Megaphone size={15} />
+                              My Campaigns
+                            </Link>
 
-                          <Link
-                            to="/collab-history"
-                            onClick={() => setProfileOpen(false)}
-                          >
-                            <FileSignature size={14} />
-                            Collab History
-                          </Link>
+                            <Link
+                              to="/applications"
+                              onClick={() => setProfileOpen(false)}
+                            >
+                              <FileText size={15} />
+                              Applications
+                            </Link>
 
+                            <Link
+                              to="/collab-history"
+                              onClick={() => setProfileOpen(false)}
+                            >
+                              <History size={15} />
+                              Collab History
+                            </Link>
+                          </>
                         )}
 
+                        <div className="ch-profile-menu-divider" />
+
+                        <Link
+                          to="/profile"
+                          onClick={() => setProfileOpen(false)}
+                        >
+                          <UserRound size={15} />
+                          Profile
+                        </Link>
 
                         <button
                           type="button"
+                          className="ch-profile-menu-signout"
                           onClick={handleLogout}
                         >
-                          <LogOut size={14} />
-                          Logout
+                          <LogOut size={15} />
+                          Sign out
                         </button>
 
                       </div>

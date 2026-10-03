@@ -12,6 +12,7 @@ import {
   BarChart3,
   ChevronDown,
   LogOut,
+  UserRound,
   Settings,
   ArrowRight,
   CheckCircle2,
@@ -1084,6 +1085,37 @@ export function AppLayout({
           min-width: 0;
         }
 
+        .app-topbar-menu {
+          display: flex;
+          align-items: center;
+          gap: 6px;
+          flex-wrap: wrap;
+        }
+
+        .app-topbar-menu-link {
+          padding: 7px 13px;
+          border-radius: 8px;
+          font: 400 13px Poppins, sans-serif;
+          color: #555;
+          text-decoration: none;
+          white-space: nowrap;
+        }
+
+        .app-topbar-menu-link:hover {
+          background: #f4f4f5;
+          color: #111;
+        }
+
+        .app-topbar-menu-link.active {
+          background: #f1f1f2;
+          color: #111;
+          font-weight: 500;
+        }
+
+        @media (max-width: 760px) {
+          .app-topbar-menu { display: none; }
+        }
+
         .app-topbar-actions {
           display: flex;
 
@@ -1596,6 +1628,26 @@ export function AppLayout({
 
                 </label>
               )}
+
+              {/* Pages without a search box get menu links instead (brands only). */}
+              {!showSearch && role === "business" && (
+                <nav className="app-topbar-menu" aria-label="Main menu">
+                  {nav.map((item) => (
+                    <Link
+                      key={item.to + item.label}
+                      to={item.to}
+                      className={`app-topbar-menu-link${
+                        location.pathname === item.to ||
+                        (item.to !== "/dashboard" && location.pathname.startsWith(item.to + "/"))
+                          ? " active"
+                          : ""
+                      }`}
+                    >
+                      {item.label}
+                    </Link>
+                  ))}
+                </nav>
+              )}
             </div>
 
             <div className="app-topbar-actions">
@@ -1656,13 +1708,31 @@ export function AppLayout({
                   <div className="app-user-menu">
 
                     <div className="app-user-menu-header">
-                      <div className="app-user-menu-name">
-                        {user?.full_name || "User"}
+                      <div className="app-user-menu-role" style={{ marginTop: 0, textTransform: "none" }}>
+                        Signed in as
                       </div>
-                      <div className="app-user-menu-role">
-                        {user?.role || role}
+                      <div className="app-user-menu-name" style={{ fontWeight: 600 }}>
+                        {user?.email || user?.full_name || "User"}
+                      </div>
+                      <div className="app-user-menu-role" style={{ textTransform: "uppercase", letterSpacing: ".04em" }}>
+                        {role === "business" ? "Brand" : role}
                       </div>
                     </div>
+
+                    {nav.map((item) => (
+                      <Link
+                        key={item.to + item.label}
+                        to={item.to}
+                        onClick={() =>
+                          setMenuOpen(false)
+                        }
+                      >
+                        <item.icon size={15} />
+                        {item.label}
+                      </Link>
+                    ))}
+
+                    <div style={{ height: 1, background: "#eee", margin: "5px 0" }} />
 
                     <Link
                       to="/profile"
@@ -1670,21 +1740,9 @@ export function AppLayout({
                         setMenuOpen(false)
                       }
                     >
-                      <Settings size={15} />
-                      Edit profile
+                      <UserRound size={15} />
+                      Profile
                     </Link>
-
-                    {role === "business" && (
-                      <Link
-                        to="/settings"
-                        onClick={() =>
-                          setMenuOpen(false)
-                        }
-                      >
-                        <Settings size={15} />
-                        Settings
-                      </Link>
-                    )}
 
                     <button
                       type="button"
@@ -1697,7 +1755,7 @@ export function AppLayout({
                       }}
                     >
                       <LogOut size={15} />
-                      Log out
+                      Sign out
                     </button>
 
                   </div>

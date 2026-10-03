@@ -3,6 +3,7 @@ import { useNavigate, Link } from 'react-router-dom';
 import { Eye, EyeOff, ArrowRight } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { AuthLayout } from './AuthLayout';
+import { GoogleButton } from './GoogleButton';
 
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const PASSWORD_DOTS = '••••••••';
@@ -46,6 +47,7 @@ export function RegisterBusiness() {
   };
 
   return <AuthLayout role="business" mode="register" title="Create your Brand account">
+    <GoogleButton role="business" />
     {/* noValidate: we run our own validate() above — without this, the
         browser's built-in minLength/required tooltips kick in first and
         leak specifics like "you are currently using 7 characters". */}

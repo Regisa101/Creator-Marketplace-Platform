@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom';
 
@@ -132,6 +132,7 @@ export function CampaignDetail() {
   // Landing/home -> PublicNavbar. Dashboard -> AppLayout.
   const fromLanding = searchParams.get('source') === 'landing';
   const fromDashboard = searchParams.get('source') === 'dashboard';
+  const wantsApply = searchParams.get('apply') === 'true';
   const backHref = fromLanding ? '/#campaigns' : '/campaigns';
   const { user } = useAuth();
 
@@ -143,6 +144,7 @@ export function CampaignDetail() {
   const [saved, setSaved] = useState(false);
 
   const [showApply, setShowApply] = useState(false);
+  const autoApplyHandled = useRef(false);
 
   const [ownerApplications, setOwnerApplications] = useState<Application[]>([]);
   const [ownerApplicationsLoaded, setOwnerApplicationsLoaded] = useState(false);
@@ -163,6 +165,23 @@ export function CampaignDetail() {
   );
 
   const isCreator = user?.role === 'creator';
+
+  // Opened from a campaign card's "Apply now": show the application popup once.
+  useEffect(() => {
+    if (
+      !wantsApply ||
+      autoApplyHandled.current ||
+      loading ||
+      !campaign ||
+      !isCreator ||
+      application ||
+      campaign.status !== 'published'
+    ) {
+      return;
+    }
+    autoApplyHandled.current = true;
+    setShowApply(true);
+  }, [wantsApply, loading, campaign, isCreator, application]);
 
   const deadlinePassed = isDeadlinePassed(campaign?.application_deadline);
   const hasAcceptedCreator = ownerApplications.some(
@@ -1087,6 +1106,7 @@ const STYLE = `
 .cd-header-apply{
   display:flex;
   align-items:flex-start;
+  margin-top:20px;
   padding-top:0;
 }
 .cd-apply--header{

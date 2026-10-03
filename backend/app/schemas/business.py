@@ -75,6 +75,9 @@ class PublicCampaignSummary(BaseModel):
     title: str
     category: str
     status: str
+    hero_image: Optional[str] = None
+    budget: Optional[float] = None
+    campaign_type: Optional[str] = None
 
 
 class BusinessWorkHistoryItem(BaseModel):
@@ -83,6 +86,8 @@ class BusinessWorkHistoryItem(BaseModel):
     campaign_title: str
     creator_id: int
     creator_name: Optional[str] = None
+    creator_avatar: Optional[str] = None
+    status: Optional[str] = None
     completed_at: Optional[datetime] = None
     deliverables: List[str] = []
 
@@ -103,6 +108,7 @@ class PublicBusinessProfile(BaseModel):
 
     team_size: Optional[str] = None
     year_established: Optional[int] = None
+    typical_budget: Optional[float] = None
 
     is_onboarding_complete: bool
     is_published: bool

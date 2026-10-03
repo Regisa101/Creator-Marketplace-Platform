@@ -8,6 +8,7 @@ import React, {
 import {
   login,
   register,
+  googleAuth,
   getCurrentUser,
   deleteAccount as deleteAccountRequest,
 } from '../api/client';
@@ -23,6 +24,10 @@ interface AuthContextType {
     user: User;
     redirectTo: string;
   }>;
+  googleLogin: (
+    credential: string,
+    role?: 'creator' | 'business'
+  ) => Promise<{ user: User; redirectTo: string }>;
   logout: () => void;
   deleteAccount: (password: string) => Promise<void>;
   updateProfile: (partialProfile: Record<string, any>) => void;
@@ -121,6 +126,30 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     };
   };
 
+  const googleLogin = async (
+    credential: string,
+    role?: 'creator' | 'business'
+  ): Promise<{ user: User; redirectTo: string }> => {
+    const response = await googleAuth(credential, role);
+
+    localStorage.setItem('access_token', response.access_token);
+    localStorage.setItem('user', JSON.stringify(response.user));
+
+    setUser(response.user);
+    setToken(response.access_token);
+
+    let redirectTo = '/';
+    if (response.user.role === 'admin') {
+      redirectTo = '/admin';
+    } else if (response.user.role === 'business') {
+      redirectTo = response.is_new_user ? '/onboarding/business' : '/dashboard';
+    } else if (response.user.role === 'creator' && response.is_new_user) {
+      redirectTo = '/onboarding/creator';
+    }
+
+    return { user: response.user, redirectTo };
+  };
+
   const updateProfile = (partialProfile: Record<string, any>): void => {
     setUser((prevUser) => {
       if (!prevUser) return prevUser;
@@ -156,6 +185,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     loading,
     loginUser,
     registerUser,
+    googleLogin,
     logout,
     deleteAccount,
     updateProfile,

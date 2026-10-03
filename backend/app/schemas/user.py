@@ -55,3 +55,29 @@ class AccountDeleteRequest(BaseModel):
     # Current password, required as confirmation before permanently
     # deleting the account — see routes/auth.py::delete_account.
     password: str
+
+# ============================================
+# GOOGLE SIGN-IN
+# ============================================
+
+class GoogleAuthRequest(BaseModel):
+    credential: str                 # Google ID token from the Google button
+    role: Optional[str] = None      # "creator" | "business" (only used to create a NEW account)
+
+class GoogleAuthResponse(TokenResponse):
+    is_new_user: bool = False
+
+
+# ============================================
+# FORGOT / RESET PASSWORD
+# ============================================
+
+class ForgotPasswordRequest(BaseModel):
+    email: EmailStr
+
+class ResetPasswordRequest(BaseModel):
+    token: str
+    new_password: str = Field(..., min_length=8, max_length=128)
+
+class MessageResponse(BaseModel):
+    message: str

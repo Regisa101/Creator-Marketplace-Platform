@@ -21,7 +21,7 @@ import {
 } from "../../api/client";
 import { useAuth } from "../../context/AuthContext";
 
-const TYPES = [
+export const TYPES = [
   "Influencer",
   "UGC Creator",
   "Content Creator",
@@ -58,10 +58,10 @@ const CATEGORIES = [
   "Pets",
 ];
 
-const CONTENT = ["Reels", "Photos", "Stories", "YouTube Videos", "Shorts", "Reviews", "UGC"];
+export const CONTENT = ["Reels", "Photos", "Stories", "YouTube Videos", "Shorts", "Reviews", "UGC"];
 const LANGUAGES = ["English", "Nepali", "Hindi", "Newari", "Maithili"];
 
-const LOCATIONS = [
+export const LOCATIONS = [
   "Kathmandu, Nepal",
   "Lalitpur, Nepal",
   "Bhaktapur, Nepal",
@@ -88,7 +88,7 @@ const LOCATIONS = [
   "International",
 ];
 
-const STEPS = ["Basic profile", "Professional", "Portfolio & social", "Availability"];
+const STEPS = ["Basic profile", "Professional", "Portfolio", "Availability"];
 
 type Social = {
   platform: string;
@@ -103,7 +103,7 @@ type Portfolio = {
   type?: string;
 };
 
-const parseTypes = (value: unknown): string[] => {
+export const parseTypes = (value: unknown): string[] => {
   if (typeof value === "string") {
     return value
       .split(/\s*(?:,|\||•)\s*/)
@@ -413,7 +413,7 @@ export function CreatorOnboarding() {
     }
 
     if (step === 3) {
-      await saveCreatorProgress({ socials, portfolio });
+      await saveCreatorProgress({ portfolio });
     }
 
     if (step === 4) {
@@ -422,7 +422,7 @@ export function CreatorOnboarding() {
   };
 
   const saveBasic = async () => {
-    if (!name.trim() || !username.trim() || !location.trim() || !photo || !types.length) {
+    if (!name.trim() || !username.trim() || !location.trim() || !types.length) {
       setError("Complete all required basic profile fields before continuing.");
       return;
     }
@@ -441,7 +441,7 @@ export function CreatorOnboarding() {
         username: username.trim(),
         location: location.trim(),
         creator_type: types.join(", "),
-        profile_image: photo,
+        ...(photo ? { profile_image: photo } : {}),
       };
 
       await completeCreatorOnboarding({
@@ -705,7 +705,7 @@ export function CreatorOnboarding() {
                 </div>
                 <label className="onb-upload">
                   <UploadCloud size={15} />
-                  {uploading ? " Uploading…" : " Add profile photo"}
+                  {uploading ? " Uploading…" : photo ? " Change photo" : " Add profile photo (optional)"}
                   <input
                     type="file"
                     accept="image/*"
@@ -837,8 +837,8 @@ export function CreatorOnboarding() {
 
           {step === 3 && (
             <section>
-              <h2>Portfolio & social</h2>
-              <p className="onb-sub">Your primary social profile is already required. Add portfolio work and any additional social profiles here when you are ready.</p>
+              <h2>Portfolio</h2>
+              <p className="onb-sub">Add examples of your best work for brands to see. You can skip this and add it later from your profile.</p>
 
               <Field label="Portfolio work sample">
                 <div className="onb-inline">
@@ -873,63 +873,6 @@ export function CreatorOnboarding() {
                           type="button"
                           aria-label={`Remove ${item.title}`}
                           onClick={() => setPortfolio((current) => current.filter((_, i) => i !== index))}
-                        >
-                          <Trash2 size={14} />
-                        </button>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </Field>
-
-              <Field label="Social account">
-                <div className="onb-grid">
-                  <StyledSelect value={socialPlatform} onChange={setSocialPlatform}>
-                    <option>Instagram</option>
-                    <option>TikTok</option>
-                    <option>YouTube</option>
-                    <option>Facebook</option>
-                    <option>LinkedIn</option>
-                    <option>Other</option>
-                  </StyledSelect>
-                  <input
-                    className="onb-input"
-                    value={socialUsername}
-                    onChange={(event) => setSocialUsername(event.target.value)}
-                    placeholder="@username"
-                  />
-                </div>
-
-                <div className="onb-grid" style={{ marginTop: 10 }}>
-                  <input
-                    className="onb-input"
-                    value={socialUrl}
-                    onChange={(event) => setSocialUrl(event.target.value)}
-                    placeholder="Profile URL"
-                  />
-                  <input
-                    className="onb-input"
-                    type="number"
-                    min="0"
-                    value={followers}
-                    onChange={(event) => setFollowers(event.target.value)}
-                    placeholder="Followers (optional)"
-                  />
-                </div>
-
-                <button type="button" className="onb-secondary" onClick={addSocial}>
-                  <Plus size={14} /> Add social account
-                </button>
-
-                {socials.length > 0 && (
-                  <div className="onb-list">
-                    {socials.map((item, index) => (
-                      <div className="onb-list-row" key={`${item.platform}-${item.profile_url}-${index}`}>
-                        <span>{item.platform} · @{item.username}</span>
-                        <button
-                          type="button"
-                          aria-label={`Remove ${item.platform} account`}
-                          onClick={() => setSocials((current) => current.filter((_, i) => i !== index))}
                         >
                           <Trash2 size={14} />
                         </button>

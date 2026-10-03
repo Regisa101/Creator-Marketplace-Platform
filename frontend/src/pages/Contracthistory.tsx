@@ -27,6 +27,7 @@ import {
 } from '../api/client';
 
 import { AppLayout } from '../components/AppLayout';
+import { PublicNavbar } from '../components/PublicNavbar';
 import { useAuth } from '../context/AuthContext';
 
 type FilterType =
@@ -118,6 +119,58 @@ function getCategoryTag(contract: Contract) {
     anyContract.evidence_snapshot?.campaign?.niche ||
     contract.engagement_type ||
     ''
+  );
+}
+
+/* Creators use the landing page navbar; brands keep the dashboard layout. */
+function HistoryShell({
+  isCreator,
+  title,
+  subtitle,
+  searchValue,
+  onSearchChange,
+  searchPlaceholder,
+  children,
+}: {
+  isCreator: boolean;
+  title: string;
+  subtitle: string;
+  searchValue: string;
+  onSearchChange: (value: string) => void;
+  searchPlaceholder: string;
+  children: React.ReactNode;
+}) {
+  if (!isCreator) {
+    return (
+      <AppLayout
+        title={title}
+        subtitle={subtitle}
+        showNotifications
+        searchValue={searchValue}
+        onSearchChange={onSearchChange}
+        searchPlaceholder={searchPlaceholder}
+      >
+        {children}
+      </AppLayout>
+    );
+  }
+
+  return (
+    <div style={{ minHeight: '100vh', background: '#fcfaf9' }}>
+      <PublicNavbar />
+      <div style={{ maxWidth: 1088, margin: '0 auto', padding: '100px 24px 60px', fontFamily: 'Poppins, sans-serif' }}>
+        <h1 style={{ margin: 0, font: "600 24px 'League Spartan', Poppins, sans-serif", letterSpacing: '-.02em' }}>{title}</h1>
+        <p style={{ margin: '4px 0 16px', fontSize: 12, color: '#777' }}>{subtitle}</p>
+        <input
+          type="search"
+          value={searchValue}
+          onChange={(e) => onSearchChange(e.target.value)}
+          placeholder={searchPlaceholder}
+          style={{ width: '100%', maxWidth: 420, height: 40, padding: '0 14px', marginBottom: 20, border: '1px solid #ddd', borderRadius: 9, background: '#fff', font: '400 12px Poppins, sans-serif', boxSizing: 'border-box' }}
+        />
+        {children}
+      </div>
+    </div>
   );
 }
 
@@ -324,14 +377,14 @@ export function ContractHistory() {
   };
 
   return (
-    <AppLayout
+    <HistoryShell
+      isCreator={isCreator}
       title={isCreator ? 'Contract History' : 'Collaboration History'}
       subtitle={
         isCreator
           ? 'View your contracts, active collaborations and completed work.'
           : 'Manage your active and completed collaborations with creators.'
       }
-      showNotifications
       searchValue={search}
       onSearchChange={setSearch}
       searchPlaceholder={
@@ -1086,7 +1139,6 @@ export function ContractHistory() {
                   <CollaborationCard
                     key={`contract-${contract.id}`}
                     contract={contract}
-                    isCreator={isCreator}
                     isBusiness={isBusiness}
                     businessLogo={businessLogos[contract.business_id]}
                     creatorAvatar={creatorAvatars[contract.creator_id]}
@@ -1137,13 +1189,12 @@ export function ContractHistory() {
           />
         )}
       </div>
-    </AppLayout>
+    </HistoryShell>
   );
 }
 
 function CollaborationCard({
   contract,
-  isCreator,
   isBusiness,
   businessLogo,
   creatorAvatar,
@@ -1153,7 +1204,6 @@ function CollaborationCard({
   onComplete,
 }: {
   contract: Contract;
-  isCreator: boolean;
   isBusiness: boolean;
   businessLogo?: string;
   creatorAvatar?: string;
@@ -1177,17 +1227,29 @@ function CollaborationCard({
   return (
     <article className="ch-card" onClick={onSelect}>
       <div className="ch-card-business">
-        <span className="ch-biz-icon" style={{ background: palette.bg }}>
+        <Link
+          to={`/brands/${contract.business_id}`}
+          className="ch-biz-icon"
+          style={{ background: palette.bg }}
+          onClick={(e) => e.stopPropagation()}
+          aria-label="View business profile"
+        >
           {businessLogo ? (
             <img src={businessLogo} alt="" />
           ) : (
             <BriefcaseBusiness size={18} color={palette.fg} />
           )}
-        </span>
+        </Link>
 
         <div className="ch-biz-info">
           <div className="ch-biz-name">
-            {contract.business_name || 'Business'}
+            <Link
+              to={`/brands/${contract.business_id}`}
+              onClick={(e) => e.stopPropagation()}
+              style={{ color: 'inherit', textDecoration: 'none' }}
+            >
+              {contract.business_name || 'Business'}
+            </Link>
           </div>
 
           {contract.campaign_title && (

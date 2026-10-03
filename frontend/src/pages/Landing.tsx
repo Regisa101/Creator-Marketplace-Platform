@@ -5,7 +5,7 @@
 // and discover creator opportunities.
 
 import { useEffect, useMemo, useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { LogoMark } from "../components/Logo";
 import { PublicNavbar } from "../components/PublicNavbar";
 import { useAuth } from "../context/AuthContext";
@@ -228,6 +228,7 @@ function CampaignCard({
   isSaved: boolean;
   onToggleSave: (campaignId: number) => void;
 }) {
+  const navigate = useNavigate();
   const booked = isBooked(c);
   const unavailable = isUnavailable(c);
   const tags = campaignTags(c);
@@ -235,10 +236,24 @@ function CampaignCard({
   return (
     <div
       className={`lp-card${booked ? " lp-card-booked" : ""}`}
+      style={{ cursor: "pointer" }}
+      role="link"
+      tabIndex={0}
+      onClick={() => navigate(`/campaigns/${c.id}?source=landing`)}
+      onKeyDown={(e) => {
+        if (e.key === "Enter" && e.target === e.currentTarget) {
+          navigate(`/campaigns/${c.id}?source=landing`);
+        }
+      }}
     >
       <div className="lp-card-body">
         <div className="lp-card-topline">
-          <div className="lp-card-brand">
+          <Link
+            to={`/brands/${c.business_id}`}
+            className="lp-card-brand"
+            onClick={(e) => e.stopPropagation()}
+            style={{ textDecoration: "none", color: "inherit" }}
+          >
             <span
               className="lp-card-avatar"
               style={{
@@ -255,7 +270,7 @@ function CampaignCard({
             <span className="lp-card-brand-name">
               {c.brand_name || "Brand"}
             </span>
-          </div>
+          </Link>
 
           {isCreator && !unavailable && (
             <button
@@ -263,7 +278,10 @@ function CampaignCard({
               className={`lp-campaign-save ${
                 isSaved ? "is-saved" : ""
               }`}
-              onClick={() => onToggleSave(c.id)}
+              onClick={(e) => {
+                e.stopPropagation();
+                onToggleSave(c.id);
+              }}
               aria-label={
                 isSaved ? "Remove from wishlist" : "Save to wishlist"
               }
@@ -339,6 +357,7 @@ function CampaignCard({
             <Link
               to={`/campaigns/${c.id}?apply=true&source=landing`}
               className="lp-card-apply"
+              onClick={(e) => e.stopPropagation()}
             >
               Apply Campaign
               <ArrowRight size={14} style={{ flexShrink: 0 }} />
@@ -347,26 +366,12 @@ function CampaignCard({
             <Link
               to={`/campaigns/${c.id}?apply=true&source=landing`}
               className="lp-card-apply"
+              onClick={(e) => e.stopPropagation()}
             >
               Apply Now
               <ArrowRight size={14} style={{ flexShrink: 0 }} />
             </Link>
-          ) : (
-            <Link
-              to={`/campaigns/${c.id}?source=landing`}
-              className="lp-card-apply"
-            >
-              View Campaign
-              <ArrowRight size={14} style={{ flexShrink: 0 }} />
-            </Link>
-          )}
-
-          <Link
-            to={`/campaigns/${c.id}?source=landing`}
-            className="lp-card-view"
-          >
-            View details
-          </Link>
+          ) : null}
         </div>
       </div>
     </div>
@@ -1419,7 +1424,7 @@ export function Landing() {
           display: flex;
           flex-direction: column;
           height: 100%;
-          min-height: 448px;
+          min-height: 400px;
           min-width: 0;
           box-sizing: border-box;
           transition: transform .18s, box-shadow .18s, border-color .18s;
@@ -1432,7 +1437,7 @@ export function Landing() {
         }
 
         .lp-card-body {
-          padding: 18px 18px 17px;
+          padding: 15px 15px 14px;
           display: flex;
           flex-direction: column;
           gap: 0;
@@ -1511,13 +1516,13 @@ export function Landing() {
         }
 
         .lp-card-title {
-          font-size: 18px;
+          font-size: 16px;
           font-weight: 500;
           color: #111;
           margin: 0 0 11px;
           line-height: 1.28;
           letter-spacing: -.02em;
-          min-height: 46px;
+          min-height: 41px;
           display: -webkit-box;
           -webkit-line-clamp: 2;
           -webkit-box-orient: vertical;
@@ -1638,19 +1643,19 @@ export function Landing() {
 
         .lp-card-actions {
           display: grid;
-          grid-template-columns: minmax(0, 1.25fr) minmax(0, .85fr);
+          grid-template-columns: minmax(0, 1fr);
           gap: 7px;
           min-height: 36px;
         }
 
         .lp-card-apply,
         .lp-card-view {
-          min-height: 36px;
+          min-height: 34px;
           display: flex;
           align-items: center;
           justify-content: center;
           gap: 6px;
-          padding: 8px 9px;
+          padding: 7px 9px;
           border-radius: 8px;
           font-size: 10.5px;
           font-weight: 500;

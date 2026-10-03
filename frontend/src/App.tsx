@@ -1,4 +1,3 @@
-
 import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom';
 import { AuthProvider, useAuth } from './context/AuthContext';
 
@@ -6,6 +5,8 @@ import { Login } from './pages/auth/Login';
 import { RoleSelect } from './pages/auth/RoleSelect';
 import { RegisterCreator } from './pages/auth/RegisterCreator';
 import { RegisterBusiness } from './pages/auth/RegisterBusiness';
+import { ForgotPassword } from './pages/auth/ForgotPassword';
+import { ResetPassword } from './pages/auth/ResetPassword';
 
 import { Landing } from './pages/Landing';
 import { Pricing } from './pages/Pricing';
@@ -23,8 +24,10 @@ import { BusinessSettings } from './pages/Settings';
 import CampaignDetail from './pages/Campaigndetail';
 import { CampaignCreate, CampaignEdit } from './pages/Campaignform';
 import { CampaignBrowse } from './pages/Campaignbrowse';
+import { Campaigns } from './pages/Campaigns';
 
 import { ApplicationsInbox } from './pages/Applicationsinbox';
+import { MyApplications } from './pages/MyApplications';
 import { SavedCampaigns } from './pages/Savedcampaigns';
 import { BrandProfile } from './pages/Brandprofile';
 
@@ -42,6 +45,7 @@ import { Notifications } from './pages/Notifications';
 import PaymentReturn from './pages/PaymentReturn';
 
 import { Dashboard } from './pages/Dashboard';
+import { CreatorDashboard } from './pages/CreatorDashboard';
 import AdminDashboard from './pages/AdminDashboard';
 
 /*
@@ -71,6 +75,32 @@ function ProfileRouter() {
    DASHBOARD ROUTER
 ============================================================ */
 
+function ApplicationsRouter() {
+  const { user } = useAuth();
+
+  // Creators see their own applications with the landing navbar;
+  // brands keep the applications inbox in the dashboard layout.
+  return user?.role === 'creator' ? <MyApplications /> : <ApplicationsInbox />;
+}
+
+
+function CampaignsRouter() {
+  const { user } = useAuth();
+
+  // Brands manage their own campaigns in the dashboard layout; creators and
+  // visitors browse campaigns with the landing page navbar.
+  if (user?.role === 'business') {
+    return <CampaignBrowse />;
+  }
+
+  return <Campaigns />;
+}
+
+
+/* ============================================================
+   DASHBOARD ROUTER
+============================================================ */
+
 function DashboardRouter() {
   const { user } = useAuth();
 
@@ -82,9 +112,10 @@ function DashboardRouter() {
     return <Dashboard />;
   }
 
-  /*
-   * Creators remain on the public marketplace.
-   */
+  if (user?.role === 'creator') {
+    return <CreatorDashboard />;
+  }
+
   return <Navigate to="/" replace />;
 }
 
@@ -143,6 +174,16 @@ export default function App() {
             element={<RegisterBusiness />}
           />
 
+           <Route
+            path="/forgot-password"
+            element={<ForgotPassword />}
+          />
+
+          <Route
+            path="/reset-password"
+            element={<ResetPassword />}
+          />
+
           <Route
             path="/login/creator"
             element={
@@ -185,7 +226,7 @@ export default function App() {
 
           <Route
             path="/campaigns"
-            element={<CampaignBrowse />}
+            element={<CampaignsRouter />}
           />
 
           <Route
@@ -307,7 +348,7 @@ export default function App() {
             path="/applications"
             element={
               <ProtectedRoute>
-                <ApplicationsInbox />
+                <ApplicationsRouter />
               </ProtectedRoute>
             }
           />

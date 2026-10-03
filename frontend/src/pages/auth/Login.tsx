@@ -1,8 +1,9 @@
 import { useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { ArrowRight, Eye, EyeOff } from "lucide-react";
 import { useAuth } from "../../context/AuthContext";
 import { AuthLayout } from "./AuthLayout";
+import { GoogleButton } from "./GoogleButton";
 
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
@@ -67,6 +68,8 @@ export function Login() {
 
   return (
     <AuthLayout mode="login" title="Log in to CreatorHub">
+      <GoogleButton />
+
       <form onSubmit={handleSubmit} noValidate>
         <div className="az-field">
           <label className="az-label" htmlFor="login-email">
@@ -87,6 +90,7 @@ export function Login() {
         <div className="az-field">
           <label className="az-label" htmlFor="login-password">
             Password
+            <Link to="/forgot-password">Forgot password?</Link>
           </label>
 
           <div className="az-pw-wrap">

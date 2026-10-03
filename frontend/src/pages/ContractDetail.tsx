@@ -23,6 +23,7 @@ import {
   type Contract,
 } from '../api/client';
 import { AppLayout } from '../components/AppLayout';
+import { PublicNavbar } from '../components/PublicNavbar';
 import { KhaltiPaymentForm } from '../components/KhaltiPaymentForm';
 import { useAuth } from '../context/AuthContext';
 
@@ -88,6 +89,31 @@ function Row({ label, value }: { label: string; value?: React.ReactNode }) {
     <div className="cdt-row">
       <span>{label}</span>
       <strong>{value || 'Not specified'}</strong>
+    </div>
+  );
+}
+
+/* Creators use the landing page navbar; brands keep the dashboard layout. */
+function DetailShell({ isCreator, children }: { isCreator: boolean; children: React.ReactNode }) {
+  if (!isCreator) {
+    return (
+      <AppLayout
+        title="Contract details"
+        subtitle="Campaign, terms and payment for this collaboration."
+        showNotifications
+        showSearch={false}
+      >
+        {children}
+      </AppLayout>
+    );
+  }
+
+  return (
+    <div style={{ minHeight: '100vh', background: '#fcfaf9' }}>
+      <PublicNavbar />
+      <div style={{ maxWidth: 1088, margin: '0 auto', padding: '100px 24px 40px' }}>
+        {children}
+      </div>
     </div>
   );
 }
@@ -238,16 +264,12 @@ export function ContractDetail() {
     : [];
 
   return (
-    <AppLayout
-      title="Contract details"
-      subtitle="Campaign, terms and payment for this collaboration."
-      showNotifications
-      showSearch={false}
-    >
+    <DetailShell isCreator={isCreator}>
       <style>{`
-        .cdt-page{max-width:1040px;margin:0 auto;padding:0 0 50px;color:#111;font-family:Poppins,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}
+        .cdt-page{max-width:none;margin:0;padding:0 0 50px;color:#111;font-family:Poppins,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}
         .cdt-back{display:inline-flex;align-items:center;gap:6px;margin-bottom:14px;color:#555;font:500 12px Poppins,sans-serif;text-decoration:none}
         .cdt-back:hover{color:#111}
+        a.cdt-avatar{text-decoration:none;color:inherit}
         .cdt-state{padding:56px 20px;text-align:center;color:#777;font:500 13px Poppins,sans-serif;background:#fff;border:1px solid #e5e5e5;border-radius:12px}
         .cdt-state h3{margin:0 0 6px;color:#111;font:600 15px Poppins,sans-serif}
         .cdt-state p{margin:0 0 16px}
@@ -283,7 +305,7 @@ export function ContractDetail() {
         .cdt-avatar img{width:100%;height:100%;object-fit:cover}
         .cdt-party-name{font:600 13px Poppins,sans-serif;color:#111}
         .cdt-party-role{font:400 11px Poppins,sans-serif;color:#888}
-        .cdt-party a{margin-left:auto}
+        .cdt-party a.cdt-link{margin-left:auto}
 
         .cdt-earn{display:flex;flex-direction:column;gap:4px;padding:14px 16px;border-radius:10px;background:#f7f7f7;margin-bottom:10px}
         .cdt-earn span{font:500 11.5px Poppins,sans-serif;color:#777}
@@ -452,20 +474,31 @@ export function ContractDetail() {
                 <section className="cdt-card">
                   <h2>Parties</h2>
                   <div className="cdt-party">
-                    <div className="cdt-avatar">
+                    <Link to={`/brands/${contract.business_id}`} className="cdt-avatar" aria-label="View business profile">
                       {businessLogo ? <img src={businessLogo} alt="" /> : initials(contract.business_name, 'B')}
-                    </div>
+                    </Link>
                     <div>
-                      <div className="cdt-party-name">{contract.business_name || 'Business'}</div>
+                      <div className="cdt-party-name">
+                        <Link to={`/brands/${contract.business_id}`} style={{ color: 'inherit', textDecoration: 'none' }}>
+                          {contract.business_name || 'Business'}
+                        </Link>
+                      </div>
                       <div className="cdt-party-role">Business</div>
                     </div>
+                    <Link className="cdt-link" to={`/brands/${contract.business_id}`}>
+                      Profile <ExternalLink size={11} />
+                    </Link>
                   </div>
                   <div className="cdt-party">
-                    <div className="cdt-avatar">
+                    <Link to={`/creators/${contract.creator_id}`} className="cdt-avatar" aria-label="View creator profile">
                       {creatorAvatar ? <img src={creatorAvatar} alt="" /> : initials(contract.creator_name, 'C')}
-                    </div>
+                    </Link>
                     <div>
-                      <div className="cdt-party-name">{contract.creator_name || 'Creator'}</div>
+                      <div className="cdt-party-name">
+                        <Link to={`/creators/${contract.creator_id}`} style={{ color: 'inherit', textDecoration: 'none' }}>
+                          {contract.creator_name || 'Creator'}
+                        </Link>
+                      </div>
                       <div className="cdt-party-role">Creator</div>
                     </div>
                     <Link className="cdt-link" to={`/creators/${contract.creator_id}`}>
@@ -594,7 +627,7 @@ export function ContractDetail() {
           </>
         )}
       </div>
-    </AppLayout>
+    </DetailShell>
   );
 }
 

@@ -73,17 +73,25 @@ def _business_display_name(campaign: Campaign) -> str:
     return (business.profile or {}).get("company_name") or business.full_name or "the brand"
 
 
-def _creator_selected_email_payload(application: Application, campaign: Campaign) -> dict | None:
+def _creator_selected_email_payload(
+    application: Application, campaign: Campaign, contract: Contract | None = None
+) -> dict | None:
     """Plain-data payload for the "you were selected" email (None if no creator email)."""
     creator = application.creator
     if not creator or not creator.email:
         return None
+    # The email button opens the contract page when we have a contract,
+    # otherwise the creator's contract list.
+    contract_url = (
+        f"{FRONTEND_URL}/contracts/{contract.id}" if contract is not None
+        else f"{FRONTEND_URL}/contracts"
+    )
     return {
         "to_email": creator.email,
         "creator_name": (creator.profile or {}).get("display_name") or creator.full_name,
         "campaign_title": campaign.title,
         "business_name": _business_display_name(campaign),
-        "campaign_url": f"{FRONTEND_URL}/campaigns/{campaign.id}",
+        "campaign_url": contract_url,
         "application_id": application.id,
     }
 
@@ -137,7 +145,7 @@ def _finalize_selection(db: Session, payment: Payment, method: str, metadata: di
             event_key=f"application-rejected-closed:{other.id}",
         )
 
-        create_notification(
+    create_notification(
         db,
         user_id=application.creator_id,
         type="creator_selected",
@@ -237,6 +245,11 @@ async def verify_payment(
                 selected_key = f"creator-selected:{application.id}"
                 first_time = db.query(Notification).filter(Notification.event_key == selected_key).first() is None
                 business_name = _business_display_name(campaign)
+                # TEMPORARY debug line - delete once emails are confirmed working.
+                print(
+                    f"[selection-email] application={application.id} first_time={first_time} "
+                    f"to={application.creator.email if application.creator else None}"
+                )
 
                 create_notification(
                     db, user_id=application.creator_id, type="creator_selected",
@@ -249,7 +262,7 @@ async def verify_payment(
                     event_key=selected_key,
                 )
                 if first_time:
-                    selected_email = _creator_selected_email_payload(application, campaign)
+                    selected_email = _creator_selected_email_payload(application, campaign, contract)
 
             create_notification(
                 db, user_id=contract.creator_id, type="contract_activated",
@@ -259,7 +272,14 @@ async def verify_payment(
                 event_key=f"contract-fee-paid:{contract.id}",
             )
     elif payment.status == "funded":
+        legacy_key = f"creator-selected:{payment.application_id}"
+        legacy_first_time = db.query(Notification).filter(Notification.event_key == legacy_key).first() is None
         payment = _finalize_selection(db, payment, "khalti", {"provider_status": provider_status})
+        if legacy_first_time:
+            legacy_app = db.query(Application).filter(Application.id == payment.application_id).first()
+            legacy_campaign = db.query(Campaign).filter(Campaign.id == payment.campaign_id).first()
+            if legacy_app and legacy_campaign:
+                selected_email = _creator_selected_email_payload(legacy_app, legacy_campaign)
 
     db.commit()
     db.refresh(payment)

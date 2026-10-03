@@ -5,7 +5,7 @@ from sqlalchemy.orm import Session
 
 from app.database import get_db
 from app.dependencies.auth import get_current_user
-from app.models import User, CreatorProfile
+from app.models import Application, BusinessProfile, Campaign, CreatorProfile, User
 
 router = APIRouter(prefix="/api/creators", tags=["Creators"])
 
@@ -20,6 +20,32 @@ async def get_creator_profile(
     creator = db.query(User).filter(User.id == creator_id, User.role == "creator").first()
     if not profile or not creator:
         raise HTTPException(status_code=404, detail="Creator profile not found")
+
+    # Accepted / completed collaborations, shown as the creator's work history.
+    history_rows = (
+        db.query(Application, Campaign)
+        .join(Campaign, Campaign.id == Application.campaign_id)
+        .filter(
+            Application.creator_id == creator_id,
+            Application.status.in_(["accepted", "completed"]),
+        )
+        .order_by(Application.created_at.desc())
+        .all()
+    )
+    work_history = []
+    for app, campaign in history_rows:
+        brand = db.query(BusinessProfile).filter(BusinessProfile.user_id == campaign.business_id).first()
+        work_history.append(
+            {
+                "application_id": app.id,
+                "campaign_id": campaign.id,
+                "campaign_title": campaign.title,
+                "brand_id": campaign.business_id,
+                "brand_name": brand.company_name if brand else None,
+                "status": app.status,
+                "date": app.created_at,
+            }
+        )
 
     return {
         "id": creator.id,
@@ -50,4 +76,6 @@ async def get_creator_profile(
         "is_shortlisted": False,
         "avg_rating": None,
         "ratings_count": 0,
+        "completed_collaborations": sum(1 for h in work_history if h["status"] == "completed"),
+        "work_history": work_history,
     }

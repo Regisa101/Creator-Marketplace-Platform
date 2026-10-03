@@ -273,6 +273,9 @@ export interface PublicBusinessCampaign {
   title: string;
   category: string;
   status: string;
+  hero_image?: string | null;
+  budget?: number | null;
+  campaign_type?: string | null;
 }
 
 export interface PublicBusinessProfile {
@@ -289,6 +292,7 @@ export interface PublicBusinessProfile {
   preferred_content_types: string[];
   team_size?: string | null;
   year_established?: number | null;
+  typical_budget?: number | null;
   is_onboarding_complete: boolean;
   is_published: boolean;
   campaigns: PublicBusinessCampaign[];
@@ -370,6 +374,8 @@ export interface PublicCreatorProfile {
   is_shortlisted?: boolean;
   avg_rating?: number | null;
   ratings_count?: number;
+  completed_collaborations?: number;
+  work_history?: any[];
 }
 
 export interface Notification {
@@ -536,6 +542,15 @@ export const login = (data: LoginData) => unwrap(api.post<AuthResponse>('/auth/l
 export const getCurrentUser = () => unwrap(api.get<User>('/auth/me'));
 export const deleteAccount = async (password: string) => { await api.delete('/auth/account', { data: { password } }); };
 
+export interface GoogleAuthResponse extends AuthResponse { is_new_user: boolean; }
+export const googleAuth = (credential: string, role?: 'creator' | 'business') =>
+  unwrap(api.post<GoogleAuthResponse>('/auth/google', { credential, role }));
+
+export const forgotPassword = (email: string) =>
+  unwrap(api.post<{ message: string }>('/auth/forgot-password', { email }));
+export const resetPassword = (token: string, new_password: string) =>
+  unwrap(api.post<{ message: string }>('/auth/reset-password', { token, new_password }));
+
 export const completeCreatorOnboarding = (data: CreatorOnboardingData) => unwrap(api.post('/onboarding/creator/complete', data));
 export const completeBusinessOnboarding = (data: BusinessOnboardingData) => unwrap(api.post('/onboarding/business/complete', data));
 export type CreatorOnboardingProgressData = Partial<CreatorOnboardingData>;
@@ -630,5 +645,3 @@ export const uploadMedia = async (file: File): Promise<{ url: string; media_type
   formData.append('file', file);
   return unwrap(api.post<{ url: string; media_type: 'image' | 'video' }>('/uploads/media', formData, { headers: { 'Content-Type': 'multipart/form-data' } }));
 };
-
-export default api;

@@ -1,6 +1,8 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
-from sqlalchemy.exc import IntegrityError
+import logging
+
+from sqlalchemy.exc import DataError, IntegrityError, SQLAlchemyError
 
 from app.database import get_db
 
@@ -25,6 +27,8 @@ from app.schemas.business import (
 
 from app.dependencies.auth import get_current_user
 
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(
     prefix="/api/onboarding",
@@ -66,7 +70,8 @@ async def complete_creator_onboarding(
     profile.username = data.username
     profile.bio = data.bio
     profile.location = data.location
-    profile.profile_image = data.profile_image
+    if data.profile_image:
+        profile.profile_image = data.profile_image
     profile.creator_type = data.creator_type
     profile.categories = data.niches
     profile.content_types = data.content_types
@@ -74,36 +79,42 @@ async def complete_creator_onboarding(
     profile.audience_age_range = data.audience_age_range
     profile.audience_location = data.audience_location
     profile.interests = data.audience_interests
-    profile.starting_price = data.starting_price
+    # Optional: only overwrite when the client actually sends a price.
+    if data.starting_price is not None:
+        profile.starting_price = data.starting_price
 
     profile.portfolio = [
         item.dict()
         for item in data.portfolio
     ]
 
-    # Remove old social records and recreate them.
-    db.query(CreatorSocial).filter(
-        CreatorSocial.creator_id == profile.id
-    ).delete(
-        synchronize_session=False
-    )
-
-    for social in data.socials:
-        db.add(
-            CreatorSocial(
-                creator_id=profile.id,
-                platform=social.platform,
-                username=social.username,
-                profile_url=social.profile_url,
-                follower_count=social.follower_count or 0,
-                is_verified=social.is_verified or False,
-            )
-        )
-
     profile.is_onboarding_complete = True
     profile.is_published = True
 
     try:
+        # The session has autoflush disabled, so a brand-new profile has no
+        # id until it is flushed. The social rows below need that id.
+        db.flush()
+
+        # Remove old social records and recreate them.
+        db.query(CreatorSocial).filter(
+            CreatorSocial.creator_id == profile.id
+        ).delete(
+            synchronize_session=False
+        )
+
+        for social in data.socials:
+            db.add(
+                CreatorSocial(
+                    creator_id=profile.id,
+                    platform=social.platform,
+                    username=social.username,
+                    profile_url=social.profile_url,
+                    follower_count=social.follower_count or 0,
+                    is_verified=social.is_verified or False,
+                )
+            )
+
         db.commit()
 
     except IntegrityError:
@@ -112,6 +123,27 @@ async def complete_creator_onboarding(
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="That username is already taken. Please choose another.",
+        )
+
+    except DataError:
+        db.rollback()
+        logger.exception("Creator onboarding: a value did not fit its column")
+
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=(
+                "One of your answers is too long. Please shorten your bio, "
+                "location or social links and try again."
+            ),
+        )
+
+    except SQLAlchemyError:
+        db.rollback()
+        logger.exception("Creator onboarding failed")
+
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Could not save your profile. Please try again.",
         )
 
     db.refresh(profile)

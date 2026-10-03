@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import {
   MapPin,
@@ -10,17 +10,17 @@ import {
   ExternalLink,
   Trash2,
   X,
-  Users,
   Briefcase,
-  Layers,
   Sparkles,
-  CheckCircle2,
 } from 'lucide-react';
 
 import { useAuth } from '../context/AuthContext';
-import { getCreatorProgress, getApplications } from '../api/client';
+import { getCreatorProgress, getApplications, saveCreatorProgress, uploadImage } from '../api/client';
 import { OFF_WHITE } from '../components/Brand';
+import { CONTENT, LOCATIONS, TYPES, parseTypes } from './onboarding/CreatorOnboarding';
 import { PublicNavbar } from '../components/PublicNavbar';
+import { Lightbox, type LightboxItem } from '../components/PublicProfileKit';
+import { PublicProfileStyles } from '../components/PublicProfileKit';
 
 const CORAL = '#111111';
 const CORAL_DARK = '#000000';
@@ -76,8 +76,76 @@ function formatFollowers(value: number) {
   return value.toLocaleString();
 }
 
+/* Location input with auto-suggestions (same list as onboarding); own text is allowed. */
+function LocationInput({ value, onChange }: { value: string; onChange: (v: string) => void }) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const outside = (e: MouseEvent) => {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+    };
+    document.addEventListener('mousedown', outside);
+    return () => document.removeEventListener('mousedown', outside);
+  }, []);
+
+  const q = value.trim().toLowerCase();
+  const suggestions = LOCATIONS.filter((x) => x.toLowerCase().includes(q)).slice(0, 40);
+
+  return (
+    <div className="cp-sugg-wrap" ref={ref}>
+      <input
+        className="cp-inline-input"
+        value={value}
+        autoComplete="off"
+        placeholder="Start typing your city"
+        onFocus={() => setOpen(true)}
+        onChange={(e) => {
+          onChange(e.target.value);
+          setOpen(true);
+        }}
+      />
+      {open && (
+        <div className="cp-sugg-menu">
+          {suggestions.length > 0 ? (
+            suggestions.map((x) => (
+              <button
+                type="button"
+                key={x}
+                className={`cp-sugg-item${x === value ? ' is-selected' : ''}`}
+                onClick={() => {
+                  onChange(x);
+                  setOpen(false);
+                }}
+              >
+                {x}
+              </button>
+            ))
+          ) : (
+            <div className="cp-sugg-empty">No match. You can keep your own location.</div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+/* A custom creator type must look like a real role, not random characters. */
+function customTypeError(raw: string, existing: string[]): string {
+  const v = raw.trim().replace(/\s+/g, ' ');
+  if (v.length < 3) return 'Creator type must be at least 3 characters.';
+  if (v.length > 30) return 'Creator type must be 30 characters or fewer.';
+  if (!/^[A-Za-z][A-Za-z0-9 &/'-]*$/.test(v)) {
+    return 'Use letters, numbers, spaces, & / - only, starting with a letter.';
+  }
+  if (!/[AEIOUaeiou]/.test(v)) return 'Please enter a real creator type.';
+  if (/(.)\1{3,}/.test(v)) return 'Please enter a real creator type.';
+  if (existing.some((x) => x.toLowerCase() === v.toLowerCase())) return 'You already added that type.';
+  return '';
+}
+
 export function CreatorProfile() {
-  const { user, deleteAccount } = useAuth();
+  const { user, deleteAccount, updateProfile } = useAuth();
   const navigate = useNavigate();
 
   const [profile, setProfile] = useState<any>(null);
@@ -87,17 +155,36 @@ export function CreatorProfile() {
   const [error, setError] = useState('');
 
   const [showDeleteModal, setShowDeleteModal] = useState(false);
+
+  // Edit profile (done here on the profile page, not in onboarding)
+  const [viewer, setViewer] = useState<LightboxItem | null>(null);
+  const [editOpen, setEditOpen] = useState(false);
+  const [editSaving, setEditSaving] = useState(false);
+  const [editUploading, setEditUploading] = useState(false);
+  const [editError, setEditError] = useState('');
+  const [ePhoto, setEPhoto] = useState('');
+  const [eName, setEName] = useState('');
+  const [eUsername, setEUsername] = useState('');
+  const [eLocation, setELocation] = useState('');
+  const [eBio, setEBio] = useState('');
+  const [eTypes, setETypes] = useState<string[]>([]);
+  const [eTypeOtherOpen, setETypeOtherOpen] = useState(false);
+  const [eTypeOther, setETypeOther] = useState('');
+  const [eContent, setEContent] = useState<string[]>([]);
+  const [eContentOther, setEContentOther] = useState('');
+  const [eNiches, setENiches] = useState('');
+  const [eSocials, setESocials] = useState<any[]>([]);
+  const [eSocPlatform, setESocPlatform] = useState('Instagram');
+  const [eSocUsername, setESocUsername] = useState('');
+  const [eSocUrl, setESocUrl] = useState('');
+  const [eSocFollowers, setESocFollowers] = useState('');
+  const [ePortfolio, setEPortfolio] = useState<any[]>([]);
+  const [ePortfolioTitle, setEPortfolioTitle] = useState('');
   const [deletePassword, setDeletePassword] = useState('');
   const [deleteError, setDeleteError] = useState('');
   const [deleting, setDeleting] = useState(false);
-  const [khaltiAccount, setKhaltiAccount] = useState('');
-  const [khaltiSaved, setKhaltiSaved] = useState(false);
 
   useEffect(() => {
-    const storedKhalti = localStorage.getItem(`creatorhub:khalti-account:${user?.id ?? 'current'}`) || '';
-    setKhaltiAccount(storedKhalti);
-    setKhaltiSaved(Boolean(storedKhalti));
-
     let cancelled = false;
 
     (async () => {
@@ -124,19 +211,6 @@ export function CreatorProfile() {
       cancelled = true;
     };
   }, [user?.id]);
-
-  const handleSaveKhalti = () => {
-    const value = khaltiAccount.trim();
-    if (!value) {
-      localStorage.removeItem(`creatorhub:khalti-account:${user?.id ?? 'current'}`);
-      setKhaltiAccount('');
-      setKhaltiSaved(false);
-      return;
-    }
-    localStorage.setItem(`creatorhub:khalti-account:${user?.id ?? 'current'}`, value);
-    setKhaltiAccount(value);
-    setKhaltiSaved(true);
-  };
 
   const handleDeleteAccount = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -165,15 +239,6 @@ export function CreatorProfile() {
   const displayName = profile?.display_name || user?.full_name || 'Creator';
   const initial = displayName[0]?.toUpperCase() ?? 'C';
 
-  const followers = useMemo(
-    () =>
-      socials.reduce(
-        (total, social) => total + Number(social?.follower_count || 0),
-        0
-      ),
-    [socials]
-  );
-
   const acceptedApps = applications.filter(
     (app) => app.status === 'accepted' || app.status === 'completed'
   );
@@ -201,6 +266,147 @@ export function CreatorProfile() {
     : Array.isArray(profile?.content_languages)
       ? profile.content_languages
       : [];
+
+
+  const openEdit = () => {
+    setEPhoto(profile?.profile_image || '');
+    setEName(profile?.display_name || '');
+    setEUsername(profile?.username || '');
+    setELocation(profile?.location || '');
+    setEBio(profile?.bio || '');
+    setETypes(parseTypes(profile?.creator_type));
+    setETypeOtherOpen(false);
+    setETypeOther('');
+    setEContent([...contentTypes]);
+    setEContentOther('');
+    setENiches((categories as string[]).join(', '));
+    setESocials(socials.map((x: any) => ({ ...x })));
+    setEPortfolio(portfolio.map((x: any) => ({ ...x })));
+    setEditError('');
+    setEditOpen(true);
+  };
+
+  const editUpload = async (file: File, kind: 'photo' | 'portfolio') => {
+    setEditError('');
+    setEditUploading(true);
+    try {
+      const { url } = await uploadImage(file);
+      if (kind === 'photo') {
+        setEPhoto(url);
+      } else {
+        setEPortfolio((cur) => [
+          ...cur,
+          {
+            title: ePortfolioTitle.trim() || 'Portfolio work',
+            media_url: url,
+            type: file.type.startsWith('video/') ? 'video' : 'image',
+          },
+        ]);
+        setEPortfolioTitle('');
+      }
+    } catch (err: any) {
+      setEditError(err?.response?.data?.detail || 'Upload failed. Please try again.');
+    } finally {
+      setEditUploading(false);
+    }
+  };
+
+  const addEditSocial = () => {
+    const u = eSocUsername.trim().replace(/^@/, '');
+    if (!u || !eSocUrl.trim()) {
+      setEditError('Add a social username and profile URL.');
+      return;
+    }
+    setESocials([
+      ...eSocials,
+      {
+        platform: eSocPlatform,
+        username: u,
+        profile_url: eSocUrl.trim(),
+        follower_count: Number(eSocFollowers) || 0,
+      },
+    ]);
+    setESocUsername('');
+    setESocUrl('');
+    setESocFollowers('');
+    setEditError('');
+  };
+
+  const addCustomType = () => {
+    const msg = customTypeError(eTypeOther, eTypes);
+    if (msg) {
+      setEditError(msg);
+      return;
+    }
+    setETypes([...eTypes, eTypeOther.trim().replace(/\s+/g, ' ')]);
+    setETypeOther('');
+    setETypeOtherOpen(false);
+    setEditError('');
+  };
+
+  const toggleContent = (item: string) =>
+    setEContent((cur) => (cur.includes(item) ? cur.filter((x) => x !== item) : [...cur, item]));
+
+  const addCustomContent = () => {
+    const msg = customTypeError(eContentOther, eContent).replace('creator type', 'content type');
+    if (msg) {
+      setEditError(msg);
+      return;
+    }
+    setEContent([...eContent, eContentOther.trim().replace(/\s+/g, ' ')]);
+    setEContentOther('');
+    setEditError('');
+  };
+
+  const saveEdit = async () => {
+    if (!eName.trim() || eUsername.trim().length < 3 || !eLocation.trim()) {
+      setEditError('Name, location and a username of at least 3 characters are required.');
+      return;
+    }
+    if (eTypes.length === 0) {
+      setEditError('Choose at least one creator type.');
+      return;
+    }
+    if (eSocials.length === 0) {
+      setEditError('Keep at least one social account.');
+      return;
+    }
+
+    setEditSaving(true);
+    setEditError('');
+
+    try {
+      const saved: any = await saveCreatorProgress({
+        display_name: eName.trim(),
+        username: eUsername.trim(),
+        location: eLocation.trim(),
+        creator_type: eTypes.join(', '),
+        content_types: eContent,
+        bio: eBio.trim(),
+        niches: eNiches.split(',').map((x) => x.trim()).filter(Boolean),
+        socials: eSocials.map((x) => ({
+          platform: x.platform,
+          username: x.username,
+          profile_url: x.profile_url,
+          follower_count: Number(x.follower_count) || 0,
+        })),
+        portfolio: ePortfolio,
+        ...(ePhoto ? { profile_image: ePhoto } : {}),
+      } as any);
+
+      if (saved?.profile) setProfile(saved.profile);
+      if (saved?.socials) setSocials(saved.socials);
+      updateProfile({
+        display_name: eName.trim(),
+        ...(ePhoto ? { profile_image: ePhoto } : {}),
+      });
+      setEditOpen(false);
+    } catch (err: any) {
+      setEditError(err?.response?.data?.detail || 'Could not save your profile.');
+    } finally {
+      setEditSaving(false);
+    }
+  };
 
   const audienceLocations = Array.isArray(profile?.audience_location)
     ? profile.audience_location
@@ -467,7 +673,7 @@ export function CreatorProfile() {
 
         .cp-chip {
           font-size: 12px;
-          font-weight: 600;
+          font-weight: 400;
           padding: 7px 12px;
           border-radius: 999px;
           background: #F3F3F3;
@@ -759,6 +965,87 @@ export function CreatorProfile() {
           background: #fdecec;
         }
 
+        .cp-inline-input {
+          width: 100%;
+          height: 36px;
+          border: 1px solid var(--line);
+          border-radius: 8px;
+          padding: 0 11px;
+          font-size: 13px;
+          font-weight: 400;
+          font-family: inherit;
+          color: var(--ink);
+          outline: none;
+          background: #fff;
+        }
+        textarea.cp-inline-input { height: auto; padding: 9px 11px; line-height: 1.55; resize: vertical; }
+        .cp-inline-input::placeholder { color: var(--ink-faint); font-weight: 400; }
+        .cp-inline-input:focus { border-color: #111; }
+        .cp-edit-grid {
+          display: grid;
+          grid-template-columns: repeat(2, minmax(0, 1fr));
+          gap: 12px 14px;
+          width: min(580px, 100%);
+          align-items: start;
+        }
+        .cp-field { display: flex; flex-direction: column; gap: 5px; min-width: 0; }
+        .cp-field-label { font-size: 11px; font-weight: 400; color: var(--ink-soft); }
+        .cp-inline-row { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; margin-top: 8px; max-width: 580px; }
+        .cp-inline-btn {
+          display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+          height: 32px; padding: 0 13px;
+          border: 1px solid var(--line); background: #fff; color: var(--ink);
+          border-radius: 8px; font-size: 12px; font-weight: 400; font-family: inherit; line-height: 1; cursor: pointer;
+          white-space: nowrap;
+        }
+        .cp-inline-btn:hover { border-color: #bbb; }
+        .cp-inline-btn:disabled { opacity: .6; cursor: default; }
+        .cp-inline-btn--dark { background: #111; border-color: #111; color: #fff; }
+        .cp-inline-btn--dark:hover { background: #000; border-color: #000; }
+        .cp-inline-list-row {
+          display: flex; justify-content: space-between; align-items: center;
+          height: 36px; padding: 0 12px; border: 1px solid var(--line); border-radius: 8px;
+          margin-bottom: 8px; font-size: 13px; font-weight: 400; background: #fff; max-width: 580px;
+        }
+        .cp-inline-list-row button { background: none; border: 0; cursor: pointer; color: var(--ink-soft); display: flex; padding: 0; }
+        .cp-edit-actions { display: flex; gap: 8px; flex-shrink: 0; align-items: center; }
+        button.cp-edit-btn { height: 32px; padding: 0 13px; font-size: 12px; font-weight: 400; border: 0; cursor: pointer; font-family: inherit; }
+        button.cp-empty-link { background: none; border: 0; padding: 0; cursor: pointer; font: inherit; text-align: left; }
+        .cp-edit-error { margin: 12px 22px 0; padding: 9px 13px; border-radius: 8px; background: #fdecea; color: #b3261e; font-size: 12.5px; font-weight: 400; }
+
+        .cp-sugg-wrap { position: relative; }
+        .cp-sugg-menu {
+          position: absolute; z-index: 60; left: 0; right: 0; top: calc(100% + 4px);
+          max-height: 200px; overflow-y: auto; padding: 5px; background: #fff;
+          border: 1px solid var(--line); border-radius: 8px; box-shadow: 0 14px 30px rgba(0,0,0,.08);
+        }
+        .cp-sugg-item {
+          display: block; width: 100%; text-align: left; background: #fff; border: 0; border-radius: 6px;
+          padding: 8px 10px; font-size: 12.5px; font-weight: 400; font-family: inherit; color: var(--ink); cursor: pointer;
+        }
+        .cp-sugg-item:hover, .cp-sugg-item.is-selected { background: #f4f4f5; }
+        .cp-sugg-empty { padding: 9px 10px; font-size: 11.5px; color: var(--ink-soft); }
+
+        .cp-type-tags { display: flex; flex-wrap: wrap; gap: 6px; }
+        .cp-type-tags:empty { display: none; }
+        .cp-type-tag {
+          display: inline-flex; align-items: center; gap: 6px; height: 26px; padding: 0 10px;
+          border: 1px solid var(--line); border-radius: 99px; background: #f6f6f7;
+          font-size: 12px; font-weight: 400; font-family: inherit; color: var(--ink); cursor: pointer;
+        }
+        .cp-type-tag span { color: var(--ink-soft); }
+        .cp-chip-toggle {
+          height: 30px; padding: 0 13px; border: 1px solid var(--line); border-radius: 99px; background: #fff;
+          font-size: 12px; font-weight: 400; font-family: inherit; color: var(--ink); cursor: pointer;
+        }
+        .cp-chip-toggle:hover { border-color: #bbb; }
+        .cp-chip-toggle.is-on { background: #111; border-color: #111; color: #fff; }
+        .cp-type-add { max-width: 280px; }
+        .cp-type-other { display: flex; gap: 8px; max-width: 280px; }
+        .cp-type-other .cp-inline-btn { flex: none; }
+
+        @media (max-width: 640px) { .cp-edit-grid, .cp-inline-row { grid-template-columns: 1fr; } }
+
         .cp-modal-overlay {
           position: fixed;
           inset: 0;
@@ -885,9 +1172,17 @@ export function CreatorProfile() {
             <div className="cp-cover" />
 
             <div className="cp-header">
-              <div className="cp-avatar">
-                {profile?.profile_image ? (
-                  <img src={profile.profile_image} alt={displayName} />
+              <div
+                className="cp-avatar"
+                style={!editOpen && profile?.profile_image ? { cursor: 'zoom-in' } : undefined}
+                onClick={() => {
+                  if (!editOpen && profile?.profile_image) {
+                    setViewer({ src: profile.profile_image, alt: displayName });
+                  }
+                }}
+              >
+                {(editOpen ? ePhoto : profile?.profile_image) ? (
+                  <img src={editOpen ? ePhoto : profile.profile_image} alt={displayName} />
                 ) : (
                   initial
                 )}
@@ -895,28 +1190,131 @@ export function CreatorProfile() {
 
               <div className="cp-header-row">
                 <div>
-                  <h1 className="cp-name">{displayName}</h1>
+                  {editOpen ? (
+                    <div className="cp-edit-grid">
+                      <label className="cp-inline-btn cp-photo-btn" style={{ gridColumn: '1 / -1', justifySelf: 'start', cursor: 'pointer' }}>
+                        {editUploading ? 'Uploading…' : ePhoto ? 'Change photo' : 'Add photo (optional)'}
+                        <input
+                          type="file"
+                          accept="image/*"
+                          hidden
+                          disabled={editUploading}
+                          onChange={(e) => {
+                            const f = e.target.files?.[0];
+                            if (f) void editUpload(f, 'photo');
+                            e.currentTarget.value = '';
+                          }}
+                        />
+                      </label>
 
-                  {profile?.username && (
-                    <p className="cp-username">@{profile.username}</p>
+                      <div className="cp-field">
+                        <span className="cp-field-label">Creator name</span>
+                        <input className="cp-inline-input" value={eName} onChange={(e) => setEName(e.target.value)} placeholder="Creator name" />
+                      </div>
+
+                      <div className="cp-field">
+                        <span className="cp-field-label">Username</span>
+                        <input className="cp-inline-input" value={eUsername} onChange={(e) => setEUsername(e.target.value)} placeholder="Username" />
+                      </div>
+
+                      <div className="cp-field">
+                        <span className="cp-field-label">Location</span>
+                        <LocationInput value={eLocation} onChange={setELocation} />
+                      </div>
+
+                      <div className="cp-field">
+                        <span className="cp-field-label">Niches</span>
+                        <input
+                          className="cp-inline-input"
+                          value={eNiches}
+                          onChange={(e) => setENiches(e.target.value)}
+                          placeholder="Fashion, Food"
+                        />
+                      </div>
+
+                      <div className="cp-field" style={{ gridColumn: '1 / -1' }}>
+                        <span className="cp-field-label">Creator type</span>
+                        <div className="cp-type-tags">
+                          {eTypes.map((t) => (
+                            <button
+                              type="button"
+                              key={t}
+                              className="cp-type-tag"
+                              onClick={() => setETypes(eTypes.filter((x) => x !== t))}
+                              aria-label={`Remove ${t}`}
+                            >
+                              {t} <span>×</span>
+                            </button>
+                          ))}
+                        </div>
+
+                        <div className="cp-type-add">
+                          <select
+                            className="cp-inline-input"
+                            value=""
+                            onChange={(e) => {
+                              const v = e.target.value;
+                              if (v === '__other') {
+                                setETypeOtherOpen(true);
+                              } else if (v) {
+                                setETypes([...eTypes, v]);
+                              }
+                            }}
+                          >
+                            <option value="">Add a creator type…</option>
+                            {TYPES.filter((t) => t !== 'Other' && !eTypes.includes(t)).map((t) => (
+                              <option key={t} value={t}>{t}</option>
+                            ))}
+                            <option value="__other">Other (type your own)</option>
+                          </select>
+                        </div>
+
+                        {eTypeOtherOpen && (
+                          <div className="cp-type-other">
+                            <input
+                              className="cp-inline-input"
+                              value={eTypeOther}
+                              maxLength={30}
+                              onChange={(e) => setETypeOther(e.target.value)}
+                              onKeyDown={(e) => {
+                                if (e.key === 'Enter') {
+                                  e.preventDefault();
+                                  addCustomType();
+                                }
+                              }}
+                              placeholder="e.g. Food Reviewer"
+                            />
+                            <button type="button" className="cp-inline-btn cp-inline-btn--dark" onClick={addCustomType}>Add</button>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  ) : (
+                    <>
+                      <h1 className="cp-name">{displayName}</h1>
+
+                      {profile?.username && (
+                        <p className="cp-username">@{profile.username}</p>
+                      )}
+                    </>
                   )}
 
                   <div className="cp-meta">
-                    {profile?.creator_type && (
+                    {!editOpen && profile?.creator_type && (
                       <span>
                         <Sparkles size={13} />
                         {profile.creator_type}
                       </span>
                     )}
 
-                    {profile?.location && (
+                    {!editOpen && profile?.location && (
                       <span>
                         <MapPin size={13} />
                         {profile.location}
                       </span>
                     )}
 
-                    {languages.length > 0 && (
+                    {!editOpen && languages.length > 0 && (
                       <span>
                         <Globe size={13} />
                         {languages.join(', ')}
@@ -925,13 +1323,29 @@ export function CreatorProfile() {
                   </div>
                 </div>
 
-                <Link to="/onboarding/creator" className="cp-edit-btn">
-                  <Pencil size={13} />
-                  Edit Profile
-                </Link>
+                {editOpen ? (
+                  <div className="cp-edit-actions">
+                    <button type="button" className="cp-inline-btn" onClick={() => setEditOpen(false)} disabled={editSaving}>
+                      Cancel
+                    </button>
+                    <button
+                      type="button"
+                      className="cp-inline-btn cp-inline-btn--dark"
+                      onClick={() => void saveEdit()}
+                      disabled={editSaving || editUploading}
+                    >
+                      {editSaving ? 'Saving…' : 'Save changes'}
+                    </button>
+                  </div>
+                ) : (
+                  <button type="button" className="cp-edit-btn" onClick={openEdit}>
+                    <Pencil size={13} />
+                    Edit Profile
+                  </button>
+                )}
               </div>
 
-              {categories.length > 0 && (
+              {editOpen ? null : categories.length > 0 && (
                 <div className="cp-tag-row">
                   {categories.slice(0, 10).map((category: string) => (
                     <span className="cp-tag" key={category}>
@@ -942,60 +1356,72 @@ export function CreatorProfile() {
               )}
             </div>
 
-            <div className="cp-stats">
-              <div className="cp-stat">
-                <div className="cp-stat-top">
-                  <span className="cp-stat-icon"><Users size={16} /></span>
-                </div>
-                <p className="cp-stat-value">{formatFollowers(followers)}</p>
-                <p className="cp-stat-label">Total followers</p>
-              </div>
+            {editOpen && editError && <div className="cp-edit-error">{editError}</div>}
 
-              <div className="cp-stat">
-                <div className="cp-stat-top">
-                  <span className="cp-stat-icon"><Layers size={16} /></span>
-                </div>
-                <p className="cp-stat-value">{portfolio.length}</p>
-                <p className="cp-stat-label">Portfolio projects</p>
-              </div>
-
-              <div className="cp-stat">
-                <div className="cp-stat-top">
-                  <span className="cp-stat-icon"><Briefcase size={16} /></span>
-                </div>
-                <p className="cp-stat-value">{acceptedApps.length}</p>
-                <p className="cp-stat-label">Collaborations</p>
-              </div>
-
-              <div className="cp-stat">
-                <div className="cp-stat-top">
-                  <span className="cp-stat-icon"><CheckCircle2 size={16} /></span>
-                </div>
-                <p className="cp-stat-value">{completedApps.length}</p>
-                <p className="cp-stat-label">Completed</p>
-              </div>
-            </div>
-
-            {profile?.bio && (
+            {(editOpen || profile?.bio) && (
               <section className="cp-section">
                 <div className="cp-section-heading">
                   <p className="cp-section-title">About</p>
                 </div>
-                <p className="cp-about">{profile.bio}</p>
+                {editOpen ? (
+                  <textarea
+                    className="cp-inline-input"
+                    rows={4}
+                    value={eBio}
+                    onChange={(e) => setEBio(e.target.value)}
+                    placeholder="Tell brands about yourself"
+                  />
+                ) : (
+                  <p className="cp-about">{profile.bio}</p>
+                )}
               </section>
             )}
 
-            {contentTypes.length > 0 && (
+            {(editOpen || contentTypes.length > 0) && (
               <section className="cp-section">
                 <div className="cp-section-heading">
                   <p className="cp-section-title">Content & Specialties</p>
                 </div>
 
-                <div className="cp-chip-row">
-                  {contentTypes.map((item: string) => (
-                    <span className="cp-chip" key={item}>{item}</span>
-                  ))}
-                </div>
+                {editOpen ? (
+                  <div>
+                    <div className="cp-chip-row">
+                      {[...CONTENT, ...eContent.filter((x) => !CONTENT.includes(x))].map((item) => (
+                        <button
+                          type="button"
+                          key={item}
+                          className={`cp-chip-toggle${eContent.includes(item) ? ' is-on' : ''}`}
+                          onClick={() => toggleContent(item)}
+                        >
+                          {item}
+                        </button>
+                      ))}
+                    </div>
+
+                    <div className="cp-type-other" style={{ marginTop: 10 }}>
+                      <input
+                        className="cp-inline-input"
+                        value={eContentOther}
+                        maxLength={30}
+                        placeholder="Other content type"
+                        onChange={(e) => setEContentOther(e.target.value)}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter') {
+                            e.preventDefault();
+                            addCustomContent();
+                          }
+                        }}
+                      />
+                      <button type="button" className="cp-inline-btn cp-inline-btn--dark" onClick={addCustomContent}>Add</button>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="cp-chip-row">
+                    {contentTypes.map((item: string) => (
+                      <span className="cp-chip" key={item}>{item}</span>
+                    ))}
+                  </div>
+                )}
               </section>
             )}
 
@@ -1007,13 +1433,35 @@ export function CreatorProfile() {
                 </p>
               </div>
 
-              {socials.length === 0 ? (
+              {editOpen ? (
+                <div>
+                  {eSocials.map((x, i) => (
+                    <div className="cp-inline-list-row" key={`${x.platform}-${i}`}>
+                      <span>{x.platform} · @{x.username}</span>
+                      <button type="button" aria-label="Remove" onClick={() => setESocials(eSocials.filter((_, n) => n !== i))}>
+                        <Trash2 size={14} />
+                      </button>
+                    </div>
+                  ))}
+                  <div className="cp-inline-row">
+                    <select className="cp-inline-input" value={eSocPlatform} onChange={(e) => setESocPlatform(e.target.value)}>
+                      {['Instagram', 'TikTok', 'YouTube', 'Facebook', 'LinkedIn', 'Other'].map((p) => <option key={p}>{p}</option>)}
+                    </select>
+                    <input className="cp-inline-input" value={eSocUsername} onChange={(e) => setESocUsername(e.target.value)} placeholder="@username" />
+                    <input className="cp-inline-input" value={eSocUrl} onChange={(e) => setESocUrl(e.target.value)} placeholder="Profile URL" />
+                    <input className="cp-inline-input" type="number" min="0" value={eSocFollowers} onChange={(e) => setESocFollowers(e.target.value)} placeholder="Followers" />
+                  </div>
+                  <button type="button" className="cp-inline-btn" style={{ marginTop: 8 }} onClick={addEditSocial}>
+                    Add social account
+                  </button>
+                </div>
+              ) : socials.length === 0 ? (
                 <div className="cp-empty">
                   <strong>Build trust with your social presence</strong>
                   Add your social platforms and audience size to help brands understand your reach.
-                  <Link className="cp-empty-link" to="/onboarding/creator">
+                  <button type="button" className="cp-empty-link" onClick={openEdit}>
                     Add social accounts →
-                  </Link>
+                  </button>
                 </div>
               ) : (
                 <div className="cp-social-grid">
@@ -1042,9 +1490,11 @@ export function CreatorProfile() {
                           </p>
                         </span>
 
-                        <span className="cp-social-followers">
-                          {formatFollowers(Number(social.follower_count || 0))}
-                        </span>
+                        {Number(social.follower_count || 0) > 0 && (
+                          <span className="cp-social-followers">
+                            {formatFollowers(Number(social.follower_count))}
+                          </span>
+                        )}
                       </a>
                     );
                   })}
@@ -1100,13 +1550,41 @@ export function CreatorProfile() {
                 </p>
               </div>
 
-              {portfolio.length === 0 ? (
+              {editOpen ? (
+                <div>
+                  {ePortfolio.map((x, i) => (
+                    <div className="cp-inline-list-row" key={`${x.media_url}-${i}`}>
+                      <span>{x.title}</span>
+                      <button type="button" aria-label="Remove" onClick={() => setEPortfolio(ePortfolio.filter((_, n) => n !== i))}>
+                        <Trash2 size={14} />
+                      </button>
+                    </div>
+                  ))}
+                  <div style={{ display: 'flex', gap: 8, maxWidth: 580 }}>
+                    <input className="cp-inline-input" value={ePortfolioTitle} onChange={(e) => setEPortfolioTitle(e.target.value)} placeholder="Work title (optional)" />
+                    <label className="cp-inline-btn" style={{ whiteSpace: 'nowrap', cursor: 'pointer' }}>
+                      {editUploading ? 'Uploading…' : 'Add work'}
+                      <input
+                        type="file"
+                        accept="image/*,video/*"
+                        hidden
+                        disabled={editUploading}
+                        onChange={(e) => {
+                          const f = e.target.files?.[0];
+                          if (f) void editUpload(f, 'portfolio');
+                          e.currentTarget.value = '';
+                        }}
+                      />
+                    </label>
+                  </div>
+                </div>
+              ) : portfolio.length === 0 ? (
                 <div className="cp-empty">
                   <strong>Your portfolio is your strongest selling point</strong>
                   Add examples of your best content, UGC, reels, photos or campaign work.
-                  <Link className="cp-empty-link" to="/onboarding/creator">
+                  <button type="button" className="cp-empty-link" onClick={openEdit}>
                     Add portfolio work →
-                  </Link>
+                  </button>
                 </div>
               ) : (
                 <div className="cp-portfolio-grid">
@@ -1128,6 +1606,8 @@ export function CreatorProfile() {
                               <img
                                 src={item.media_url}
                                 alt={item.title || 'Portfolio project'}
+                                style={{ cursor: 'zoom-in' }}
+                                onClick={() => setViewer({ src: item.media_url, alt: item.title, type: 'image' })}
                               />
                             )
                           ) : (
@@ -1229,63 +1709,6 @@ export function CreatorProfile() {
             </section>
 
             <section className="cp-section">
-              <p className="cp-section-title" style={{ marginBottom: 12 }}>
-                Collaboration rate
-              </p>
-
-              <div className="cp-info-row" style={{
-                display: 'grid',
-                gridTemplateColumns: 'repeat(2, 1fr)',
-                gap: 11
-              }}>
-                <div className="cp-audience-card">
-                  <p className="cp-audience-label">Starting rate</p>
-                  <p className="cp-audience-value">
-                    {Number(profile?.starting_price || 0) > 0
-                      ? `NPR ${Number(profile.starting_price).toLocaleString()}+`
-                      : 'Not specified'}
-                  </p>
-                </div>
-
-                <div className="cp-audience-card">
-                  <p className="cp-audience-label">Completed work</p>
-                  <p className="cp-audience-value">
-                    {completedApps.length > 0
-                      ? `${completedApps.length} successful collaboration${completedApps.length === 1 ? '' : 's'}`
-                      : 'Build your first collaboration'}
-                  </p>
-                </div>
-              </div>
-            </section>
-
-            <section className="cp-section">
-              <div className="cp-section-heading">
-                <p className="cp-section-title">Payment</p>
-                <p className="cp-section-sub">For creator payouts</p>
-              </div>
-              <div className="cp-payment-card">
-                <div className="cp-payment-copy">
-                  <p className="cp-payment-title">Khalti account</p>
-                  <p className="cp-payment-desc">Add the Khalti account you want to use for payouts from completed collaborations.</p>
-                </div>
-                <div className="cp-payment-form">
-                  <input
-                    className="cp-payment-input"
-                    value={khaltiAccount}
-                    onChange={(e) => { setKhaltiAccount(e.target.value); setKhaltiSaved(false); }}
-                    placeholder="Khalti mobile number or account"
-                    inputMode="tel"
-                    aria-label="Khalti account"
-                  />
-                  <button type="button" className="cp-payment-save" onClick={handleSaveKhalti}>
-                    {khaltiSaved ? 'Saved' : 'Save'}
-                  </button>
-                </div>
-                <p className="cp-payment-note">This is currently stored as your payout account preference. Real Khalti verification can be connected later.</p>
-              </div>
-            </section>
-
-            <section className="cp-section">
               <p className="cp-section-title">Account</p>
 
               <div className="cp-danger-zone">
@@ -1314,6 +1737,9 @@ export function CreatorProfile() {
           </div>
         )}
       </div>
+
+      <PublicProfileStyles />
+      <Lightbox item={viewer} onClose={() => setViewer(null)} />
 
       {showDeleteModal && (
         <div

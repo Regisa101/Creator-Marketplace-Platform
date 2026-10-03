@@ -72,7 +72,7 @@ def build_creator_selected_email(
         f"You have been selected by {business_name} for the campaign “{campaign_title}”.\n\n"
         f"Next steps: log in to {BRAND_NAME} to view the campaign details, review your "
         f"contract, and get started with {business_name}.\n\n"
-        f"View campaign: {campaign_url}\n\n"
+        f"View your contract: {campaign_url}\n\n"
         f"Thank you,\n{BRAND_NAME} Team\n"
     )
 
@@ -101,7 +101,7 @@ def build_creator_selected_email(
                   details, review your contract, and continue with the next steps.
                 </p>
                 <p style="margin:0 0 24px;">
-                  <a href="{url}" style="display:inline-block;background:#111111;color:#ffffff;text-decoration:none;font-size:16px;font-weight:600;padding:14px 28px;border-radius:8px;">View Campaign</a>
+                  <a href="{url}" style="display:inline-block;background:#111111;color:#ffffff;text-decoration:none;font-size:16px;font-weight:600;padding:14px 28px;border-radius:8px;">View Contract</a>
                 </p>
                 <p style="margin:0;font-size:16px;line-height:1.6;">Thank you,<br>{BRAND_NAME} Team</p>
               </td>
@@ -156,4 +156,87 @@ def send_creator_selected_email(
         return True
     except Exception:  # noqa: BLE001 - email must never break the selection flow
         logger.exception("Selection email FAILED (selection is unaffected): %s", ref)
+        return False
+
+
+# ----------------------------------------------------------------------
+# Password reset email
+# ----------------------------------------------------------------------
+def build_password_reset_email(
+    *, name: str, reset_url: str, expires_minutes: int
+) -> tuple[str, str, str]:
+    """Return (subject, text_body, html_body) for the password reset email."""
+    subject = f"Reset your {BRAND_NAME} password"
+
+    text_body = (
+        f"Hi {name},\n\n"
+        f"We received a request to reset your {BRAND_NAME} password.\n\n"
+        f"Choose a new password here (this link works once and expires in {expires_minutes} minutes):\n"
+        f"{reset_url}\n\n"
+        f"If you didn't ask for this, you can ignore this email. Your password won't change.\n\n"
+        f"{BRAND_NAME} Team\n"
+    )
+
+    n, url = escape(name), escape(reset_url, quote=True)
+    html_body = f"""\
+<!DOCTYPE html>
+<html>
+  <body style="margin:0;padding:0;background:#f4f4f5;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;color:#111111;">
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#f4f4f5;padding:32px 12px;">
+      <tr>
+        <td align="center">
+          <table role="presentation" width="560" cellpadding="0" cellspacing="0" style="max-width:560px;width:100%;background:#ffffff;border-radius:12px;overflow:hidden;">
+            <tr>
+              <td style="background:#111111;padding:20px 32px;color:#ffffff;font-size:20px;font-weight:700;letter-spacing:0.3px;">{BRAND_NAME}</td>
+            </tr>
+            <tr>
+              <td style="padding:32px;">
+                <p style="margin:0 0 16px;font-size:16px;">Hi {n},</p>
+                <h1 style="margin:0 0 16px;font-size:24px;line-height:1.3;">Reset your password</h1>
+                <p style="margin:0 0 24px;font-size:16px;line-height:1.6;">
+                  We received a request to reset your {BRAND_NAME} password. This link works once
+                  and expires in {expires_minutes} minutes.
+                </p>
+                <p style="margin:0 0 24px;">
+                  <a href="{url}" style="display:inline-block;background:#111111;color:#ffffff;text-decoration:none;font-size:16px;font-weight:600;padding:14px 28px;border-radius:8px;">Choose a new password</a>
+                </p>
+                <p style="margin:0;font-size:14px;line-height:1.6;color:#52525b;">
+                  If you didn't ask for this, you can ignore this email. Your password won't change.
+                </p>
+              </td>
+            </tr>
+            <tr>
+              <td style="padding:16px 32px;background:#fafafa;color:#71717a;font-size:12px;line-height:1.5;">
+                If the button doesn't work, copy this link into your browser:<br>
+                <span style="word-break:break-all;">{url}</span>
+              </td>
+            </tr>
+          </table>
+        </td>
+      </tr>
+    </table>
+  </body>
+</html>
+"""
+    return subject, text_body, html_body
+
+
+def send_password_reset_email(*, to_email: str, name: str, reset_url: str, expires_minutes: int = 30) -> bool:
+    """Email a password reset link. Never raises; returns True if handed to SMTP."""
+    ref = f"to={to_email!r}"
+    try:
+        if not to_email:
+            logger.warning("Password reset email skipped (no email): %s", ref)
+            return False
+        if not is_email_configured():
+            logger.warning("Password reset email skipped (SMTP not configured): %s", ref)
+            return False
+        subject, text_body, html_body = build_password_reset_email(
+            name=name, reset_url=reset_url, expires_minutes=expires_minutes
+        )
+        send_email(to_email=to_email, subject=subject, text_body=text_body, html_body=html_body)
+        logger.info("Password reset email sent: %s", ref)
+        return True
+    except Exception:  # noqa: BLE001 - must never break the request
+        logger.exception("Password reset email FAILED: %s", ref)
         return False

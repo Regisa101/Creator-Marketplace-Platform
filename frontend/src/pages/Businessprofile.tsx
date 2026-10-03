@@ -25,6 +25,7 @@ import {
 } from '../api/client';
 import { OFF_WHITE } from '../components/Brand';
 import { PublicNavbar } from '../components/PublicNavbar';
+import { Lightbox, PublicProfileStyles, type LightboxItem } from '../components/PublicProfileKit';
 
 const VIOLET = '#111111';
 const VIOLET_DARK = '#000000';
@@ -35,6 +36,7 @@ export function BusinessProfile() {
   const navigate = useNavigate();
 
   const [profile, setProfile] = useState<any>(null);
+  const [viewer, setViewer] = useState<LightboxItem | null>(null);
   const [campaigns, setCampaigns] = useState<any[]>([]);
   const [applications, setApplications] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
@@ -766,7 +768,11 @@ export function BusinessProfile() {
             <div className="bp-cover" />
 
             <div className="bp-header">
-              <div className="bp-avatar">
+              <div
+                className="bp-avatar"
+                style={profile?.logo_url ? { cursor: 'zoom-in' } : undefined}
+                onClick={() => profile?.logo_url && setViewer({ src: profile.logo_url, alt: companyName })}
+              >
                 {profile?.logo_url ? (
                   <img src={profile.logo_url} alt={companyName} />
                 ) : (
@@ -1075,7 +1081,12 @@ export function BusinessProfile() {
                       name[0]?.toUpperCase() || 'C';
 
                     return (
-                      <div className="bp-creator-card" key={application.id}>
+                      <Link
+                        className="bp-creator-card"
+                        key={application.id}
+                        to={`/creators/${application.creator_id}`}
+                        style={{ textDecoration: 'none', color: 'inherit' }}
+                      >
                         <div className="bp-creator-avatar">
                           {application.creator_avatar ? (
                             <img
@@ -1095,7 +1106,7 @@ export function BusinessProfile() {
                               : 'Active collaboration'}
                           </p>
                         </div>
-                      </div>
+                      </Link>
                     );
                   })}
                 </div>
@@ -1170,6 +1181,9 @@ export function BusinessProfile() {
           </div>
         )}
       </div>
+
+      <PublicProfileStyles />
+      <Lightbox item={viewer} onClose={() => setViewer(null)} />
 
       {showDeleteModal && (
         <div

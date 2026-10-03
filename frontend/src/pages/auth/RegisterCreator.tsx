@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { Eye, EyeOff, ArrowRight } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
+import { GoogleButton } from './GoogleButton';
 import { AuthLayout } from './AuthLayout';
 
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -46,6 +47,7 @@ export function RegisterCreator() {
   };
 
   return <AuthLayout role="creator" mode="register" title="Create your Creator account">
+    <GoogleButton role="creator" />
     <form onSubmit={handleSubmit} noValidate>
       <div className="az-field"><label className="az-label">Full name</label><input className="az-input" type="text" required maxLength={80} value={data.full_name} onChange={(e) => setData(p => ({...p, full_name: e.target.value}))} placeholder="Enter your full name" /></div>
       <div className="az-field"><label className="az-label">Email</label><input className="az-input" type="email" required value={data.email} onChange={(e) => setData(p => ({...p, email: e.target.value}))} placeholder="you@example.com" /></div>

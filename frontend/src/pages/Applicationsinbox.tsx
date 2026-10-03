@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { parseSocialLink } from '../utils/social';
+import { parseSocialLink } from '../utils/Social';
 import { Check, ChevronDown, FileSignature, Loader2, X, ExternalLink, ZoomIn } from 'lucide-react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { getApplications, selectApplication, updateApplicationStatus, finalizeContract, getContract, getCreatorProfile, getPublicBusinessProfile, type Application, type Contract } from '../api/client';
@@ -244,7 +244,7 @@ export function ApplicationsInbox() {
       .ab-list{display:flex;flex-direction:column;gap:8px}
       .ab-card{background:#fff;border:1px solid #e5e5e5;border-radius:12px;transition:border-color .15s ease}
       .ab-card:hover{border-color:#cfcfcf}
-      .ab-row-card{display:grid;grid-template-columns:minmax(0,1.15fr) minmax(0,1.25fr) auto auto;gap:16px;align-items:center;padding:12px 14px}
+      .ab-row-card{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.2fr) 104px 330px;gap:16px;align-items:center;padding:12px 16px}
       .ab-person{display:flex;gap:10px;align-items:center;text-decoration:none;color:#111;min-width:0}
       .ab-avatar{width:36px;height:36px;border-radius:50%;overflow:hidden;background:#111;color:#fff;display:flex;align-items:center;justify-content:center;font:600 12px Poppins,sans-serif;flex:none}
       .ab-avatar img{width:100%;height:100%;object-fit:cover}
@@ -261,7 +261,8 @@ export function ApplicationsInbox() {
       .ab-status--accepted{background:#e9f6ee;color:#1e8a4c}
       .ab-status--completed{background:#e8f0fb;color:#2a5aa5}
       .ab-status--rejected,.ab-status--withdrawn{background:#f3f2f4;color:#77717e}
-      .ab-actions{display:flex;gap:6px;align-items:center;justify-content:flex-end}
+      .ab-actions{display:flex;gap:6px;align-items:center;justify-content:flex-start;min-width:0}
+      .ab-status{justify-self:start}
       .ab-chevron{transition:transform .15s ease}
       .ab-chevron.open{transform:rotate(180deg)}
       .ab-spin{animation:ab-spin .8s linear infinite}@keyframes ab-spin{to{transform:rotate(360deg)}}
@@ -334,6 +335,7 @@ export function ApplicationsInbox() {
       .ab-line strong{color:#111;font-weight:500;text-align:right;overflow-wrap:anywhere}
       @media(max-width:820px){.ab-checkout{grid-template-columns:1fr}.ab-side{border-right:0;border-bottom:1px solid #eee}.ab-modal{max-height:calc(100vh - 24px)}.ab-modal-backdrop{padding:12px}}
       @media(max-width:480px){.ab-fields{grid-template-columns:1fr}.ab-actions-modal{flex-direction:column-reverse}.ab-secondary{padding:0}.ab-side,.ab-main{padding:20px}.ab-modal-head{padding:16px 20px}}
+      @media(max-width:1100px){.ab-row-card{grid-template-columns:minmax(0,1fr) minmax(0,1.1fr) 104px}.ab-actions{grid-column:1 / -1;order:4}}
       @media(max-width:860px){.ab-row-card{grid-template-columns:minmax(0,1fr) auto}.ab-info{grid-column:1 / -1;order:3}.ab-actions{grid-column:1 / -1;order:4;justify-content:flex-start;flex-wrap:wrap}}
       @media(max-width:760px){.ab-details{grid-template-columns:1fr}.ab-work{max-width:140px}}
     `}</style>
@@ -495,14 +497,14 @@ export function ApplicationsInbox() {
               {meta && <div className="ab-camp-sub">{meta}</div>}
 
               <div className="ab-people">
-                <div className="ab-person-row">
+                <Link className="ab-person-row" to={`/creators/${contract.creator_id}`} style={{ textDecoration: 'none', color: 'inherit' }}>
                   <div className="ab-avatar">{(creatorPic || creatorApp?.creator_avatar) ? <img src={creatorPic || mediaUrl(creatorApp?.creator_avatar)} alt=""/> : creatorName.slice(0,1).toUpperCase()}</div>
                   <div><div className="ab-person-name">{creatorName}</div><div className="ab-person-role">Creator</div></div>
-                </div>
-                <div className="ab-person-row">
+                </Link>
+                <Link className="ab-person-row" to={`/brands/${contract.business_id}`} style={{ textDecoration: 'none', color: 'inherit' }}>
                   <div className="ab-avatar">{brandPic ? <img src={brandPic} alt=""/> : (contract.business_name || 'B').slice(0,1).toUpperCase()}</div>
                   <div><div className="ab-person-name">{contract.business_name || 'Your business'}</div><div className="ab-person-role">Brand (you)</div></div>
-                </div>
+                </Link>
               </div>
 
               <div className="ab-eyebrow" style={{marginTop:20}}>Timeline</div>

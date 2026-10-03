@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 from pathlib import Path
 
 from fastapi import FastAPI
@@ -8,6 +9,10 @@ from fastapi.staticfiles import StaticFiles
 from sqlalchemy import text
 
 from app.database import Base, engine
+
+# Show INFO logs (e.g. "Selection email sent") in the terminal.
+# Without this Python hides everything below WARNING.
+logging.basicConfig(level=logging.INFO)
 
 # Import Notification so SQLAlchemy includes the model
 # when creating database metadata.

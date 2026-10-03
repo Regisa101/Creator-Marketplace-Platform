@@ -1,17 +1,16 @@
 import { useEffect, useState } from 'react';
-import { ArrowLeft, Building2, ExternalLink, MapPin } from 'lucide-react';
-import { Link, useParams } from 'react-router-dom';
+import { ArrowLeft, Building2, ExternalLink, Globe, Link2, MapPin } from 'lucide-react';
+import { Link, useNavigate, useParams } from 'react-router-dom';
 import { getPublicBusinessProfile, type PublicBusinessProfile } from '../api/client';
 import { PublicNavbar } from '../components/PublicNavbar';
-
-const API_ORIGIN = 'http://localhost:8000';
-
-function mediaUrl(value?: string | null) {
-  if (!value) return '';
-  if (/^(https?:)?\/\//i.test(value) || value.startsWith('data:') || value.startsWith('blob:')) return value;
-  if (value.startsWith('/api/')) return `${API_ORIGIN}${value}`;
-  return `${API_ORIGIN}/${value.replace(/^\/+/, '')}`;
-}
+import {
+  Lightbox,
+  PublicProfileStyles,
+  Section,
+  externalHref,
+  mediaUrl,
+  type LightboxItem,
+} from '../components/PublicProfileKit';
 
 function initials(name?: string | null) {
   const parts = (name || 'Business').trim().split(/\s+/).filter(Boolean);
@@ -20,9 +19,11 @@ function initials(name?: string | null) {
 
 export function BrandProfile() {
   const { businessId } = useParams<{ businessId: string }>();
+  const navigate = useNavigate();
   const [profile, setProfile] = useState<PublicBusinessProfile | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [viewer, setViewer] = useState<LightboxItem | null>(null);
 
   useEffect(() => {
     if (!businessId) return;
@@ -38,57 +39,176 @@ export function BrandProfile() {
     return () => { cancelled = true; };
   }, [businessId]);
 
+  const logo = mediaUrl(profile?.logo_url);
+  const website = externalHref(profile?.website);
+  const socialLinks = Object.entries(profile?.social_links || {}).filter(([, v]) => v);
+  const creators = (() => {
+    const seen = new Set<number>();
+    return (profile?.work_history || []).filter((w: any) => {
+      if (seen.has(w.creator_id)) return false;
+      seen.add(w.creator_id);
+      return true;
+    });
+  })();
+
   return (
-    <div className="bp-page">
+    <>
       <PublicNavbar />
-      <style>{`
-        .bp-page{min-height:100vh;background:#fff;font-family:Poppins,sans-serif;padding-top:124px}.bp-shell{width:min(1120px,calc(100% - 40px));margin:0 auto;padding:30px 0 70px}.bp-back{display:inline-flex;align-items:center;gap:6px;color:#666;text-decoration:none;font:500 12px Poppins;margin-bottom:22px}.bp-card{border:1px solid #e5e5e5;border-radius:18px;background:#fff;padding:28px}.bp-head{display:flex;align-items:center;gap:18px;padding-bottom:24px;border-bottom:1px solid #eee}.bp-logo{width:72px;height:72px;border-radius:16px;overflow:hidden;background:#f3f3f3;display:flex;align-items:center;justify-content:center;font:700 20px Poppins}.bp-logo img{width:100%;height:100%;object-fit:cover}.bp-name{font:700 25px 'League Spartan',sans-serif;color:#111}.bp-meta{display:flex;flex-wrap:wrap;gap:12px;margin-top:7px;color:#777;font:400 11px Poppins}.bp-meta span{display:flex;align-items:center;gap:5px}.bp-desc{margin:18px 0 0;color:#555;font:400 13px/1.7 Poppins}.bp-grid{display:grid;grid-template-columns:1.1fr .9fr;gap:18px;margin-top:18px}.bp-section{border:1px solid #e8e8e8;border-radius:14px;padding:20px}.bp-section h2{margin:0 0 14px;font:700 15px Poppins}.bp-tags{display:flex;flex-wrap:wrap;gap:7px}.bp-tag{padding:7px 10px;background:#f5f5f5;border-radius:999px;font:500 10px Poppins}.bp-campaign{display:block;padding:13px 0;border-top:1px solid #eee;text-decoration:none;color:#111}.bp-campaign:first-of-type{border-top:0}.bp-campaign strong{display:block;font:600 12px Poppins}.bp-campaign span{display:block;margin-top:3px;color:#888;font:400 10px Poppins}.bp-empty,.bp-error{padding:60px;text-align:center;color:#777;font:500 13px Poppins}.bp-error{color:#a33}@media(max-width:760px){.bp-grid{grid-template-columns:1fr}.bp-head{align-items:flex-start}}
-      `}</style>
-      <main className="bp-shell">
-        <Link className="bp-back" to="/campaigns"><ArrowLeft size={14}/> Back to campaigns</Link>
-        {loading && <div className="bp-card bp-empty">Loading brand profile…</div>}
-        {!loading && error && <div className="bp-card bp-error">{error}</div>}
-        {!loading && profile && <>
-          <section className="bp-card">
-            <div className="bp-head">
-              <div className="bp-logo">{profile.logo_url ? <img src={mediaUrl(profile.logo_url)} alt=""/> : initials(profile.company_name)}</div>
-              <div>
-                <div className="bp-name">{profile.company_name}</div>
-                <div className="bp-meta">
-                  {profile.industry && <span><Building2 size={13}/>{profile.industry}</span>}
-                  {profile.location && <span><MapPin size={13}/>{profile.location}</span>}
-                  {profile.website && <a href={profile.website} target="_blank" rel="noreferrer" style={{color:'#555',display:'flex',gap:5,alignItems:'center'}}><ExternalLink size={13}/> Website</a>}
+      <PublicProfileStyles />
+
+      <main className="pp-page">
+        <div className="pp-wrap">
+          <button type="button" className="pp-back" onClick={() => navigate(-1)}>
+            <ArrowLeft size={14} /> Back
+          </button>
+
+          {loading && <div className="pp-state">Loading brand profile…</div>}
+          {!loading && error && <div className="pp-state">{error}</div>}
+
+          {!loading && profile && (
+            <div className="pp-card">
+              <div className="pp-cover" />
+
+              <div className="pp-header">
+                {logo ? (
+                  <button
+                    type="button"
+                    className="pp-avatar is-square"
+                    onClick={() => setViewer({ src: logo, alt: profile.company_name })}
+                    aria-label="View logo"
+                  >
+                    <img src={logo} alt={profile.company_name} />
+                  </button>
+                ) : (
+                  <div className="pp-avatar is-square">{initials(profile.company_name)}</div>
+                )}
+
+                <div className="pp-id">
+                  <h1 className="pp-name">{profile.company_name}</h1>
+                  {profile.business_type && <p className="pp-sub">{profile.business_type}</p>}
+
+                  <div className="pp-meta">
+                    {profile.industry && <span><Building2 size={13} />{profile.industry}</span>}
+                    {profile.location && <span><MapPin size={13} />{profile.location}</span>}
+                    {website && (
+                      <a href={website} target="_blank" rel="noreferrer">
+                        <Globe size={13} /> Website
+                      </a>
+                    )}
+                  </div>
                 </div>
               </div>
-            </div>
-            {profile.description && <p className="bp-desc">{profile.description}</p>}
-          </section>
 
-          <div className="bp-grid">
-            <section className="bp-section">
-              <h2>About the business</h2>
-              <div className="bp-meta" style={{marginBottom:14}}>
-                {profile.business_type && <span><Building2 size={13}/>{profile.business_type}</span>}
-                {profile.team_size && <span>{profile.team_size} team</span>}
-                {profile.year_established && <span>Since {profile.year_established}</span>}
-              </div>
-              <div className="bp-tags">
-                {profile.interested_categories.map((item) => <span className="bp-tag" key={`cat-${item}`}>{item}</span>)}
-                {profile.preferred_content_types.map((item) => <span className="bp-tag" key={`type-${item}`}>{item}</span>)}
-              </div>
-            </section>
-            <section className="bp-section">
-              <h2>Published campaigns</h2>
-              {profile.campaigns.length === 0 ? <div className="bp-empty" style={{padding:20}}>No published campaigns.</div> : profile.campaigns.map((campaign) => (
-                <Link className="bp-campaign" key={campaign.id} to={`/campaigns/${campaign.id}?source=landing`}>
-                  <strong>{campaign.title}</strong><span>{campaign.category}</span>
-                </Link>
-              ))}
-            </section>
-          </div>
-        </>}
+              {profile.interested_categories?.length > 0 && (
+                <div className="pp-tags">
+                  {profile.interested_categories.slice(0, 10).map((c) => <span className="pp-tag" key={c}>{c}</span>)}
+                </div>
+              )}
+
+              {profile.description && (
+                <Section title="About the company">
+                  <p className="pp-about">{profile.description}</p>
+                </Section>
+              )}
+
+              {profile.interested_categories?.length > 0 && (
+                <Section title="What we look for">
+                  <div className="pp-chips">
+                    {profile.interested_categories.map((c) => <span className="pp-chip" key={c}>{c}</span>)}
+                  </div>
+                </Section>
+              )}
+
+              {profile.preferred_content_types?.length > 0 && (
+                <Section title="Content we commission">
+                  <div className="pp-chips">
+                    {profile.preferred_content_types.map((c) => <span className="pp-chip" key={c}>{c}</span>)}
+                  </div>
+                </Section>
+              )}
+
+              <Section title="Company Information">
+                <div className="pp-grid">
+                  <div className="pp-info"><small>Team size</small><p>{profile.team_size || 'Not specified'}</p></div>
+                  <div className="pp-info">
+                    <small>Typical campaign budget</small>
+                    <p>{Number(profile.typical_budget || 0) > 0 ? `NPR ${Number(profile.typical_budget).toLocaleString()}` : 'Not specified'}</p>
+                  </div>
+                  <div className="pp-info"><small>Established</small><p>{profile.year_established || 'Not specified'}</p></div>
+                  <div className="pp-info">
+                    <small>Website</small>
+                    <p>
+                      {website ? (
+                        <a href={website} target="_blank" rel="noreferrer">Visit website <ExternalLink size={11} /></a>
+                      ) : 'Not specified'}
+                    </p>
+                  </div>
+                </div>
+              </Section>
+
+              {socialLinks.length > 0 && (
+                <Section title="Social Links">
+                  <div className="pp-grid">
+                    {socialLinks.map(([platform, url]) => (
+                      <a key={platform} className="pp-link-card" href={externalHref(url)} target="_blank" rel="noreferrer">
+                        <span className="pp-ico"><Link2 size={16} /></span>
+                        <span style={{ minWidth: 0 }}>
+                          <strong style={{ textTransform: 'capitalize' }}>{platform}</strong>
+                          <small>{url}</small>
+                        </span>
+                      </a>
+                    ))}
+                  </div>
+                </Section>
+              )}
+
+              <Section title="Recent Campaigns" sub={profile.campaigns.length > 4 ? `Latest 4 of ${profile.campaigns.length}` : `${profile.campaigns.length} published`}>
+                {profile.campaigns.length === 0 ? (
+                  <p className="pp-empty">No published campaigns.</p>
+                ) : (
+                  <div className="pp-grid">
+                    {profile.campaigns.slice(0, 4).map((c) => (
+                      <Link className="pp-campaign" key={c.id} to={`/campaigns/${c.id}?source=landing`}>
+                        <div className="pp-campaign-body">
+                          <small>{c.category || 'General'}</small>
+                          <strong>{c.title}</strong>
+                          <span>{c.budget ? `NPR ${Number(c.budget).toLocaleString()}` : c.campaign_type || 'Campaign'}</span>
+                        </div>
+                      </Link>
+                    ))}
+                  </div>
+                )}
+              </Section>
+
+              <Section
+                title="Creators We've Worked With"
+                sub={`${profile.creators_worked_with || 0} creator${profile.creators_worked_with === 1 ? '' : 's'} · ${profile.completed_collaborations || 0} completed`}
+              >
+                {creators.length === 0 ? (
+                  <p className="pp-empty">No collaborations yet.</p>
+                ) : (
+                  <div className="pp-grid">
+                    {creators.slice(0, 8).map((w: any) => (
+                      <Link key={w.application_id} className="pp-link-card" to={`/creators/${w.creator_id}`}>
+                        <span className="pp-avatar-sm">
+                          {w.creator_avatar ? <img src={mediaUrl(w.creator_avatar)} alt="" /> : (w.creator_name || 'C')[0].toUpperCase()}
+                        </span>
+                        <span style={{ minWidth: 0 }}>
+                          <strong>{w.creator_name || `Creator #${w.creator_id}`}</strong>
+                          <small>{w.status === 'completed' ? 'Completed collaboration' : 'Active collaboration'}</small>
+                        </span>
+                      </Link>
+                    ))}
+                  </div>
+                )}
+              </Section>
+            </div>
+          )}
+        </div>
       </main>
-    </div>
+
+      <Lightbox item={viewer} onClose={() => setViewer(null)} />
+    </>
   );
 }
 

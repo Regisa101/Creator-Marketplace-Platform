@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { Link, useSearchParams } from "react-router-dom";
+import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import {
   ArrowLeft,
   ArrowRight,
@@ -268,19 +268,35 @@ function CampaignCard({
     deadlinePassed(campaign);
 
   const tags = tagsFor(campaign);
+  const navigate = useNavigate();
+  const detailUrl = `/campaigns/${campaign.id}?source=${
+    isAuthenticated && !isCreator ? "dashboard" : "landing"
+  }`;
 
   return (
     <article
       className={`campaign-card ${
         expired ? "campaign-card-expired" : ""
       }`}
+      style={{ cursor: "pointer" }}
+      role="link"
+      tabIndex={0}
+      onClick={() => navigate(detailUrl)}
+      onKeyDown={(e) => {
+        if (e.key === "Enter" && e.target === e.currentTarget) navigate(detailUrl);
+      }}
     >
       <div className="campaign-card-inner">
 
         {/* BRAND */}
 
         <div className="campaign-card-top">
-          <div className="campaign-brand">
+          <Link
+            to={`/brands/${campaign.business_id}`}
+            className="campaign-brand"
+            onClick={(e) => e.stopPropagation()}
+            style={{ textDecoration: "none", color: "inherit" }}
+          >
             <div className="campaign-avatar">
               {campaign.brand_logo ? (
                 <img
@@ -295,7 +311,7 @@ function CampaignCard({
             <span>
               {campaign.brand_name || "Brand"}
             </span>
-          </div>
+          </Link>
 
           {isCreator && !expired && (
             <button
@@ -305,9 +321,10 @@ function CampaignCard({
                   ? "campaign-heart saved"
                   : "campaign-heart"
               }
-              onClick={() =>
-                onToggleSave(campaign.id)
-              }
+              onClick={(e) => {
+                e.stopPropagation();
+                onToggleSave(campaign.id);
+              }}
               aria-label={
                 isSaved
                   ? "Remove from wishlist"
@@ -410,52 +427,24 @@ function CampaignCard({
 
         {/* ACTION */}
 
-        <div className="campaign-actions">
-
-          {/* BRAND */}
-
-          {isAuthenticated && !isCreator ? (
-            <Link
-              to={`/campaigns/${campaign.id}?source=dashboard`}
-              className="campaign-primary campaign-full"
-            >
-              View campaign detail
-              <ArrowRight size={14} />
-            </Link>
-          ) : expired ? (
-            /* EXPIRED PUBLIC CAMPAIGN */
-            <span className="campaign-disabled campaign-full">
-              Application deadline passed
-            </span>
-          ) : passedDeadline ? (
-            /* DEADLINE PASSED BUT APPLICATIONS EXIST */
-            <Link
-              to={`/campaigns/${campaign.id}?source=landing`}
-              className="campaign-primary campaign-full"
-            >
-              View campaign detail
-              <ArrowRight size={14} />
-            </Link>
-          ) : (
-            <>
+        {!(isAuthenticated && !isCreator) && (
+          <div className="campaign-actions">
+            {expired ? (
+              <span className="campaign-disabled campaign-full">
+                Application deadline passed
+              </span>
+            ) : !passedDeadline ? (
               <Link
                 to={`/campaigns/${campaign.id}?apply=true&source=landing`}
-                className="campaign-primary"
+                className="campaign-primary campaign-full"
+                onClick={(e) => e.stopPropagation()}
               >
                 Apply Campaign
                 <ArrowRight size={14} />
               </Link>
-
-              <Link
-                to={`/campaigns/${campaign.id}?source=landing`}
-                className="campaign-secondary"
-              >
-                View details
-              </Link>
-            </>
-          )}
-
-        </div>
+            ) : null}
+          </div>
+        )}
       </div>
     </article>
   );
@@ -1578,7 +1567,7 @@ export function Campaigns() {
         .campaign-grid {
           display: grid;
           grid-template-columns: repeat(2, minmax(0, 1fr));
-          gap: 18px;
+          gap: 14px;
         }
 
         /* CARD */
@@ -1598,7 +1587,7 @@ export function Campaigns() {
         }
 
         .campaign-card-inner {
-          padding: 18px;
+          padding: 15px;
         }
 
         .campaign-card-top {
@@ -1665,7 +1654,7 @@ export function Campaigns() {
 
         .campaign-title {
           margin: 0 0 9px;
-          font: 500 21px/1.15 "League Spartan", sans-serif;
+          font: 500 19px/1.15 "League Spartan", sans-serif;
           letter-spacing: -.02em;
         }
 
@@ -1783,7 +1772,7 @@ export function Campaigns() {
         .campaign-primary,
         .campaign-secondary,
         .campaign-disabled {
-          min-height: 37px;
+          min-height: 34px;
           display: flex;
           align-items: center;
           justify-content: center;

@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 
-import { parseSocialLink } from '../utils/social';
+import { parseSocialLink } from '../utils/Social';
 
 import { Check, ImagePlus, Loader2, Upload, X } from 'lucide-react';
 
