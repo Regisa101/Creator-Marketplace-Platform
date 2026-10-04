@@ -17,6 +17,7 @@ logging.basicConfig(level=logging.INFO)
 # Import Notification so SQLAlchemy includes the model
 # when creating database metadata.
 from app.models import Notification  # noqa: F401
+from app.models import Complaint  # noqa: F401
 
 
 # ============================================================
@@ -36,7 +37,9 @@ from app.routes import (
     saved_campaigns,
     uploads,
     admin,
+    admin_complaints,
     analytics,
+    complaints,
 )
 
 
@@ -323,6 +326,32 @@ def ensure_schema() -> None:
         TIMESTAMPTZ
         """,
 
+        # Restriction reasons (admin moderation)
+        """
+        ALTER TABLE users
+        ADD COLUMN IF NOT EXISTS restriction_reason VARCHAR(60)
+        """,
+
+        """
+        ALTER TABLE users
+        ADD COLUMN IF NOT EXISTS restriction_note TEXT
+        """,
+
+        """
+        ALTER TABLE users
+        ADD COLUMN IF NOT EXISTS restricted_by INTEGER
+        """,
+
+        """
+        ALTER TABLE campaigns
+        ADD COLUMN IF NOT EXISTS restriction_reason VARCHAR(60)
+        """,
+
+        """
+        ALTER TABLE campaigns
+        ADD COLUMN IF NOT EXISTS restriction_note TEXT
+        """,
+
         # ====================================================
         # NOTIFICATIONS
         # ====================================================
@@ -447,6 +476,14 @@ app.include_router(
 
 app.include_router(
     analytics.router
+)
+
+app.include_router(
+    complaints.router
+)
+
+app.include_router(
+    admin_complaints.router
 )
 
 

@@ -11,6 +11,7 @@ from app.models.saved_campaign import SavedCampaign
 from app.models.payment import Payment
 from app.models.contract import Contract
 from app.models.notification import Notification
+from app.models.complaint import Complaint
 
 
 __all__ = [
@@ -27,4 +28,5 @@ __all__ = [
     "Payment",
     "Contract",
     "Notification",
+    "Complaint",
 ]

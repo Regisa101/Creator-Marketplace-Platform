@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, Boolean, DateTime
+from sqlalchemy import Column, Integer, String, Boolean, DateTime, Text
 from sqlalchemy.sql import func
 from sqlalchemy.orm import relationship
 from app.database import Base
@@ -23,6 +23,13 @@ class User(Base):
     # blocks login entirely.
     is_restricted = Column(Boolean, nullable=False, default=False, server_default="false")
     restricted_at = Column(DateTime(timezone=True), nullable=True)
+
+    # Why the admin restricted the account (a key from services/complaints.py
+    # RESTRICTION_REASONS), an optional internal note, and which admin did it.
+    # Cleared when the account is reactivated.
+    restriction_reason = Column(String(60), nullable=True)
+    restriction_note = Column(Text, nullable=True)
+    restricted_by = Column(Integer, nullable=True)
     
     # Relationships
     creator_profile = relationship("CreatorProfile", back_populates="user", uselist=False, cascade="all, delete-orphan")

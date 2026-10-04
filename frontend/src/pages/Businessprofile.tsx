@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import {
   MapPin,
@@ -10,10 +10,6 @@ import {
   Trash2,
   X,
   Briefcase,
-  CheckCircle2,
-  Megaphone,
-  Layers,
-  Clock3,
   ArrowUpRight,
 } from 'lucide-react';
 
@@ -21,7 +17,6 @@ import { useAuth } from '../context/AuthContext';
 import {
   getBusinessProgress,
   getCampaigns,
-  getApplications,
   saveBusinessProgress,
   uploadImage,
 } from '../api/client';
@@ -42,7 +37,6 @@ export function BusinessProfile() {
   const [profile, setProfile] = useState<any>(null);
   const [viewer, setViewer] = useState<LightboxItem | null>(null);
   const [campaigns, setCampaigns] = useState<any[]>([]);
-  const [applications, setApplications] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
 
@@ -75,17 +69,15 @@ export function BusinessProfile() {
 
     (async () => {
       try {
-        const [profileData, campaignData, applicationData] =
+        const [profileData, campaignData] =
           await Promise.all([
             getBusinessProgress(),
             getCampaigns({ limit: 50 }),
-            getApplications(),
           ]);
 
         if (!cancelled) {
           setProfile(profileData?.profile ?? null);
           setCampaigns(campaignData?.campaigns ?? []);
-          setApplications(applicationData ?? []);
         }
       } catch (err) {
         console.error('Could not load profile:', err);
@@ -228,42 +220,6 @@ export function BusinessProfile() {
   const initial =
     companyName[0]?.toUpperCase() ?? 'B';
 
-  const liveCampaigns = campaigns.filter(
-    (campaign) => campaign.status === 'published'
-  );
-
-  const activeCampaigns = campaigns.filter(
-    (campaign) =>
-      campaign.status === 'published' ||
-      campaign.status === 'in_progress'
-  );
-
-  const completedCampaigns = campaigns.filter(
-    (campaign) => campaign.status === 'completed'
-  );
-
-  const acceptedApplications = applications.filter(
-    (application) =>
-      application.status === 'accepted' ||
-      application.status === 'completed'
-  );
-
-  const creatorsWorkedWith = useMemo(() => {
-    const map = new Map<string, any>();
-
-    acceptedApplications.forEach((application) => {
-      const key =
-        application.creator_id?.toString() ||
-        application.creator_name ||
-        `creator-${application.id}`;
-
-      if (!map.has(key)) {
-        map.set(key, application);
-      }
-    });
-
-    return Array.from(map.values());
-  }, [acceptedApplications]);
 
   const categories = Array.isArray(profile?.interested_categories)
     ? profile.interested_categories
@@ -1045,48 +1001,6 @@ export function BusinessProfile() {
 
             {editOpen && editError && <div className="bp-edit-error">{editError}</div>}
 
-            <div className="bp-stats">
-              <div className="bp-stat">
-                <span className="bp-stat-icon">
-                  <Megaphone size={16} />
-                </span>
-                <p className="bp-stat-value">
-                  {activeCampaigns.length}
-                </p>
-                <p className="bp-stat-label">Active campaigns</p>
-              </div>
-
-              <div className="bp-stat">
-                <span className="bp-stat-icon">
-                  <Layers size={16} />
-                </span>
-                <p className="bp-stat-value">
-                  {campaigns.length}
-                </p>
-                <p className="bp-stat-label">Campaigns created</p>
-              </div>
-
-              <div className="bp-stat">
-                <span className="bp-stat-icon">
-                  <Users size={16} />
-                </span>
-                <p className="bp-stat-value">
-                  {creatorsWorkedWith.length}
-                </p>
-                <p className="bp-stat-label">Creators worked with</p>
-              </div>
-
-              <div className="bp-stat">
-                <span className="bp-stat-icon">
-                  <CheckCircle2 size={16} />
-                </span>
-                <p className="bp-stat-value">
-                  {completedCampaigns.length}
-                </p>
-                <p className="bp-stat-label">Completed campaigns</p>
-              </div>
-            </div>
-
             {(editOpen || profile?.description) && (
               <section className="bp-section">
                 <div className="bp-section-heading">
@@ -1327,104 +1241,6 @@ export function BusinessProfile() {
                   ))}
                 </div>
               )}
-            </section>
-
-            <section className="bp-section">
-              <div className="bp-section-heading">
-                <p className="bp-section-title">Creators We've Worked With</p>
-                <p className="bp-section-sub">
-                  {creatorsWorkedWith.length} creator{creatorsWorkedWith.length === 1 ? '' : 's'}
-                </p>
-              </div>
-
-              {creatorsWorkedWith.length === 0 ? (
-                <div className="bp-empty">
-                  <strong>No completed creator relationships yet</strong>
-                  Accepted collaborations will automatically appear here.
-                  <Link className="bp-empty-link" to="/creators">
-                    Discover creators →
-                  </Link>
-                </div>
-              ) : (
-                <div className="bp-creators">
-                  {creatorsWorkedWith.slice(0, 8).map((application: any) => {
-                    const name =
-                      application.creator_name ||
-                      `Creator #${application.creator_id}`;
-
-                    const initial =
-                      name[0]?.toUpperCase() || 'C';
-
-                    return (
-                      <Link
-                        className="bp-creator-card"
-                        key={application.id}
-                        to={`/creators/${application.creator_id}`}
-                        style={{ textDecoration: 'none', color: 'inherit' }}
-                      >
-                        <div className="bp-creator-avatar">
-                          {application.creator_avatar ? (
-                            <img
-                              src={application.creator_avatar}
-                              alt={name}
-                            />
-                          ) : (
-                            initial
-                          )}
-                        </div>
-
-                        <div>
-                          <p className="bp-creator-name">{name}</p>
-                          <p className="bp-creator-meta">
-                            {application.status === 'completed'
-                              ? 'Completed collaboration'
-                              : 'Active collaboration'}
-                          </p>
-                        </div>
-                      </Link>
-                    );
-                  })}
-                </div>
-              )}
-            </section>
-
-            <section className="bp-section">
-              <p className="bp-section-title" style={{ marginBottom: 12 }}>
-                Collaboration Snapshot
-              </p>
-
-              <div
-                style={{
-                  display: 'grid',
-                  gridTemplateColumns: 'repeat(2, 1fr)',
-                  gap: 11,
-                }}
-              >
-                <div className="bp-info-card">
-                  <span className="bp-info-icon">
-                    <Clock3 size={17} />
-                  </span>
-                  <span>
-                    <p className="bp-info-label">Live campaigns</p>
-                    <p className="bp-info-value">
-                      {liveCampaigns.length} currently accepting creators
-                    </p>
-                  </span>
-                </div>
-
-                <div className="bp-info-card">
-                  <span className="bp-info-icon">
-                    <CheckCircle2 size={17} />
-                  </span>
-                  <span>
-                    <p className="bp-info-label">Completed work</p>
-                    <p className="bp-info-value">
-                      {completedCampaigns.length} completed campaign
-                      {completedCampaigns.length === 1 ? '' : 's'}
-                    </p>
-                  </span>
-                </div>
-              </div>
             </section>
 
             <section className="bp-section">

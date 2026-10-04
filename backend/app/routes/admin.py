@@ -18,6 +18,7 @@ from datetime import datetime, timedelta, timezone
 from typing import Optional
 
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query
+from pydantic import BaseModel, Field
 from sqlalchemy import func, or_, select
 from sqlalchemy.orm import Session, aliased
 
@@ -37,10 +38,24 @@ from app.routes.applications import build_evidence_snapshot
 from app.services.email_service import send_moderation_email
 from app.services.pricing import candidate_rate_and_status, total_for_rate
 from app.services.notifications import create_notification
+from app.services.complaints import RESTRICTION_REASONS, category_label, resolve_complaints, user_complaint_stats
 
 router = APIRouter(prefix="/api/admin", tags=["Admin"])
 
 BRAND = "CreatorHub"
+
+
+class RestrictRequest(BaseModel):
+    reason: str = Field(min_length=2, max_length=60)
+    note: Optional[str] = Field(default=None, max_length=1000)
+    complaint_ids: list[int] = Field(default_factory=list, max_length=50)
+
+
+def _check_reason(body: RestrictRequest) -> None:
+    if body.reason not in RESTRICTION_REASONS:
+        raise HTTPException(status_code=400, detail="Choose a valid restriction reason.")
+    if body.reason == "other" and not (body.note or "").strip():
+        raise HTTPException(status_code=400, detail="Please add a note when the reason is Other.")
 
 # Payment rows that represent CreatorHub's own fee (see models/payment.py).
 FEE_TYPES = ("platform_fee", "selection_fee")
@@ -165,6 +180,24 @@ def _get_user_or_404(db: Session, user_id: int, role: str) -> User:
     return user
 
 
+def _complaints_for(db: Session, user_id: int) -> dict:
+    """Complaint summary + the open complaint ids to attach to a restriction."""
+    from app.models import Complaint
+
+    stats = user_complaint_stats(db, user_id)
+    open_rows = (
+        db.query(Complaint)
+        .filter(Complaint.target_user_id == user_id, Complaint.status.in_(("new", "under_review")))
+        .order_by(Complaint.created_at.desc())
+        .limit(20)
+        .all()
+    )
+    stats["open_complaints"] = [
+        {"id": c.id, "category_label": category_label(c.category), "created_at": c.created_at} for c in open_rows
+    ]
+    return stats
+
+
 def _status_counts(base_query) -> dict:
     """all / active / restricted counts for a user query (ignores status filter)."""
     rows = dict(base_query.order_by(None).with_entities(User.is_restricted, func.count(User.id)).group_by(User.is_restricted).all())
@@ -173,20 +206,30 @@ def _status_counts(base_query) -> dict:
     return {"all": active + restricted, "active": active, "restricted": restricted}
 
 
-def _set_restriction(db: Session, user: User, restricted: bool, label: str) -> Optional[dict]:
+def _set_restriction(db: Session, user: User, restricted: bool, label: str, body: Optional[RestrictRequest] = None, admin: Optional[User] = None) -> Optional[dict]:
     """Apply the change; returns the email to send after commit, or None if nothing changed."""
     if bool(user.is_restricted) == restricted:
         return None  # already in the requested state
     user.is_restricted = restricted
     user.restricted_at = _now() if restricted else None
+    if restricted and body:
+        user.restriction_reason = body.reason
+        user.restriction_note = (body.note or "").strip() or None
+        user.restricted_by = admin.id if admin else None
+    elif not restricted:
+        user.restriction_reason = None
+        user.restriction_note = None
+        user.restricted_by = None
+    reason_text = RESTRICTION_REASONS.get(body.reason) if (restricted and body) else None
     create_notification(
         db,
         user_id=user.id,
         type="account_restricted" if restricted else "account_reactivated",
         title="Account restricted" if restricted else "Account reactivated",
         message=(
-            f"Your {label} account has been restricted by CreatorHub. You can still view your history, "
-            "but you cannot start new marketplace activity."
+            f"Your {label} account has been restricted by CreatorHub"
+            + (f" (reason: {reason_text})" if reason_text else "")
+            + ". You can still view your history, but you cannot start new marketplace activity."
             if restricted
             else f"Your {label} account has been reactivated. You can use CreatorHub normally again."
         ),
@@ -196,7 +239,8 @@ def _set_restriction(db: Session, user: User, restricted: bool, label: str) -> O
     db.commit()
     if restricted:
         paragraphs = [
-            f"Your {label} account on {BRAND} has been restricted by our team.",
+            f"Your {label} account on {BRAND} has been restricted by our team."
+            + (f" Reason: {reason_text}." if reason_text else ""),
             "You can still log in and view your campaigns, applications, contracts and payment history, "
             "but you cannot start new marketplace activity until the restriction is lifted.",
             "If you think this is a mistake, please reply to this email or contact CreatorHub support.",
@@ -323,6 +367,11 @@ def _recent_activity(db: Session, since: Optional[datetime], limit: int = 50) ->
     return events[:limit]
 
 
+@router.get("/restriction-reasons")
+async def restriction_reasons(current_user: User = Depends(get_current_admin)):
+    return [{"value": k, "label": v} for k, v in RESTRICTION_REASONS.items()]
+
+
 # ------------------------------------------------------------------
 # CREATORS
 # ------------------------------------------------------------------
@@ -402,6 +451,10 @@ async def admin_creator_detail(
         ],
         "status": "restricted" if user.is_restricted else "active",
         "restricted_at": user.restricted_at,
+        "restriction_reason": user.restriction_reason,
+        "restriction_reason_label": RESTRICTION_REASONS.get(user.restriction_reason) if user.restriction_reason else None,
+        "restriction_note": user.restriction_note,
+        "complaints": _complaints_for(db, user.id),
         "joined_at": user.created_at,
         "stats": {
             "applications": app_count(),
@@ -414,10 +467,13 @@ async def admin_creator_detail(
 
 
 @router.post("/creators/{user_id}/restrict")
-async def restrict_creator(user_id: int, background_tasks: BackgroundTasks, db: Session = Depends(get_db), current_user: User = Depends(get_current_admin)):
+async def restrict_creator(user_id: int, body: RestrictRequest, background_tasks: BackgroundTasks, db: Session = Depends(get_db), current_user: User = Depends(get_current_admin)):
+    _check_reason(body)
     user = _get_user_or_404(db, user_id, "creator")
-    email = _set_restriction(db, user, True, "creator")
+    email = _set_restriction(db, user, True, "creator", body, current_user)
     if email:
+        resolve_complaints(db, current_user, body.complaint_ids, target_user_id=user.id)
+        db.commit()
         background_tasks.add_task(send_moderation_email, **email)
     return {"id": user.id, "status": "restricted"}
 
@@ -520,6 +576,10 @@ async def admin_business_detail(
         "website": p.website if p else None,
         "status": "restricted" if user.is_restricted else "active",
         "restricted_at": user.restricted_at,
+        "restriction_reason": user.restriction_reason,
+        "restriction_reason_label": RESTRICTION_REASONS.get(user.restriction_reason) if user.restriction_reason else None,
+        "restriction_note": user.restriction_note,
+        "complaints": _complaints_for(db, user.id),
         "joined_at": user.created_at,
         "stats": {
             "campaigns": campaigns(Campaign.status != CampaignStatus.DRAFT),
@@ -533,10 +593,13 @@ async def admin_business_detail(
 
 
 @router.post("/businesses/{user_id}/restrict")
-async def restrict_business(user_id: int, background_tasks: BackgroundTasks, db: Session = Depends(get_db), current_user: User = Depends(get_current_admin)):
+async def restrict_business(user_id: int, body: RestrictRequest, background_tasks: BackgroundTasks, db: Session = Depends(get_db), current_user: User = Depends(get_current_admin)):
+    _check_reason(body)
     user = _get_user_or_404(db, user_id, "business")
-    email = _set_restriction(db, user, True, "business")
+    email = _set_restriction(db, user, True, "business", body, current_user)
     if email:
+        resolve_complaints(db, current_user, body.complaint_ids, target_user_id=user.id)
+        db.commit()
         background_tasks.add_task(send_moderation_email, **email)
     return {"id": user.id, "status": "restricted"}
 
@@ -695,6 +758,7 @@ async def admin_campaign_detail(
         "status": campaign.status.value,
         "is_restricted": bool(campaign.is_restricted),
         "restricted_at": campaign.restricted_at,
+        "restriction_reason_label": RESTRICTION_REASONS.get(campaign.restriction_reason) if campaign.restriction_reason else None,
         "application_deadline": campaign.application_deadline,
         "start_date": campaign.start_date,
         "end_date": campaign.end_date,
@@ -708,12 +772,14 @@ async def admin_campaign_detail(
 @router.post("/campaigns/{campaign_id}/restrict")
 async def restrict_campaign(
     campaign_id: int,
+    body: RestrictRequest,
     background_tasks: BackgroundTasks,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_admin),
 ):
     """Close a campaign for moderation. Nothing is deleted: applications,
     contracts and payments stay linked to it."""
+    _check_reason(body)
     campaign = db.query(Campaign).filter(Campaign.id == campaign_id).first()
     if not campaign:
         raise HTTPException(status_code=404, detail="Campaign not found.")
@@ -721,6 +787,9 @@ async def restrict_campaign(
     if not campaign.is_restricted:
         campaign.is_restricted = True
         campaign.restricted_at = _now()
+        campaign.restriction_reason = body.reason
+        campaign.restriction_note = (body.note or "").strip() or None
+        resolve_complaints(db, current_user, body.complaint_ids, target_campaign_id=campaign.id)
         campaign.is_active = False
         # Completed/cancelled campaigns keep their real final status.
         if campaign.status in MOD_STATUSES:
@@ -730,7 +799,7 @@ async def restrict_campaign(
             user_id=campaign.business_id,
             type="campaign_restricted",
             title="Campaign restricted",
-            message=f'Your campaign "{campaign.title}" was closed by CreatorHub. Existing contracts and records are unchanged.',
+            message=f'Your campaign "{campaign.title}" was closed by CreatorHub (reason: {RESTRICTION_REASONS[body.reason]}). Existing contracts and records are unchanged.',
             link=f"/campaigns/{campaign.id}",
             reference_id=campaign.id,
         )
@@ -744,7 +813,7 @@ async def restrict_campaign(
                 subject=f"Your {BRAND} campaign was closed",
                 headline="Campaign closed by CreatorHub",
                 paragraphs=[
-                    f'Your campaign "{campaign.title}" has been restricted and closed by our team.',
+                    f'Your campaign "{campaign.title}" has been restricted and closed by our team. Reason: {RESTRICTION_REASONS[body.reason]}.',
                     "It no longer accepts applications. Existing applications, contracts and payments are unchanged.",
                     "If you think this is a mistake, please contact CreatorHub support.",
                 ],

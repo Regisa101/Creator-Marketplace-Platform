@@ -2,6 +2,9 @@ import { useEffect, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
 import { X } from 'lucide-react';
 
+import { getRestrictionReasons } from '../../api/client';
+import type { ComplaintSummary, RestrictPayload, RestrictionReason } from '../../api/client';
+
 import { AppLayout } from '../../components/AppLayout';
 
 /* ============================================================
@@ -386,6 +389,116 @@ export function ConfirmModal({
   );
 }
 
+export function RestrictModal({
+  open,
+  title,
+  message,
+  busy,
+  error,
+  complaints,
+  onConfirm,
+  onCancel,
+}: {
+  open: boolean;
+  title: string;
+  message: string;
+  busy?: boolean;
+  error?: string;
+  /** Open complaints about this account; ticked ones are marked "upheld" on restrict. */
+  complaints?: ComplaintSummary['open_complaints'];
+  onConfirm: (payload: RestrictPayload) => void;
+  onCancel: () => void;
+}) {
+  const [reasons, setReasons] = useState<RestrictionReason[]>([]);
+  const [reason, setReason] = useState('');
+  const [note, setNote] = useState('');
+  const [picked, setPicked] = useState<number[]>([]);
+  const [localError, setLocalError] = useState('');
+  useEscape(open && !busy, onCancel);
+
+  useEffect(() => {
+    if (!open) return;
+    setReason('');
+    setNote('');
+    setLocalError('');
+    setPicked((complaints ?? []).map((c) => c.id));
+    if (!reasons.length) getRestrictionReasons().then(setReasons).catch(() => setLocalError('Could not load reasons.'));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open]);
+
+  if (!open) return null;
+
+  const submit = () => {
+    if (!reason) return setLocalError('Please choose a reason.');
+    if (reason === 'other' && !note.trim()) return setLocalError('Please add a note when the reason is Other.');
+    setLocalError('');
+    onConfirm({ reason, note: note.trim() || undefined, complaint_ids: picked });
+  };
+
+  return (
+    <div className="adm-backdrop" onClick={busy ? undefined : onCancel}>
+      <div className="adm-modal" role="dialog" aria-modal="true" aria-labelledby="adm-restrict-title" onClick={(e) => e.stopPropagation()}>
+        <h3 id="adm-restrict-title">{title}</h3>
+        <p>{message}</p>
+
+        <label className="adm-field-label" htmlFor="adm-restrict-reason">Reason *</label>
+        <select id="adm-restrict-reason" className="adm-input" value={reason} onChange={(e) => setReason(e.target.value)}>
+          <option value="">Select a reason</option>
+          {reasons.map((r) => (
+            <option key={r.value} value={r.value}>{r.label}</option>
+          ))}
+        </select>
+
+        <label className="adm-field-label" htmlFor="adm-restrict-note">Internal note{reason === 'other' ? ' *' : ' (optional)'}</label>
+        <textarea id="adm-restrict-note" className="adm-input adm-textarea" rows={3} maxLength={1000} value={note} onChange={(e) => setNote(e.target.value)} placeholder="Only admins see this note" />
+
+        {complaints && complaints.length > 0 && (
+          <>
+            <div className="adm-field-label">Mark these complaints as acted on</div>
+            <ul className="adm-check-list">
+              {complaints.map((c) => (
+                <li key={c.id}>
+                  <label>
+                    <input
+                      type="checkbox"
+                      checked={picked.includes(c.id)}
+                      onChange={(e) => setPicked((p) => (e.target.checked ? [...p, c.id] : p.filter((x) => x !== c.id)))}
+                    />
+                    <span>#{c.id} · {c.category_label}</span>
+                  </label>
+                </li>
+              ))}
+            </ul>
+          </>
+        )}
+
+        {(localError || error) && <div className="adm-error" role="alert">{localError || error}</div>}
+        <div className="adm-modal-actions">
+          <button type="button" className="btn btn-secondary" disabled={busy} onClick={onCancel}>Cancel</button>
+          <button type="button" className="btn adm-btn-danger" disabled={busy} onClick={submit}>{busy ? 'Working…' : 'Restrict'}</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+export function ComplaintSummaryBlock({ summary }: { summary?: ComplaintSummary | null }) {
+  if (!summary || summary.total === 0) return null;
+  return (
+    <>
+      <div className="adm-section-title">Complaints</div>
+      <div className={`adm-note${summary.flagged ? ' adm-note-warn' : ''}`}>
+        {summary.total} complaint{summary.total === 1 ? '' : 's'} from {summary.unique_reporters} different {summary.unique_reporters === 1 ? 'person' : 'people'}
+        {summary.open ? ` · ${summary.open} still open` : ''}
+        {summary.top_category_label && summary.top_category_reporters >= 2
+          ? ` · ${summary.top_category_reporters} people reported "${summary.top_category_label}"`
+          : ''}
+        {summary.flagged ? '. Repeat problem: please review.' : '.'}
+      </div>
+    </>
+  );
+}
+
 export function Drawer({ open, title, onClose, children }: { open: boolean; title: string; onClose: () => void; children: ReactNode }) {
   useEscape(open, onClose);
   if (!open) return null;
@@ -731,6 +844,15 @@ const ADMIN_CSS = `
 .adm-mini-list li span:last-child { color: #888; text-align: right; }
 .adm-note { margin: 12px 0 0; padding: 10px 12px; border-radius: 9px; background: #f7f7f7; color: #666; font: 400 11.5px/1.5 Poppins, sans-serif; }
 .adm-link { color: #111; text-decoration: underline; }
+.adm-note-warn { background: #fdf3e7; color: #8a5a12; }
+.adm-field-label { display: block; margin: 12px 0 6px; color: #555; font: 500 11.5px Poppins, sans-serif; }
+.adm-input { width: 100%; box-sizing: border-box; border: 1px solid #e0e0e0; border-radius: 8px; padding: 9px 12px; background: #fff; color: #111; font: 400 12.5px Poppins, sans-serif; outline: none; }
+.adm-input:focus { border-color: #111; }
+.adm-textarea { resize: vertical; line-height: 1.5; }
+.adm-check-list { margin: 0 0 12px; padding: 0; list-style: none; display: grid; gap: 6px; }
+.adm-check-list label { display: flex; align-items: center; gap: 8px; font: 400 12px Poppins, sans-serif; color: #444; cursor: pointer; }
+.adm-modal .adm-error { margin: 12px 0 0; }
+.adm-modal-actions { margin-top: 16px; }
 
 .adm-donut { position: relative; height: 100%; min-height: 220px; display: flex; align-items: center; gap: 28px; flex-wrap: wrap; justify-content: center; }
 .adm-donut svg { width: 170px; height: 170px; flex: none; }

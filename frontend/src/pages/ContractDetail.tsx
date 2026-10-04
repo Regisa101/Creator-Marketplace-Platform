@@ -26,6 +26,7 @@ import { AppLayout } from '../components/AppLayout';
 import { PublicNavbar } from '../components/PublicNavbar';
 import { KhaltiPaymentForm } from '../components/KhaltiPaymentForm';
 import { useAuth } from '../context/AuthContext';
+import { ComplaintModal } from '../components/ComplaintModal';
 
 const STATUS_LABEL: Record<string, string> = {
   draft: 'Draft',
@@ -131,6 +132,7 @@ export function ContractDetail() {
   const [error, setError] = useState('');
 
   const [confirmComplete, setConfirmComplete] = useState(false);
+  const [reportOpen, setReportOpen] = useState(false);
   const [completing, setCompleting] = useState(false);
   const [actionError, setActionError] = useState('');
 
@@ -580,6 +582,26 @@ export function ContractDetail() {
                     ))}
                   </ul>
                 </section>
+
+                {(isBusiness || isCreator) && (
+                  <section className="cdt-card">
+                    <h2>Problem with this collaboration?</h2>
+                    <button type="button" className="btn btn-secondary" style={{ width: '100%' }} onClick={() => setReportOpen(true)}>
+                      Report a problem
+                    </button>
+                    <ComplaintModal
+                      open={reportOpen}
+                      onClose={() => setReportOpen(false)}
+                      role={isBusiness ? 'business' : 'creator'}
+                      contractId={contract.id}
+                      against={{
+                        type: 'user',
+                        userId: isBusiness ? contract.creator_id : contract.business_id,
+                        name: (isBusiness ? contract.creator_name : contract.business_name) || (isBusiness ? 'the creator' : 'the business'),
+                      }}
+                    />
+                  </section>
+                )}
 
                 {canComplete && (
                   <section className="cdt-card">

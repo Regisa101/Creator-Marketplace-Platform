@@ -274,6 +274,10 @@ class Campaign(Base):
         nullable=True,
     )
 
+    restriction_reason = Column(String(60), nullable=True)
+
+    restriction_note = Column(Text, nullable=True)
+
     # ============================================================
     # TIMESTAMPS
     # ============================================================

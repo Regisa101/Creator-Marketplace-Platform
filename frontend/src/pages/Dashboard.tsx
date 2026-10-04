@@ -9,6 +9,8 @@ import { useAuth } from '../context/AuthContext';
 import { AppLayout } from '../components/AppLayout';
 import {
   getApplications,
+  getBusinessAnalytics,
+  getBusinessProgress,
   getCampaigns,
   type Application,
   type Campaign,
@@ -46,9 +48,14 @@ export function Dashboard() {
   // the public marketplace instead of rendering a creator dashboard.
   const isBusinessUser = !!user && user.role === 'business';
 
-  const firstName = user?.full_name?.split(' ')[0] || 'there';
+  // The page title is "Welcome, <brand name>" (from the business profile),
+  // not the logged-in person's name. Until it loads the title is just "Welcome".
+  const [brandName, setBrandName] = useState('');
   const [campaigns, setCampaigns] = useState<Campaign[]>([]);
   const [applications, setApplications] = useState<Application[]>([]);
+  // Real spending, calculated by the backend from paid contracts.
+  // null = not loaded (or the request failed) -> the card shows "—".
+  const [totalSpent, setTotalSpent] = useState<number | null>(null);
   const [loading, setLoading] = useState(true);
   const [errors, setErrors] = useState<string[]>([]);
   const [campaignTab, setCampaignTab] = useState<CampaignTab>('active');
@@ -73,6 +80,8 @@ export function Dashboard() {
       const results = await Promise.allSettled([
         getCampaigns({ limit: 50 }),
         getApplications(),
+        getBusinessAnalytics('all'),
+        getBusinessProgress(),
       ]);
 
       if (cancelled) return;
@@ -91,6 +100,20 @@ export function Dashboard() {
       } else {
         setApplications([]);
         nextErrors.push('Applications could not be loaded.');
+      }
+
+      if (results[2].status === 'fulfilled') {
+        setTotalSpent(Number(results[2].value.summary?.total_spent ?? 0));
+      } else {
+        setTotalSpent(null);
+        nextErrors.push('Spending could not be loaded.');
+      }
+
+      // The brand name is cosmetic: if this request fails the title simply
+      // stays "Welcome" and no error banner is shown.
+      if (results[3].status === 'fulfilled') {
+        const name = String(results[3].value?.profile?.company_name ?? '').trim();
+        if (name) setBrandName(name);
       }
 
       setErrors(nextErrors);
@@ -142,16 +165,6 @@ export function Dashboard() {
     [applications]
   );
 
-  // Total spent = budget of campaigns that have actually completed, i.e.
-  // money that's gone out the door rather than just budgeted/open spend.
-  const totalSpent = useMemo(
-    () =>
-      campaigns
-        .filter((c) => c.status === 'completed')
-        .reduce((sum, c) => sum + Number((c as any).budget || 0), 0),
-    [campaigns]
-  );
-
   // Pending applications are what actually need a business's attention —
   // everything else in the funnel (accepted/rejected/etc.) has already
   // been acted on.
@@ -174,7 +187,7 @@ export function Dashboard() {
   }
 
   // Rendered inside AppLayout's header row, to the right of the
-  // "Welcome, {firstName}" title — not in the page body — so it lines up
+  // brand-name title — not in the page body — so it lines up
   // with the title instead of floating below it.
   const headerActions = (
     <Link className="btn btn-primary" to="/campaigns/new">
@@ -185,7 +198,7 @@ export function Dashboard() {
 
   return (
     <AppLayout
-      title={`Welcome, ${firstName}`}
+      title={brandName ? `Welcome, ${brandName}` : 'Welcome'}
       subtitle="Manage campaigns, review creators and confirm selections."
       showNotifications
       headerActions={headerActions}
@@ -269,7 +282,9 @@ export function Dashboard() {
             <div className="overview-label">In Progress</div>
           </Link>
           <Link className="overview-item" to="/collab-history">
-            <div className="overview-value">{loading ? '—' : money(totalSpent)}</div>
+            <div className="overview-value">
+              {loading || totalSpent === null ? '—' : money(totalSpent)}
+            </div>
             <div className="overview-label">Total Spent</div>
           </Link>
         </section>

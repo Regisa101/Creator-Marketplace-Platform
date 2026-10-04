@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
+import type { MouseEvent } from 'react';
 import { Link } from 'react-router-dom';
 import { ArrowRight, BarChart3, CheckCircle2, Plus } from 'lucide-react';
 import { AppLayout } from '../components/AppLayout';
@@ -119,45 +120,189 @@ function matchesFillFilter(campaign: BusinessAnalytics['campaigns'][number], fil
 }
 
 /* ============================================================
-   Spend over time (plain CSS bars - no chart library needed)
+   Spend over time (pie chart, plain SVG - no chart library needed)
 ============================================================ */
 
-function SpendChart({ spend }: { spend: BusinessAnalytics['spend_over_time'] }) {
-  const { points, granularity } = spend;
-  const max = Math.max(0, ...points.map((p) => p.amount));
+const PIE_COLORS = ['#111111', '#4a4a4a', '#7a7a7a', '#a3a3a3', '#c6c6c6', '#e1e1e1'];
 
-  if (!points.length || max === 0) {
+function SpendPie({ spend }: { spend: BusinessAnalytics['spend_over_time'] }) {
+  const { points, granularity } = spend;
+  const [active, setActive] = useState<number | null>(null);
+  const [tip, setTip] = useState<{ x: number; y: number; label: string; amount: number; pct: number } | null>(null);
+
+  const total = points.reduce((sum, p) => sum + p.amount, 0);
+  if (!points.length || total === 0) {
     return <div className="an-empty">No payments in this period.</div>;
   }
 
-  // Keep the x-axis readable: with many bars only label every few of them.
-  const step = Math.max(1, Math.ceil(points.length / 7));
-  const last = points.length - 1;
+  // One slice per day/month when there are few, otherwise group neighbouring
+  // periods into at most 6 slices so the pie stays readable.
+  const groupSize = Math.max(1, Math.ceil(points.length / 6));
+  const slices: { label: string; amount: number }[] = [];
+  for (let i = 0; i < points.length; i += groupSize) {
+    const chunk = points.slice(i, i + groupSize);
+    const first = periodLabel(chunk[0].period, granularity);
+    const last = periodLabel(chunk[chunk.length - 1].period, granularity);
+    slices.push({
+      label: chunk.length === 1 || first === last ? first : `${first} – ${last}`,
+      amount: chunk.reduce((sum, p) => sum + p.amount, 0),
+    });
+  }
+  const shown = slices.map((slice, index) => ({ ...slice, index })).filter((slice) => slice.amount > 0);
+
+  const cx = 100;
+  const cy = 100;
+  const r = 88;
+  let angle = -Math.PI / 2;
+  const paths = shown.map((slice) => {
+    const fraction = slice.amount / total;
+    const start = angle;
+    const end = angle + fraction * Math.PI * 2;
+    angle = end;
+    const mid = (start + end) / 2;
+    const large = end - start > Math.PI ? 1 : 0;
+    const d =
+      fraction >= 0.9999
+        ? null
+        : `M ${cx} ${cy} L ${cx + r * Math.cos(start)} ${cy + r * Math.sin(start)} A ${r} ${r} 0 ${large} 1 ${cx + r * Math.cos(end)} ${cy + r * Math.sin(end)} Z`;
+    return { ...slice, d, mid, pct: Math.round(fraction * 100) };
+  });
 
   return (
-    <div className="an-chart" role="img" aria-label="Spend over time">
-      <div className="an-chart-max">{money(max)}</div>
-      <div className="an-bars">
-        {points.map((point, index) => {
-          const pct = (point.amount / max) * 100;
-          const barHeight = point.amount > 0 ? Math.max(2, pct) : 0;
-          const label = periodLabel(point.period, granularity);
-          // Bars at the left/right edge align their tooltip to the edge so it
-          // never gets cut off.
-          const edge = points.length < 5 ? '' : index < 2 ? ' tip-left' : index > last - 2 ? ' tip-right' : '';
-          return (
-            <div key={point.period} className="an-bar-col">
-              <div className="an-bar-track">
-                <div className="an-bar" style={{ height: `${barHeight}%` }} />
-                <div className={`an-tip${edge}`} style={{ bottom: `calc(${barHeight}% + 6px)` }}>
-                  {label} · <strong>{money(point.amount)}</strong>
-                </div>
-              </div>
-              <div className="an-bar-label">{index % step === 0 ? label : '\u00A0'}</div>
-            </div>
+    <div className="an-pie" onMouseLeave={() => { setActive(null); setTip(null); }}>
+      <svg viewBox="0 0 200 200" className="an-pie-svg" role="img" aria-label="Spend over time">
+        {paths.map((slice, i) => {
+          const color = PIE_COLORS[i % PIE_COLORS.length];
+          const isActive = active === slice.index;
+          const shift = isActive && slice.d ? 5 : 0;
+          const transform = `translate(${Math.cos(slice.mid) * shift} ${Math.sin(slice.mid) * shift})`;
+          const handlers = {
+            onMouseEnter: () => setActive(slice.index),
+            onMouseMove: (e: MouseEvent<SVGElement>) => {
+              const box = (e.currentTarget.ownerSVGElement?.parentElement as HTMLElement | null)?.getBoundingClientRect();
+              if (box) setTip({ x: e.clientX - box.left, y: e.clientY - box.top, label: slice.label, amount: slice.amount, pct: slice.pct });
+            },
+          };
+          return slice.d ? (
+            <path key={slice.index} d={slice.d} fill={color} stroke="#fff" strokeWidth="1.5" transform={transform} style={{ transition: 'transform .12s ease' }} {...handlers} />
+          ) : (
+            <circle key={slice.index} cx={cx} cy={cy} r={r} fill={color} {...handlers} />
           );
         })}
-      </div>
+      </svg>
+
+      <ul className="an-pie-legend">
+        {paths.map((slice, i) => (
+          <li
+            key={slice.index}
+            className={active === slice.index ? 'active' : undefined}
+            onMouseEnter={() => setActive(slice.index)}
+            onMouseLeave={() => setActive(null)}
+          >
+            <span className="an-pie-dot" style={{ background: PIE_COLORS[i % PIE_COLORS.length] }} />
+            <span className="an-pie-label">{slice.label}</span>
+            <strong>{money(slice.amount)}</strong>
+            <em>{slice.pct}%</em>
+          </li>
+        ))}
+      </ul>
+
+      {tip && (
+        <div className="an-sc-tip" style={{ left: tip.x, top: tip.y }} role="status">
+          <span>{tip.label}</span>
+          <strong>{money(tip.amount)} · {tip.pct}%</strong>
+        </div>
+      )}
+    </div>
+  );
+}
+
+/* ============================================================
+   Campaign overview: campaigns by status (same idea as the admin dashboard)
+============================================================ */
+
+const STATUS_LABEL: Record<string, string> = {
+  draft: 'Draft',
+  published: 'Active',
+  in_progress: 'In Progress',
+  completed: 'Completed',
+  closed: 'Closed',
+  cancelled: 'Cancelled',
+};
+
+function niceTop(value: number) {
+  if (value <= 4) return 4;
+  const exp = Math.pow(10, Math.floor(Math.log10(value)));
+  const f = value / exp;
+  const nf = f <= 1 ? 1 : f <= 2 ? 2 : f <= 5 ? 5 : 10;
+  return Math.max(4, nf * exp);
+}
+
+function CampaignStatusChart({ statuses }: { statuses: BusinessAnalytics['campaign_statuses'] }) {
+  const [active, setActive] = useState<number | null>(null);
+  const [tip, setTip] = useState<{ x: number; y: number; label: string; count: number } | null>(null);
+
+  const W = 900;
+  const H = 250;
+  const pad = { top: 22, right: 12, bottom: 34, left: 36 };
+  const innerW = W - pad.left - pad.right;
+  const innerH = H - pad.top - pad.bottom;
+  const max = niceTop(Math.max(...statuses.map((s) => s.count), 0));
+  const ticks = [0, 0.25, 0.5, 0.75, 1].map((f) => Math.round(f * max));
+  const slot = innerW / statuses.length;
+  const barW = Math.min(56, slot * 0.5);
+  const y = (v: number) => pad.top + innerH - (v / max) * innerH;
+
+  return (
+    <div className="an-sc-wrap" onMouseLeave={() => { setActive(null); setTip(null); }}>
+      <svg className="an-sc-svg" viewBox={`0 0 ${W} ${H}`} role="img" aria-label="Campaigns by status">
+        {ticks.map((t) => (
+          <g key={t}>
+            <line x1={pad.left} x2={W - pad.right} y1={y(t)} y2={y(t)} stroke="#eee" />
+            <text x={pad.left - 8} y={y(t) + 3} textAnchor="end" className="an-sc-axis">{t}</text>
+          </g>
+        ))}
+        {statuses.map((s, i) => {
+          const label = STATUS_LABEL[s.status] ?? s.status;
+          const x = pad.left + slot * i + (slot - barW) / 2;
+          const h = (s.count / max) * innerH;
+          return (
+            <g key={s.status}>
+              <rect
+                x={x}
+                y={y(s.count)}
+                width={barW}
+                height={Math.max(h, s.count > 0 ? 2 : 0)}
+                rx="3"
+                fill={active === i ? '#000' : '#2b2b2b'}
+                opacity={active === null || active === i ? 1 : 0.55}
+              />
+              {s.count > 0 && (
+                <text x={x + barW / 2} y={y(s.count) - 6} textAnchor="middle" className="an-sc-value">{s.count}</text>
+              )}
+              <text x={x + barW / 2} y={H - 12} textAnchor="middle" className="an-sc-axis">{label}</text>
+              <rect
+                x={pad.left + slot * i}
+                y={pad.top}
+                width={slot}
+                height={innerH}
+                fill="transparent"
+                onMouseEnter={() => setActive(i)}
+                onMouseMove={(e) => {
+                  const box = (e.currentTarget.ownerSVGElement?.parentElement as HTMLElement | null)?.getBoundingClientRect();
+                  if (box) setTip({ x: e.clientX - box.left, y: e.clientY - box.top, label, count: s.count });
+                }}
+              />
+            </g>
+          );
+        })}
+      </svg>
+      {tip && (
+        <div className="an-sc-tip" style={{ left: tip.x, top: tip.y }} role="status">
+          <span>{tip.label}</span>
+          <strong>{tip.count} campaign{tip.count === 1 ? '' : 's'}</strong>
+        </div>
+      )}
     </div>
   );
 }
@@ -397,6 +542,22 @@ export function Analytics() {
         .an-card-label{font-size:12px;color:#6b6b6b;margin-top:6px}
         .an-card-hint{font-size:11px;color:#9a9a9a;margin-top:3px}
 
+        .an-pie{position:relative;display:flex;align-items:center;justify-content:center;gap:28px;flex-wrap:wrap;padding:6px 0 4px}
+        .an-pie-svg{width:190px;height:190px;flex:none;overflow:visible}
+        .an-pie-svg path,.an-pie-svg circle{cursor:pointer}
+        .an-pie-legend{margin:0;padding:0;list-style:none;display:grid;gap:8px;min-width:190px;flex:1 1 190px;max-width:320px}
+        .an-pie-legend li{display:grid;grid-template-columns:10px minmax(0,1fr) auto auto;align-items:center;gap:8px;padding:4px 6px;margin:-4px -6px;border-radius:8px;font:500 12px 'Poppins',sans-serif;color:#444;transition:background .12s}
+        .an-pie-legend li.active{background:#f4f4f4}
+        .an-pie-label{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+        .an-pie-legend strong{font-weight:500;color:#111}
+        .an-pie-legend em{min-width:32px;text-align:right;color:#999;font-style:normal;font-weight:400}
+        .an-pie-dot{width:10px;height:10px;border-radius:50%;border:1px solid rgba(0,0,0,.08)}
+        .an-sc-wrap{position:relative;width:100%}
+        .an-sc-svg{width:100%;height:auto;display:block}
+        .an-sc-axis{font:400 10.5px 'Poppins',sans-serif;fill:#8a8a8a}
+        .an-sc-value{font:500 11px 'Poppins',sans-serif;fill:#111}
+        .an-sc-tip{position:absolute;z-index:5;transform:translate(12px,-110%);pointer-events:none;display:flex;flex-direction:column;gap:1px;padding:6px 10px;border-radius:8px;background:#111;color:#fff;white-space:nowrap;box-shadow:0 6px 18px rgba(0,0,0,.25);font:400 11px 'Poppins',sans-serif}
+        .an-sc-tip strong{font-weight:600;font-size:12.5px}
         .an-grid{display:grid;gap:16px;margin:0 0 16px}
         .an-grid.row-2{grid-template-columns:minmax(0,1.4fr) minmax(0,1fr)}
         .an-grid.row-3{grid-template-columns:minmax(0,1.2fr) minmax(0,1fr)}
@@ -552,16 +713,31 @@ export function Analytics() {
               </div>
             </section>
 
+            {/* ---------- Campaign overview (by status) ---------- */}
+            <div className="an-grid">
+              <section className="an-panel" aria-label="Campaign overview">
+                <div className="an-panel-head">
+                  <h2>Campaign Overview</h2>
+                  <span className="an-panel-sub">Campaigns created · {RANGE_HINT[range].toLowerCase()}, by current status</span>
+                </div>
+                {data.campaign_statuses.every((s) => s.count === 0) ? (
+                  <div className="an-empty">No campaigns were created in this period. Try a longer range.</div>
+                ) : (
+                  <CampaignStatusChart statuses={data.campaign_statuses} />
+                )}
+              </section>
+            </div>
+
             {/* ---------- Row 2: spend + funnel ---------- */}
             <div className="an-grid row-2">
               <section className="an-panel" aria-label="Spend over time">
                 <div className="an-panel-head">
                   <h2>Spend Over Time</h2>
                   <span className="an-panel-sub">
-                    {data.spend_over_time.granularity === 'day' ? 'Per day' : 'Per month'} · NPR
+                    Share of spend by {data.spend_over_time.granularity === 'day' ? 'day' : 'month'} · NPR
                   </span>
                 </div>
-                <SpendChart spend={data.spend_over_time} />
+                <SpendPie spend={data.spend_over_time} />
               </section>
 
               <section className="an-panel" aria-label="Hiring funnel">

@@ -635,6 +635,7 @@ export interface BusinessAnalytics {
     paid_pct: number | null;
     completed_pct: number | null;
   };
+  campaign_statuses: { status: string; count: number }[];
   spend_over_time: {
     granularity: 'day' | 'month';
     points: { period: string; amount: number }[];
@@ -935,24 +936,125 @@ export const getAdminCreators = (params: AdminListParams) =>
   api.get<AdminUserList<AdminCreatorRow>>('/admin/creators', { params }).then((r) => r.data);
 export const getAdminCreator = (id: number) =>
   api.get<AdminCreatorDetail>(`/admin/creators/${id}`).then((r) => r.data);
-export const setAdminCreatorRestricted = (id: number, restricted: boolean) =>
-  api.post(`/admin/creators/${id}/${restricted ? 'restrict' : 'reactivate'}`).then((r) => r.data);
+export const setAdminCreatorRestricted = (id: number, restricted: boolean, payload?: RestrictPayload) =>
+  api.post(`/admin/creators/${id}/${restricted ? 'restrict' : 'reactivate'}`, restricted ? payload : undefined).then((r) => r.data);
 
 export const getAdminBusinesses = (params: AdminListParams) =>
   api.get<AdminUserList<AdminBusinessRow>>('/admin/businesses', { params }).then((r) => r.data);
 export const getAdminBusiness = (id: number) =>
   api.get<AdminBusinessDetail>(`/admin/businesses/${id}`).then((r) => r.data);
-export const setAdminBusinessRestricted = (id: number, restricted: boolean) =>
-  api.post(`/admin/businesses/${id}/${restricted ? 'restrict' : 'reactivate'}`).then((r) => r.data);
+export const setAdminBusinessRestricted = (id: number, restricted: boolean, payload?: RestrictPayload) =>
+  api.post(`/admin/businesses/${id}/${restricted ? 'restrict' : 'reactivate'}`, restricted ? payload : undefined).then((r) => r.data);
 
 export const getAdminCampaigns = (params: AdminListParams) =>
   api.get<AdminCampaignList>('/admin/campaigns', { params }).then((r) => r.data);
 export const getAdminCampaign = (id: number) =>
   api.get<AdminCampaignDetail>(`/admin/campaigns/${id}`).then((r) => r.data);
-export const restrictAdminCampaign = (id: number) =>
-  api.post(`/admin/campaigns/${id}/restrict`).then((r) => r.data);
+export const restrictAdminCampaign = (id: number, payload: RestrictPayload) =>
+  api.post(`/admin/campaigns/${id}/restrict`, payload).then((r) => r.data);
 export const selectAdminCampaignCreator = (campaignId: number, applicationId: number) =>
   api.post(`/admin/campaigns/${campaignId}/applications/${applicationId}/select`).then((r) => r.data);
 
 export const getAdminRevenue = (params: { range: AdminRevenueRange; page?: number; page_size?: number }) =>
   api.get<AdminRevenueData>('/admin/revenue', { params }).then((r) => r.data);
+
+/* ---------- complaints + restriction reasons ---------- */
+
+export interface RestrictPayload {
+  reason: string;
+  note?: string;
+  complaint_ids?: number[];
+}
+
+export interface RestrictionReason {
+  value: string;
+  label: string;
+}
+
+export interface ComplaintSummary {
+  total: number;
+  unique_reporters: number;
+  open: number;
+  top_category: string | null;
+  top_category_label: string | null;
+  top_category_reporters: number;
+  flagged: boolean;
+  open_complaints: { id: number; category_label: string; created_at: string }[];
+}
+
+export type ComplaintStatus = 'new' | 'under_review' | 'upheld' | 'dismissed';
+
+export interface AdminComplaintRow {
+  id: number;
+  created_at: string;
+  status: ComplaintStatus;
+  category: string;
+  category_label: string;
+  target_type: 'user' | 'campaign' | 'platform';
+  reporter: { id: number; name: string; role: string | null };
+  target: {
+    type: string;
+    user_id: number | null;
+    name: string;
+    owner?: string | null;
+    role: string | null;
+    campaign_id: number | null;
+    status: 'active' | 'restricted' | null;
+  };
+  repeat: { unique_reporters: number; top_category_reporters: number; flagged: boolean } | null;
+}
+
+export interface AdminComplaintDetail extends AdminComplaintRow {
+  description: string;
+  evidence_urls: string[];
+  contract_id: number | null;
+  admin_note: string | null;
+  reviewed_at: string | null;
+  related: { id: number; category_label: string; status: ComplaintStatus; created_at: string; reporter: string }[];
+}
+
+export interface AdminComplaintList extends AdminPage {
+  items: AdminComplaintRow[];
+  counts: Record<string, number>;
+}
+
+export interface MyComplaint {
+  id: number;
+  target_type: string;
+  target_name: string | null;
+  category: string;
+  category_label: string;
+  description: string;
+  status: ComplaintStatus;
+  created_at: string;
+}
+
+export interface ComplaintInput {
+  target_type: 'user' | 'campaign' | 'platform';
+  target_user_id?: number;
+  target_campaign_id?: number;
+  contract_id?: number;
+  category: string;
+  description: string;
+  evidence_urls?: string[];
+}
+
+export const getRestrictionReasons = () =>
+  api.get<RestrictionReason[]>('/admin/restriction-reasons').then((r) => r.data);
+
+export const getAdminComplaints = (params: {
+  status?: string;
+  target_type?: string;
+  flagged?: boolean;
+  search?: string;
+  page?: number;
+  page_size?: number;
+}) => api.get<AdminComplaintList>('/admin/complaints', { params }).then((r) => r.data);
+export const getAdminComplaint = (id: number) =>
+  api.get<AdminComplaintDetail>(`/admin/complaints/${id}`).then((r) => r.data);
+export const updateAdminComplaint = (id: number, data: { status?: ComplaintStatus; admin_note?: string }) =>
+  api.patch(`/admin/complaints/${id}`, data).then((r) => r.data);
+
+export const fileComplaint = (data: ComplaintInput) =>
+  api.post<MyComplaint>('/complaints', data).then((r) => r.data);
+export const getMyComplaints = () => api.get<MyComplaint[]>('/complaints/mine').then((r) => r.data);

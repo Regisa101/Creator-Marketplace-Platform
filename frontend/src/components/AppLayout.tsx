@@ -23,6 +23,7 @@ import {
   Users,
   Building2,
   Wallet,
+  Flag,
 } from "lucide-react";
 
 import { useAuth } from "../context/AuthContext";
@@ -449,6 +450,7 @@ export function AppLayout({
     { label: "Creators", icon: Users, to: "/admin/creators" },
     { label: "Businesses", icon: Building2, to: "/admin/businesses" },
     { label: "Campaigns", icon: Megaphone, to: "/admin/campaigns" },
+    { label: "Complaints", icon: Flag, to: "/admin/complaints" },
     { label: "Revenue", icon: Wallet, to: "/admin/revenue" },
   ];
 
@@ -471,6 +473,11 @@ export function AppLayout({
             icon: BarChart3,
             to: "/analytics",
           },
+          {
+            label: "Complaints",
+            icon: Flag,
+            to: "/complaints",
+          },
         ]
       : [
           {
@@ -492,6 +499,11 @@ export function AppLayout({
             label: "Analytics",
             icon: BarChart3,
             to: "/analytics",
+          },
+          {
+            label: "Complaints",
+            icon: Flag,
+            to: "/complaints",
           },
         ];
 

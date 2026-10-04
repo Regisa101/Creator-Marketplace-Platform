@@ -2,9 +2,10 @@ import { useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { Plus } from 'lucide-react';
 
+import type { RestrictPayload } from '../../api/client';
 import { getAdminCampaign, getAdminCampaigns, restrictAdminCampaign, selectAdminCampaignCreator } from '../../api/client';
 import {
-  AdminShell, Card, CAMPAIGN_STATUS_OPTIONS, ConfirmModal, DATE_RANGE_OPTIONS, DetailGrid, Drawer, EmptyState, ErrorBanner,
+  AdminShell, Card, CAMPAIGN_STATUS_OPTIONS, ConfirmModal, RestrictModal, DATE_RANGE_OPTIONS, DetailGrid, Drawer, EmptyState, ErrorBanner,
   FilterPills, LoadingBlock, Pagination, StatusBadge, TagList, errorMessage, formatDate, formatNPR, useAdminData, useDebounced,
 } from './adminUi';
 
@@ -37,12 +38,12 @@ export default function AdminCampaigns() {
   const [pickBusy, setPickBusy] = useState(false);
   const [pickError, setPickError] = useState('');
 
-  const confirmRestrict = async () => {
+  const confirmRestrict = async (payload: RestrictPayload) => {
     if (!target) return;
     setBusy(true);
     setDialogError('');
     try {
-      await restrictAdminCampaign(target.id);
+      await restrictAdminCampaign(target.id, payload);
       setTarget(null);
       list.reload();
       if (viewId === target.id) detail.reload();
@@ -161,7 +162,7 @@ export default function AdminCampaigns() {
             <DetailGrid
               rows={[
                 { label: 'Status', value: <StatusBadge status={shown.status} /> },
-                ...(shown.is_restricted ? [{ label: 'Restricted on', value: formatDate(shown.restricted_at) }] : []),
+                ...(shown.is_restricted ? [{ label: 'Restricted on', value: formatDate(shown.restricted_at) }, { label: 'Reason', value: (shown as any).restriction_reason_label }] : []),
                 { label: 'Category', value: shown.category },
                 { label: 'Engagement', value: [shown.engagement_type, shown.duration].filter(Boolean).join(' · ') },
                 {
@@ -232,14 +233,13 @@ export default function AdminCampaigns() {
         )}
       </Drawer>
 
-      <ConfirmModal
+      <RestrictModal
         open={target !== null}
         title="Restrict campaign?"
-        message={`Are you sure you want to restrict this campaign? "${target?.title ?? ''}" will be closed to new applications and cannot be re-published by its owner. Applications, contracts and payments stay intact.`}
-        confirmLabel="Restrict"
+        message={`"${target?.title ?? ''}" will be closed to new applications and cannot be re-published by its owner. Applications, contracts and payments stay intact. The owner is told the reason you choose.`}
         busy={busy}
         error={dialogError}
-        onConfirm={() => void confirmRestrict()}
+        onConfirm={(payload) => void confirmRestrict(payload)}
         onCancel={() => setTarget(null)}
       />
 

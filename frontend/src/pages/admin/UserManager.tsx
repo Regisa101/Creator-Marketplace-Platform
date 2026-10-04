@@ -1,11 +1,12 @@
 import { useState } from 'react';
 import type { ReactNode } from 'react';
 
-import type { AdminListParams, AdminUserList, AdminUserStatus } from '../../api/client';
+import type { AdminListParams, AdminUserList, AdminUserStatus, ComplaintSummary, RestrictPayload } from '../../api/client';
 import {
   AdminShell,
   Card,
-  ConfirmModal,
+  ComplaintSummaryBlock,
+  RestrictModal,
   Drawer,
   EmptyState,
   ErrorBanner,
@@ -23,6 +24,9 @@ export interface ManagedUser {
   id: number;
   name: string;
   status: AdminUserStatus;
+  restriction_reason_label?: string | null;
+  restriction_note?: string | null;
+  complaints?: ComplaintSummary;
 }
 
 export interface UserColumn<R> {
@@ -44,7 +48,7 @@ interface UserManagerProps<R extends ManagedUser, D extends ManagedUser> {
   columns: UserColumn<R>[];
   fetchList: (params: AdminListParams) => Promise<AdminUserList<R>>;
   fetchDetail: (id: number) => Promise<D>;
-  setRestricted: (id: number, restricted: boolean) => Promise<unknown>;
+  setRestricted: (id: number, restricted: boolean, payload?: RestrictPayload) => Promise<unknown>;
   renderDetail: (detail: D) => ReactNode;
 }
 
@@ -100,18 +104,18 @@ export default function UserManager<R extends ManagedUser, D extends ManagedUser
     setPage(1);
   };
 
-  const apply = async (id: number, restricted: boolean) => {
-    await setRestricted(id, restricted);
+  const apply = async (id: number, restricted: boolean, payload?: RestrictPayload) => {
+    await setRestricted(id, restricted, payload);
     list.reload();
     if (viewId === id) detail.reload();
   };
 
-  const confirmRestrict = async () => {
+  const confirmRestrict = async (payload: RestrictPayload) => {
     if (!target) return;
     setBusy(true);
     setDialogError('');
     try {
-      await apply(target.id, true);
+      await apply(target.id, true, payload);
       setTarget(null);
     } catch (err) {
       setDialogError(errorMessage(err));
@@ -248,19 +252,26 @@ export default function UserManager<R extends ManagedUser, D extends ManagedUser
         {shownDetail && (
           <>
             {renderDetail(shownDetail)}
+            {shownDetail.status === 'restricted' && shownDetail.restriction_reason_label && (
+              <p className="adm-note">
+                Restricted for: {shownDetail.restriction_reason_label}
+                {shownDetail.restriction_note ? `. Note: ${shownDetail.restriction_note}` : ''}
+              </p>
+            )}
+            <ComplaintSummaryBlock summary={shownDetail.complaints} />
             <div className="adm-drawer-actions">{actionButton(shownDetail)}</div>
           </>
         )}
       </Drawer>
 
-      <ConfirmModal
+      <RestrictModal
         open={target !== null}
         title={`Restrict ${noun}?`}
-        message={`Are you sure you want to restrict this ${noun}? ${restrictNote} All of ${target?.name ?? `this ${noun}`}'s existing records stay intact, and you can reactivate the account at any time.`}
-        confirmLabel="Restrict"
+        message={`${restrictNote} All of ${target?.name ?? `this ${noun}`}'s existing records stay intact, and you can reactivate the account at any time. The ${noun} is told the reason you choose.`}
         busy={busy}
         error={dialogError}
-        onConfirm={() => void confirmRestrict()}
+        complaints={target && shownDetail && shownDetail.id === target.id ? shownDetail.complaints?.open_complaints : undefined}
+        onConfirm={(payload) => void confirmRestrict(payload)}
         onCancel={() => setTarget(null)}
       />
     </AdminShell>

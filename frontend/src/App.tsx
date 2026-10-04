@@ -52,6 +52,8 @@ import AdminCreators from './pages/admin/AdminCreators';
 import AdminBusinesses from './pages/admin/AdminBusinesses';
 import AdminCampaigns from './pages/admin/AdminCampaigns';
 import AdminRevenue from './pages/admin/AdminRevenue';
+import AdminComplaints from './pages/admin/AdminComplaints';
+import MyComplaints from './pages/MyComplaints';
 
 /*
  * Same component renders both "Contract History" (creator)
@@ -372,6 +374,22 @@ export default function App() {
             element={
               <ProtectedRoute roles={['admin']}>
                 <AdminRevenue />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/admin/complaints"
+            element={
+              <ProtectedRoute roles={['admin']}>
+                <AdminComplaints />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/complaints"
+            element={
+              <ProtectedRoute roles={['creator', 'business']}>
+                <MyComplaints />
               </ProtectedRoute>
             }
           />

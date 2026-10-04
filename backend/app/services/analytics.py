@@ -285,11 +285,29 @@ def build_business_analytics(
 
     attention_groups = int(pending_count > 0) + int(unpaid_count > 0) + int(len(closing_rows) > 0)
 
+    # ---- Campaigns created in the range, by current status (drafts included) ----
+    status_query = db.query(Campaign.status, func.count(Campaign.id)).filter(Campaign.business_id == business_id)
+    if start is not None:
+        status_query = status_query.filter(Campaign.created_at >= start)
+    status_counts = {_status_value(st): int(n) for st, n in status_query.group_by(Campaign.status).all()}
+    campaign_statuses = [
+        {"status": st.value, "count": status_counts.get(st.value, 0)}
+        for st in (
+            CampaignStatus.DRAFT,
+            CampaignStatus.PUBLISHED,
+            CampaignStatus.IN_PROGRESS,
+            CampaignStatus.COMPLETED,
+            CampaignStatus.CLOSED,
+            CampaignStatus.CANCELLED,
+        )
+    ]
+
     return {
         "range": range_key,
         "range_start": _iso(start),
         "generated_at": _iso(now),
         "has_campaigns": len(campaign_rows) > 0,
+        "campaign_statuses": campaign_statuses,
         "summary": {
             "total_applications": applications_total,
             "creators_hired": paid_total,
