@@ -22,7 +22,11 @@ import {
   getBusinessProgress,
   getCampaigns,
   getApplications,
+  saveBusinessProgress,
+  uploadImage,
 } from '../api/client';
+import { LocationInput } from '../components/LocationInput';
+import { INDUSTRIES, LOCATIONS } from './onboarding/BusinessOnboarding';
 import { OFF_WHITE } from '../components/Brand';
 import { PublicNavbar } from '../components/PublicNavbar';
 import { Lightbox, PublicProfileStyles, type LightboxItem } from '../components/PublicProfileKit';
@@ -32,7 +36,7 @@ const VIOLET_DARK = '#000000';
 const CORAL = '#111111';
 
 export function BusinessProfile() {
-  const { user, deleteAccount } = useAuth();
+  const { user, deleteAccount, updateProfile } = useAuth();
   const navigate = useNavigate();
 
   const [profile, setProfile] = useState<any>(null);
@@ -43,6 +47,25 @@ export function BusinessProfile() {
   const [error, setError] = useState('');
 
   const [showDeleteModal, setShowDeleteModal] = useState(false);
+
+  // Edit profile (done here on the profile page, not in onboarding)
+  const [editOpen, setEditOpen] = useState(false);
+  const [editSaving, setEditSaving] = useState(false);
+  const [editUploading, setEditUploading] = useState(false);
+  const [editError, setEditError] = useState('');
+  const [eLogo, setELogo] = useState('');
+  const [eName, setEName] = useState('');
+  const [eIndustry, setEIndustry] = useState('');
+  const [eLocation, setELocation] = useState('');
+  const [eWebsite, setEWebsite] = useState('');
+  const [eDescription, setEDescription] = useState('');
+  const [eContactPhone, setEContactPhone] = useState('');
+  const [eTeam, setETeam] = useState('');
+  const [eYear, setEYear] = useState('');
+  const [eBudget, setEBudget] = useState('');
+  const [eCategories, setECategories] = useState('');
+  const [eContentTypes, setEContentTypes] = useState('');
+  const [eSocial, setESocial] = useState({ company: '', instagram: '', facebook: '', other: '' });
   const [deletePassword, setDeletePassword] = useState('');
   const [deleteError, setDeleteError] = useState('');
   const [deleting, setDeleting] = useState(false);
@@ -100,6 +123,100 @@ export function BusinessProfile() {
       );
     } finally {
       setDeleting(false);
+    }
+  };
+
+  const openEdit = () => {
+    setELogo(profile?.logo_url || '');
+    setEName(profile?.company_name || '');
+    setEIndustry(profile?.industry || '');
+    setELocation(profile?.location || '');
+    setEWebsite(profile?.website || '');
+    setEDescription(profile?.description || '');
+    setEContactPhone(profile?.contact_phone || '');
+    setETeam(profile?.team_size || '');
+    setEYear(profile?.year_established ? String(profile.year_established) : '');
+    setEBudget(Number(profile?.typical_budget || 0) > 0 ? String(profile.typical_budget) : '');
+    setECategories(categories.join(', '));
+    setEContentTypes(contentTypes.join(', '));
+    setESocial({
+      company: profile?.social_links?.company || '',
+      instagram: profile?.social_links?.instagram || '',
+      facebook: profile?.social_links?.facebook || '',
+      other: profile?.social_links?.other || '',
+    });
+    setEditError('');
+    setEditOpen(true);
+  };
+
+  const uploadLogo = async (file: File) => {
+    setEditError('');
+    setEditUploading(true);
+    try {
+      const { url } = await uploadImage(file);
+      setELogo(url);
+    } catch (err: any) {
+      setEditError(err?.response?.data?.detail || 'Upload failed. Please try again.');
+    } finally {
+      setEditUploading(false);
+    }
+  };
+
+  const splitList = (value: string) =>
+    Array.from(new Set(value.split(',').map((x) => x.trim()).filter(Boolean)));
+
+  const saveEdit = async () => {
+    if (!eName.trim()) {
+      setEditError('Company name is required.');
+      return;
+    }
+    const year = eYear.trim() ? Number(eYear) : undefined;
+    if (year !== undefined && (!Number.isInteger(year) || year < 1800 || year > new Date().getFullYear())) {
+      setEditError('Enter a valid year of establishment.');
+      return;
+    }
+    const budget = eBudget.trim() ? Number(eBudget) : undefined;
+    if (budget !== undefined && (!Number.isFinite(budget) || budget < 0)) {
+      setEditError('Typical campaign budget must be a positive number.');
+      return;
+    }
+
+    setEditSaving(true);
+    setEditError('');
+
+    try {
+      const saved: any = await saveBusinessProgress({
+        company_name: eName.trim(),
+        industry: eIndustry || undefined,
+        location: eLocation.trim() || undefined,
+        website: eWebsite.trim() || undefined,
+        description: eDescription.trim() || undefined,
+        contact_phone: eContactPhone.trim() || undefined,
+        team_size: eTeam.trim() || undefined,
+        year_established: year,
+        typical_budget: budget,
+        interested_categories: splitList(eCategories),
+        preferred_content_types: splitList(eContentTypes),
+        social_links: {
+          company: eSocial.company.trim() || undefined,
+          instagram: eSocial.instagram.trim() || undefined,
+          facebook: eSocial.facebook.trim() || undefined,
+          other: eSocial.other.trim() || undefined,
+        },
+        ...(eLogo ? { logo_url: eLogo } : {}),
+      });
+
+      if (saved?.profile) setProfile(saved.profile);
+      updateProfile({
+        company_name: eName.trim(),
+        ...(eLogo ? { logo_url: eLogo } : {}),
+      });
+      setEditOpen(false);
+    } catch (err: any) {
+      const detail = err?.response?.data?.detail;
+      setEditError(typeof detail === 'string' ? detail : 'Could not save your profile.');
+    } finally {
+      setEditSaving(false);
     }
   };
 
@@ -739,6 +856,39 @@ export function BusinessProfile() {
           cursor: default;
         }
 
+        .bp-inline-input {
+          width: 100%;
+          height: 36px;
+          border: 1px solid var(--line);
+          border-radius: 8px;
+          padding: 0 11px;
+          font-size: 13px;
+          font-weight: 400;
+          font-family: inherit;
+          color: var(--ink);
+          outline: none;
+          background: #fff;
+        }
+        textarea.bp-inline-input { height: auto; padding: 9px 11px; line-height: 1.55; resize: vertical; }
+        .bp-inline-input::placeholder { color: var(--ink-faint); }
+        .bp-inline-input:focus { border-color: #111; }
+        .bp-edit-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px 14px; width: min(620px, 100%); align-items: start; }
+        .bp-field { display: flex; flex-direction: column; gap: 5px; min-width: 0; }
+        .bp-field-label { font-size: 11px; font-weight: 400; color: var(--ink-soft); }
+        .bp-inline-btn {
+          display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+          height: 32px; padding: 0 13px; border: 1px solid var(--line); background: #fff; color: var(--ink);
+          border-radius: 8px; font-size: 12px; font-weight: 400; font-family: inherit; line-height: 1; cursor: pointer; white-space: nowrap;
+        }
+        .bp-inline-btn:hover { border-color: #bbb; }
+        .bp-inline-btn:disabled { opacity: .6; cursor: default; }
+        .bp-inline-btn--dark { background: #111; border-color: #111; color: #fff; }
+        .bp-inline-btn--dark:hover { background: #000; border-color: #000; }
+        .bp-edit-actions { display: flex; gap: 8px; flex-shrink: 0; align-items: center; }
+        button.bp-edit-btn { height: 32px; padding: 0 13px; font-size: 12px; font-weight: 400; border: 0; cursor: pointer; font-family: inherit; }
+        .bp-edit-error { margin: 12px 28px 0; padding: 9px 13px; border-radius: 8px; background: #fdecea; color: #b3261e; font-size: 12.5px; }
+        @media (max-width: 640px) { .bp-edit-grid { grid-template-columns: 1fr; } }
+
         .bp-loading,
         .bp-error {
           text-align: center;
@@ -770,17 +920,58 @@ export function BusinessProfile() {
             <div className="bp-header">
               <div
                 className="bp-avatar"
-                style={profile?.logo_url ? { cursor: 'zoom-in' } : undefined}
-                onClick={() => profile?.logo_url && setViewer({ src: profile.logo_url, alt: companyName })}
+                style={!editOpen && profile?.logo_url ? { cursor: 'zoom-in' } : undefined}
+                onClick={() => !editOpen && profile?.logo_url && setViewer({ src: profile.logo_url, alt: companyName })}
               >
-                {profile?.logo_url ? (
-                  <img src={profile.logo_url} alt={companyName} />
+                {(editOpen ? eLogo : profile?.logo_url) ? (
+                  <img src={editOpen ? eLogo : profile.logo_url} alt={companyName} />
                 ) : (
                   initial
                 )}
               </div>
 
               <div className="bp-header-row">
+                {editOpen ? (
+                  <div className="bp-edit-grid">
+                    <label className="bp-inline-btn" style={{ gridColumn: '1 / -1', justifySelf: 'start', cursor: 'pointer' }}>
+                      {editUploading ? 'Uploading…' : eLogo ? 'Change logo' : 'Add logo'}
+                      <input
+                        type="file"
+                        accept="image/*"
+                        hidden
+                        disabled={editUploading}
+                        onChange={(e) => {
+                          const f = e.target.files?.[0];
+                          if (f) void uploadLogo(f);
+                          e.currentTarget.value = '';
+                        }}
+                      />
+                    </label>
+
+                    <div className="bp-field">
+                      <span className="bp-field-label">Company name</span>
+                      <input className="bp-inline-input" value={eName} onChange={(e) => setEName(e.target.value)} placeholder="Company name" />
+                    </div>
+
+                    <div className="bp-field">
+                      <span className="bp-field-label">Industry</span>
+                      <select className="bp-inline-input" value={eIndustry} onChange={(e) => setEIndustry(e.target.value)}>
+                        <option value="">Select industry</option>
+                        {INDUSTRIES.map((x) => <option key={x} value={x}>{x}</option>)}
+                      </select>
+                    </div>
+
+                    <div className="bp-field">
+                      <span className="bp-field-label">Location</span>
+                      <LocationInput value={eLocation} onChange={setELocation} options={LOCATIONS} />
+                    </div>
+
+                    <div className="bp-field">
+                      <span className="bp-field-label">Website</span>
+                      <input className="bp-inline-input" value={eWebsite} onChange={(e) => setEWebsite(e.target.value)} placeholder="https://yourbrand.com" />
+                    </div>
+                  </div>
+                ) : (
                 <div>
                   <h1 className="bp-name">{companyName}</h1>
 
@@ -817,14 +1008,31 @@ export function BusinessProfile() {
                     )}
                   </div>
                 </div>
+                )}
 
-                <Link to="/onboarding/business" className="bp-edit-btn">
-                  <Pencil size={13} />
-                  Edit Profile
-                </Link>
+                {editOpen ? (
+                  <div className="bp-edit-actions">
+                    <button type="button" className="bp-inline-btn" onClick={() => setEditOpen(false)} disabled={editSaving}>
+                      Cancel
+                    </button>
+                    <button
+                      type="button"
+                      className="bp-inline-btn bp-inline-btn--dark"
+                      onClick={() => void saveEdit()}
+                      disabled={editSaving || editUploading}
+                    >
+                      {editSaving ? 'Saving…' : 'Save changes'}
+                    </button>
+                  </div>
+                ) : (
+                  <button type="button" className="bp-edit-btn" onClick={openEdit}>
+                    <Pencil size={13} />
+                    Edit Profile
+                  </button>
+                )}
               </div>
 
-              {categories.length > 0 && (
+              {!editOpen && categories.length > 0 && (
                 <div className="bp-tag-row">
                   {categories.slice(0, 10).map((category: string) => (
                     <span className="bp-tag" key={category}>
@@ -834,6 +1042,8 @@ export function BusinessProfile() {
                 </div>
               )}
             </div>
+
+            {editOpen && editError && <div className="bp-edit-error">{editError}</div>}
 
             <div className="bp-stats">
               <div className="bp-stat">
@@ -877,40 +1087,68 @@ export function BusinessProfile() {
               </div>
             </div>
 
-            {profile?.description && (
+            {(editOpen || profile?.description) && (
               <section className="bp-section">
                 <div className="bp-section-heading">
                   <p className="bp-section-title">About the company</p>
                 </div>
-                <p className="bp-about">{profile.description}</p>
+                {editOpen ? (
+                  <textarea
+                    className="bp-inline-input"
+                    rows={4}
+                    value={eDescription}
+                    onChange={(e) => setEDescription(e.target.value)}
+                    placeholder="Tell creators about your company"
+                  />
+                ) : (
+                  <p className="bp-about">{profile.description}</p>
+                )}
               </section>
             )}
 
-            {categories.length > 0 && (
+            {(editOpen || categories.length > 0) && (
               <section className="bp-section">
                 <div className="bp-section-heading">
                   <p className="bp-section-title">What we look for</p>
                 </div>
 
-                <div className="bp-chip-row">
-                  {categories.map((item: string) => (
-                    <span className="bp-chip" key={item}>{item}</span>
-                  ))}
-                </div>
+                {editOpen ? (
+                  <input
+                    className="bp-inline-input"
+                    value={eCategories}
+                    onChange={(e) => setECategories(e.target.value)}
+                    placeholder="Niches, separated by commas (e.g. Food, Fashion)"
+                  />
+                ) : (
+                  <div className="bp-chip-row">
+                    {categories.map((item: string) => (
+                      <span className="bp-chip" key={item}>{item}</span>
+                    ))}
+                  </div>
+                )}
               </section>
             )}
 
-            {contentTypes.length > 0 && (
+            {(editOpen || contentTypes.length > 0) && (
               <section className="bp-section">
                 <div className="bp-section-heading">
                   <p className="bp-section-title">Content we commission</p>
                 </div>
 
-                <div className="bp-chip-row">
-                  {contentTypes.map((item: string) => (
-                    <span className="bp-chip" key={item}>{item}</span>
-                  ))}
-                </div>
+                {editOpen ? (
+                  <input
+                    className="bp-inline-input"
+                    value={eContentTypes}
+                    onChange={(e) => setEContentTypes(e.target.value)}
+                    placeholder="Content types, separated by commas (e.g. Reels, Photos)"
+                  />
+                ) : (
+                  <div className="bp-chip-row">
+                    {contentTypes.map((item: string) => (
+                      <span className="bp-chip" key={item}>{item}</span>
+                    ))}
+                  </div>
+                )}
               </section>
             )}
 
@@ -919,6 +1157,42 @@ export function BusinessProfile() {
                 <p className="bp-section-title">Company Information</p>
               </div>
 
+              {editOpen ? (
+                <div className="bp-edit-grid" style={{ width: '100%' }}>
+                  <div className="bp-field">
+                    <span className="bp-field-label">Team size</span>
+                    <input className="bp-inline-input" value={eTeam} onChange={(e) => setETeam(e.target.value)} placeholder="e.g. 11 to 50" />
+                  </div>
+                  <div className="bp-field">
+                    <span className="bp-field-label">Established (year)</span>
+                    <input className="bp-inline-input" inputMode="numeric" value={eYear} onChange={(e) => setEYear(e.target.value)} placeholder="e.g. 2018" />
+                  </div>
+                  <div className="bp-field">
+                    <span className="bp-field-label">Contact phone</span>
+                    <input className="bp-inline-input" value={eContactPhone} onChange={(e) => setEContactPhone(e.target.value)} placeholder="+977 98XXXXXXXX" />
+                  </div>
+                  <div className="bp-field">
+                    <span className="bp-field-label">Typical campaign budget (NPR)</span>
+                    <input className="bp-inline-input" inputMode="numeric" value={eBudget} onChange={(e) => setEBudget(e.target.value)} placeholder="e.g. 20000" />
+                  </div>
+                  <div className="bp-field">
+                    <span className="bp-field-label">Company page</span>
+                    <input className="bp-inline-input" value={eSocial.company} onChange={(e) => setESocial({ ...eSocial, company: e.target.value })} placeholder="Facebook or LinkedIn page" />
+                  </div>
+                  <div className="bp-field">
+                    <span className="bp-field-label">Instagram</span>
+                    <input className="bp-inline-input" value={eSocial.instagram} onChange={(e) => setESocial({ ...eSocial, instagram: e.target.value })} placeholder="Instagram link" />
+                  </div>
+                  <div className="bp-field">
+                    <span className="bp-field-label">Facebook</span>
+                    <input className="bp-inline-input" value={eSocial.facebook} onChange={(e) => setESocial({ ...eSocial, facebook: e.target.value })} placeholder="Facebook link" />
+                  </div>
+                  <div className="bp-field" style={{ gridColumn: '1 / -1' }}>
+                    <span className="bp-field-label">Other link</span>
+                    <input className="bp-inline-input" value={eSocial.other} onChange={(e) => setESocial({ ...eSocial, other: e.target.value })} placeholder="Any other link" />
+                  </div>
+                </div>
+              ) : (
               <div className="bp-info-grid">
                 <div className="bp-info-card">
                   <span className="bp-info-icon">
@@ -992,6 +1266,7 @@ export function BusinessProfile() {
                   </span>
                 </div>
               </div>
+              )}
             </section>
 
             <section className="bp-section">

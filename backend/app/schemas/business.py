@@ -47,7 +47,9 @@ class BusinessOnboardingProgress(BaseModel):
     website: Optional[str] = None
     description: Optional[str] = None
     logo_url: Optional[str] = None
+    contact_person_name: Optional[str] = None
     contact_phone: Optional[str] = None
+    social_links: Optional[dict] = None
 
     interested_categories: Optional[List[str]] = None
     preferred_content_types: Optional[List[str]] = None

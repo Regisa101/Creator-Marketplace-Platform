@@ -42,6 +42,26 @@ def get_current_creator(current_user: User = Depends(get_current_user)) -> User:
     return current_user
 
 
+def get_active_creator(current_user: User = Depends(get_current_creator)) -> User:
+    """Creator who is not restricted. Use on endpoints that start NEW marketplace activity."""
+    if current_user.role != "admin" and current_user.is_restricted:
+        raise HTTPException(
+            status_code=403,
+            detail="Your creator account is restricted. Please contact CreatorHub support.",
+        )
+    return current_user
+
+
+def get_active_business(current_user: User = Depends(get_current_business)) -> User:
+    """Business who is not restricted. Use on endpoints that start NEW marketplace activity."""
+    if current_user.role != "admin" and current_user.is_restricted:
+        raise HTTPException(
+            status_code=403,
+            detail="Your business account is restricted. Please contact CreatorHub support.",
+        )
+    return current_user
+
+
 def get_current_admin(current_user: User = Depends(get_current_user)) -> User:
     if current_user.role != "admin":
         raise HTTPException(status_code=403, detail="Admin access required")

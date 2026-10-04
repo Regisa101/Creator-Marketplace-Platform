@@ -260,6 +260,20 @@ class Campaign(Base):
         nullable=False,
     )
 
+    # Set when an admin restricts/closes the campaign for moderation.
+    # The record, its applications and contracts are all kept.
+    is_restricted = Column(
+        Boolean,
+        default=False,
+        nullable=False,
+        server_default="false",
+    )
+
+    restricted_at = Column(
+        DateTime(timezone=True),
+        nullable=True,
+    )
+
     # ============================================================
     # TIMESTAMPS
     # ============================================================

@@ -240,3 +240,37 @@ def send_password_reset_email(*, to_email: str, name: str, reset_url: str, expir
     except Exception:  # noqa: BLE001 - must never break the request
         logger.exception("Password reset email FAILED: %s", ref)
         return False
+
+# ------------------------------------------------------------------
+# Account / campaign moderation emails (sent by admin actions)
+# ------------------------------------------------------------------
+
+def build_moderation_email(*, name: str, headline: str, paragraphs: list[str]) -> tuple[str, str]:
+    """Return (text_body, html_body) for a short plain moderation notice."""
+    text_body = f"Hi {name},\n\n" + "\n\n".join(paragraphs) + f"\n\nThank you,\n{BRAND_NAME} Team\n"
+    body_html = "".join(f'<p style="margin:0 0 14px;color:#444;font-size:14px;line-height:1.6">{escape(p)}</p>' for p in paragraphs)
+    html_body = (
+        '<div style="font-family:Poppins,Arial,sans-serif;max-width:520px;margin:0 auto;padding:24px">'
+        f'<h2 style="margin:0 0 16px;color:#111;font-size:18px">{escape(headline)}</h2>'
+        f'<p style="margin:0 0 14px;color:#444;font-size:14px">Hi {escape(name)},</p>'
+        f"{body_html}"
+        f'<p style="margin:18px 0 0;color:#888;font-size:12px">{BRAND_NAME} Team</p></div>'
+    )
+    return text_body, html_body
+
+
+def send_moderation_email(*, to_email: str, name: str, subject: str, headline: str, paragraphs: list[str]) -> bool:
+    """Best-effort: never raises, so SMTP trouble cannot undo an admin action."""
+    if not to_email:
+        return False
+    if not is_email_configured():
+        logger.warning("Moderation email skipped (SMTP not configured): %s -> %s", subject, to_email)
+        return False
+    try:
+        text_body, html_body = build_moderation_email(name=name, headline=headline, paragraphs=paragraphs)
+        send_email(to_email=to_email, subject=subject, text_body=text_body, html_body=html_body)
+        logger.info("Moderation email sent: %s -> %s", subject, to_email)
+        return True
+    except Exception:
+        logger.exception("Moderation email failed: %s -> %s", subject, to_email)
+        return False

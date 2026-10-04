@@ -15,6 +15,14 @@ class User(Base):
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())
     last_login = Column(DateTime(timezone=True), nullable=True)
+
+    # Soft restriction set by an admin (see routes/admin.py). A restricted
+    # account can still log in and read its history, but cannot start new
+    # marketplace activity (apply, create/publish campaigns, select creators,
+    # start contracts). Nothing is deleted. Separate from is_active, which
+    # blocks login entirely.
+    is_restricted = Column(Boolean, nullable=False, default=False, server_default="false")
+    restricted_at = Column(DateTime(timezone=True), nullable=True)
     
     # Relationships
     creator_profile = relationship("CreatorProfile", back_populates="user", uselist=False, cascade="all, delete-orphan")

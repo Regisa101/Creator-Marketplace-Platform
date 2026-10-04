@@ -11,7 +11,7 @@ import {
 } from "../../api/client";
 import { useAuth } from "../../context/AuthContext";
 
-const INDUSTRIES = [
+export const INDUSTRIES = [
   "Retail & E-commerce",
   "Agency",
   "SaaS",
@@ -30,7 +30,7 @@ const INDUSTRIES = [
   "Other",
 ];
 
-const LOCATIONS = [
+export const LOCATIONS = [
   "Kathmandu, Nepal",
   "Lalitpur, Nepal",
   "Bhaktapur, Nepal",

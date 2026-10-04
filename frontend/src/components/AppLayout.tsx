@@ -20,6 +20,9 @@ import {
   Search,
   Bell,
   Plus,
+  Users,
+  Building2,
+  Wallet,
 } from "lucide-react";
 
 import { useAuth } from "../context/AuthContext";
@@ -130,8 +133,8 @@ function isRouteActive(
   pathname: string,
   to: string
 ) {
-  if (to === "/dashboard") {
-    return pathname === "/dashboard";
+  if (to === "/dashboard" || to === "/admin") {
+    return pathname === to;
   }
 
   return (
@@ -150,6 +153,8 @@ type AppLayoutProps = {
   headerActions?: ReactNode;
   searchValue?: string;
   onSearchChange?: (value: string) => void;
+  // Called when the user presses Enter in the search box (optional).
+  onSearchSubmit?: (value: string) => void;
   searchPlaceholder?: string;
   actionLabel?: string;
   actionTo?: string;
@@ -164,6 +169,7 @@ export function AppLayout({
   headerActions,
   searchValue = "",
   onSearchChange,
+  onSearchSubmit,
   searchPlaceholder,
   actionLabel,
   actionTo,
@@ -179,6 +185,10 @@ export function AppLayout({
     user?.role === "creator"
       ? "creator"
       : "business";
+
+  // Admins reuse the business styling but get their own sidebar and none of
+  // the brand-only widgets (applications badge, profile completion, defaults).
+  const isAdmin = user?.role === "admin";
 
   const primary =
     role === "creator"
@@ -332,7 +342,7 @@ export function AppLayout({
     useState(0);
 
   useEffect(() => {
-    if (role !== "business") {
+    if (role !== "business" || isAdmin) {
       setPendingApplicationsCount(0);
       return;
     }
@@ -364,7 +374,7 @@ export function AppLayout({
       mounted = false;
       window.clearInterval(interval);
     };
-  }, [role]);
+  }, [role, isAdmin]);
 
   const applicationsBadge =
     pendingApplicationsCount > 99
@@ -434,8 +444,17 @@ export function AppLayout({
    * =====================================================
    */
 
-  const nav =
-    role === "creator"
+  const adminNav = [
+    { label: "Overview", icon: LayoutDashboard, to: "/admin" },
+    { label: "Creators", icon: Users, to: "/admin/creators" },
+    { label: "Businesses", icon: Building2, to: "/admin/businesses" },
+    { label: "Campaigns", icon: Megaphone, to: "/admin/campaigns" },
+    { label: "Revenue", icon: Wallet, to: "/admin/revenue" },
+  ];
+
+  const nav = isAdmin
+    ? adminNav
+    : role === "creator"
       ? [
           {
             label: "Home",
@@ -1485,6 +1504,7 @@ export function AppLayout({
             );
           })}
 
+          {!isAdmin && (
           <Link
             to={role === "creator" ? "/contracts" : "/collab-history"}
             className={`app-nav-link ${
@@ -1497,6 +1517,7 @@ export function AppLayout({
             <Briefcase size={17} className="shrink-0" />
             <span>{role === "creator" ? "Contract History" : "Collab History"}</span>
           </Link>
+          )}
         </nav>
 
         {/* =================================================
@@ -1505,7 +1526,7 @@ export function AppLayout({
 
         <div className="app-sidebar-bottom">
 
-          {profileCompletion < 100 && (
+          {!isAdmin && profileCompletion < 100 && (
             <div className="app-completion">
 
               <div className="app-completion-title">
@@ -1549,6 +1570,7 @@ export function AppLayout({
           )}
 
           {role === "business" &&
+            !isAdmin &&
             !defaultsHintDismissed && (
               <div className="app-defaults">
 
@@ -1619,6 +1641,13 @@ export function AppLayout({
                         event.target.value
                       )
                     }
+                    onKeyDown={(event) => {
+                      if (event.key === "Enter") {
+                        onSearchSubmit?.(
+                          event.currentTarget.value
+                        );
+                      }
+                    }}
                     placeholder={
                       searchPlaceholder ||
                       defaultSearchPlaceholder
@@ -1630,7 +1659,7 @@ export function AppLayout({
               )}
 
               {/* Pages without a search box get menu links instead (brands only). */}
-              {!showSearch && role === "business" && (
+              {!showSearch && role === "business" && !isAdmin && (
                 <nav className="app-topbar-menu" aria-label="Main menu">
                   {nav.map((item) => (
                     <Link
@@ -1654,13 +1683,15 @@ export function AppLayout({
 
               {/* SETTINGS ICON */}
 
-              <Link
-                to="/settings"
-                className="app-notification"
-                aria-label="Settings"
-              >
-                <Settings size={20} />
-              </Link>
+              {!isAdmin && (
+                <Link
+                  to="/settings"
+                  className="app-notification"
+                  aria-label="Settings"
+                >
+                  <Settings size={20} />
+                </Link>
+              )}
 
               {/* NOTIFICATION BELL */}
 
@@ -1715,7 +1746,7 @@ export function AppLayout({
                         {user?.email || user?.full_name || "User"}
                       </div>
                       <div className="app-user-menu-role" style={{ textTransform: "uppercase", letterSpacing: ".04em" }}>
-                        {role === "business" ? "Brand" : role}
+                        {isAdmin ? "Admin" : role === "business" ? "Brand" : role}
                       </div>
                     </div>
 
@@ -1734,15 +1765,17 @@ export function AppLayout({
 
                     <div style={{ height: 1, background: "#eee", margin: "5px 0" }} />
 
-                    <Link
-                      to="/profile"
-                      onClick={() =>
-                        setMenuOpen(false)
-                      }
-                    >
-                      <UserRound size={15} />
-                      Profile
-                    </Link>
+                    {!isAdmin && (
+                      <Link
+                        to="/profile"
+                        onClick={() =>
+                          setMenuOpen(false)
+                        }
+                      >
+                        <UserRound size={15} />
+                        Profile
+                      </Link>
+                    )}
 
                     <button
                       type="button"

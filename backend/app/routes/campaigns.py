@@ -9,6 +9,7 @@ from sqlalchemy import func
 
 from app.database import get_db
 from app.dependencies.auth import (
+    get_active_business,
     get_current_business,
     get_current_user,
     get_current_user_optional,
@@ -367,7 +368,9 @@ async def get_public_campaigns(
                 # Public business information comes from
                 # the business profile, not duplicated campaign data.
                 "brand_name": (
-                    business_profile.company_name
+                    "CreatorHub"
+                    if business is not None and business.role == "admin"
+                    else business_profile.company_name
                     if business_profile
                     else (
                         business.full_name
@@ -412,7 +415,7 @@ async def get_public_campaigns(
 async def create_campaign(
     data: CampaignCreate,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_business),
+    current_user: User = Depends(get_active_business),
 ):
     """
     Create a new campaign.
@@ -488,7 +491,7 @@ async def create_campaign(
         # Single pricing model: brand's own amount + 10% platform fee on top.
         pricing_model=DEFAULT_PRICING_MODEL,
         compensation_type=data.compensation_type,
-        platform_fee_rate=PLATFORM_FEE_RATE,
+        platform_fee_rate=0 if current_user.role == "admin" else PLATFORM_FEE_RATE,
         budget=data.budget,
         budget_min=data.budget_min,
         budget_max=data.budget_max,
@@ -700,7 +703,9 @@ async def get_campaigns(
                 ),
 
                 "brand_name": (
-                    business_profile.company_name
+                    "CreatorHub"
+                    if business is not None and business.role == "admin"
+                    else business_profile.company_name
                     if business_profile
                     else (
                         business.full_name
@@ -874,6 +879,13 @@ async def get_campaign(
                 status_code=403,
                 detail="Access denied.",
             )
+
+    # --------------------------------------------------------
+    # Admin (read access to every campaign)
+    # --------------------------------------------------------
+
+    elif current_user.role == "admin":
+        pass
 
     # --------------------------------------------------------
     # Other roles
@@ -1068,7 +1080,7 @@ async def update_campaign(
 async def publish_campaign(
     campaign_id: int,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_business),
+    current_user: User = Depends(get_active_business),
 ):
     """
     Publish a draft campaign.
@@ -1092,6 +1104,12 @@ async def publish_campaign(
         raise HTTPException(
             status_code=403,
             detail="Access denied.",
+        )
+
+    if campaign.is_restricted:
+        raise HTTPException(
+            status_code=403,
+            detail="This campaign was restricted by CreatorHub and cannot be published.",
         )
 
     # Publishing an already-published campaign is a no-op, so a stale
@@ -1185,7 +1203,7 @@ async def publish_campaign(
 async def duplicate_campaign(
     campaign_id: int,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_business),
+    current_user: User = Depends(get_active_business),
 ):
     """
     Duplicate a campaign as a new draft.

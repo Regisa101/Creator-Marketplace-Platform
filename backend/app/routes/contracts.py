@@ -9,7 +9,7 @@ from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from app.database import get_db
-from app.dependencies.auth import get_current_business, get_current_user
+from app.dependencies.auth import get_active_business, get_current_business, get_current_user
 from app.models import User, Campaign, Application, Contract, Payment
 from app.schemas.contract import (
     ContractFinalizeRequest,
@@ -169,7 +169,7 @@ async def get_contract(contract_id: int, db: Session = Depends(get_db), current_
 @router.put("/{contract_id}/finalize", response_model=ContractResponse)
 async def finalize_contract(
     contract_id: int, data: ContractFinalizeRequest,
-    db: Session = Depends(get_db), current_user: User = Depends(get_current_business),
+    db: Session = Depends(get_db), current_user: User = Depends(get_active_business),
 ):
     """
     Business locks in the final terms. This does NOT activate the contract —
@@ -219,7 +219,7 @@ async def finalize_contract(
 async def initiate_contract_fee_checkout(
     contract_id: int,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_business),
+    current_user: User = Depends(get_active_business),
 ):
     """Create a real hosted Khalti checkout for the CreatorHub service fee.
 
@@ -236,6 +236,8 @@ async def initiate_contract_fee_checkout(
         raise HTTPException(status_code=404, detail="Contract not found.")
     if contract.fee_paid_at is not None:
         raise HTTPException(status_code=400, detail="This contract's service fee is already paid.")
+    if contract.creator and contract.creator.is_restricted:
+        raise HTTPException(status_code=400, detail="This creator's account is currently restricted, so this contract cannot be started.")
     if contract.status not in ("pending_payment", "draft"):
         raise HTTPException(status_code=400, detail="This contract is not awaiting payment.")
     if not contract.platform_fee_amount or float(contract.platform_fee_amount) <= 0:

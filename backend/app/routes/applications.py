@@ -7,7 +7,13 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 
 from app.database import get_db
-from app.dependencies.auth import get_current_business, get_current_creator, get_current_user
+from app.dependencies.auth import (
+    get_active_business,
+    get_active_creator,
+    get_current_business,
+    get_current_creator,
+    get_current_user,
+)
 from app.models import User, Campaign, Application
 from app.models.campaign import CampaignStatus
 from app.schemas.application import ApplicationCreate, ApplicationResponse, ApplicationUpdate
@@ -95,7 +101,7 @@ def _clean_social_link(value):
 async def create_application(
     data: ApplicationCreate,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_creator),
+    current_user: User = Depends(get_active_creator),
 ):
     campaign = db.query(Campaign).filter(Campaign.id == data.campaign_id).first()
     if not campaign:
@@ -206,57 +212,9 @@ async def get_applications(
     return [_response(app, app.campaign) for app in applications]
 
 
-@router.post("/{application_id}/select", response_model=dict)
-async def select_application(
-    application_id: int,
-    db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_business),
-):
-    """Select a creator and create the contract draft. No creator payment is processed here."""
-    from app.models import Contract
-
-    application = db.query(Application).filter(Application.id == application_id).first()
-    if not application:
-        raise HTTPException(status_code=404, detail="Application not found.")
-    campaign = db.query(Campaign).filter(Campaign.id == application.campaign_id).first()
-    if not campaign or campaign.business_id != current_user.id:
-        raise HTTPException(status_code=403, detail="Access denied.")
-    if application.status not in ("pending", "selected"):
-        raise HTTPException(status_code=400, detail="This application is no longer pending.")
-
-    existing = db.query(Contract).filter(Contract.application_id == application.id).first()
-    if existing:
-        return {"application_id": application.id, "contract_id": existing.id, "contract_status": existing.status}
-
-    # Only already-paid/active selections count as selected. Creating a draft
-    # contract must NOT select the creator, close the campaign, reject other
-    # applicants, or notify the creator. Those actions happen only after the
-    # CreatorHub fee payment succeeds.
-    selected_count = db.query(Application).filter(
-        Application.campaign_id == campaign.id,
-        Application.status == "accepted",
-    ).count()
-    if selected_count >= int(campaign.creators_needed or 1):
-        raise HTTPException(status_code=400, detail="This campaign has already selected the required number of creators.")
-
-    # The application remains pending while the business creates/finalizes
-    # the contract. The creator is officially selected only after payment.
-    rate, _can_activate = candidate_rate_and_status(application, campaign)
-    total = total_for_rate(rate, campaign) if rate is not None else None
-    fee_rate = campaign_fee_rate(campaign)
-    contract = Contract(
-        campaign_id=campaign.id, application_id=application.id, business_id=current_user.id, creator_id=application.creator_id,
-        engagement_type=campaign.engagement_type, duration=campaign.duration, pricing_model=campaign.pricing_model,
-        compensation_type=campaign.compensation_type, compensation_description=campaign.compensation_description,
-        agreed_rate=rate, total_value=total, platform_fee_rate=fee_rate,
-        platform_fee_amount=platform_fee_for(total, fee_rate) if total is not None else None,
-        start_date=campaign.start_date, end_date=campaign.end_date, status="draft",
-    )
-
-    # Immutable collaboration evidence. This is captured at the moment the
-    # business selects the creator so later edits to the campaign/application
-    # cannot silently rewrite what the parties originally agreed to.
-    contract.evidence_snapshot = {
+def build_evidence_snapshot(campaign, application, rate) -> dict:
+    """Immutable record of what was agreed when a creator is selected."""
+    return {
         "version": 1,
         "historical": True,
         "captured_at": datetime.now(timezone.utc).isoformat(),
@@ -307,6 +265,61 @@ async def select_application(
             "updated_at": application.updated_at.isoformat() if application.updated_at else None,
         },
     }
+
+
+@router.post("/{application_id}/select", response_model=dict)
+async def select_application(
+    application_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_active_business),
+):
+    """Select a creator and create the contract draft. No creator payment is processed here."""
+    from app.models import Contract
+
+    application = db.query(Application).filter(Application.id == application_id).first()
+    if not application:
+        raise HTTPException(status_code=404, detail="Application not found.")
+    campaign = db.query(Campaign).filter(Campaign.id == application.campaign_id).first()
+    if not campaign or campaign.business_id != current_user.id:
+        raise HTTPException(status_code=403, detail="Access denied.")
+    if application.status not in ("pending", "selected"):
+        raise HTTPException(status_code=400, detail="This application is no longer pending.")
+    if application.creator and application.creator.is_restricted:
+        raise HTTPException(status_code=400, detail="This creator's account is currently restricted and cannot be selected.")
+
+    existing = db.query(Contract).filter(Contract.application_id == application.id).first()
+    if existing:
+        return {"application_id": application.id, "contract_id": existing.id, "contract_status": existing.status}
+
+    # Only already-paid/active selections count as selected. Creating a draft
+    # contract must NOT select the creator, close the campaign, reject other
+    # applicants, or notify the creator. Those actions happen only after the
+    # CreatorHub fee payment succeeds.
+    selected_count = db.query(Application).filter(
+        Application.campaign_id == campaign.id,
+        Application.status == "accepted",
+    ).count()
+    if selected_count >= int(campaign.creators_needed or 1):
+        raise HTTPException(status_code=400, detail="This campaign has already selected the required number of creators.")
+
+    # The application remains pending while the business creates/finalizes
+    # the contract. The creator is officially selected only after payment.
+    rate, _can_activate = candidate_rate_and_status(application, campaign)
+    total = total_for_rate(rate, campaign) if rate is not None else None
+    fee_rate = campaign_fee_rate(campaign)
+    contract = Contract(
+        campaign_id=campaign.id, application_id=application.id, business_id=current_user.id, creator_id=application.creator_id,
+        engagement_type=campaign.engagement_type, duration=campaign.duration, pricing_model=campaign.pricing_model,
+        compensation_type=campaign.compensation_type, compensation_description=campaign.compensation_description,
+        agreed_rate=rate, total_value=total, platform_fee_rate=fee_rate,
+        platform_fee_amount=platform_fee_for(total, fee_rate) if total is not None else None,
+        start_date=campaign.start_date, end_date=campaign.end_date, status="draft",
+    )
+
+    # Immutable collaboration evidence. This is captured at the moment the
+    # business selects the creator so later edits to the campaign/application
+    # cannot silently rewrite what the parties originally agreed to.
+    contract.evidence_snapshot = build_evidence_snapshot(campaign, application, rate)
     # IMPORTANT: do not mutate application status or campaign status here.
     # Payment completion is the single point that makes the selection official.
     db.add(contract)

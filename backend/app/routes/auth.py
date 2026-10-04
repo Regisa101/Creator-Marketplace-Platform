@@ -300,6 +300,13 @@ async def delete_account(
     their own foreign keys (saved campaigns/applications before the
     campaigns they point to).
     """
+    if current_user.is_restricted:
+        # Records of a restricted account must stay intact for CreatorHub.
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Restricted accounts cannot be deleted. Please contact CreatorHub support.",
+        )
+
     if not verify_password(payload.password, current_user.password):
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,

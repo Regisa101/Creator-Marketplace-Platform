@@ -713,3 +713,246 @@ export const uploadMedia = async (file: File): Promise<{ url: string; media_type
   formData.append('file', file);
   return unwrap(api.post<{ url: string; media_type: 'image' | 'video' }>('/uploads/media', formData, { headers: { 'Content-Type': 'multipart/form-data' } }));
 };
+
+/* ============================================================
+   ADMIN
+   All endpoints are admin-only on the server (403 otherwise).
+============================================================ */
+
+export type AdminRange = '7d' | '30d' | '90d' | 'all';
+export type AdminRevenueRange = '7d' | '30d' | '90d' | 'year' | 'all';
+export type AdminUserStatus = 'active' | 'restricted';
+
+export interface AdminPage {
+  page: number;
+  page_size: number;
+  total: number;
+  total_pages: number;
+}
+
+export interface AdminActivity {
+  type: string;
+  title: string;
+  subject: string | null;
+  at: string;
+}
+
+export interface AdminRevenuePoint {
+  key: string;
+  label: string;
+  revenue: number;
+}
+
+export interface AdminRevenueChart {
+  granularity: 'day' | 'month';
+  points: AdminRevenuePoint[];
+}
+
+export interface AdminOverviewData {
+  range: AdminRange;
+  cards: {
+    total_creators: number;
+    total_businesses: number;
+    new_creators: number;
+    new_businesses: number;
+    active_campaigns: number;
+    platform_revenue: number;
+    paid_contracts: number;
+  };
+  users: { creators: number; businesses: number };
+  campaign_statuses: { status: string; count: number }[];
+  revenue_trend: AdminRevenueChart;
+  recent_activity: AdminActivity[];
+}
+
+export interface AdminListParams {
+  search?: string;
+  status?: string;
+  sort?: 'newest' | 'oldest';
+  range?: string;
+  page?: number;
+  page_size?: number;
+}
+
+export interface AdminCreatorRow {
+  id: number;
+  name: string;
+  email: string;
+  location: string | null;
+  profile_image: string | null;
+  status: AdminUserStatus;
+  joined_at: string;
+}
+
+export interface AdminBusinessRow {
+  id: number;
+  name: string;
+  email: string;
+  logo_url: string | null;
+  status: AdminUserStatus;
+  campaigns: number;
+  joined_at: string;
+}
+
+export interface AdminCampaignRow {
+  id: number;
+  title: string;
+  business_id: number;
+  business: string | null;
+  is_platform_owned: boolean;
+  status: string;
+  is_restricted: boolean;
+  applications: number;
+  creators_needed: number;
+  created_at: string;
+}
+
+export interface AdminUserList<T> extends AdminPage {
+  items: T[];
+  counts: { all: number; active: number; restricted: number };
+}
+
+export interface AdminCampaignList extends AdminPage {
+  items: AdminCampaignRow[];
+  counts: Record<string, number>;
+}
+
+export interface AdminCreatorDetail {
+  id: number;
+  name: string;
+  email: string;
+  username: string | null;
+  profile_image: string | null;
+  bio: string | null;
+  location: string | null;
+  creator_type: string | null;
+  niches: string[];
+  skills: string[];
+  languages: string[];
+  socials: { platform: string; username: string | null; profile_url: string | null; follower_count: number | null }[];
+  status: AdminUserStatus;
+  restricted_at: string | null;
+  joined_at: string;
+  stats: { applications: number; selected_campaigns: number; completed_contracts: number };
+}
+
+export interface AdminBusinessDetail {
+  id: number;
+  name: string;
+  email: string;
+  logo_url: string | null;
+  location: string | null;
+  description: string | null;
+  industry: string | null;
+  website: string | null;
+  status: AdminUserStatus;
+  restricted_at: string | null;
+  joined_at: string;
+  stats: {
+    campaigns: number;
+    completed_campaigns: number;
+    contracts: number;
+    platform_fees_paid: number;
+    contract_value: number;
+  };
+}
+
+export interface AdminCampaignApplication {
+  id: number;
+  creator_id: number;
+  creator: string;
+  status: string;
+  rate: number | null;
+  applied_at: string;
+}
+
+export interface AdminCampaignDetail {
+  id: number;
+  title: string;
+  business_id: number;
+  business: string | null;
+  is_platform_owned: boolean;
+  creators_selected: number;
+  description: string;
+  responsibilities: string | null;
+  requirements: string | null;
+  category: string;
+  engagement_type: string | null;
+  duration: string | null;
+  creator_types: string[];
+  required_skills: string[];
+  deliverables: string[];
+  location: string | null;
+  work_arrangement: string | null;
+  hero_image: string | null;
+  compensation_type: string | null;
+  budget: number | null;
+  budget_min: number | null;
+  budget_max: number | null;
+  creators_needed: number;
+  status: string;
+  is_restricted: boolean;
+  restricted_at: string | null;
+  application_deadline: string | null;
+  start_date: string | null;
+  end_date: string | null;
+  created_at: string;
+  total_applications: number;
+  applications: AdminCampaignApplication[];
+  selected_creators: AdminCampaignApplication[];
+}
+
+export interface AdminRevenueTransaction {
+  id: number;
+  date: string;
+  campaign_id: number | null;
+  campaign: string | null;
+  business: string | null;
+  contract_value: number | null;
+  platform_fee: number;
+  status: 'paid';
+}
+
+export interface AdminRevenueData extends AdminPage {
+  range: AdminRevenueRange;
+  summary: {
+    total_revenue: number;
+    revenue_this_month: number;
+    revenue_this_year: number;
+    paid_contracts: number;
+    range_revenue: number;
+    range_paid_contracts: number;
+  };
+  chart: AdminRevenueChart;
+  breakdown: { type: string; label: string; count: number; amount: number }[];
+  transactions: AdminRevenueTransaction[];
+}
+
+export const getAdminOverview = (range: AdminRange) =>
+  api.get<AdminOverviewData>('/admin/overview', { params: { range } }).then((r) => r.data);
+
+export const getAdminCreators = (params: AdminListParams) =>
+  api.get<AdminUserList<AdminCreatorRow>>('/admin/creators', { params }).then((r) => r.data);
+export const getAdminCreator = (id: number) =>
+  api.get<AdminCreatorDetail>(`/admin/creators/${id}`).then((r) => r.data);
+export const setAdminCreatorRestricted = (id: number, restricted: boolean) =>
+  api.post(`/admin/creators/${id}/${restricted ? 'restrict' : 'reactivate'}`).then((r) => r.data);
+
+export const getAdminBusinesses = (params: AdminListParams) =>
+  api.get<AdminUserList<AdminBusinessRow>>('/admin/businesses', { params }).then((r) => r.data);
+export const getAdminBusiness = (id: number) =>
+  api.get<AdminBusinessDetail>(`/admin/businesses/${id}`).then((r) => r.data);
+export const setAdminBusinessRestricted = (id: number, restricted: boolean) =>
+  api.post(`/admin/businesses/${id}/${restricted ? 'restrict' : 'reactivate'}`).then((r) => r.data);
+
+export const getAdminCampaigns = (params: AdminListParams) =>
+  api.get<AdminCampaignList>('/admin/campaigns', { params }).then((r) => r.data);
+export const getAdminCampaign = (id: number) =>
+  api.get<AdminCampaignDetail>(`/admin/campaigns/${id}`).then((r) => r.data);
+export const restrictAdminCampaign = (id: number) =>
+  api.post(`/admin/campaigns/${id}/restrict`).then((r) => r.data);
+export const selectAdminCampaignCreator = (campaignId: number, applicationId: number) =>
+  api.post(`/admin/campaigns/${campaignId}/applications/${applicationId}/select`).then((r) => r.data);
+
+export const getAdminRevenue = (params: { range: AdminRevenueRange; page?: number; page_size?: number }) =>
+  api.get<AdminRevenueData>('/admin/revenue', { params }).then((r) => r.data);

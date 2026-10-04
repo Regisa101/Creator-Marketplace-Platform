@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import type { FormEvent, ReactNode } from "react";
-import { Link, useNavigate, useParams } from "react-router-dom";
+import { Link, useLocation, useNavigate, useParams } from "react-router-dom";
 import { LogoMark } from "../components/Logo";
 import {
   ArrowLeft,
@@ -36,7 +36,7 @@ const CATEGORIES = [
   "Entertainment",
 ];
 
-const CREATOR_TYPES = [
+export const CREATOR_TYPES = [
   "UGC Creator",
   "Influencer",
   "Content Creator",
@@ -48,7 +48,7 @@ const CREATOR_TYPES = [
   "Model",
 ];
 
-const SKILLS = [
+export const SKILLS = [
   "Short-form video",
   "Photography",
   "Video editing",
@@ -63,7 +63,7 @@ const SKILLS = [
   "Tutorials",
 ];
 
-const LOCATION_SUGGESTIONS = [
+export const LOCATION_SUGGESTIONS = [
   "Kathmandu, Nepal",
   "Kirtipur, Nepal",
   "Lalitpur, Nepal",
@@ -86,7 +86,7 @@ const LOCATION_SUGGESTIONS = [
   "Remote",
 ];
 
-const ENGAGEMENT_TYPES = [
+export const ENGAGEMENT_TYPES = [
   "One-time",
   "Weekly",
   "Monthly",
@@ -94,22 +94,22 @@ const ENGAGEMENT_TYPES = [
   "Yearly",
 ];
 
-const WORK_ARRANGEMENTS = [
+export const WORK_ARRANGEMENTS = [
   "Full-time",
   "Part-time",
   "Flexible",
 ];
 
-const PRICING_MODELS = [
+export const PRICING_MODELS = [
   "Custom budget",
 ];
 
-const COMPENSATION_TYPES = [
+export const COMPENSATION_TYPES = [
   "Custom amount",
   "Budget range",
 ];
 
-const EXPERIENCE_LEVELS = [
+export const EXPERIENCE_LEVELS = [
   "Entry level",
   "Intermediate",
   "Experienced",
@@ -244,6 +244,8 @@ function CampaignForm({
 }) {
   const today = todayInputDate();
   const navigate = useNavigate();
+  // The same form is used by admins at /admin/campaigns/new (CreatorHub's own campaigns).
+  const isAdminArea = useLocation().pathname.startsWith("/admin");
   const { id } = useParams<{ id: string }>();
 
   const editing = mode === "edit";
@@ -588,9 +590,11 @@ function CampaignForm({
 
     if (step === 1) {
       navigate(
-        editing && id
-          ? `/campaigns/${id}`
-          : "/campaigns"
+        isAdminArea
+          ? "/admin/campaigns"
+          : editing && id
+            ? `/campaigns/${id}`
+            : "/campaigns"
       );
 
       return;
@@ -666,7 +670,9 @@ function CampaignForm({
       }
 
       navigate(
-        `/campaigns/${saved.id}`
+        isAdminArea
+          ? "/admin/campaigns"
+          : `/campaigns/${saved.id}`
       );
     } catch (e) {
       setError(
@@ -715,9 +721,11 @@ function CampaignForm({
 
           <Link
             to={
-              editing && id
-                ? `/campaigns/${id}`
-                : "/campaigns"
+              isAdminArea
+                ? "/admin/campaigns"
+                : editing && id
+                  ? `/campaigns/${id}`
+                  : "/campaigns"
             }
             className="cf-back"
           >
@@ -730,7 +738,7 @@ function CampaignForm({
             type="button"
             className="cf-logo"
             onClick={() =>
-              navigate("/dashboard")
+              navigate(isAdminArea ? "/admin" : "/dashboard")
             }
             aria-label="Go to dashboard"
           >

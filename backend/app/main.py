@@ -296,6 +296,34 @@ def ensure_schema() -> None:
         """,
 
         # ====================================================
+        # ADMIN SOFT RESTRICTION
+        # ====================================================
+
+        """
+        ALTER TABLE users
+        ADD COLUMN IF NOT EXISTS is_restricted
+        BOOLEAN NOT NULL DEFAULT FALSE
+        """,
+
+        """
+        ALTER TABLE users
+        ADD COLUMN IF NOT EXISTS restricted_at
+        TIMESTAMPTZ
+        """,
+
+        """
+        ALTER TABLE campaigns
+        ADD COLUMN IF NOT EXISTS is_restricted
+        BOOLEAN NOT NULL DEFAULT FALSE
+        """,
+
+        """
+        ALTER TABLE campaigns
+        ADD COLUMN IF NOT EXISTS restricted_at
+        TIMESTAMPTZ
+        """,
+
+        # ====================================================
         # NOTIFICATIONS
         # ====================================================
 

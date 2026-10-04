@@ -48,6 +48,10 @@ import { Dashboard } from './pages/Dashboard';
 import { Analytics } from './pages/Analytics';
 import { CreatorDashboard } from './pages/CreatorDashboard';
 import AdminDashboard from './pages/AdminDashboard';
+import AdminCreators from './pages/admin/AdminCreators';
+import AdminBusinesses from './pages/admin/AdminBusinesses';
+import AdminCampaigns from './pages/admin/AdminCampaigns';
+import AdminRevenue from './pages/admin/AdminRevenue';
 
 /*
  * Same component renders both "Contract History" (creator)
@@ -312,8 +316,62 @@ export default function App() {
           <Route
             path="/admin"
             element={
-              <ProtectedRoute>
+              <ProtectedRoute roles={['admin']}>
                 <AdminDashboard />
+              </ProtectedRoute>
+            }
+          />
+
+          <Route
+            path="/admin/creators"
+            element={
+              <ProtectedRoute roles={['admin']}>
+                <AdminCreators />
+              </ProtectedRoute>
+            }
+          />
+
+          <Route
+            path="/admin/businesses"
+            element={
+              <ProtectedRoute roles={['admin']}>
+                <AdminBusinesses />
+              </ProtectedRoute>
+            }
+          />
+
+          <Route
+            path="/admin/campaigns"
+            element={
+              <ProtectedRoute roles={['admin']}>
+                <AdminCampaigns />
+              </ProtectedRoute>
+            }
+          />
+
+          <Route
+            path="/admin/campaigns/new"
+            element={
+              <ProtectedRoute roles={['admin']}>
+                <CampaignCreate />
+              </ProtectedRoute>
+            }
+          />
+
+          <Route
+            path="/admin/campaigns/:id/edit"
+            element={
+              <ProtectedRoute roles={['admin']}>
+                <CampaignEdit />
+              </ProtectedRoute>
+            }
+          />
+
+          <Route
+            path="/admin/revenue"
+            element={
+              <ProtectedRoute roles={['admin']}>
+                <AdminRevenue />
               </ProtectedRoute>
             }
           />
