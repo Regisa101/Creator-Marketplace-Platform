@@ -82,9 +82,8 @@ function postedAgo(value?: string | null) {
   if (days < 7) return `Posted ${days} day${days === 1 ? "" : "s"} ago`;
   if (weeks < 5) return `Posted ${weeks} week${weeks === 1 ? "" : "s"} ago`;
 
-  return `Posted ${Math.floor(days / 30)} month${
-    Math.floor(days / 30) === 1 ? "" : "s"
-  } ago`;
+  const months = Math.floor(days / 30);
+  return `Posted ${months} month${months === 1 ? "" : "s"} ago`;
 }
 
 function getLocation(campaign: PublicCampaign) {
@@ -92,26 +91,14 @@ function getLocation(campaign: PublicCampaign) {
 }
 
 function getMinPrice(campaign: PublicCampaign) {
-  if (campaign.budget_min != null) {
-    return Number(campaign.budget_min);
-  }
-
-  if (campaign.budget != null) {
-    return Number(campaign.budget);
-  }
-
+  if (campaign.budget_min != null) return Number(campaign.budget_min);
+  if (campaign.budget != null) return Number(campaign.budget);
   return null;
 }
 
 function getMaxPrice(campaign: PublicCampaign) {
-  if (campaign.budget_max != null) {
-    return Number(campaign.budget_max);
-  }
-
-  if (campaign.budget != null) {
-    return Number(campaign.budget);
-  }
-
+  if (campaign.budget_max != null) return Number(campaign.budget_max);
+  if (campaign.budget != null) return Number(campaign.budget);
   return null;
 }
 
@@ -131,15 +118,10 @@ function budgetLabel(campaign: PublicCampaign) {
 }
 
 function deadlinePassed(campaign: PublicCampaign) {
-  if (!campaign.application_deadline) {
-    return false;
-  }
+  if (!campaign.application_deadline) return false;
 
   const deadline = new Date(campaign.application_deadline);
-
-  if (Number.isNaN(deadline.getTime())) {
-    return false;
-  }
+  if (Number.isNaN(deadline.getTime())) return false;
 
   return new Date() >= deadline;
 }
@@ -148,13 +130,8 @@ function hasNoApplications(campaign: PublicCampaign) {
   return Number(campaign.application_count || 0) === 0;
 }
 
-function isExpiredWithoutApplications(
-  campaign: PublicCampaign
-) {
-  return (
-    deadlinePassed(campaign) &&
-    hasNoApplications(campaign)
-  );
+function isExpiredWithoutApplications(campaign: PublicCampaign) {
+  return deadlinePassed(campaign) && hasNoApplications(campaign);
 }
 
 function tagsFor(campaign: PublicCampaign) {
@@ -202,12 +179,11 @@ function SortDropdown({
         type="button"
         className="campaign-sort-button"
         onClick={() => setOpen((current) => !current)}
+        aria-haspopup="listbox"
+        aria-expanded={open}
       >
         <span>{selected}</span>
-        <ChevronDown
-          size={14}
-          className={open ? "sort-open" : ""}
-        />
+        <ChevronDown size={14} className={open ? "sort-open" : ""} />
       </button>
 
       {open && (
@@ -219,11 +195,13 @@ function SortDropdown({
             aria-label="Close sort menu"
           />
 
-          <div className="campaign-sort-menu">
+          <div className="campaign-sort-menu" role="listbox">
             {options.map((option) => (
               <button
                 key={option.value}
                 type="button"
+                role="option"
+                aria-selected={value === option.value}
                 className={
                   value === option.value
                     ? "sort-option selected"
@@ -261,11 +239,8 @@ function CampaignCard({
   isSaved: boolean;
   onToggleSave: (id: number) => void;
 }) {
-  const expired =
-    isExpiredWithoutApplications(campaign);
-
-  const passedDeadline =
-    deadlinePassed(campaign);
+  const expired = isExpiredWithoutApplications(campaign);
+  const passedDeadline = deadlinePassed(campaign);
 
   const tags = tagsFor(campaign);
   const navigate = useNavigate();
@@ -275,19 +250,18 @@ function CampaignCard({
 
   return (
     <article
-      className={`campaign-card ${
-        expired ? "campaign-card-expired" : ""
-      }`}
+      className={`campaign-card ${expired ? "campaign-card-expired" : ""}`}
       style={{ cursor: "pointer" }}
       role="link"
       tabIndex={0}
       onClick={() => navigate(detailUrl)}
       onKeyDown={(e) => {
-        if (e.key === "Enter" && e.target === e.currentTarget) navigate(detailUrl);
+        if (e.key === "Enter" && e.target === e.currentTarget) {
+          navigate(detailUrl);
+        }
       }}
     >
       <div className="campaign-card-inner">
-
         {/* BRAND */}
 
         <div className="campaign-card-top">
@@ -299,51 +273,33 @@ function CampaignCard({
           >
             <div className="campaign-avatar">
               {campaign.brand_logo ? (
-                <img
-                  src={mediaUrl(campaign.brand_logo)}
-                  alt=""
-                />
+                <img src={mediaUrl(campaign.brand_logo)} alt="" />
               ) : (
                 initials(campaign.brand_name)
               )}
             </div>
 
-            <span>
-              {campaign.brand_name || "Brand"}
-            </span>
+            <span>{campaign.brand_name || "Brand"}</span>
           </Link>
 
           {isCreator && !expired && (
             <button
               type="button"
-              className={
-                isSaved
-                  ? "campaign-heart saved"
-                  : "campaign-heart"
-              }
+              className={isSaved ? "campaign-heart saved" : "campaign-heart"}
               onClick={(e) => {
                 e.stopPropagation();
                 onToggleSave(campaign.id);
               }}
-              aria-label={
-                isSaved
-                  ? "Remove from wishlist"
-                  : "Save campaign"
-              }
+              aria-label={isSaved ? "Remove from wishlist" : "Save campaign"}
             >
-              <Bookmark
-                size={17}
-                fill={isSaved ? "currentColor" : "none"}
-              />
+              <Bookmark size={17} fill={isSaved ? "currentColor" : "none"} />
             </button>
           )}
         </div>
 
         {/* TITLE */}
 
-        <h2 className="campaign-title">
-          {campaign.title}
-        </h2>
+        <h2 className="campaign-title">{campaign.title}</h2>
 
         {/* LOCATION */}
 
@@ -353,9 +309,7 @@ function CampaignCard({
             {getLocation(campaign)}
           </span>
 
-          <span>
-            {campaign.engagement_type || "Short-term"}
-          </span>
+          <span>{campaign.engagement_type || "Short-term"}</span>
         </div>
 
         {/* BUDGET */}
@@ -363,9 +317,7 @@ function CampaignCard({
         <div className="campaign-budget-row">
           <div>
             <small>Budget</small>
-            <strong>
-              {budgetLabel(campaign)}
-            </strong>
+            <strong>{budgetLabel(campaign)}</strong>
           </div>
 
           {campaign.duration && (
@@ -389,8 +341,7 @@ function CampaignCard({
         {/* DESCRIPTION */}
 
         <p className="campaign-description">
-          {campaign.description ||
-            "View the campaign details to learn more."}
+          {campaign.description || "View the campaign details to learn more."}
         </p>
 
         {/* DEADLINE MESSAGE */}
@@ -410,19 +361,14 @@ function CampaignCard({
         {/* FOOTER */}
 
         <div className="campaign-footer">
-          <span>
-            {postedAgo(campaign.created_at)}
-          </span>
+          <span>{postedAgo(campaign.created_at)}</span>
 
-          {!expired &&
-            campaign.application_count > 0 && (
-              <span>
-                {campaign.application_count} application
-                {campaign.application_count === 1
-                  ? ""
-                  : "s"}
-              </span>
-            )}
+          {!expired && campaign.application_count > 0 && (
+            <span>
+              {campaign.application_count} application
+              {campaign.application_count === 1 ? "" : "s"}
+            </span>
+          )}
         </div>
 
         {/* ACTION */}
@@ -458,50 +404,23 @@ export function Campaigns() {
   const { user } = useAuth();
   const [searchParams] = useSearchParams();
 
-  const isCreator =
-    user?.role === "creator";
+  const isCreator = user?.role === "creator";
+  const isAuthenticated = Boolean(user);
 
-  const isAuthenticated =
-    Boolean(user);
+  const [campaigns, setCampaigns] = useState<PublicCampaign[]>([]);
+  const [saved, setSaved] = useState<SavedCampaignEntry[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
 
-  const [campaigns, setCampaigns] =
-    useState<PublicCampaign[]>([]);
-
-  const [saved, setSaved] =
-    useState<SavedCampaignEntry[]>([]);
-
-  const [loading, setLoading] =
-    useState(true);
-
-  const [error, setError] =
-    useState("");
-
-  const [category, setCategory] =
-    useState(searchParams.get("category") || "");
-
-  const [location, setLocation] =
-    useState("");
-
-  const [minPrice, setMinPrice] =
-    useState("");
-
-  const [maxPrice, setMaxPrice] =
-    useState("");
-
-  const [engagement, setEngagement] =
-    useState("");
-
-  const [experience, setExperience] =
-    useState("");
-
-  const [creatorType, setCreatorType] =
-    useState("");
-
-  const [sort, setSort] =
-    useState("newest");
-
-  const [currentPage, setCurrentPage] =
-    useState(1);
+  const [category, setCategory] = useState(searchParams.get("category") || "");
+  const [location, setLocation] = useState("");
+  const [minPrice, setMinPrice] = useState("");
+  const [maxPrice, setMaxPrice] = useState("");
+  const [engagement, setEngagement] = useState("");
+  const [experience, setExperience] = useState("");
+  const [creatorType, setCreatorType] = useState("");
+  const [sort, setSort] = useState("newest");
+  const [currentPage, setCurrentPage] = useState(1);
 
   /* ==========================================================
      LOAD
@@ -513,10 +432,7 @@ export function Campaigns() {
     setLoading(true);
     setError("");
 
-    getPublicCampaigns({
-      page: 1,
-      limit: 100,
-    })
+    getPublicCampaigns({ page: 1, limit: 100 })
       .then((response) => {
         if (!cancelled) {
           setCampaigns(response.campaigns || []);
@@ -526,9 +442,7 @@ export function Campaigns() {
         console.error(err);
 
         if (!cancelled) {
-          setError(
-            "Campaigns could not be loaded right now."
-          );
+          setError("Campaigns could not be loaded right now.");
         }
       })
       .finally(() => {
@@ -557,20 +471,12 @@ export function Campaigns() {
         setSaved(items || []);
       })
       .catch((err) => {
-        console.error(
-          "Could not load saved campaigns",
-          err
-        );
+        console.error("Could not load saved campaigns", err);
       });
   }, [isCreator]);
 
   const savedIds = useMemo(
-    () =>
-      new Set(
-        saved.map(
-          (item) => item.campaign_id
-        )
-      ),
+    () => new Set(saved.map((item) => item.campaign_id)),
     [saved]
   );
 
@@ -584,27 +490,13 @@ export function Campaigns() {
     try {
       if (savedIds.has(id)) {
         await unsaveCampaign(id);
-
-        setSaved((items) =>
-          items.filter(
-            (item) =>
-              item.campaign_id !== id
-          )
-        );
+        setSaved((items) => items.filter((item) => item.campaign_id !== id));
       } else {
-        const item =
-          await saveCampaign(id);
-
-        setSaved((items) => [
-          ...items,
-          item,
-        ]);
+        const item = await saveCampaign(id);
+        setSaved((items) => [...items, item]);
       }
     } catch (err) {
-      console.error(
-        "Could not update wishlist",
-        err
-      );
+      console.error("Could not update wishlist", err);
     }
   };
 
@@ -617,10 +509,7 @@ export function Campaigns() {
       [
         ...new Set(
           campaigns
-            .map(
-              (item) =>
-                item.category?.trim()
-            )
+            .map((item) => item.category?.trim())
             .filter(Boolean) as string[]
         ),
       ].sort(),
@@ -628,14 +517,7 @@ export function Campaigns() {
   );
 
   const locations = useMemo(
-    () =>
-      [
-        ...new Set(
-          campaigns
-            .map(getLocation)
-            .filter(Boolean)
-        ),
-      ].sort(),
+    () => [...new Set(campaigns.map(getLocation).filter(Boolean))].sort(),
     [campaigns]
   );
 
@@ -644,10 +526,7 @@ export function Campaigns() {
       [
         ...new Set(
           campaigns
-            .map(
-              (item) =>
-                item.engagement_type?.trim()
-            )
+            .map((item) => item.engagement_type?.trim())
             .filter(Boolean) as string[]
         ),
       ].sort(),
@@ -659,10 +538,7 @@ export function Campaigns() {
       [
         ...new Set(
           campaigns
-            .map(
-              (item) =>
-                item.experience_level?.trim()
-            )
+            .map((item) => item.experience_level?.trim())
             .filter(Boolean) as string[]
         ),
       ].sort(),
@@ -672,12 +548,7 @@ export function Campaigns() {
   const creatorTypes = useMemo(
     () =>
       [
-        ...new Set(
-          campaigns.flatMap(
-            (item) =>
-              item.creator_types || []
-          )
-        ),
+        ...new Set(campaigns.flatMap((item) => item.creator_types || [])),
       ].sort(),
     [campaigns]
   );
@@ -686,251 +557,126 @@ export function Campaigns() {
      FILTER
   ========================================================== */
 
-  const filteredCampaigns =
-    useMemo(() => {
-      const search =
-        searchParams
-          .get("search")
-          ?.trim()
-          .toLowerCase() || "";
+  const filteredCampaigns = useMemo(() => {
+    const search = searchParams.get("search")?.trim().toLowerCase() || "";
 
-      const minimum =
-        minPrice
-          ? Number(minPrice)
-          : null;
+    const minimum = minPrice ? Number(minPrice) : null;
+    const maximum = maxPrice ? Number(maxPrice) : null;
 
-      const maximum =
-        maxPrice
-          ? Number(maxPrice)
-          : null;
+    const result = campaigns.filter((campaign) => {
+      /*
+        A campaign with a passed deadline and ZERO applications is
+        expired and should disappear from the public marketplace.
+      */
+      if (isExpiredWithoutApplications(campaign)) return false;
 
-      const result =
-        campaigns.filter(
-          (campaign) => {
+      if (search) {
+        const text = [
+          campaign.title,
+          campaign.description,
+          campaign.category,
+          campaign.brand_name,
+          campaign.brand_location,
+          campaign.location,
+          ...(campaign.required_skills || []),
+          ...(campaign.creator_types || []),
+        ]
+          .filter(Boolean)
+          .join(" ")
+          .toLowerCase();
 
-            /*
-              A campaign with a passed deadline and ZERO
-              applications is expired and should disappear
-              from the public marketplace.
-            */
-            if (
-              isExpiredWithoutApplications(
-                campaign
-              )
-            ) {
-              return false;
-            }
+        if (!text.includes(search)) return false;
+      }
 
-            if (
-              search
-            ) {
-              const text = [
-                campaign.title,
-                campaign.description,
-                campaign.category,
-                campaign.brand_name,
-                campaign.brand_location,
-                campaign.location,
-                ...(campaign.required_skills || []),
-                ...(campaign.creator_types || []),
-              ]
-                .filter(Boolean)
-                .join(" ")
-                .toLowerCase();
+      if (category && campaign.category !== category) return false;
+      if (location && getLocation(campaign) !== location) return false;
+      if (engagement && campaign.engagement_type !== engagement) return false;
+      if (experience && campaign.experience_level !== experience) return false;
 
-              if (
-                !text.includes(search)
-              ) {
-                return false;
-              }
-            }
+      if (
+        creatorType &&
+        !(campaign.creator_types || []).includes(creatorType)
+      ) {
+        return false;
+      }
 
-            if (
-              category &&
-              campaign.category !==
-                category
-            ) {
-              return false;
-            }
+      const campaignMin = getMinPrice(campaign);
+      const campaignMax = getMaxPrice(campaign);
 
-            if (
-              location &&
-              getLocation(campaign) !==
-                location
-            ) {
-              return false;
-            }
+      if (minimum != null && (campaignMax == null || campaignMax < minimum)) {
+        return false;
+      }
 
-            if (
-              engagement &&
-              campaign.engagement_type !==
-                engagement
-            ) {
-              return false;
-            }
+      if (maximum != null && (campaignMin == null || campaignMin > maximum)) {
+        return false;
+      }
 
-            if (
-              experience &&
-              campaign.experience_level !==
-                experience
-            ) {
-              return false;
-            }
+      return true;
+    });
 
-            if (
-              creatorType &&
-              !(
-                campaign.creator_types ||
-                []
-              ).includes(
-                creatorType
-              )
-            ) {
-              return false;
-            }
-
-            const campaignMin =
-              getMinPrice(
-                campaign
-              );
-
-            const campaignMax =
-              getMaxPrice(
-                campaign
-              );
-
-            if (
-              minimum != null &&
-              (
-                campaignMax == null ||
-                campaignMax <
-                  minimum
-              )
-            ) {
-              return false;
-            }
-
-            if (
-              maximum != null &&
-              (
-                campaignMin == null ||
-                campaignMin >
-                  maximum
-              )
-            ) {
-              return false;
-            }
-
-            return true;
-          }
+    result.sort((a, b) => {
+      if (sort === "oldest") {
+        return (
+          new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
         );
+      }
 
-      result.sort(
-        (a, b) => {
-          if (
-            sort === "oldest"
-          ) {
-            return (
-              new Date(
-                a.created_at
-              ).getTime() -
-              new Date(
-                b.created_at
-              ).getTime()
-            );
-          }
+      if (sort === "price-low") {
+        return (getMinPrice(a) ?? Infinity) - (getMinPrice(b) ?? Infinity);
+      }
 
-          if (
-            sort === "price-low"
-          ) {
-            return (
-              (getMinPrice(a) ?? Infinity) -
-              (getMinPrice(b) ?? Infinity)
-            );
-          }
+      if (sort === "price-high") {
+        return (getMaxPrice(b) ?? 0) - (getMaxPrice(a) ?? 0);
+      }
 
-          if (
-            sort === "price-high"
-          ) {
-            return (
-              (getMaxPrice(b) ?? 0) -
-              (getMaxPrice(a) ?? 0)
-            );
-          }
-
-          return (
-            new Date(
-              b.created_at
-            ).getTime() -
-            new Date(
-              a.created_at
-            ).getTime()
-          );
-        }
+      return (
+        new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
       );
+    });
 
-      return result;
-    }, [
-      campaigns,
-      searchParams,
-      category,
-      location,
-      minPrice,
-      maxPrice,
-      engagement,
-      experience,
-      creatorType,
-      sort,
-    ]);
+    return result;
+  }, [
+    campaigns,
+    searchParams,
+    category,
+    location,
+    minPrice,
+    maxPrice,
+    engagement,
+    experience,
+    creatorType,
+    sort,
+  ]);
 
   /* ==========================================================
      PAGINATION
   ========================================================== */
 
-  const totalPages =
-    Math.max(
-      1,
-      Math.ceil(
-        filteredCampaigns.length /
-          CAMPAIGNS_PER_PAGE
-      )
-    );
+  const totalPages = Math.max(
+    1,
+    Math.ceil(filteredCampaigns.length / CAMPAIGNS_PER_PAGE)
+  );
 
   useEffect(() => {
-    if (
-      currentPage >
-      totalPages
-    ) {
-      setCurrentPage(
-        totalPages
-      );
+    if (currentPage > totalPages) {
+      setCurrentPage(totalPages);
     }
-  }, [
-    currentPage,
-    totalPages,
-  ]);
+  }, [currentPage, totalPages]);
 
-  const visibleCampaigns =
-    filteredCampaigns.slice(
-      (currentPage - 1) *
-        CAMPAIGNS_PER_PAGE,
-      currentPage *
-        CAMPAIGNS_PER_PAGE
-    );
+  const visibleCampaigns = filteredCampaigns.slice(
+    (currentPage - 1) * CAMPAIGNS_PER_PAGE,
+    currentPage * CAMPAIGNS_PER_PAGE
+  );
 
   const first =
     filteredCampaigns.length === 0
       ? 0
-      : (currentPage - 1) *
-          CAMPAIGNS_PER_PAGE +
-        1;
+      : (currentPage - 1) * CAMPAIGNS_PER_PAGE + 1;
 
-  const last =
-    Math.min(
-      currentPage *
-        CAMPAIGNS_PER_PAGE,
-      filteredCampaigns.length
-    );
+  const last = Math.min(
+    currentPage * CAMPAIGNS_PER_PAGE,
+    filteredCampaigns.length
+  );
 
   /* ==========================================================
      CLEAR
@@ -948,16 +694,15 @@ export function Campaigns() {
     setCurrentPage(1);
   };
 
-  const hasFilters =
-    Boolean(
-      category ||
+  const hasFilters = Boolean(
+    category ||
       location ||
       minPrice ||
       maxPrice ||
       engagement ||
       experience ||
       creatorType
-    );
+  );
 
   /* ==========================================================
      RENDER
@@ -965,105 +710,63 @@ export function Campaigns() {
 
   return (
     <div className="campaigns-page">
-
       <PublicNavbar sticky />
 
       <main className="campaigns-main">
         <div className="campaigns-container">
-
           <div className="campaigns-layout">
-
             {/* SIDEBAR */}
 
             <aside className="campaign-sidebar">
+              <div className="sidebar-sort-label">Sort by:</div>
 
-              <div className="sidebar-sort-label">
-                Sort by:
-              </div>
+              <SortDropdown value={sort} onChange={setSort} />
 
-              <SortDropdown
-                value={sort}
-                onChange={setSort}
-              />
-
-              <FilterSection
-                title="Category"
-              >
+              <FilterSection title="Category">
                 <RadioRow
                   label="All categories"
                   checked={!category}
-                  onClick={() =>
-                    setCategory("")
-                  }
+                  onClick={() => setCategory("")}
                 />
 
-                {categories.map(
-                  (item) => (
-                    <RadioRow
-                      key={item}
-                      label={item}
-                      checked={
-                        category ===
-                        item
-                      }
-                      onClick={() =>
-                        setCategory(
-                          item
-                        )
-                      }
-                    />
-                  )
-                )}
+                {categories.map((item) => (
+                  <RadioRow
+                    key={item}
+                    label={item}
+                    checked={category === item}
+                    onClick={() => setCategory(item)}
+                  />
+                ))}
               </FilterSection>
 
-              <FilterSection
-                title="Location"
-              >
+              <FilterSection title="Location">
                 <div className="location-input">
                   <MapPin size={13} />
 
                   <input
                     value={location}
-                    onChange={(e) =>
-                      setLocation(
-                        e.target.value
-                      )
-                    }
+                    onChange={(e) => setLocation(e.target.value)}
                     placeholder="e.g. Kathmandu"
                   />
                 </div>
 
-                {locations.map(
-                  (item) => (
-                    <RadioRow
-                      key={item}
-                      label={item}
-                      checked={
-                        location ===
-                        item
-                      }
-                      onClick={() =>
-                        setLocation(
-                          item
-                        )
-                      }
-                    />
-                  )
-                )}
+                {locations.map((item) => (
+                  <RadioRow
+                    key={item}
+                    label={item}
+                    checked={location === item}
+                    onClick={() => setLocation(item)}
+                  />
+                ))}
               </FilterSection>
 
               <FilterSection title="Price">
                 <div className="price-inputs">
-
                   <input
                     type="number"
                     min="0"
                     value={minPrice}
-                    onChange={(e) =>
-                      setMinPrice(
-                        e.target.value
-                      )
-                    }
+                    onChange={(e) => setMinPrice(e.target.value)}
                     placeholder="NPR 0"
                   />
 
@@ -1073,125 +776,77 @@ export function Campaigns() {
                     type="number"
                     min="0"
                     value={maxPrice}
-                    onChange={(e) =>
-                      setMaxPrice(
-                        e.target.value
-                      )
-                    }
+                    onChange={(e) => setMaxPrice(e.target.value)}
                     placeholder="NPR 50000"
                   />
-
                 </div>
               </FilterSection>
 
-              <FilterSection
-                title="Engagement"
-              >
+              <FilterSection title="Engagement">
                 <RadioRow
                   label="All engagement types"
                   checked={!engagement}
-                  onClick={() =>
-                    setEngagement("")
-                  }
+                  onClick={() => setEngagement("")}
                 />
 
-                {engagements.map(
-                  (item) => (
-                    <RadioRow
-                      key={item}
-                      label={item}
-                      checked={
-                        engagement ===
-                        item
-                      }
-                      onClick={() =>
-                        setEngagement(
-                          item
-                        )
-                      }
-                    />
-                  )
-                )}
+                {engagements.map((item) => (
+                  <RadioRow
+                    key={item}
+                    label={item}
+                    checked={engagement === item}
+                    onClick={() => setEngagement(item)}
+                  />
+                ))}
               </FilterSection>
 
-              <FilterSection
-                title="Experience"
-              >
+              <FilterSection title="Experience">
                 <RadioRow
                   label="All experience levels"
                   checked={!experience}
-                  onClick={() =>
-                    setExperience("")
-                  }
+                  onClick={() => setExperience("")}
                 />
 
-                {experiences.map(
-                  (item) => (
-                    <RadioRow
-                      key={item}
-                      label={item}
-                      checked={
-                        experience ===
-                        item
-                      }
-                      onClick={() =>
-                        setExperience(
-                          item
-                        )
-                      }
-                    />
-                  )
-                )}
+                {experiences.map((item) => (
+                  <RadioRow
+                    key={item}
+                    label={item}
+                    checked={experience === item}
+                    onClick={() => setExperience(item)}
+                  />
+                ))}
               </FilterSection>
 
-              <FilterSection
-                title="Creator type"
-              >
+              <FilterSection title="Creator type">
                 <RadioRow
                   label="All creator types"
                   checked={!creatorType}
-                  onClick={() =>
-                    setCreatorType("")
-                  }
+                  onClick={() => setCreatorType("")}
                 />
 
-                {creatorTypes.map(
-                  (item) => (
-                    <RadioRow
-                      key={item}
-                      label={item}
-                      checked={
-                        creatorType ===
-                        item
-                      }
-                      onClick={() =>
-                        setCreatorType(
-                          item
-                        )
-                      }
-                    />
-                  )
-                )}
+                {creatorTypes.map((item) => (
+                  <RadioRow
+                    key={item}
+                    label={item}
+                    checked={creatorType === item}
+                    onClick={() => setCreatorType(item)}
+                  />
+                ))}
               </FilterSection>
 
               {hasFilters && (
                 <button
                   type="button"
                   className="clear-filters"
-                  onClick={
-                    clearFilters
-                  }
+                  onClick={clearFilters}
                 >
                   Clear all filters
                 </button>
               )}
-
             </aside>
 
             {/* RESULTS */}
 
             <section className="campaign-results">
-
               <div className="results-heading">
                 {loading
                   ? "Loading campaigns..."
@@ -1199,161 +854,84 @@ export function Campaigns() {
               </div>
 
               {loading && (
-                <div className="campaign-state">
-                  Loading campaigns...
+                <div className="campaign-state">Loading campaigns...</div>
+              )}
+
+              {!loading && error && (
+                <div className="campaign-state">{error}</div>
+              )}
+
+              {!loading && !error && visibleCampaigns.length === 0 && (
+                <div className="campaign-empty">
+                  <Search size={22} />
+
+                  <h2>No campaigns found</h2>
+
+                  <p>Try changing your filters.</p>
+
+                  {hasFilters && (
+                    <button type="button" onClick={clearFilters}>
+                      Clear filters
+                    </button>
+                  )}
                 </div>
               )}
 
-              {!loading &&
-                error && (
-                  <div className="campaign-state">
-                    {error}
-                  </div>
-                )}
-
-              {!loading &&
-                !error &&
-                visibleCampaigns.length ===
-                  0 && (
-                  <div className="campaign-empty">
-                    <Search size={22} />
-
-                    <h2>
-                      No campaigns found
-                    </h2>
-
-                    <p>
-                      Try changing your filters.
-                    </p>
-
-                    {hasFilters && (
-                      <button
-                        type="button"
-                        onClick={
-                          clearFilters
-                        }
-                      >
-                        Clear filters
-                      </button>
-                    )}
-                  </div>
-                )}
-
-              {!loading &&
-                !error &&
-                visibleCampaigns.length >
-                  0 && (
-                  <div className="campaign-grid">
-
-                    {visibleCampaigns.map(
-                      (campaign) => (
-                        <CampaignCard
-                          key={
-                            campaign.id
-                          }
-                          campaign={
-                            campaign
-                          }
-                          isCreator={
-                            isCreator
-                          }
-                          isAuthenticated={
-                            isAuthenticated
-                          }
-                          isSaved={savedIds.has(
-                            campaign.id
-                          )}
-                          onToggleSave={
-                            toggleSave
-                          }
-                        />
-                      )
-                    )}
-
-                  </div>
-                )}
+              {!loading && !error && visibleCampaigns.length > 0 && (
+                <div className="campaign-grid">
+                  {visibleCampaigns.map((campaign) => (
+                    <CampaignCard
+                      key={campaign.id}
+                      campaign={campaign}
+                      isCreator={isCreator}
+                      isAuthenticated={isAuthenticated}
+                      isSaved={savedIds.has(campaign.id)}
+                      onToggleSave={toggleSave}
+                    />
+                  ))}
+                </div>
+              )}
 
               {/* PAGINATION */}
 
-              {!loading &&
-                !error &&
-                totalPages > 1 && (
-                  <div className="pagination">
+              {!loading && !error && totalPages > 1 && (
+                <div className="pagination">
+                  <button
+                    type="button"
+                    disabled={currentPage === 1}
+                    onClick={() =>
+                      setCurrentPage((page) => Math.max(1, page - 1))
+                    }
+                    aria-label="Previous page"
+                  >
+                    <ArrowLeft size={15} />
+                  </button>
 
-                    <button
-                      type="button"
-                      disabled={
-                        currentPage ===
-                        1
-                      }
-                      onClick={() =>
-                        setCurrentPage(
-                          (page) =>
-                            Math.max(
-                              1,
-                              page - 1
-                            )
-                        )
-                      }
-                    >
-                      <ArrowLeft
-                        size={15}
-                      />
-                    </button>
+                  {Array.from({ length: totalPages }, (_, index) => index + 1).map(
+                    (page) => (
+                      <button
+                        key={page}
+                        type="button"
+                        className={currentPage === page ? "active" : ""}
+                        onClick={() => setCurrentPage(page)}
+                      >
+                        {page}
+                      </button>
+                    )
+                  )}
 
-                    {Array.from(
-                      {
-                        length:
-                          totalPages,
-                      },
-                      (_, index) =>
-                        index + 1
-                    ).map(
-                      (page) => (
-                        <button
-                          key={page}
-                          type="button"
-                          className={
-                            currentPage ===
-                            page
-                              ? "active"
-                              : ""
-                          }
-                          onClick={() =>
-                            setCurrentPage(
-                              page
-                            )
-                          }
-                        >
-                          {page}
-                        </button>
-                      )
-                    )}
-
-                    <button
-                      type="button"
-                      disabled={
-                        currentPage ===
-                        totalPages
-                      }
-                      onClick={() =>
-                        setCurrentPage(
-                          (page) =>
-                            Math.min(
-                              totalPages,
-                              page + 1
-                            )
-                        )
-                      }
-                    >
-                      <ArrowRight
-                        size={15}
-                      />
-                    </button>
-
-                  </div>
-                )}
-
+                  <button
+                    type="button"
+                    disabled={currentPage === totalPages}
+                    onClick={() =>
+                      setCurrentPage((page) => Math.min(totalPages, page + 1))
+                    }
+                    aria-label="Next page"
+                  >
+                    <ArrowRight size={15} />
+                  </button>
+                </div>
+              )}
             </section>
           </div>
         </div>
@@ -1372,7 +950,7 @@ export function Campaigns() {
         }
 
         .campaigns-main {
-          padding: 150px 0 70px;
+          padding: 110px 0 70px;
         }
 
         .campaigns-container {
@@ -1384,6 +962,7 @@ export function Campaigns() {
           display: grid;
           grid-template-columns: 245px minmax(0, 1fr);
           gap: 30px;
+          align-items: start;
         }
 
         /* SIDEBAR */
@@ -1393,30 +972,47 @@ export function Campaigns() {
           border-right: 1px solid #e9e9e9;
         }
 
-        .sidebar-sort-label {
-          margin-bottom: 10px;
+        /* "Sort by:" and "Showing x–y" share one height so the
+           sort button and the first card start on the same line */
+        .sidebar-sort-label,
+        .results-heading {
+          height: 20px;
+          margin: 0 0 12px;
+          display: flex;
+          align-items: center;
           font-size: 12px;
           font-weight: 500;
+          line-height: 1;
         }
 
         .campaign-sort {
           position: relative;
-          margin-bottom: 30px;
+          margin-bottom: 28px;
         }
 
         .campaign-sort-button {
           width: 100%;
-          height: 45px;
+          height: 40px;
           padding: 0 12px;
           display: flex;
           align-items: center;
           justify-content: space-between;
-          border: 0;
-          border-radius: 6px;
-          background: #111;
-          color: #fff;
+          border: 1px solid #ddd;
+          border-radius: 8px;
+          background: #fff;
+          color: #111;
           font: 500 11px Poppins, sans-serif;
           cursor: pointer;
+          transition: border-color .15s ease;
+        }
+
+        .campaign-sort-button:hover {
+          border-color: #aaa;
+        }
+
+        .campaign-sort-button svg {
+          color: #777;
+          transition: transform .15s ease;
         }
 
         .sort-open {
@@ -1433,15 +1029,15 @@ export function Campaigns() {
 
         .campaign-sort-menu {
           position: absolute;
-          top: 51px;
+          top: 46px;
           left: 0;
           right: 0;
           z-index: 20;
           overflow: hidden;
           border: 1px solid #ddd;
-          border-radius: 7px;
+          border-radius: 8px;
           background: #fff;
-          box-shadow: 0 12px 28px rgba(0,0,0,.1);
+          box-shadow: 0 12px 28px rgba(0,0,0,.08);
         }
 
         .sort-option {
@@ -1449,18 +1045,27 @@ export function Campaigns() {
           height: 38px;
           padding: 0 12px;
           border: 0;
-          border-bottom: 1px solid #eee;
+          border-bottom: 1px solid #f0f0f0;
           background: #fff;
           text-align: left;
-          font: 400 10px Poppins, sans-serif;
+          font: 400 11px Poppins, sans-serif;
           color: #555;
           cursor: pointer;
         }
 
-        .sort-option:hover,
-        .sort-option.selected {
-          background: #f5f5f5;
+        .sort-option:last-child {
+          border-bottom: 0;
+        }
+
+        .sort-option:hover {
+          background: #f7f7f7;
           color: #111;
+        }
+
+        .sort-option.selected {
+          background: #f7f7f7;
+          color: #111;
+          font-weight: 600;
         }
 
         .campaign-filter-section {
@@ -1477,13 +1082,14 @@ export function Campaigns() {
           min-height: 28px;
           display: flex;
           align-items: center;
-          gap: 7px;
+          gap: 8px;
           color: #555;
-          font-size: 10.5px;
+          font-size: 11px;
           cursor: pointer;
         }
 
         .radio-row input {
+          flex: 0 0 14px;
           width: 14px;
           height: 14px;
           margin: 0;
@@ -1491,21 +1097,26 @@ export function Campaigns() {
         }
 
         .location-input {
-          height: 37px;
+          height: 40px;
           margin-bottom: 6px;
-          padding: 0 8px;
+          padding: 0 10px;
           display: flex;
           align-items: center;
           gap: 6px;
           border: 1px solid #ddd;
-          border-radius: 5px;
+          border-radius: 8px;
           color: #999;
+        }
+
+        .location-input svg {
+          flex: 0 0 auto;
         }
 
         .location-input input {
           width: 100%;
           border: 0;
           outline: 0;
+          background: transparent;
           font: 400 10px Poppins, sans-serif;
           color: #222;
         }
@@ -1519,11 +1130,13 @@ export function Campaigns() {
 
         .price-inputs input {
           width: 100%;
-          height: 37px;
-          padding: 0 7px;
+          min-width: 0;
+          height: 40px;
+          padding: 0 8px;
           border: 1px solid #ddd;
+          border-radius: 8px;
           outline: 0;
-          font: 400 9px Poppins, sans-serif;
+          font: 400 10px Poppins, sans-serif;
         }
 
         .price-inputs span {
@@ -1533,8 +1146,9 @@ export function Campaigns() {
 
         .clear-filters {
           width: 100%;
-          height: 36px;
+          height: 40px;
           border: 1px solid #111;
+          border-radius: 8px;
           background: #fff;
           color: #111;
           font: 500 10px Poppins, sans-serif;
@@ -1552,28 +1166,18 @@ export function Campaigns() {
           min-width: 0;
         }
 
-        .results-heading {
-          margin-bottom: 17px;
-          font-size: 12px;
-          font-weight: 500;
-        }
-
-        /*
-          IMPORTANT:
-          Two cards per row.
-          This makes each card wider and more rectangular.
-        */
-
         .campaign-grid {
           display: grid;
           grid-template-columns: repeat(2, minmax(0, 1fr));
-          gap: 14px;
+          gap: 16px;
+          align-items: stretch;
         }
 
         /* CARD */
 
         .campaign-card {
           min-width: 0;
+          display: flex;
           border: 1px solid #e0e0e0;
           border-radius: 14px;
           background: #fff;
@@ -1587,7 +1191,11 @@ export function Campaigns() {
         }
 
         .campaign-card-inner {
-          padding: 15px;
+          flex: 1;
+          min-width: 0;
+          display: flex;
+          flex-direction: column;
+          padding: 18px 20px;
         }
 
         .campaign-card-top {
@@ -1595,6 +1203,7 @@ export function Campaigns() {
           align-items: center;
           justify-content: space-between;
           gap: 10px;
+          min-height: 32px;
           margin-bottom: 13px;
         }
 
@@ -1673,22 +1282,25 @@ export function Campaigns() {
           gap: 4px;
         }
 
+        /* budget text starts at the same left edge as the title */
         .campaign-budget-row {
           display: grid;
-          grid-template-columns: 1fr 150px;
+          grid-template-columns: 1fr auto;
           border-top: 1px solid #eee;
           border-bottom: 1px solid #eee;
         }
 
         .campaign-budget-row > div {
           min-height: 58px;
-          padding: 10px 14px;
+          padding: 10px 0;
           display: flex;
           flex-direction: column;
           justify-content: center;
         }
 
         .campaign-duration {
+          min-width: 140px;
+          padding-left: 20px !important;
           border-left: 1px solid #eee;
         }
 
@@ -1710,27 +1322,29 @@ export function Campaigns() {
         }
 
         .campaign-tags {
-          min-height: 24px;
-          margin: 11px 0 6px;
+          margin: 12px 0 4px;
           display: flex;
           flex-wrap: wrap;
-          gap: 5px;
+          gap: 6px;
         }
 
         .campaign-tags span {
-          padding: 4px 8px;
+          display: inline-flex;
+          align-items: center;
+          height: 22px;
+          padding: 0 10px;
           border-radius: 99px;
           background: #f4f4f4;
           color: #555;
-          font-size: 8px;
+          font-size: 9px;
+          line-height: 1;
         }
 
         .campaign-description {
-          min-height: 31px;
-          margin: 4px 0 12px;
+          margin: 8px 0 14px;
           color: #666;
-          font-size: 9.5px;
-          line-height: 1.55;
+          font-size: 10px;
+          line-height: 1.6;
           display: -webkit-box;
           -webkit-box-orient: vertical;
           -webkit-line-clamp: 2;
@@ -1753,10 +1367,13 @@ export function Campaigns() {
           color: #777;
         }
 
+        /* footer and button sit at the bottom so cards in a row line up */
         .campaign-footer {
+          margin-top: auto;
+          padding-top: 4px;
           min-height: 20px;
-          margin-bottom: 10px;
           display: flex;
+          align-items: center;
           justify-content: space-between;
           gap: 8px;
           color: #888;
@@ -1764,6 +1381,7 @@ export function Campaigns() {
         }
 
         .campaign-actions {
+          margin-top: 12px;
           display: grid;
           grid-template-columns: 1.35fr .85fr;
           gap: 7px;
@@ -1889,6 +1507,8 @@ export function Campaigns() {
           cursor: pointer;
         }
 
+        /* RESPONSIVE */
+
         @media (max-width: 950px) {
           .campaign-grid {
             grid-template-columns: 1fr;
@@ -1912,8 +1532,8 @@ export function Campaigns() {
             display: none;
           }
 
-          .campaign-grid {
-            grid-template-columns: 1fr;
+          .campaign-card-inner {
+            padding: 16px;
           }
         }
 
@@ -1923,6 +1543,7 @@ export function Campaigns() {
           }
 
           .campaign-duration {
+            padding-left: 0 !important;
             border-left: 0;
             border-top: 1px solid #eee;
           }
@@ -1970,11 +1591,7 @@ function RadioRow({
 }) {
   return (
     <label className="radio-row">
-      <input
-        type="radio"
-        checked={checked}
-        onChange={onClick}
-      />
+      <input type="radio" checked={checked} onChange={onClick} />
       <span>{label}</span>
     </label>
   );

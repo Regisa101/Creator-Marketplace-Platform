@@ -45,11 +45,21 @@ export function KhaltiPaymentForm({
       // Khalti hosts the checkout. CreatorHub never sees the PIN or OTP.
       window.location.assign(checkout.payment_url);
     } catch (err: any) {
-      setError(
-        err?.response?.data?.detail ||
-          err?.message ||
-          'Could not start Khalti checkout. Please try again.'
-      );
+      const detail = err?.response?.data?.detail;
+      const status = err?.response?.status;
+      let message: string;
+      if (typeof detail === 'string' && detail) {
+        message = detail;
+      } else if (Array.isArray(detail)) {
+        message = detail.map((d: any) => d?.msg || JSON.stringify(d)).join('; ');
+      } else if (!err?.response) {
+        message = 'Could not reach the server. Make sure the backend is running on port 8000.';
+      } else if (status === 502 || status === 503) {
+        message = 'Khalti checkout is unavailable right now. Please try again shortly.';
+      } else {
+        message = err?.message || 'Could not start Khalti checkout. Please try again.';
+      }
+      setError(message);
       setBusy(false);
     }
   };
@@ -274,5 +284,3 @@ export function KhaltiPaymentForm({
     </div>
   );
 }
-
-export default KhaltiPaymentForm;

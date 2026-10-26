@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Link, Navigate } from 'react-router-dom';
+import { Link, Navigate, useNavigate } from 'react-router-dom';
 import {
   Plus,
   ArrowRight,
@@ -42,6 +42,14 @@ type CampaignTab = 'active' | 'drafts' | 'completed';
 
 export function Dashboard() {
   const { user } = useAuth();
+  const navigate = useNavigate();
+
+  // Header search box: pressing Enter opens "My campaigns" filtered by the text.
+  const [searchText, setSearchText] = useState('');
+  const submitSearch = (value: string) => {
+    const q = value.trim();
+    navigate(q ? `/campaigns?search=${encodeURIComponent(q)}` : '/campaigns');
+  };
 
   // Creator accounts no longer have a dashboard. If an old bookmark,
   // login flow, or onboarding flow sends a creator here, take them back to
@@ -202,6 +210,10 @@ export function Dashboard() {
       subtitle="Manage campaigns, review creators and confirm selections."
       showNotifications
       headerActions={headerActions}
+      searchValue={searchText}
+      onSearchChange={setSearchText}
+      onSearchSubmit={submitSearch}
+      searchPlaceholder="Search your campaigns…"
     >
       <style>{`
         /*

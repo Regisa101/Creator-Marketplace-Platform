@@ -117,8 +117,9 @@ export function CampaignBrowse() {
   // searchInput drives the shared AppLayout topbar search box directly
   // (no separate submit step) — typing immediately updates `search`,
   // which the fetch effect below depends on.
-  const [searchInput, setSearchInput] = useState('');
-  const [search, setSearch] = useState('');
+  const initialSearch = (searchParams.get('search') || '').trim();
+  const [searchInput, setSearchInput] = useState(initialSearch);
+  const [search, setSearch] = useState(initialSearch);
 
   const [tab, setTab] = useState<CampaignTabKey>('all');
 

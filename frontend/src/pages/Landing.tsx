@@ -4,7 +4,7 @@
 // Anyone (logged out or in) can land here, browse live campaigns,
 // and discover creator opportunities.
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, type CSSProperties } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { LogoMark } from "../components/Logo";
 import { PublicNavbar } from "../components/PublicNavbar";
@@ -19,7 +19,6 @@ import {
 } from "../api/client";
 
 import {
-  Calendar,
   ArrowRight,
   MapPin,
   Bookmark,
@@ -379,71 +378,40 @@ function CampaignCard({
 }
 
 // ============================================
-// HERO SLIDES
+// HERO CARDS (floating campaigns)
 // ============================================
 
-const HERO_SLIDES = [
-  {
-    image: "https://images.unsplash.com/photo-1500530855697-b586d89ba3ee?auto=format&fit=crop&w=1400&q=90",
-    photoOne: "https://images.unsplash.com/photo-1527631746610-bca00a040d60?auto=format&fit=crop&w=500&q=85",
-    photoTwo: "https://images.unsplash.com/photo-1500534623283-312aade485b7?auto=format&fit=crop&w=500&q=85",
-    alt: "Travel creator creating destination campaign content",
-    creator: "Travelwithsara",
-    followers: "248K followers",
-    creatorImage: "https://images.unsplash.com/photo-1494790108377-be9c29b29330?auto=format&fit=crop&w=160&q=85",
-    brand: "Mountain Gear Co.",
-    category: "Travel Campaign",
-    campaignTitle: "Explore Pokhara",
-    budget: "$300",
-    location: "Pokhara, Nepal",
-    deadline: "Apply by May 20",
-  },
-  {
-    image: "https://images.unsplash.com/photo-1522335789203-aabd1fc54bc9?auto=format&fit=crop&w=1400&q=90",
-    photoOne: "https://images.unsplash.com/photo-1515372039744-b8f02a3ae446?auto=format&fit=crop&w=500&q=85",
-    photoTwo: "https://images.unsplash.com/photo-1525507119028-ed4c629a60a3?auto=format&fit=crop&w=500&q=85",
-    alt: "Beauty creator creating product campaign content",
-    creator: "MayaCreates",
-    followers: "126K followers",
-    creatorImage: "https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=160&q=85",
-    brand: "Glow Studio",
-    category: "Beauty Campaign",
-    campaignTitle: "Everyday Glow",
-    budget: "$200",
-    location: "Kathmandu, Nepal",
-    deadline: "Apply by May 28",
-  },
-  {
-    image: "https://images.unsplash.com/photo-1483985988355-763728e1935b?auto=format&fit=crop&w=1400&q=90",
-    photoOne: "https://images.unsplash.com/photo-1445205170230-053b83016050?auto=format&fit=crop&w=500&q=85",
-    photoTwo: "https://images.unsplash.com/photo-1490481651871-ab68de25d43d?auto=format&fit=crop&w=500&q=85",
-    alt: "Fashion creator making branded campaign content",
-    creator: "StylebyAri",
-    followers: "89K followers",
-    creatorImage: "https://images.unsplash.com/photo-1544005313-94ddf0286df2?auto=format&fit=crop&w=160&q=85",
-    brand: "Urban Thread",
-    category: "Fashion Campaign",
-    campaignTitle: "Weekend Edit",
-    budget: "$250",
-    location: "Lalitpur, Nepal",
-    deadline: "Apply by June 3",
-  },
-  {
-    image: "https://images.unsplash.com/photo-1500530855697-b586d89ba3ee?auto=format&fit=crop&w=1400&q=90",
-    photoOne: "https://images.unsplash.com/photo-1530789253388-582c481c54b0?auto=format&fit=crop&w=500&q=85",
-    photoTwo: "https://images.unsplash.com/photo-1500534623283-312aade485b7?auto=format&fit=crop&w=500&q=85",
-    alt: "Travel creator creating destination campaign content",
-    creator: "WanderwithNia",
-    followers: "172K followers",
-    creatorImage: "https://images.unsplash.com/photo-1524504388940-b1c1722653e1?auto=format&fit=crop&w=160&q=85",
-    brand: "Explore Nepal",
-    category: "Travel Campaign",
-    campaignTitle: "Discover Nepal",
-    budget: "$300",
-    location: "Kathmandu, Nepal",
-    deadline: "Apply by June 10",
-  },
+type HeroCard = {
+  brand: string;
+  title: string;
+  category: string;
+  budget: string;
+  filter?: string; // category filter used by the Apply link
+  pos: "p1" | "p2" | "p3" | "p4" | "p5" | "p6";
+  depth: "back" | "front";
+  rot: string; // resting rotation
+  dy: string; // float distance
+  dr: string; // extra rotation at the float peak
+  dur: string; // float duration
+  delay: string; // negative so cards start out of phase
+  enter: string; // entrance delay
+  feature?: boolean; // the card the arrow points to
+};
+
+const HERO_CARDS: HeroCard[] = [
+  { brand: "Lune", title: "Lifestyle Creator", category: "Lifestyle", budget: "NPR 12,000", filter: "Lifestyle", pos: "p1", depth: "back", rot: "-6deg", dy: "-9px", dr: "1deg", dur: "8.2s", delay: "-1s", enter: ".10s" },
+  { brand: "Bakery", title: "Food Creator", category: "Food", budget: "NPR 6,500", filter: "Food", pos: "p2", depth: "front", rot: "4deg", dy: "-12px", dr: "-1.2deg", dur: "6.8s", delay: "-3s", enter: ".30s" },
+  { brand: "Lune", title: "Beauty Content Creator", category: "Beauty", budget: "NPR 15,000", filter: "Beauty", pos: "p3", depth: "back", rot: "-3deg", dy: "-8px", dr: "1.2deg", dur: "9s", delay: "-5s", enter: ".50s" },
+  { brand: "CreatorHub", title: "UGC Creator", category: "UGC", budget: "NPR 8,000", pos: "p4", depth: "front", rot: "5deg", dy: "-11px", dr: "-1deg", dur: "7.4s", delay: "-2s", enter: ".20s" },
+  { brand: "Skincare Brand", title: "Beauty Creator", category: "Beauty", budget: "NPR 10,000", filter: "Beauty", pos: "p5", depth: "back", rot: "-4deg", dy: "-8px", dr: "1deg", dur: "8.6s", delay: "-4s", enter: ".40s" },
+  { brand: "Fashion Brand", title: "Fashion Creator", category: "Fashion", budget: "NPR 18,000", filter: "Fashion", pos: "p6", depth: "front", rot: "3deg", dy: "-10px", dr: "-1deg", dur: "7.8s", delay: "-1.5s", enter: ".60s", feature: true },
 ];
+
+function heroApplyHref(c: HeroCard) {
+  return c.filter
+    ? `/campaigns?source=landing&category=${encodeURIComponent(c.filter)}`
+    : "/campaigns?source=landing";
+}
 
 // ============================================
 // LANDING PAGE
@@ -464,18 +432,10 @@ export function Landing() {
   // Category pagination.
   const [catPage, setCatPage] = useState(0);
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
-  const [heroSlide, setHeroSlide] = useState(0);
+  const [pointing, setPointing] = useState(false);
   const [howWorksRole, setHowWorksRole] = useState<"creator" | "business">(
     "creator"
   );
-
-  useEffect(() => {
-    const timer = window.setInterval(() => {
-      setHeroSlide((current) => (current + 1) % HERO_SLIDES.length);
-    }, 5500);
-
-    return () => window.clearInterval(timer);
-  }, []);
 
   // ============================================
   // SCROLL TO SECTION WHEN ARRIVING FROM ANOTHER PAGE
@@ -706,7 +666,7 @@ export function Landing() {
   return (
     <div className="lp">
       <style>{`
-        @import url('https://fonts.googleapis.com/css2?family=League+Spartan:wght@300;400;500;600;700;800&family=Poppins:wght@300;400;500;600;700&display=swap');
+        @import url('https://fonts.googleapis.com/css2?family=League+Spartan:wght@300;400;500;600;700;800&family=Poppins:wght@300;400;500;600;700&family=Caveat:wght@600&display=swap');
 
         .lp {
           --content-width: 1304px;
@@ -814,336 +774,355 @@ export function Landing() {
         }
 
         /* ============================================
-           FULL PAGE HERO
+           HERO
         ============================================ */
 
-        .lp-hero {
-          background: var(--hero-bg);
+        .hx {
+          --hx-ink: #111111;
+          --hx-muted: #6d6d68;
+          --hx-line: #e3e1db;
+          --hx-paper: #ffffff;
+          --cw: 252px;
+          position: relative;
+          isolation: isolate;
           min-height: 100vh;
-          display: flex;
-          align-items: center;
-          padding: 60px 0;
           box-sizing: border-box;
-        }
-
-        .lp-hero-inner > div:first-child {
-          width: 100%;
-          max-width: 760px;
-          margin-top: 64px;
-        }
-
-
-        .lp-h1 {
-          font-size: 64px;
-          line-height: 1.02;
-          font-weight: 400;
-          color: #111111;
-          margin: 0 0 22px;
-          letter-spacing: -0.035em;
-          max-width: 760px;
-        }
-
-        .lp-hero-sub {
-          font-size: 17px;
-          color: var(--ink-soft);
-          max-width: 590px;
-          margin: 0 0 30px;
-          line-height: 1.65;
-        }
-
-        .lp-hero-actions {
           display: flex;
-          align-items: center;
-          gap: 12px;
-          margin: 0;
-          flex-wrap: wrap;
-        }
-
-        .lp-hero-btn {
-          min-height: 46px;
-          padding: 0 20px;
-          border-radius: 8px;
-          display: inline-flex;
           align-items: center;
           justify-content: center;
-          gap: 8px;
-          font-size: 13px;
-          font-weight: 500;
-          transition: all .18s ease;
-        }
-
-        .lp-hero-btn-primary {
-          background: #111111;
-          border: 1px solid #111111;
-          color: #ffffff;
-        }
-
-        .lp-hero-btn-primary:hover {
-          background: #000000;
-          border-color: #000000;
-          color: #ffffff !important;
-          transform: translateY(-1px);
-        }
-
-        .lp-hero-btn-secondary {
-          background: #ffffff;
-          border: 1px solid #111111;
-          color: #111111;
-        }
-
-        .lp-hero-btn-secondary:hover {
-          background: #f5f5f5;
-          transform: translateY(-1px);
-        }
-
-        /* ============================================
-           HERO VISUAL / SLIDER
-        ============================================ */
-
-        .lp-hero-inner {
-          display: grid;
-          grid-template-columns: minmax(0, .92fr) minmax(500px, 1.08fr);
-          align-items: center;
-          gap: 62px;
-        }
-
-        .lp-hero-copy {
-          min-width: 0;
-          max-width: 650px;
-        }
-
-        .lp-hero-visual {
-          position: relative;
-          width: 100%;
-          max-width: 650px;
-          height: 520px;
-          margin-left: auto;
-          margin-top: 42px;
-          padding-bottom: 34px;
-          box-sizing: border-box;
-        }
-
-        .lp-hero-art {
-          position: absolute;
-          top: 42px;
-          right: 0;
-          bottom: 34px;
-          left: 0;
-        }
-
-        .lp-hero-art::before {
-          content: "";
-          position: absolute;
-          width: 220px;
-          height: 220px;
-          right: -42px;
-          top: 44px;
-          border-radius: 50%;
-          background: #f1f1f1;
-          z-index: 0;
-        }
-
-        .lp-hero-image-frame {
-          position: absolute;
-          inset: 8px 44px 0 8px;
+          padding: 120px 24px 88px;
+          background: var(--hx-paper);
+          color: var(--hx-ink);
           overflow: hidden;
-          border-radius: 30px;
-          background: #f1f1f1;
-          transform: rotate(-2deg);
-          box-shadow: 0 22px 48px -32px rgba(17,17,17,.35);
-          z-index: 1;
         }
 
-        .lp-hero-slide-image {
+        .hx-copy {
+          position: relative;
+          z-index: 3;
+          max-width: 720px;
+          text-align: center;
+        }
+
+        .hx .hx-h1 {
+          margin: 0 0 24px;
+          font-size: clamp(46px, 6.4vw, 92px);
+          font-weight: 500;
+          line-height: .96;
+          letter-spacing: -0.04em;
+          color: var(--hx-ink);
+        }
+
+        .hx-sub {
+          margin: 0 auto 34px;
+          max-width: 460px;
+          font-size: 16.5px;
+          line-height: 1.65;
+          color: var(--hx-muted);
+        }
+
+        .hx-actions {
+          display: flex;
+          justify-content: center;
+          flex-wrap: wrap;
+          gap: 12px;
+        }
+
+        .hx-btn {
+          min-height: 48px;
+          padding: 0 24px;
+          border-radius: 999px;
+          display: inline-flex;
+          align-items: center;
+          font-size: 14px;
+          font-weight: 500;
+          border: 1px solid var(--hx-ink);
+          transition: transform .18s ease, background .18s ease;
+        }
+
+        .hx-btn:hover { transform: translateY(-1px); }
+        .hx-btn-primary { background: var(--hx-ink); color: #fff; }
+        .hx-btn-primary:hover { background: #000; color: #fff; }
+        .hx-btn-secondary { background: transparent; color: var(--hx-ink); }
+        .hx-btn-secondary:hover { background: #fff; color: var(--hx-ink); }
+
+        /* floating field */
+        .hx-field {
+          position: absolute;
+          inset: 0;
+          width: 100%;
+          max-width: 1480px;
+          margin: 0 auto;
+          pointer-events: none;
+        }
+
+        .hx-slot {
+          position: absolute;
+          width: var(--cw);
+          pointer-events: auto;
+          animation: hx-in .8s cubic-bezier(.2,.7,.2,1) both;
+          animation-delay: var(--in, 0s);
+        }
+
+        .hx-back { z-index: 1; }
+        .hx-front { z-index: 5; }
+        .hx-feature { z-index: 6; }
+
+        .hx-p1 { left: 5%;  top: 17%; }
+        .hx-p2 { left: 11%; top: 47%; }
+        .hx-p3 { left: 2%;  top: 61%; }
+        .hx-p4 { right: 6%; top: 15%; }
+        .hx-p5 { right: 2%; top: 36%; }
+        .hx-p6 { right: 11%; top: 51%; }
+
+        .hx-card {
+          position: relative;
+          box-sizing: border-box;
+          padding: 14px 14px 13px;
+          background: #fff;
+          border: 1px solid var(--hx-line);
+          border-radius: 14px;
+          box-shadow: 0 1px 0 rgba(17,17,17,.03), 0 16px 30px -20px rgba(17,17,17,.3);
+          transform: rotate(var(--rot)) scale(var(--s, 1));
+          animation: hx-float var(--dur) ease-in-out var(--delay) infinite;
+          transition: box-shadow .25s ease, border-color .25s ease;
+        }
+
+        .hx-back .hx-card {
+          --s: .94;
+          box-shadow: 0 1px 0 rgba(17,17,17,.02), 0 10px 22px -18px rgba(17,17,17,.22);
+        }
+
+        .hx-card:hover {
+          animation-play-state: paused;
+          border-color: #cfccc4;
+          box-shadow: 0 22px 36px -20px rgba(17,17,17,.38);
+        }
+
+        .hx-feature .hx-card {
+          border-color: var(--hx-ink);
+          box-shadow: 0 24px 42px -22px rgba(17,17,17,.42);
+        }
+
+        .hx-top {
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          gap: 8px;
+          margin-bottom: 10px;
+        }
+
+        .hx-brand {
+          display: flex;
+          align-items: center;
+          gap: 8px;
+          min-width: 0;
+          font-size: 11.5px;
+          font-weight: 500;
+          color: var(--hx-muted);
+        }
+
+        .hx-brand span:last-child {
+          overflow: hidden;
+          text-overflow: ellipsis;
+          white-space: nowrap;
+        }
+
+        .hx-av {
+          flex: 0 0 22px;
+          width: 22px;
+          height: 22px;
+          border-radius: 7px;
+          display: grid;
+          place-items: center;
+          background: var(--hx-ink);
+          color: #fff;
+          font-size: 9px;
+          font-weight: 500;
+        }
+
+        .hx-tag {
+          flex-shrink: 0;
+          padding: 3px 8px;
+          border-radius: 999px;
+          background: #f1f0ec;
+          color: #55554f;
+          font-size: 10px;
+          line-height: 1.2;
+        }
+
+        .hx .hx-title {
+          margin: 0 0 13px;
+          font-size: 18px;
+          font-weight: 500;
+          line-height: 1.12;
+          letter-spacing: -0.02em;
+          color: var(--hx-ink);
+        }
+
+        .hx-foot {
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          gap: 10px;
+        }
+
+        .hx-budget { font-size: 12px; font-weight: 500; color: var(--hx-ink); }
+
+        .hx-apply {
+          min-height: 30px;
+          padding: 0 15px;
+          border-radius: 999px;
+          display: inline-flex;
+          align-items: center;
+          background: var(--hx-ink);
+          color: #fff;
+          font-size: 12px;
+          font-weight: 500;
+          transition: transform .18s ease, background .18s ease;
+        }
+
+        .hx-apply:hover,
+        .hx-apply:focus-visible {
+          background: #000;
+          color: #fff;
+          transform: translateY(-1px) scale(1.06);
+        }
+
+        .hx-apply:focus-visible { outline: 2px solid var(--hx-ink); outline-offset: 3px; }
+        .hx-feature .hx-apply { animation: hx-ring 3.2s ease-out 4s infinite; }
+
+        /* hand-drawn pointer */
+        .hx-pointer {
+          position: absolute;
+          right: 25px;
+          top: calc(100% - 22px);
+          width: 190px;
+          height: 130px;
+          pointer-events: none;
+          z-index: 2;
+        }
+
+        .hx-pointer svg {
           position: absolute;
           inset: 0;
           width: 100%;
           height: 100%;
-          object-fit: cover;
-          display: block;
-          transition: opacity .4s ease, transform .55s ease;
+          overflow: visible;
+          transition: transform .3s cubic-bezier(.2,.8,.2,1);
         }
 
-        .lp-hero-slide-image.is-hidden {
+        .hx-pointer.is-pointing svg { transform: translate(4px, -8px); }
+        .hx-pointer.is-pointing .hx-arrow-g { animation-play-state: paused; }
+        .hx-arrow-g { animation: hx-nudge 2.8s ease-in-out 3.8s infinite alternate; }
+
+        .hx-draw {
+          fill: none;
+          stroke: var(--hx-ink);
+          stroke-width: 2.4;
+          stroke-linecap: round;
+          stroke-linejoin: round;
+          stroke-dasharray: 1;
+          stroke-dashoffset: 1;
           opacity: 0;
-          transform: scale(1.035);
-          pointer-events: none;
+          animation: hx-draw 1.2s cubic-bezier(.5,0,.2,1) 2s forwards;
         }
 
-        .lp-hero-slide-image.is-visible {
-          opacity: 1;
-          transform: scale(1);
-        }
+        .hx-draw-head { animation-duration: .4s; animation-delay: 3.15s; }
 
-        .lp-hero-image-shade {
+        .hx-note {
           position: absolute;
-          inset: 0;
-          background: linear-gradient(180deg, rgba(0,0,0,0) 48%, rgba(0,0,0,.22) 100%);
-          pointer-events: none;
-        }
-
-        .lp-hero-creator-chip {
-          position: absolute;
-          top: 0;
-          left: 28px;
-          z-index: 5;
-          display: flex;
-          align-items: center;
-          gap: 10px;
-          padding: 8px 18px 8px 8px;
-          border-radius: 999px;
-          background: #ffffff;
-          box-shadow: 0 12px 30px -20px rgba(17,17,17,.35);
-        }
-
-        .lp-hero-creator-avatar {
-          width: 42px;
-          height: 42px;
-          border-radius: 50%;
-          object-fit: cover;
-          display: block;
-        }
-
-        .lp-hero-creator-name {
-          font-size: 12px;
-          font-weight: 400;
-          color: #111111;
-          line-height: 1.25;
-        }
-
-        .lp-hero-creator-followers {
-          margin-top: 2px;
-          font-size: 10px;
-          color: #777777;
-        }
-
-        .lp-hero-polaroid {
-          position: absolute;
-          z-index: 4;
-          width: 128px;
-          padding: 7px 7px 16px;
-          background: #ffffff;
-          box-shadow: 0 18px 34px -24px rgba(17,17,17,.42);
-        }
-
-        .lp-hero-polaroid img {
-          width: 100%;
-          height: 126px;
-          object-fit: cover;
-          display: block;
-        }
-
-        .lp-hero-polaroid-one {
-          right: -2px;
-          top: 122px;
-          transform: rotate(-9deg);
-        }
-
-        .lp-hero-polaroid-two {
-          right: 12px;
-          bottom: 32px;
-          transform: rotate(8deg);
-        }
-
-        .lp-hero-campaign-card {
-          position: absolute;
-          left: 18px;
-          bottom: 18px;
-          width: min(410px, calc(100% - 90px));
-          padding: 20px 22px;
-          border-radius: 20px;
-          background: rgba(255,255,255,.98);
-          box-shadow: 0 20px 44px -22px rgba(17,17,17,.32);
-          z-index: 6;
-          box-sizing: border-box;
-        }
-
-        .lp-hero-campaign-brand {
-          font-size: 11.5px;
-          font-weight: 400;
-          color: #666666;
-          margin-bottom: 5px;
-        }
-
-        .lp-hero-campaign-title {
-          font-family: 'League Spartan', sans-serif;
-          font-size: 24px;
-          font-weight: 400;
-          color: #111111;
-          margin: 0 0 12px;
-        }
-
-        .lp-hero-campaign-meta {
-          display: flex;
-          align-items: center;
-          gap: 12px;
-          flex-wrap: wrap;
-          font-size: 11px;
-          color: #666666;
-        }
-
-        .lp-hero-campaign-meta-item {
-          display: inline-flex;
-          align-items: center;
-          gap: 5px;
+          left: -40px;
+          top: 98px;
+          font-family: 'Poppins', sans-serif;
+          font-size: 15px;
+          font-weight: 500;
+          line-height: 1;
           white-space: nowrap;
+          color: var(--hx-ink);
+          transform: rotate(-5deg);
+          clip-path: inset(-6px 100% -6px 0);
+          animation: hx-write 1s cubic-bezier(.4,0,.2,1) 1.2s forwards;
         }
 
-        .lp-hero-campaign-meta-item svg {
-          flex-shrink: 0;
-          color: #555555;
+        @keyframes hx-in {
+          from { opacity: 0; transform: translateY(18px); }
+          to   { opacity: 1; transform: none; }
         }
 
-        .lp-hero-campaign-budget {
-          font-weight: 400;
-          color: #111111;
+        @keyframes hx-float {
+          0%, 100% { transform: translate3d(0,0,0) rotate(var(--rot)) scale(var(--s, 1)); }
+          50%      { transform: translate3d(0,var(--dy),0) rotate(calc(var(--rot) + var(--dr))) scale(var(--s, 1)); }
         }
 
-        .lp-hero-dots {
-          position: absolute;
-          left: 50%;
-          bottom: -2px;
-          transform: translateX(-50%);
-          display: flex;
-          align-items: center;
-          gap: 8px;
-          z-index: 8;
+        @keyframes hx-draw {
+          from { opacity: 1; stroke-dashoffset: 1; }
+          to   { opacity: 1; stroke-dashoffset: 0; }
         }
 
-        .lp-hero-dot {
-          width: 40px;
-          height: 4px;
-          min-width: 40px;
-          padding: 0;
-          border: 0;
-          border-radius: 999px;
-          background: #dedede !important;
-          appearance: none;
-          -webkit-appearance: none;
-          cursor: pointer;
-          transition: background .18s ease, transform .18s ease;
+        @keyframes hx-write {
+          to { clip-path: inset(-6px -6px -6px -6px); }
         }
 
-        .lp-hero-dot:hover {
-          background: #dedede !important;
-          transform: scaleX(1.04);
+        @keyframes hx-nudge {
+          from { transform: translate(0, 0); }
+          to   { transform: translate(3px, -5px); }
         }
 
-        .lp-hero-dot.is-active,
-        .lp-hero-dot.is-active:hover {
-          background: #111111 !important;
+        @keyframes hx-ring {
+          0%   { box-shadow: 0 0 0 0 rgba(17,17,17,.28); }
+          60%, 100% { box-shadow: 0 0 0 10px rgba(17,17,17,0); }
         }
 
-        .lp-hero-dot:focus-visible {
-          outline: 2px solid #111111;
-          outline-offset: 4px;
+        @media (max-width: 1200px) {
+          .hx { --cw: 222px; }
+          .hx-p3, .hx-p5 { display: none; }
+          .hx-p1 { left: 3%; }
+          .hx-p2 { left: 4%; top: 50%; }
+          .hx-p4 { right: 3%; }
+          .hx-p6 { right: 4%; }
+        }
+
+        @media (max-width: 900px) {
+          .hx {
+            --cw: 200px;
+            display: block;
+            min-height: 0;
+            padding: 104px 20px 56px;
+          }
+
+          .hx-field {
+            position: relative;
+            inset: auto;
+            height: 540px;
+            max-width: 560px;
+            margin-top: 40px;
+          }
+
+          .hx-p1 { left: 0; top: 0; }
+          .hx-p4 { right: 0; top: 36px; }
+          .hx-p2 { left: 4%; top: 130px; }
+          .hx-p6 { right: 2%; top: 250px; }
+          .hx-pointer { transform: scale(.85); transform-origin: 100% 0; }
+        }
+
+        @media (max-width: 480px) {
+          .hx { --cw: 176px; }
+          .hx .hx-h1 { font-size: 42px; }
+          .hx-sub { font-size: 15px; }
+          .hx .hx-title { font-size: 16px; }
+          .hx-tag { display: none; }
+        }
+
+        @media (prefers-reduced-motion: reduce) {
+          .hx-slot, .hx-card, .hx-arrow-g, .hx-feature .hx-apply { animation: none; }
+          .hx-draw { animation: none; opacity: 1; stroke-dashoffset: 0; }
+          .hx-note { animation: none; clip-path: none; }
         }
 
         /* ============================================
            SHARED CONTENT ALIGNMENT
         ============================================ */
         .lp-container,
-        .lp-hero-inner,
         .lp-cat-section,
         .lp-how-inner,
         .lp-footer-inner {
@@ -2416,28 +2395,6 @@ export function Landing() {
             max-width: none;
           }
 
-          .lp-hero {
-            min-height: 100vh;
-            padding: 56px 0;
-          }
-
-          .lp-hero-inner {
-            grid-template-columns: minmax(0, .9fr) minmax(390px, 1.1fr);
-            gap: 42px;
-          }
-
-          .lp-hero-copy {
-            max-width: 600px;
-          }
-
-          .lp-hero-visual {
-            height: 430px;
-          }
-
-          .lp-h1 {
-            font-size: 54px;
-          }
-
           .lp-why-left {
             padding-right: 36px;
           }
@@ -2529,88 +2486,6 @@ export function Landing() {
             padding-left: 0;
           }
 
-          .lp-hero {
-            min-height: 100vh;
-            padding: 48px 0;
-          }
-
-          .lp-hero-inner {
-            display: flex;
-            flex-direction: column;
-            align-items: stretch;
-            gap: 46px;
-          }
-
-          .lp-hero-inner > div:first-child {
-            margin-top: 32px;
-          }
-
-          .lp-hero-copy {
-            max-width: none;
-          }
-
-          .lp-hero-visual {
-            height: 430px;
-            max-width: none;
-            margin: 0;
-          }
-
-          .lp-hero-image-frame {
-            inset: 8px 38px 0 4px;
-          }
-
-          .lp-hero-campaign-card {
-            left: 12px;
-            bottom: 14px;
-            width: min(350px, calc(100% - 70px));
-            padding: 17px 18px;
-          }
-
-          .lp-hero-polaroid {
-            width: 96px;
-            padding: 5px 5px 11px;
-          }
-
-          .lp-hero-polaroid img {
-            height: 94px;
-          }
-
-          .lp-hero-polaroid-one {
-            right: 0;
-            top: 92px;
-          }
-
-          .lp-hero-polaroid-two {
-            right: 12px;
-            bottom: 24px;
-          }
-
-          .lp-hero-creator-chip {
-            left: 16px;
-          }
-
-          .lp-hero-dots {
-            bottom: -2px;
-          }
-
-          .lp-h1 {
-            font-size: 42px;
-            line-height: 1.05;
-          }
-
-          .lp-hero-sub {
-            font-size: 15px;
-          }
-
-          .lp-hero-actions {
-            gap: 10px;
-          }
-
-          .lp-hero-btn {
-            min-height: 42px;
-            padding: 0 15px;
-          }
-
           .lp-brand-cta-inner {
             min-height: 0;
             padding: 34px 18px;
@@ -2631,23 +2506,6 @@ export function Landing() {
             --heading-size: 26px;
           }
 
-          .lp-hero-visual {
-            height: 330px;
-          }
-
-          .lp-hero-campaign-card {
-            padding: 15px 16px;
-          }
-
-          .lp-hero-campaign-title {
-            font-size: 19px;
-          }
-
-          .lp-hero-dot {
-            width: 30px;
-            min-width: 30px;
-          }
-
           .lp-grid {
             grid-template-columns: 1fr;
           }
@@ -2658,10 +2516,6 @@ export function Landing() {
 
           .lp-card {
             min-height: 0;
-          }
-
-          .lp-h1 {
-            font-size: 36px;
           }
 
           .lp-how-toggle-btn {
@@ -2726,101 +2580,104 @@ export function Landing() {
           HERO
       ============================================ */}
 
-      <section className="lp-hero" id="home">
-        <div className="lp-hero-inner">
-          <div className="lp-hero-copy">
-            <h1 className="lp-h1">
-              Where Brands Meet Creators
-            </h1>
-
-            <p className="lp-hero-sub">
-              Discover paid creator campaigns from businesses and turn your content skills into real collaboration opportunities.
-            </p>
-
-            <div className="lp-hero-actions">
-              <Link
-                to="/campaigns?source=landing"
-                className="lp-hero-btn lp-hero-btn-primary"
+      <section className="hx" id="home">
+        <div className="hx-field" role="group" aria-label="Featured campaigns">
+          {HERO_CARDS.map((c) => (
+            <div
+              key={`${c.brand}-${c.title}`}
+              className={`hx-slot hx-${c.pos} ${c.depth === "back" ? "hx-back" : "hx-front"}${
+                c.feature ? " hx-feature" : ""
+              }`}
+              style={{ "--in": c.enter } as CSSProperties}
+            >
+              <article
+                className="hx-card"
+                style={
+                  {
+                    "--rot": c.rot,
+                    "--dy": c.dy,
+                    "--dr": c.dr,
+                    "--dur": c.dur,
+                    "--delay": c.delay,
+                  } as CSSProperties
+                }
               >
-                Explore Campaigns
-                <ArrowRight size={15} />
-              </Link>
-
-              <Link
-                to="/register/business"
-                className="lp-hero-btn lp-hero-btn-secondary"
-              >
-                Post a Campaign
-                <ArrowRight size={15} />
-              </Link>
-            </div>
-          </div>
-
-          <div className="lp-hero-visual" aria-label="Featured creator campaigns">
-            <div className="lp-hero-art">
-              <div className="lp-hero-image-frame">
-                {HERO_SLIDES.map((slide, index) => (
-                  <img
-                    key={`${slide.category}-${index}`}
-                    className={`lp-hero-slide-image ${index === heroSlide ? "is-visible" : "is-hidden"}`}
-                    src={slide.image}
-                    alt={slide.alt}
-                  />
-                ))}
-                <span className="lp-hero-image-shade" aria-hidden="true" />
-              </div>
-
-              <div className="lp-hero-creator-chip">
-                <img
-                  className="lp-hero-creator-avatar"
-                  src={HERO_SLIDES[heroSlide].creatorImage}
-                  alt=""
-                />
-                <div>
-                  <div className="lp-hero-creator-name">{HERO_SLIDES[heroSlide].creator}</div>
-                  <div className="lp-hero-creator-followers">{HERO_SLIDES[heroSlide].followers}</div>
+                <div className="hx-top">
+                  <div className="hx-brand">
+                    <span className="hx-av">{initials(c.brand)}</span>
+                    <span>{c.brand}</span>
+                  </div>
+                  <span className="hx-tag">{c.category}</span>
                 </div>
-              </div>
 
-              <div className="lp-hero-polaroid lp-hero-polaroid-one" aria-hidden="true">
-                <img src={HERO_SLIDES[heroSlide].photoOne} alt="" />
-              </div>
+                <h3 className="hx-title">{c.title}</h3>
 
-              <div className="lp-hero-polaroid lp-hero-polaroid-two" aria-hidden="true">
-                <img src={HERO_SLIDES[heroSlide].photoTwo} alt="" />
-              </div>
-
-              <div className="lp-hero-campaign-card">
-                <div className="lp-hero-campaign-brand">{HERO_SLIDES[heroSlide].brand}</div>
-                <h2 className="lp-hero-campaign-title">{HERO_SLIDES[heroSlide].campaignTitle}</h2>
-                <div className="lp-hero-campaign-meta">
-                  <span className="lp-hero-campaign-meta-item lp-hero-campaign-budget">
-                    {HERO_SLIDES[heroSlide].budget}
-                  </span>
-                  <span className="lp-hero-campaign-meta-item">
-                    <MapPin size={13} />
-                    {HERO_SLIDES[heroSlide].location}
-                  </span>
-                  <span className="lp-hero-campaign-meta-item">
-                    <Calendar size={13} />
-                    {HERO_SLIDES[heroSlide].deadline}
-                  </span>
+                <div className="hx-foot">
+                  <span className="hx-budget">{c.budget}</span>
+                  <Link
+                    to={heroApplyHref(c)}
+                    className="hx-apply"
+                    aria-label={`Apply to ${c.brand} ${c.title} campaigns`}
+                    {...(c.feature
+                      ? {
+                          onMouseEnter: () => setPointing(true),
+                          onMouseLeave: () => setPointing(false),
+                          onFocus: () => setPointing(true),
+                          onBlur: () => setPointing(false),
+                        }
+                      : {})}
+                  >
+                    Apply
+                  </Link>
                 </div>
-              </div>
-            </div>
 
-            <div className="lp-hero-dots" aria-label="Featured campaign slides">
-              {HERO_SLIDES.map((slide, index) => (
-                <button
-                  key={`${slide.category}-${index}`}
-                  type="button"
-                  className={`lp-hero-dot ${index === heroSlide ? "is-active" : ""}`}
-                  onClick={() => setHeroSlide(index)}
-                  aria-label={`Show ${slide.category}`}
-                  aria-current={index === heroSlide ? "true" : undefined}
-                />
-              ))}
+                {c.feature && (
+                  <div
+                    className={`hx-pointer${pointing ? " is-pointing" : ""}`}
+                    aria-hidden="true"
+                  >
+                    <span className="hx-note">Found one? Apply.</span>
+                    <svg viewBox="0 0 190 130">
+                      <g className="hx-arrow-g">
+                        <path
+                          className="hx-draw"
+                          pathLength={1}
+                          d="M 92 114 C 112 128, 150 120, 156 80 C 160 58, 166 40, 170 22"
+                        />
+                        <path
+                          className="hx-draw hx-draw-head"
+                          pathLength={1}
+                          d="M 156 39 C 162 33, 167 27, 170 20 C 172 27, 174 36, 173 44"
+                        />
+                      </g>
+                    </svg>
+                  </div>
+                )}
+              </article>
             </div>
+          ))}
+        </div>
+
+        <div className="hx-copy">
+          <h1 className="hx-h1">
+            Where Brands
+            <br />
+            Meet Creators
+          </h1>
+
+          <p className="hx-sub">
+            Discover paid creator campaigns from businesses and turn your content
+            skills into real collaboration opportunities.
+          </p>
+
+          <div className="hx-actions">
+            <Link to="/campaigns?source=landing" className="hx-btn hx-btn-primary">
+              Explore Campaigns
+            </Link>
+
+            <Link to="/register/business" className="hx-btn hx-btn-secondary">
+              Post a Campaign
+            </Link>
           </div>
         </div>
       </section>

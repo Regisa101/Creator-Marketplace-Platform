@@ -390,8 +390,11 @@ export function AppLayout({
    * The brand receives collaboration_completed; the creator receives
    * payment_released after the brand approves all deliverables.
    */
+  // Set to true to bring back the "payment successful" popup on the dashboard.
+  const SHOW_PAYMENT_POPUP = false;
+
   useEffect(() => {
-    if (!role) return;
+    if (!role || !SHOW_PAYMENT_POPUP) return;
 
     let mounted = true;
 
@@ -1116,37 +1119,6 @@ export function AppLayout({
           min-width: 0;
         }
 
-        .app-topbar-menu {
-          display: flex;
-          align-items: center;
-          gap: 6px;
-          flex-wrap: wrap;
-        }
-
-        .app-topbar-menu-link {
-          padding: 7px 13px;
-          border-radius: 8px;
-          font: 400 13px Poppins, sans-serif;
-          color: #555;
-          text-decoration: none;
-          white-space: nowrap;
-        }
-
-        .app-topbar-menu-link:hover {
-          background: #f4f4f5;
-          color: #111;
-        }
-
-        .app-topbar-menu-link.active {
-          background: #f1f1f2;
-          color: #111;
-          font-weight: 500;
-        }
-
-        @media (max-width: 760px) {
-          .app-topbar-menu { display: none; }
-        }
-
         .app-topbar-actions {
           display: flex;
 
@@ -1668,26 +1640,6 @@ export function AppLayout({
                   />
 
                 </label>
-              )}
-
-              {/* Pages without a search box get menu links instead (brands only). */}
-              {!showSearch && role === "business" && !isAdmin && (
-                <nav className="app-topbar-menu" aria-label="Main menu">
-                  {nav.map((item) => (
-                    <Link
-                      key={item.to + item.label}
-                      to={item.to}
-                      className={`app-topbar-menu-link${
-                        location.pathname === item.to ||
-                        (item.to !== "/dashboard" && location.pathname.startsWith(item.to + "/"))
-                          ? " active"
-                          : ""
-                      }`}
-                    >
-                      {item.label}
-                    </Link>
-                  ))}
-                </nav>
               )}
             </div>
 

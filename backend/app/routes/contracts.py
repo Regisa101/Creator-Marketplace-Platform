@@ -19,7 +19,7 @@ from app.schemas.contract import (
 )
 from app.services.notifications import create_notification
 from app.services.pricing import PLATFORM_FEE_RATE, campaign_fee_rate, platform_fee_for, resolve_campaign_rate, total_for_rate
-from app.services.khalti import initiate_payment, KhaltiError
+from app.services.khalti import initiate_payment, is_configured, KhaltiError, MIN_AMOUNT_NPR
 from app.core.config import FRONTEND_URL
 
 router = APIRouter(prefix="/api/contracts", tags=["Contracts"])
@@ -243,14 +243,32 @@ async def initiate_contract_fee_checkout(
     if not contract.platform_fee_amount or float(contract.platform_fee_amount) <= 0:
         raise HTTPException(status_code=400, detail="Finalize the contract value before paying the service fee.")
 
+    fee_amount = round(float(contract.platform_fee_amount), 2)
+
+    # Fail fast, BEFORE creating a Payment row, so a misconfigured server or a
+    # too-small fee does not leave a new "failed" payment on every click.
+    if not is_configured():
+        raise HTTPException(
+            status_code=503,
+            detail=(
+                "Payments are not set up on the server: KHALTI_SECRET_KEY is missing in "
+                "backend/.env. Add it and restart the backend."
+            ),
+        )
+    if fee_amount < MIN_AMOUNT_NPR:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Khalti requires a payment of at least NPR {MIN_AMOUNT_NPR}. This service fee is NPR {fee_amount:g}.",
+        )
+
     purchase_order_id = f"CH-FEE-{contract.id}-{uuid.uuid4().hex[:10].upper()}"
     payment = Payment(
         application_id=contract.application_id,
         campaign_id=contract.campaign_id,
         payment_type="platform_fee",
         purchase_order_id=purchase_order_id,
-        amount=round(float(contract.platform_fee_amount), 2),
-        platform_fee=round(float(contract.platform_fee_amount), 2),
+        amount=fee_amount,
+        platform_fee=fee_amount,
         creator_payout=0,
         currency="NPR",
         status="initiated",
@@ -269,12 +287,13 @@ async def initiate_contract_fee_checkout(
     profile = current_user.profile or {}
     customer_name = profile.get("company_name") or current_user.full_name
     customer_email = getattr(current_user, "email", None)
+    campaign_title = contract.campaign.title if contract.campaign else "Campaign"
 
     try:
         checkout = await initiate_payment(
             amount_npr=float(payment.amount),
             purchase_order_id=purchase_order_id,
-            purchase_order_name=f"CreatorHub service fee - {contract.campaign.title if contract.campaign else 'Campaign'}",
+            purchase_order_name=f"CreatorHub service fee - {campaign_title}",
             return_url=f"{FRONTEND_URL}/payments/return",
             website_url=FRONTEND_URL,
             customer_name=customer_name,
@@ -282,12 +301,12 @@ async def initiate_contract_fee_checkout(
         )
     except KhaltiError as exc:
         payment.status = "failed"
-        details = payment.payment_details if isinstance(payment.payment_details, dict) else {}
+        details = dict(payment.payment_details) if isinstance(payment.payment_details, dict) else {}
         details["initiation_error"] = exc.detail or str(exc)
         payment.payment_details = details
         db.commit()
         raise HTTPException(
-            status_code=502,
+            status_code=exc.status_code,
             detail=exc.detail or "Could not start Khalti checkout. Check the Khalti merchant configuration.",
         )
 
@@ -299,11 +318,8 @@ async def initiate_contract_fee_checkout(
         raise HTTPException(status_code=502, detail="Khalti did not return a valid checkout session.")
 
     payment.pidx = pidx
-    details = payment.payment_details if isinstance(payment.payment_details, dict) else {}
-    details.update({
-        "provider": "khalti",
-        "checkout_created": True,
-    })
+    details = dict(payment.payment_details) if isinstance(payment.payment_details, dict) else {}
+    details.update({"provider": "khalti", "checkout_created": True})
     payment.payment_details = details
     db.commit()
 
@@ -315,6 +331,7 @@ async def initiate_contract_fee_checkout(
         "transaction_id": None,
         "contract": _response(contract),
     }
+
 
 @router.post("/{contract_id}/pay-fee", response_model=ContractResponse)
 async def pay_platform_fee_legacy(

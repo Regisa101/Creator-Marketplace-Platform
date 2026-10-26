@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import {
   ArrowLeft,
@@ -94,17 +94,32 @@ function Row({ label, value }: { label: string; value?: React.ReactNode }) {
   );
 }
 
-/* Creators use the landing page navbar; brands keep the dashboard layout. */
-function DetailShell({ isCreator, children }: { isCreator: boolean; children: React.ReactNode }) {
+/* Creators use the landing page navbar; brands keep the dashboard layout
+   (with a search box in the header instead of menu links). */
+function DetailShell({
+  isCreator,
+  searchValue,
+  onSearchChange,
+  children,
+}: {
+  isCreator: boolean;
+  searchValue: string;
+  onSearchChange: (value: string) => void;
+  children: React.ReactNode;
+}) {
   if (!isCreator) {
     return (
       <AppLayout
         title="Contract details"
         subtitle="Campaign, terms and payment for this collaboration."
         showNotifications
-        showSearch={false}
+        showSearch
+        searchValue={searchValue}
+        onSearchChange={onSearchChange}
+        searchPlaceholder="Search this contract…"
       >
-        {children}
+        {/* 24px side padding lines the content up with the header title */}
+        <div style={{ padding: '0 24px' }}>{children}</div>
       </AppLayout>
     );
   }
@@ -135,6 +150,11 @@ export function ContractDetail() {
   const [reportOpen, setReportOpen] = useState(false);
   const [completing, setCompleting] = useState(false);
   const [actionError, setActionError] = useState('');
+
+  // Header search box: hides the cards that do not contain the typed text.
+  const [query, setQuery] = useState('');
+  const [noMatch, setNoMatch] = useState(false);
+  const pageRef = useRef<HTMLDivElement>(null);
 
   // Profile pictures + live campaign details (fallback for old contracts
   // that have no saved snapshot).
@@ -209,6 +229,21 @@ export function ContractDetail() {
     };
   }, [contract?.id, contract?.evidence_snapshot?.campaign, user?.role]);
 
+  // Apply the header search: show only the cards containing the typed text.
+  useEffect(() => {
+    const root = pageRef.current;
+    if (!root) return;
+    const needle = query.trim().toLowerCase();
+    const cards = Array.from(root.querySelectorAll<HTMLElement>('.cdt-card'));
+    let visible = 0;
+    cards.forEach((card) => {
+      const match = !needle || (card.textContent || '').toLowerCase().includes(needle);
+      card.style.display = match ? '' : 'none';
+      if (match) visible += 1;
+    });
+    setNoMatch(Boolean(needle) && cards.length > 0 && visible === 0);
+  }, [query, loading, contract, liveCampaign, confirmComplete]);
+
   const handleComplete = async () => {
     if (!contract) return;
     setCompleting(true);
@@ -266,10 +301,10 @@ export function ContractDetail() {
     : [];
 
   return (
-    <DetailShell isCreator={isCreator}>
+    <DetailShell isCreator={isCreator} searchValue={query} onSearchChange={setQuery}>
       <style>{`
         .cdt-page{max-width:none;margin:0;padding:0 0 50px;color:#111;font-family:Poppins,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}
-        .cdt-back{display:inline-flex;align-items:center;gap:6px;margin-bottom:14px;color:#555;font:500 12px Poppins,sans-serif;text-decoration:none}
+        .cdt-back{display:inline-flex;align-items:center;gap:6px;margin:4px 0 14px;color:#555;font:500 12px Poppins,sans-serif;text-decoration:none}
         .cdt-back:hover{color:#111}
         a.cdt-avatar{text-decoration:none;color:inherit}
         .cdt-state{padding:56px 20px;text-align:center;color:#777;font:500 13px Poppins,sans-serif;background:#fff;border:1px solid #e5e5e5;border-radius:12px}
@@ -277,7 +312,7 @@ export function ContractDetail() {
         .cdt-state p{margin:0 0 16px}
         .cdt-spin{animation:cdt-spin .8s linear infinite}@keyframes cdt-spin{to{transform:rotate(360deg)}}
 
-        .cdt-head{display:flex;gap:16px;align-items:center;justify-content:space-between;flex-wrap:wrap;padding:16px 18px;background:#fff;border:1px solid #e5e5e5;border-radius:12px;margin-bottom:14px}
+        .cdt-head{display:flex;gap:16px;align-items:center;justify-content:space-between;flex-wrap:wrap;padding:16px 20px;background:#fff;border:1px solid #e5e5e5;border-radius:12px;margin-bottom:14px}
         .cdt-head-main{display:flex;align-items:center;gap:14px;min-width:0}
         .cdt-thumb{width:56px;height:56px;border-radius:10px;overflow:hidden;background:#f3f3f3;flex:none;display:flex;align-items:center;justify-content:center;color:#aaa}
         .cdt-thumb img{width:100%;height:100%;object-fit:cover}
@@ -291,9 +326,9 @@ export function ContractDetail() {
 
         .cdt-grid{display:grid;grid-template-columns:minmax(0,1.5fr) minmax(0,1fr);gap:14px;align-items:start}
         .cdt-col{display:flex;flex-direction:column;gap:14px;min-width:0}
-        .cdt-card{background:#fff;border:1px solid #e5e5e5;border-radius:12px;padding:16px 18px}
-        .cdt-card h2{margin:0 0 12px;font:600 11px Poppins,sans-serif;color:#888;text-transform:uppercase;letter-spacing:.08em}
-        .cdt-row{display:flex;justify-content:space-between;gap:16px;padding:8px 0;border-bottom:1px solid #f0f0f0;font:400 12.5px Poppins,sans-serif}
+        .cdt-card{background:#fff;border:1px solid #e5e5e5;border-radius:12px;padding:18px 20px}
+        .cdt-card h2{margin:0 0 10px;font:600 11px Poppins,sans-serif;color:#888;text-transform:uppercase;letter-spacing:.08em}
+        .cdt-row{display:flex;align-items:flex-start;justify-content:space-between;gap:16px;padding:9px 0;border-bottom:1px solid #f0f0f0;font:400 12.5px Poppins,sans-serif}
         .cdt-row:last-child{border-bottom:0}
         .cdt-row span{color:#777;flex:none}
         .cdt-row strong{font-weight:500;color:#111;text-align:right;min-width:0;overflow-wrap:anywhere}
@@ -301,7 +336,8 @@ export function ContractDetail() {
         .cdt-list{margin:0;padding-left:18px;font:400 12.5px/1.7 Poppins,sans-serif;color:#444}
         .cdt-link{display:inline-flex;align-items:center;gap:5px;color:#111;font:500 12px Poppins,sans-serif;text-decoration:underline;text-underline-offset:3px}
 
-        .cdt-party{display:flex;align-items:center;gap:10px;padding:8px 0}
+        .cdt-party{display:flex;align-items:center;gap:12px;padding:10px 0}
+        .cdt-party>div{min-width:0}
         .cdt-party+.cdt-party{border-top:1px solid #f0f0f0}
         .cdt-avatar{width:36px;height:36px;border-radius:50%;background:#111;color:#fff;display:flex;align-items:center;justify-content:center;font:600 12px Poppins,sans-serif;flex:none;overflow:hidden}
         .cdt-avatar img{width:100%;height:100%;object-fit:cover}
@@ -317,7 +353,7 @@ export function ContractDetail() {
         .cdt-fee.unpaid{background:#fff6e5;color:#9a6a08}
 
         .cdt-timeline{list-style:none;margin:0;padding:0}
-        .cdt-timeline li{display:flex;gap:10px;padding:0 0 14px 0;font:400 12.5px Poppins,sans-serif;color:#aaa}
+        .cdt-timeline li{display:flex;align-items:flex-start;gap:12px;padding:0 0 14px 0;font:400 12.5px Poppins,sans-serif;color:#aaa}
         .cdt-timeline li:last-child{padding-bottom:0}
         .cdt-dot{width:18px;height:18px;border-radius:50%;border:1.5px solid #ccc;display:flex;align-items:center;justify-content:center;flex:none;background:#fff;color:#fff}
         .cdt-timeline li.done{color:#111}
@@ -331,7 +367,7 @@ export function ContractDetail() {
         @media(max-width:860px){.cdt-grid{grid-template-columns:1fr}}
       `}</style>
 
-      <div className="cdt-page">
+      <div className="cdt-page" ref={pageRef}>
         <Link className="cdt-back" to="/contracts">
           <ArrowLeft size={14} /> Back to {isCreator ? 'contract history' : 'collaboration history'}
         </Link>
@@ -381,6 +417,12 @@ export function ContractDetail() {
                 {statusLabel(contract.status)}
               </span>
             </div>
+
+            {noMatch && (
+              <div className="cdt-state" style={{ marginBottom: 14 }}>
+                <p style={{ margin: 0 }}>Nothing in this contract matches “{query}”.</p>
+              </div>
+            )}
 
             <div className="cdt-grid">
               {/* LEFT: campaign + agreement */}

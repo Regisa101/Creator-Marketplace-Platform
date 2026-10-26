@@ -151,6 +151,17 @@ export function PublicNavbar({
 
   const profileRef = useRef<HTMLDivElement>(null);
 
+  // Keep the box in sync when the URL's ?search= changes (back button, clearing).
+  const urlSearch = searchParams.get('search') || '';
+  const lastNavigated = useRef(urlSearch.trim());
+  useEffect(() => {
+    // Only react to changes that did NOT come from typing in this box.
+    if (urlSearch.trim() !== lastNavigated.current) {
+      lastNavigated.current = urlSearch.trim();
+      setSearch(urlSearch);
+    }
+  }, [urlSearch]);
+
 
   /* ==========================================================
      CONTEXT
@@ -421,21 +432,38 @@ export function PublicNavbar({
      SEARCH
   ========================================================== */
 
+  const searchUrl = (value: string) => {
+    const q = value.trim();
+    // Brands browse inside the dashboard layout, which must NOT get source=landing.
+    const base = user?.role === 'business' ? '/campaigns' : '/campaigns?source=landing';
+    if (!q) return base;
+    return `${base}${base.includes('?') ? '&' : '?'}search=${encodeURIComponent(q)}`;
+  };
+
   const submitSearch = (event: FormEvent) => {
 
     event.preventDefault();
 
     setMobileOpen(false);
 
-    const value = search.trim();
-
-    navigate(
-      value
-        ? `/campaigns?source=landing&search=${encodeURIComponent(value)}`
-        : '/campaigns?source=landing'
-    );
+    lastNavigated.current = search.trim();
+    navigate(searchUrl(search));
 
   };
+
+  // While already on the campaigns page, results update as you type.
+  useEffect(() => {
+    if (!isCampaigns) return;
+    if (search.trim() === urlSearch.trim()) return;
+
+    const timer = window.setTimeout(() => {
+      lastNavigated.current = search.trim();
+      navigate(searchUrl(search), { replace: true });
+    }, 350);
+
+    return () => window.clearTimeout(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [search, isCampaigns]);
 
 
   /* ==========================================================
@@ -699,6 +727,17 @@ export function PublicNavbar({
         .ch-nav-search input::placeholder {
           color: #918b99;
           opacity: 1;
+        }
+
+        .ch-nav-search-btn {
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          padding: 0;
+          border: 0;
+          background: transparent;
+          color: inherit;
+          cursor: pointer;
         }
 
         .ch-nav-search svg {
@@ -1182,12 +1221,15 @@ export function PublicNavbar({
               onSubmit={submitSearch}
             >
 
-              <Search size={17} />
+              <button type="submit" className="ch-nav-search-btn" aria-label="Search">
+                <Search size={17} />
+              </button>
 
               <input
                 value={search}
                 onChange={(event) => setSearch(event.target.value)}
                 placeholder="Search campaigns..."
+                aria-label="Search campaigns"
               />
 
             </form>
@@ -1420,12 +1462,15 @@ export function PublicNavbar({
               onSubmit={submitSearch}
             >
 
-              <Search size={17} />
+              <button type="submit" className="ch-nav-search-btn" aria-label="Search">
+                <Search size={17} />
+              </button>
 
               <input
                 value={search}
                 onChange={(event) => setSearch(event.target.value)}
                 placeholder="Search campaigns..."
+                aria-label="Search campaigns"
               />
 
             </form>
