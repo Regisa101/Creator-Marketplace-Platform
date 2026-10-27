@@ -534,7 +534,7 @@ export function Analytics() {
         .an-ranges{display:flex;gap:8px;flex-wrap:wrap}
         .an-range{height:32px;padding:0 14px;border:1px solid #dedede;border-radius:999px;background:#fff;color:#111;font:500 12.5px 'Poppins',sans-serif;cursor:pointer;transition:background-color .15s ease,border-color .15s ease}
         .an-range:hover{background:#f5f5f5;border-color:#c4c4c4}
-        .an-range.active{background:#111;color:#fff;border-color:#111}
+        .an-range.active{background:#197935;color:#fff;border-color:#197935}
 
         .an-cards{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;margin:0 0 16px}
         .an-card{padding:16px 18px;border:1px solid #e5e5e5;border-radius:12px;background:#fff}
@@ -592,7 +592,7 @@ export function Analytics() {
         .an-chips{display:flex;gap:8px;flex-wrap:wrap;margin:0 0 14px}
         .an-chip{height:28px;padding:0 12px;border:1px solid #dedede;border-radius:999px;background:#fff;color:#111;font:500 12px 'Poppins',sans-serif;cursor:pointer;transition:background-color .15s ease,border-color .15s ease}
         .an-chip:hover{background:#f5f5f5;border-color:#c4c4c4}
-        .an-chip.active{background:#111;color:#fff;border-color:#111}
+        .an-chip.active{background:#197935;color:#fff;border-color:#197935}
 
         .an-list{display:flex;flex-direction:column}
         .an-row{display:block;padding:12px 0;border-top:1px solid #eeece6;text-decoration:none;color:inherit}

@@ -1,3 +1,5 @@
+import { brandCoverStyle } from '../utils/brandCover';
+import { categoryImage } from '../utils/categoryArt';
 import { useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import {
@@ -217,9 +219,6 @@ export function BusinessProfile() {
     user?.full_name ||
     'Business';
 
-  const initial =
-    companyName[0]?.toUpperCase() ?? 'B';
-
 
   const categories = Array.isArray(profile?.interested_categories)
     ? profile.interested_categories
@@ -375,7 +374,7 @@ export function BusinessProfile() {
           font-size: 13px;
           font-weight: 650;
           color: #fff;
-          background: var(--violet);
+          background: #197935;
           border: none;
           padding: 10px 17px;
           border-radius: 10px;
@@ -383,7 +382,7 @@ export function BusinessProfile() {
           white-space: nowrap;
         }
 
-        .bp-edit-btn:hover { background: var(--violet-dark); }
+        .bp-edit-btn:hover { background: #15672d; }
 
         .bp-tag-row {
           display: flex;
@@ -838,8 +837,8 @@ export function BusinessProfile() {
         }
         .bp-inline-btn:hover { border-color: #bbb; }
         .bp-inline-btn:disabled { opacity: .6; cursor: default; }
-        .bp-inline-btn--dark { background: #111; border-color: #111; color: #fff; }
-        .bp-inline-btn--dark:hover { background: #000; border-color: #000; }
+        .bp-inline-btn--dark { background: #197935; border-color: #197935; color: #fff; }
+        .bp-inline-btn--dark:hover { background: #15672d; border-color: #15672d; }
         .bp-edit-actions { display: flex; gap: 8px; flex-shrink: 0; align-items: center; }
         button.bp-edit-btn { height: 32px; padding: 0 13px; font-size: 12px; font-weight: 400; border: 0; cursor: pointer; font-family: inherit; }
         .bp-edit-error { margin: 12px 28px 0; padding: 9px 13px; border-radius: 8px; background: #fdecea; color: #b3261e; font-size: 12.5px; }
@@ -871,7 +870,15 @@ export function BusinessProfile() {
           <div className="bp-error">{error}</div>
         ) : (
           <div className="bp-card">
-            <div className="bp-cover" />
+            <div
+              className="bp-cover"
+              style={brandCoverStyle({
+                name: companyName,
+                category: profile?.industry,
+                hints: [...(profile?.interested_categories || []), profile?.business_type],
+                coverUrl: profile?.cover_url,
+              })}
+            />
 
             <div className="bp-header">
               <div
@@ -882,7 +889,15 @@ export function BusinessProfile() {
                 {(editOpen ? eLogo : profile?.logo_url) ? (
                   <img src={editOpen ? eLogo : profile.logo_url} alt={companyName} />
                 ) : (
-                  initial
+                  <img
+                    src={categoryImage(
+                      profile?.industry,
+                      ...(profile?.interested_categories || []),
+                      profile?.business_type,
+                      companyName,
+                    )}
+                    alt={companyName}
+                  />
                 )}
               </div>
 

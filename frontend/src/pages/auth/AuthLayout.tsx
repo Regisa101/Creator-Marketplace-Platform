@@ -276,9 +276,9 @@ export function AuthLayout({
           justify-content: center;
           gap: 8px;
           margin-top: 4px;
-          border: 1px solid #111111;
+          border: 1px solid #197935;
           border-radius: 9px;
-          background: #111111;
+          background: #197935;
           color: #ffffff !important;
           font: inherit;
           font-size: 13px;
@@ -290,7 +290,7 @@ export function AuthLayout({
         .az-submit:hover:not(:disabled),
         .az-submit:focus:not(:disabled),
         .az-submit:active:not(:disabled) {
-          background: #111111 !important;
+          background: #15672d !important;
           color: #ffffff !important;
           transform: translateY(-1px);
         }

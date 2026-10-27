@@ -38,6 +38,9 @@ import {
 import { useAuth } from '../context/AuthContext';
 import { PublicNavbar } from '../components/PublicNavbar';
 import { AppLayout } from '../components/AppLayout';
+import { LogoMark } from '../components/Logo';
+import { brandDisplayName, isCreatorHub } from '../utils/brand';
+import { categoryImage } from '../utils/categoryArt';
 import { ApplyModal } from '../components/ApplyModels';
 
 function money(value?: number | null) {
@@ -502,7 +505,10 @@ export function CampaignDetail() {
   const budgetLabel = getBudgetLabel(campaign);
   const platform = getPlatform(campaign);
   const publicCampaign = campaign as PublicCampaign;
-  const businessName = business?.company_name || publicCampaign.brand_name || 'Business';
+  const businessName = brandDisplayName(
+    business?.company_name || publicCampaign.brand_name,
+    'Business'
+  );
 
   return renderFrame(
     <main className="cd-page">
@@ -771,10 +777,16 @@ export function CampaignDetail() {
                 aria-label={`View ${businessName} business profile`}
               >
                 <div className="cd-business-card-avatar">
-                  {business?.logo_url ? (
-                    <img src={business.logo_url} alt={`${businessName} logo`} />
+                  {isCreatorHub(businessName) ? (
+                    <LogoMark size={26} />
                   ) : (
-                    <span>{(businessName.trim()[0] || 'B').toUpperCase()}</span>
+                    <img
+                      src={
+                        business?.logo_url ||
+                        categoryImage(business?.industry, campaign.category, businessName)
+                      }
+                      alt={`${businessName} logo`}
+                    />
                   )}
                 </div>
 
@@ -1158,8 +1170,8 @@ const STYLE = `
 .cd-dark{
   min-height:34px;
   padding:0 12px;
-  border:1px solid #111;
-  background:#111;
+  border:1px solid #197935;
+  background:#197935;
   color:#fff;
   font-size:10.5px;
 }
@@ -1352,13 +1364,13 @@ const STYLE = `
 /* Header / shared buttons */
 .cd-extend-owner-button{white-space:nowrap}
 .cd-apply{
-  border:1px solid #111;
-  background:#111;
+  border:1px solid #197935;
+  background:#197935;
   color:#fff;
   font-size:11px;
   font-weight:600;
 }
-.cd-apply:hover{background:#252525}
+.cd-apply:hover{background:#15672d}
 
 /* States */
 .cd-state{
@@ -1387,7 +1399,7 @@ const STYLE = `
 .cd-extension-eyebrow{margin-bottom:7px;color:#999;font-size:9px;font-weight:700;letter-spacing:.13em;text-transform:uppercase}
 .cd-extension-title{margin:0;color:#111;font-size:20px;line-height:1.2;font-weight:700}
 .cd-extension-description{margin:7px 0 0;color:#777;font-size:12px;line-height:1.55}
-.cd-extension-close{flex:0 0 auto;width:30px;height:30px;margin-left:12px;display:flex;align-items:center;justify-content:center;border:0;border-radius:50%;background:#111;color:#fff;cursor:pointer}
+.cd-extension-close{flex:0 0 auto;width:30px;height:30px;margin-left:12px;display:flex;align-items:center;justify-content:center;border:0;border-radius:50%;background:#197935;color:#fff;cursor:pointer}
 .cd-extension-close:disabled{opacity:.5;cursor:not-allowed}
 .cd-extension-date-comparison{margin:12px 24px 18px;display:grid;grid-template-columns:1fr 32px 1fr;align-items:center;padding:14px;border:1px solid #e4e4e4;border-radius:10px;background:#fafafa}
 .cd-extension-date-block{min-width:0}
@@ -1406,7 +1418,7 @@ const STYLE = `
 .cd-extension-actions{display:flex;justify-content:flex-end;align-items:center;gap:7px;margin-top:18px}
 .cd-extension-cancel,.cd-extension-submit{height:37px;padding:0 15px;display:inline-flex;align-items:center;justify-content:center;gap:7px;border-radius:7px;font-family:inherit;font-size:11px;font-weight:600;cursor:pointer}
 .cd-extension-cancel{border:1px solid #ddd;background:#fff;color:#222}
-.cd-extension-submit{border:1px solid #111;background:#111;color:#fff}
+.cd-extension-submit{border:1px solid #197935;background:#197935;color:#fff}
 .cd-extension-submit:disabled,.cd-extension-cancel:disabled{opacity:.5;cursor:not-allowed}
 
 @media(max-width:760px){

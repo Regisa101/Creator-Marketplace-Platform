@@ -500,7 +500,7 @@ const styles = `
   .st-tabs{display:flex;gap:8px;flex-wrap:wrap;margin:8px 0 20px}
   .st-tab{height:34px;padding:0 16px;border:1px solid #e0e0e0;background:#fff;border-radius:999px;font:400 12.5px Poppins,sans-serif;color:#444;cursor:pointer}
   .st-tab:hover{border-color:#bbb}
-  .st-tab.is-active{background:#111;border-color:#111;color:#fff}
+  .st-tab.is-active{background:#197935;border-color:#197935;color:#fff}
   .st-card{background:#fff;border:1px solid #e5e5e5;border-radius:12px;margin-bottom:16px;overflow:hidden}
   .st-card-head{padding:16px 22px;border-bottom:1px solid #f0f0f0}
   .st-card-head h2{margin:0;font:500 14.5px Poppins,sans-serif}
@@ -512,7 +512,7 @@ const styles = `
   .st-chips{display:flex;flex-wrap:wrap;gap:7px}
   .st-chip{border:1px solid #e0e0e0;background:#fff;color:#222;border-radius:999px;padding:7px 13px;font:400 12px Poppins,sans-serif;cursor:pointer;text-align:left}
   .st-chip:hover{border-color:#aaa}
-  .st-chip.is-on{background:#111;border-color:#111;color:#fff}
+  .st-chip.is-on{background:#197935;border-color:#197935;color:#fff}
   .st-row{display:flex;gap:8px;align-items:center;margin-bottom:8px}
   .st-index{width:22px;flex:none;text-align:center;font:400 12px Poppins,sans-serif;color:#999}
   .st-input{flex:1;min-width:0;width:100%;height:38px;border:1px solid #e0e0e0;border-radius:8px;padding:0 12px;font:400 13px Poppins,sans-serif;color:#111;background:#fff;outline:none;box-sizing:border-box}
@@ -523,8 +523,8 @@ const styles = `
   .st-btn{display:inline-flex;align-items:center;justify-content:center;gap:6px;height:38px;padding:0 16px;border:1px solid #d6d6d6;background:#fff;color:#111;border-radius:8px;font:400 12.5px Poppins,sans-serif;text-decoration:none;cursor:pointer;white-space:nowrap;flex:none}
   .st-btn:hover{border-color:#999}
   .st-btn:disabled{opacity:.6;cursor:default}
-  .st-btn--dark{background:#111;border-color:#111;color:#fff}
-  .st-btn--dark:hover{background:#000;border-color:#000;color:#fff}
+  .st-btn--dark{background:#197935;border-color:#197935;color:#fff}
+  .st-btn--dark:hover{background:#15672d;border-color:#15672d;color:#fff}
   .st-savebar{display:flex;align-items:center;gap:14px;padding-top:2px}
   .st-msg{font:400 12.5px Poppins,sans-serif}
   .st-msg.ok{color:#1e8a4c}

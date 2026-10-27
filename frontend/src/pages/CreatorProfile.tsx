@@ -556,7 +556,7 @@ export function CreatorProfile() {
           font-size: 13px;
           font-weight: 650;
           color: #fff;
-          background: var(--coral);
+          background: #197935;
           border: none;
           padding: 10px 17px;
           border-radius: 10px;
@@ -565,7 +565,7 @@ export function CreatorProfile() {
           text-decoration: none;
         }
 
-        .cp-edit-btn:hover { background: var(--coral-dark); }
+        .cp-edit-btn:hover { background: #15672d; }
 
         .cp-tag-row {
           display: flex;
@@ -916,8 +916,8 @@ export function CreatorProfile() {
         .cp-payment-form { display: flex; gap: 9px; max-width: 620px; }
         .cp-payment-input { flex: 1; min-width: 0; height: 42px; border: 1px solid #DBDBDB; border-radius: 10px; padding: 0 12px; background: #fff; color: var(--ink); font: inherit; font-size: 12px; outline: none; }
         .cp-payment-input:focus { border-color: var(--violet); box-shadow: 0 0 0 3px rgba(17,17,17,.09); }
-        .cp-payment-save { min-width: 78px; height: 42px; border: 0; border-radius: 10px; background: var(--violet); color: #fff; font-size: 11.5px; font-weight: 750; cursor: pointer; }
-        .cp-payment-save:hover { background: #000000; }
+        .cp-payment-save { min-width: 78px; height: 42px; border: 0; border-radius: 10px; background: #197935; color: #fff; font-size: 11.5px; font-weight: 750; cursor: pointer; }
+        .cp-payment-save:hover { background: #15672d; }
         .cp-payment-note { margin: 9px 0 0; color: var(--ink-faint); font-size: 10px; line-height: 1.5; }
 
         .cp-danger-zone {
@@ -1000,8 +1000,8 @@ export function CreatorProfile() {
         }
         .cp-inline-btn:hover { border-color: #bbb; }
         .cp-inline-btn:disabled { opacity: .6; cursor: default; }
-        .cp-inline-btn--dark { background: #111; border-color: #111; color: #fff; }
-        .cp-inline-btn--dark:hover { background: #000; border-color: #000; }
+        .cp-inline-btn--dark { background: #197935; border-color: #197935; color: #fff; }
+        .cp-inline-btn--dark:hover { background: #15672d; border-color: #15672d; }
         .cp-inline-list-row {
           display: flex; justify-content: space-between; align-items: center;
           height: 36px; padding: 0 12px; border: 1px solid var(--line); border-radius: 8px;
@@ -1039,7 +1039,7 @@ export function CreatorProfile() {
           font-size: 12px; font-weight: 400; font-family: inherit; color: var(--ink); cursor: pointer;
         }
         .cp-chip-toggle:hover { border-color: #bbb; }
-        .cp-chip-toggle.is-on { background: #111; border-color: #111; color: #fff; }
+        .cp-chip-toggle.is-on { background: #197935; border-color: #197935; color: #fff; }
         .cp-type-add { max-width: 280px; }
         .cp-type-other { display: flex; gap: 8px; max-width: 280px; }
         .cp-type-other .cp-inline-btn { flex: none; }

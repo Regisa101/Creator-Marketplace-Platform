@@ -3,6 +3,8 @@ import { ArrowLeft, Building2, ExternalLink, Globe, Link2, MapPin } from 'lucide
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { getPublicBusinessProfile, type PublicBusinessProfile } from '../api/client';
 import { PublicNavbar } from '../components/PublicNavbar';
+import { brandCoverStyle } from '../utils/brandCover';
+import { categoryImage } from '../utils/categoryArt';
 import {
   Lightbox,
   PublicProfileStyles,
@@ -11,11 +13,6 @@ import {
   mediaUrl,
   type LightboxItem,
 } from '../components/PublicProfileKit';
-
-function initials(name?: string | null) {
-  const parts = (name || 'Business').trim().split(/\s+/).filter(Boolean);
-  return parts.length > 1 ? `${parts[0][0]}${parts[1][0]}`.toUpperCase() : (parts[0] || 'B').slice(0, 2).toUpperCase();
-}
 
 export function BrandProfile() {
   const { businessId } = useParams<{ businessId: string }>();
@@ -67,20 +64,40 @@ export function BrandProfile() {
 
           {!loading && profile && (
             <div className="pp-card">
-              <div className="pp-cover" />
+              <div
+                className="pp-cover"
+                style={{
+                  height: 200,
+                  ...brandCoverStyle(
+                    {
+                      name: profile.company_name,
+                      category: profile.industry,
+                      hints: [...(profile.interested_categories || []), profile.business_type],
+                      coverUrl: profile.cover_url,
+                    },
+                    mediaUrl,
+                  ),
+                }}
+              />
 
               <div className="pp-header">
                 {logo ? (
                   <button
                     type="button"
                     className="pp-avatar is-square"
+                    style={{ background: '#fff' }}
                     onClick={() => setViewer({ src: logo, alt: profile.company_name })}
                     aria-label="View logo"
                   >
                     <img src={logo} alt={profile.company_name} />
                   </button>
                 ) : (
-                  <div className="pp-avatar is-square">{initials(profile.company_name)}</div>
+                  <div className="pp-avatar is-square" style={{ background: '#fff' }}>
+                    <img
+                      src={categoryImage(profile.industry, ...(profile.interested_categories || []), profile.business_type, profile.company_name)}
+                      alt={profile.company_name}
+                    />
+                  </div>
                 )}
 
                 <div className="pp-id">

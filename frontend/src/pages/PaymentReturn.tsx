@@ -156,8 +156,8 @@ export default function PaymentReturn() {
 
         .pr-actions { display: flex; flex-wrap: wrap; gap: 10px; padding: 24px 28px 28px; }
         .pr-btn { height: 46px; padding: 0 20px; border-radius: 11px; font: 600 13px Poppins, sans-serif; display: inline-flex; align-items: center; justify-content: center; gap: 8px; cursor: pointer; text-decoration: none; transition: background-color .15s ease, border-color .15s ease; }
-        .pr-btn.primary { flex: 1 1 200px; background: #111; color: #fff; border: 1px solid #111; }
-        .pr-btn.primary:hover { background: #000; }
+        .pr-btn.primary { flex: 1 1 200px; background: #197935; color: #fff; border: 1px solid #197935; }
+        .pr-btn.primary:hover { background: #15672d; }
         .pr-btn.secondary { flex: 1 1 140px; background: #fff; color: #111; border: 1px solid #dcdcdf; }
         .pr-btn.secondary:hover { background: #f5f5f6; border-color: #c4c4c8; }
         .pr-foot { padding: 0 28px 24px; text-align: center; font-size: 11.5px; color: #999; }

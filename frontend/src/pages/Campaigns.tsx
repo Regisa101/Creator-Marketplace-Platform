@@ -9,7 +9,11 @@ import {
   Search,
 } from "lucide-react";
 
+import { LogoMark } from "../components/Logo";
+import { demoLast } from "../api/demoCampaigns";
+import { categoryImage } from "../utils/categoryArt";
 import { PublicNavbar } from "../components/PublicNavbar";
+import { brandDisplayName, isCreatorHub } from "../utils/brand";
 import { useAuth } from "../context/AuthContext";
 
 import {
@@ -44,20 +48,6 @@ function mediaUrl(value?: string | null) {
   }
 
   return `${API_ORIGIN}/${value.replace(/^\/+/, "")}`;
-}
-
-function initials(value?: string | null) {
-  const text = (value || "Brand").trim();
-
-  if (!text) return "B";
-
-  const parts = text.split(/\s+/).filter(Boolean);
-
-  if (parts.length >= 2) {
-    return `${parts[0][0]}${parts[1][0]}`.toUpperCase();
-  }
-
-  return parts[0].slice(0, 2).toUpperCase();
 }
 
 function postedAgo(value?: string | null) {
@@ -271,15 +261,29 @@ function CampaignCard({
             onClick={(e) => e.stopPropagation()}
             style={{ textDecoration: "none", color: "inherit" }}
           >
-            <div className="campaign-avatar">
-              {campaign.brand_logo ? (
-                <img src={mediaUrl(campaign.brand_logo)} alt="" />
+            <div
+              className="campaign-avatar"
+              style={
+                isCreatorHub(campaign.brand_name)
+                  ? { background: "#fff", border: "1px solid #e5e5e5", boxSizing: "border-box" }
+                  : { background: "#fff" }
+              }
+            >
+              {isCreatorHub(campaign.brand_name) ? (
+                <LogoMark size={20} />
               ) : (
-                initials(campaign.brand_name)
+                <img
+                  src={
+                    campaign.brand_logo
+                      ? mediaUrl(campaign.brand_logo)
+                      : categoryImage(campaign.category, campaign.brand_name)
+                  }
+                  alt=""
+                />
               )}
             </div>
 
-            <span>{campaign.brand_name || "Brand"}</span>
+            <span>{brandDisplayName(campaign.brand_name)}</span>
           </Link>
 
           {isCreator && !expired && (
@@ -634,7 +638,7 @@ export function Campaigns() {
       );
     });
 
-    return result;
+    return demoLast(result);
   }, [
     campaigns,
     searchParams,
@@ -1156,7 +1160,7 @@ export function Campaigns() {
         }
 
         .clear-filters:hover {
-          background: #111;
+          background: #15672d;
           color: #fff;
         }
 
@@ -1404,8 +1408,8 @@ export function Campaigns() {
         }
 
         .campaign-primary {
-          border: 1px solid #111;
-          background: #111;
+          border: 1px solid #197935;
+          background: #197935;
           color: #fff;
         }
 
@@ -1451,11 +1455,11 @@ export function Campaigns() {
 
         .pagination button:hover:not(:disabled),
         .pagination button.active {
-          border-color: #111;
+          border-color: #15672d;
         }
 
         .pagination button.active {
-          background: #111;
+          background: #197935;
           color: #fff;
         }
 
@@ -1499,9 +1503,9 @@ export function Campaigns() {
         .campaign-empty button {
           height: 35px;
           padding: 0 14px;
-          border: 1px solid #111;
+          border: 1px solid #197935;
           border-radius: 7px;
-          background: #111;
+          background: #197935;
           color: #fff;
           font: 500 10px Poppins, sans-serif;
           cursor: pointer;

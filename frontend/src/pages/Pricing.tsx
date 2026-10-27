@@ -1023,11 +1023,11 @@ export function Pricing() {
 
           padding: 0 28px;
 
-          border: 1px solid #111111;
+          border: 1px solid #197935;
 
           border-radius: 8px;
 
-          background: #111111;
+          background: #197935;
 
           color: #ffffff;
 
@@ -1043,9 +1043,9 @@ export function Pricing() {
         }
 
         .pricing-cta-button:hover {
-          background: #000000;
+          background: #15672d;
 
-          border-color: #000000;
+          border-color: #15672d;
 
           color: #ffffff;
 

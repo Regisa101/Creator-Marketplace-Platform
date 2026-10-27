@@ -67,7 +67,7 @@ export function MyApplications() {
         .ma-wrap > p{margin:4px 0 20px;font-size:12px;color:#777}
         .ma-tabs{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:18px}
         .ma-tab{border:1px solid #ddd;background:#fff;border-radius:99px;padding:7px 15px;font:500 11.5px Poppins,sans-serif;color:#444;cursor:pointer}
-        .ma-tab.is-active{background:#111;border-color:#111;color:#fff}
+        .ma-tab.is-active{background:#197935;border-color:#197935;color:#fff}
         .ma-list{display:flex;flex-direction:column;gap:10px}
         .ma-item{display:flex;justify-content:space-between;align-items:center;gap:14px;background:#fff;border:1px solid #e6e6e6;border-radius:12px;padding:16px 18px;text-decoration:none;color:#111;transition:.18s}
         .ma-item:hover{border-color:#cfcfcf;box-shadow:0 12px 24px -16px rgba(0,0,0,.2)}
@@ -78,8 +78,8 @@ export function MyApplications() {
         .ma-status--rejected,.ma-status--withdrawn{background:#f6eaea;color:#a33}
         .ma-status--pending,.ma-status--selected{background:#fff6e5;color:#9a6a08}
         .ma-state{text-align:center;padding:50px 20px;color:#777;font-size:12.5px;border:1.5px dashed #ddd;border-radius:16px}
-        .ma-btn{display:inline-flex;margin-top:14px;min-height:38px;align-items:center;padding:0 16px;border-radius:9px;background:#111;color:#fff;font:500 12px Poppins,sans-serif;text-decoration:none}
-        .ma-btn:hover{color:#fff;background:#000}
+        .ma-btn{display:inline-flex;margin-top:14px;min-height:38px;align-items:center;padding:0 16px;border-radius:9px;background:#197935;color:#fff;font:500 12px Poppins,sans-serif;text-decoration:none}
+        .ma-btn:hover{color:#fff;background:#15672d}
       `}</style>
 
       <PublicNavbar />

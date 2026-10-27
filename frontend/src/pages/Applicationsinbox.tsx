@@ -319,8 +319,8 @@ export function ApplicationsInbox() {
       .ab-field input:focus,.ab-field textarea:focus{border-color:#111}
       .ab-locked{display:flex;align-items:center;justify-content:space-between;gap:8px;box-sizing:border-box;width:100%;border:1px solid #e5e5e5;border-radius:10px;padding:12px 13px;background:#f5f5f5;color:#444;font:500 14px Poppins,sans-serif;cursor:not-allowed}
       .ab-actions-modal{display:flex;gap:10px;margin-top:22px}
-      .ab-primary{flex:1;height:46px;border:1px solid #111;border-radius:10px;background:#111;color:#fff;font:600 13.5px Poppins,sans-serif;cursor:pointer;transition:background-color .15s ease}
-      .ab-primary:hover:not(:disabled){background:#000}
+      .ab-primary{flex:1;height:46px;border:1px solid #197935;border-radius:10px;background:#197935;color:#fff;font:600 13.5px Poppins,sans-serif;cursor:pointer;transition:background-color .15s ease}
+      .ab-primary:hover:not(:disabled){background:#15672d}
       .ab-primary:disabled{opacity:.55;cursor:not-allowed}
       .ab-secondary{height:46px;padding:0 22px;border:1px solid #dcdcdc;border-radius:10px;background:#fff;color:#333;font:600 13.5px Poppins,sans-serif;cursor:pointer}
       .ab-secondary:hover{background:#f5f5f5;border-color:#c4c4c4}

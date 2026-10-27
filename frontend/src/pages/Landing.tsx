@@ -7,6 +7,10 @@
 import { useEffect, useMemo, useState, type CSSProperties } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { LogoMark } from "../components/Logo";
+import { HeroBrandLogo } from "../components/BrandLogo";
+import { brandDisplayName, isCreatorHub } from "../utils/brand";
+import { categoryImage } from "../utils/categoryArt";
+import { isDemoCampaignId } from "../api/demoCampaigns";
 import { PublicNavbar } from "../components/PublicNavbar";
 import { useAuth } from "../context/AuthContext";
 import {
@@ -57,16 +61,6 @@ function mediaUrl(url?: string | null) {
   }
 
   return `${API_ORIGIN}/${url.replace(/^\/+/, "")}`;
-}
-
-function initials(name: string) {
-  return name
-    .split(" ")
-    .filter(Boolean)
-    .slice(0, 2)
-    .map((word) => word[0])
-    .join("")
-    .toUpperCase();
 }
 
 // ============================================
@@ -256,18 +250,28 @@ function CampaignCard({
             <span
               className="lp-card-avatar"
               style={{
-                background: c.brand_logo ? "#fff" : "#111111",
+                background: "#fff",
+                ...(isCreatorHub(c.brand_name)
+                  ? { border: "1px solid #e5e5e5", boxSizing: "border-box" }
+                  : {}),
               }}
             >
-              {c.brand_logo ? (
-                <img src={mediaUrl(c.brand_logo)} alt="" />
+              {isCreatorHub(c.brand_name) ? (
+                <LogoMark size={18} />
               ) : (
-                initials(c.brand_name || "Brand")
+                <img
+                  src={
+                    c.brand_logo
+                      ? mediaUrl(c.brand_logo)
+                      : categoryImage(c.category, c.brand_name)
+                  }
+                  alt=""
+                />
               )}
             </span>
 
             <span className="lp-card-brand-name">
-              {c.brand_name || "Brand"}
+              {brandDisplayName(c.brand_name)}
             </span>
           </Link>
 
@@ -399,12 +403,12 @@ type HeroCard = {
 };
 
 const HERO_CARDS: HeroCard[] = [
-  { brand: "Lune", title: "Lifestyle Creator", category: "Lifestyle", budget: "NPR 12,000", filter: "Lifestyle", pos: "p1", depth: "back", rot: "-6deg", dy: "-9px", dr: "1deg", dur: "8.2s", delay: "-1s", enter: ".10s" },
-  { brand: "Bakery", title: "Food Creator", category: "Food", budget: "NPR 6,500", filter: "Food", pos: "p2", depth: "front", rot: "4deg", dy: "-12px", dr: "-1.2deg", dur: "6.8s", delay: "-3s", enter: ".30s" },
-  { brand: "Lune", title: "Beauty Content Creator", category: "Beauty", budget: "NPR 15,000", filter: "Beauty", pos: "p3", depth: "back", rot: "-3deg", dy: "-8px", dr: "1.2deg", dur: "9s", delay: "-5s", enter: ".50s" },
+  { brand: "Bhatbhateni", title: "Lifestyle Creator", category: "Lifestyle", budget: "NPR 12,000", filter: "Lifestyle", pos: "p1", depth: "back", rot: "-6deg", dy: "-9px", dr: "1deg", dur: "8.2s", delay: "-1s", enter: ".10s" },
+  { brand: "Himalayan Java", title: "Food Creator", category: "Food", budget: "NPR 6,500", filter: "Food", pos: "p2", depth: "front", rot: "4deg", dy: "-12px", dr: "-1.2deg", dur: "6.8s", delay: "-3s", enter: ".30s" },
+  { brand: "Lali", title: "Beauty Content Creator", category: "Beauty", budget: "NPR 15,000", filter: "Beauty", pos: "p3", depth: "back", rot: "-3deg", dy: "-8px", dr: "1.2deg", dur: "9s", delay: "-5s", enter: ".50s" },
   { brand: "CreatorHub", title: "UGC Creator", category: "UGC", budget: "NPR 8,000", pos: "p4", depth: "front", rot: "5deg", dy: "-11px", dr: "-1deg", dur: "7.4s", delay: "-2s", enter: ".20s" },
-  { brand: "Skincare Brand", title: "Beauty Creator", category: "Beauty", budget: "NPR 10,000", filter: "Beauty", pos: "p5", depth: "back", rot: "-4deg", dy: "-8px", dr: "1deg", dur: "8.6s", delay: "-4s", enter: ".40s" },
-  { brand: "Fashion Brand", title: "Fashion Creator", category: "Fashion", budget: "NPR 18,000", filter: "Fashion", pos: "p6", depth: "front", rot: "3deg", dy: "-10px", dr: "-1deg", dur: "7.8s", delay: "-1.5s", enter: ".60s", feature: true },
+  { brand: "Avani Nepal", title: "Beauty Creator", category: "Beauty", budget: "NPR 10,000", filter: "Beauty", pos: "p5", depth: "back", rot: "-4deg", dy: "-8px", dr: "1deg", dur: "8.6s", delay: "-4s", enter: ".40s" },
+  { brand: "Daraz", title: "Fashion Creator", category: "Fashion", budget: "NPR 18,000", filter: "Fashion", pos: "p6", depth: "front", rot: "3deg", dy: "-10px", dr: "-1deg", dur: "7.8s", delay: "-1.5s", enter: ".60s", feature: true },
 ];
 
 function heroApplyHref(c: HeroCard) {
@@ -642,6 +646,11 @@ export function Landing() {
 
         return dateB - dateA;
       })
+      // Real campaigns first; sample campaigns only fill the remaining slots.
+      .sort(
+        (a, b) =>
+          Number(isDemoCampaignId(a.id)) - Number(isDemoCampaignId(b.id))
+      )
       .slice(0, 7);
   }, [campaigns]);
 
@@ -840,8 +849,8 @@ export function Landing() {
         }
 
         .hx-btn:hover { transform: translateY(-1px); }
-        .hx-btn-primary { background: var(--hx-ink); color: #fff; }
-        .hx-btn-primary:hover { background: #000; color: #fff; }
+        .hx-btn-primary { background: #197935; border-color: #197935; color: #fff; }
+        .hx-btn-primary:hover { background: #15672d; border-color: #15672d; color: #fff; }
         .hx-btn-secondary { background: transparent; color: var(--hx-ink); }
         .hx-btn-secondary:hover { background: #fff; color: var(--hx-ink); }
 
@@ -940,6 +949,31 @@ export function Landing() {
           font-weight: 500;
         }
 
+        .hx-logo {
+          flex: 0 0 28px;
+          width: 28px;
+          height: 28px;
+          display: block;
+          border-radius: 7px;
+        }
+
+        .hx-logo--tile {
+          display: grid;
+          place-items: center;
+          box-sizing: border-box;
+          padding: 5px;
+          background: #fff;
+          border: 1px solid #e5e5e5;
+        }
+
+        .hx-logo--tile svg { display: block; }
+
+        .hx-logo--pic {
+          overflow: hidden;
+          border: 1px solid rgba(0, 0, 0, .06);
+          box-sizing: border-box;
+        }
+
         .hx-tag {
           flex-shrink: 0;
           padding: 3px 8px;
@@ -974,7 +1008,7 @@ export function Landing() {
           border-radius: 999px;
           display: inline-flex;
           align-items: center;
-          background: var(--hx-ink);
+          background: #197935;
           color: #fff;
           font-size: 12px;
           font-weight: 500;
@@ -983,7 +1017,7 @@ export function Landing() {
 
         .hx-apply:hover,
         .hx-apply:focus-visible {
-          background: #000;
+          background: #15672d;
           color: #fff;
           transform: translateY(-1px) scale(1.06);
         }
@@ -1349,9 +1383,9 @@ export function Landing() {
         }
 
         .lp-latest-view-all:hover {
-          color: #111111;
+          color: #197935;
           transform: translateX(3px);
-          opacity: .7;
+          opacity: 1;
         }
 
         .lp-latest-grid {
@@ -1643,14 +1677,14 @@ export function Landing() {
         }
 
         .lp-card-apply {
-          background: #111;
-          border: 1px solid #111;
+          background: #197935;
+          border: 1px solid #197935;
           color: #fff;
         }
 
         .lp-card-apply:hover {
-          background: #000;
-          border-color: #000;
+          background: #15672d;
+          border-color: #15672d;
           color: #fff;
         }
 
@@ -1724,7 +1758,8 @@ export function Landing() {
         .lp-how-toggle-btn.is-active {
           background: #FFFFFF;
           color: #111111;
-          box-shadow: inset 0 0 0 2px #111111;
+          font-weight: 500;
+          box-shadow: inset 0 0 0 2px #197935;
           border-radius: 999px;
           z-index: 2;
         }
@@ -1745,12 +1780,12 @@ export function Landing() {
         .lp-how-toggle-btn.is-active:hover {
           background: #FFFFFF !important;
           color: #111111 !important;
-          box-shadow: inset 0 0 0 2px #111111 !important;
+          box-shadow: inset 0 0 0 2px #197935 !important;
           transform: none !important;
         }
 
         .lp-how-toggle-btn:focus-visible {
-          outline: 2px solid #111111;
+          outline: 2px solid #197935;
           outline-offset: -4px;
         }
 
@@ -1957,10 +1992,10 @@ export function Landing() {
         }
 
         .lp-price-view-all:hover {
-          color: #111111 !important;
+          color: #197935 !important;
           background: transparent;
           transform: translateX(3px);
-          opacity: .7;
+          opacity: 1;
         }
 
         .lp-price-content {
@@ -2156,9 +2191,9 @@ export function Landing() {
           gap: 7px;
           min-height: 42px;
           padding: 0 20px;
-          border: 1px solid #111111;
+          border: 1px solid #197935;
           border-radius: 8px;
-          background: #111111;
+          background: #197935;
           color: #ffffff;
           font-size: 13px;
           font-weight: 500;
@@ -2166,8 +2201,8 @@ export function Landing() {
         }
 
         .lp-brand-btn:hover {
-          background: #000000;
-          border-color: #000000;
+          background: #15672d;
+          border-color: #15672d;
           color: #ffffff !important;
           transform: translateY(-1px);
         }
@@ -2604,8 +2639,8 @@ export function Landing() {
               >
                 <div className="hx-top">
                   <div className="hx-brand">
-                    <span className="hx-av">{initials(c.brand)}</span>
-                    <span>{c.brand}</span>
+                    <HeroBrandLogo brand={c.brand} category={c.category} />
+                    <span>{brandDisplayName(c.brand)}</span>
                   </div>
                   <span className="hx-tag">{c.category}</span>
                 </div>

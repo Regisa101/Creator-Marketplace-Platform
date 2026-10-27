@@ -948,16 +948,16 @@ export function ContractHistory() {
             width: 100%;
             min-height: 38px;
             margin-top: 12px;
-            border: 1px solid #111;
+            border: 1px solid #197935;
             border-radius: 8px;
-            background: #111;
+            background: #197935;
             color: #fff;
             font: 500 10px Poppins, sans-serif;
             cursor: pointer;
           }
 
           .ch-complete-btn:hover:not(:disabled) {
-            background: #292929;
+            background: #15672d;
           }
 
           .ch-complete-btn:disabled {
@@ -1070,8 +1070,8 @@ export function ContractHistory() {
           }
 
           .ch-modal-confirm {
-            border: 1px solid #111;
-            background: #111;
+            border: 1px solid #197935;
+            background: #197935;
             color: #fff;
           }
 

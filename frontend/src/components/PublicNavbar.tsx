@@ -57,6 +57,8 @@ type Section =
 
 const API_ORIGIN = 'http://localhost:8000';
 
+const NOTIFICATION_POLL_MS = 15000;
+
 
 /* ============================================================
    HELPERS
@@ -242,10 +244,12 @@ export function PublicNavbar({
      NOTIFICATIONS
   ========================================================== */
 
-  const refreshNotifications = async () => {
+  // Returns true if polling should continue, false if it should stop
+  // (e.g. the token is invalid and every further call would 401).
+  const refreshNotifications = async (): Promise<boolean> => {
 
     if (!isAuthenticated) {
-      return;
+      return false;
     }
 
     try {
@@ -259,10 +263,15 @@ export function PublicNavbar({
 
       setUnread(Number(count) || 0);
 
-    } catch {
+      return true;
+
+    } catch (error: any) {
 
       setNotifications([]);
       setUnread(0);
+
+      // 401 = invalid/expired token. Stop hammering the server.
+      return error?.response?.status !== 401;
 
     }
   };
@@ -279,14 +288,31 @@ export function PublicNavbar({
       return;
     }
 
-    void refreshNotifications();
+    let timer: number | undefined;
+    let cancelled = false;
 
-    const timer = window.setInterval(() => {
-      void refreshNotifications();
-    }, 15000);
+    // Chained setTimeout (not setInterval) so a slow server can never
+    // cause overlapping requests.
+    const tick = async () => {
+
+      const keepGoing = await refreshNotifications();
+
+      if (!cancelled && keepGoing) {
+        timer = window.setTimeout(tick, NOTIFICATION_POLL_MS);
+      }
+
+    };
+
+    void tick();
 
     return () => {
-      window.clearInterval(timer);
+
+      cancelled = true;
+
+      if (timer !== undefined) {
+        window.clearTimeout(timer);
+      }
+
     };
 
   }, [isAuthenticated]);
@@ -766,9 +792,9 @@ export function PublicNavbar({
         }
 
         .ch-nav-login {
-          background: #111 !important;
+          background: #197935 !important;
           color: #fff !important;
-          border: 1px solid #111 !important;
+          border: 1px solid #197935 !important;
         }
 
         .ch-nav-register {
@@ -778,7 +804,7 @@ export function PublicNavbar({
         }
 
         .ch-nav-login:hover {
-          background: #111 !important;
+          background: #15672d !important;
           color: #fff !important;
         }
 

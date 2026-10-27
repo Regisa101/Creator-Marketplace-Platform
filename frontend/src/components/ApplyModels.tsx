@@ -11,6 +11,7 @@ import {
   type Campaign,
   type CreatorPortfolioItemData,
 } from '../api/client';
+import { isDemoCampaignId } from '../api/demoCampaigns';
 
 type Props = {
   isOpen: boolean;
@@ -691,9 +692,9 @@ export function ApplyModal({
         }
 
         .apply-submit {
-          background: #111;
+          background: #197935;
 
-          border: 1px solid #111;
+          border: 1px solid #197935;
 
           color: #fff;
 
@@ -704,7 +705,7 @@ export function ApplyModal({
         }
 
         .apply-submit:hover:not(:disabled) {
-          background: #222;
+          background: #15672d;
         }
 
         .apply-submit:disabled {
@@ -769,7 +770,7 @@ export function ApplyModal({
 
           border-radius: 9px;
 
-          background: #111;
+          background: #197935;
 
           color: #fff;
 
@@ -779,7 +780,7 @@ export function ApplyModal({
         }
 
         .apply-success button:hover {
-          background: #222;
+          background: #15672d;
         }
 
         /* =========================================
@@ -865,10 +866,18 @@ export function ApplyModal({
 
             <h2>Application sent!</h2>
 
-            <p>
-              Your application has been sent to the brand. We’ll
-              notify you when the brand makes a decision.
-            </p>
+            {isDemoCampaignId(campaign.id) ? (
+              <p>
+                This is a sample campaign shown for reference, so your
+                application is saved on this device only and is not sent to a
+                brand. Real campaigns will appear above it.
+              </p>
+            ) : (
+              <p>
+                Your application has been sent to the brand. We’ll
+                notify you when the brand makes a decision.
+              </p>
+            )}
 
             <button
               type="button"

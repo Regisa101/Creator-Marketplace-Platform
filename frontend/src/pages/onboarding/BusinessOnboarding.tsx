@@ -453,8 +453,8 @@ export function BusinessOnboarding() {
         .onb-back,.onb-skip{display:inline-flex;align-items:center;gap:6px;border:0!important;background:transparent!important;color:#666!important;box-shadow:none!important;outline:none!important;padding:0!important;font:400 12px Poppins,Arial,sans-serif;cursor:pointer}
         .onb-back:hover,.onb-back:focus,.onb-skip:hover,.onb-skip:focus{border:0!important;background:transparent!important;color:#111!important;box-shadow:none!important;outline:none!important}
         .onb-actions{display:flex;align-items:center;gap:17px}
-        .onb-primary{display:inline-flex;align-items:center;gap:7px;border:1px solid #111;border-radius:8px;background:#111;color:#fff;padding:11px 18px;font:400 12px Poppins,Arial,sans-serif;cursor:pointer;transition:transform .15s ease}
-        .onb-primary:hover{background:#000;transform:translateY(-1px)}
+        .onb-primary{display:inline-flex;align-items:center;gap:7px;border:1px solid #197935;border-radius:8px;background:#197935;color:#fff;padding:11px 18px;font:400 12px Poppins,Arial,sans-serif;cursor:pointer;transition:transform .15s ease}
+        .onb-primary:hover{background:#15672d;transform:translateY(-1px)}
         .onb-primary:disabled{opacity:.55;cursor:not-allowed;transform:none}
         .onb-loading{min-height:100vh;display:grid;place-items:center;color:#777;font:400 13px Poppins,Arial,sans-serif}
         @media(max-width:650px){.onb-page{padding:20px 15px 50px}.onb-top{margin-bottom:35px}.onb-progress h1{font-size:29px}.onb-steps{grid-template-columns:1fr 1fr}.onb-card{padding:26px 20px}.onb-grid{grid-template-columns:1fr}.onb-footer{align-items:flex-start}.onb-actions{flex-wrap:wrap;justify-content:flex-end}}

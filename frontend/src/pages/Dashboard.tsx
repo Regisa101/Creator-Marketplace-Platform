@@ -246,7 +246,7 @@ export function Dashboard() {
         .campaigns-tabs{display:flex;gap:8px;margin:0 0 8px}
         .campaigns-tabs .campaigns-tab{height:32px;padding:0 14px;border:1px solid #dedede;border-radius:999px;background:#fff;color:#111;font:500 12.5px 'Poppins',sans-serif;cursor:pointer;transition:background-color .15s ease,border-color .15s ease}
         .campaigns-tabs .campaigns-tab:hover{background:#f5f5f5;border-color:#c4c4c4}
-        .campaigns-tabs .campaigns-tab.active{background:#111;color:#fff;border-color:#111}
+        .campaigns-tabs .campaigns-tab.active{background:#197935;color:#fff;border-color:#197935}
         .campaigns-row{display:grid;grid-template-columns:minmax(0,1.7fr) 110px 120px 100px 28px;gap:12px;align-items:center;padding:18px 0;border-top:1px solid #e4e1d9;text-decoration:none;color:inherit}
         .campaigns-row:first-of-type{border-top:0}
         .campaigns-row:hover{background:rgba(0,0,0,.02)}

@@ -69,8 +69,8 @@ section,
 .btn:disabled,
 .btn[aria-disabled='true'] { opacity: .45; cursor: not-allowed; pointer-events: none; }
 
-.btn-primary { background: var(--btn-ink); color: #fff; border-color: var(--btn-ink); }
-.btn-primary:hover { background: #000; color: #fff; border-color: #000; }
+.btn-primary { background: #197935; color: #fff; border-color: #197935; }
+.btn-primary:hover { background: #15672d; color: #fff; border-color: #15672d; }
 
 .btn-secondary { background: #fff; color: var(--btn-ink); border-color: var(--btn-line); }
 .btn-secondary:hover { background: var(--btn-soft); color: var(--btn-ink); border-color: #c4c4c4; }
@@ -91,7 +91,7 @@ section,
   transition:background-color .15s ease, border-color .15s ease, color .15s ease;
 }
 .tab-pill:hover { background:var(--btn-soft); border-color:#c4c4c4; }
-.tab-pill.active { background:var(--btn-ink); color:#fff; border-color:var(--btn-ink); }
+.tab-pill.active { background:#197935; color:#fff; border-color:#197935; }
 .tab-count {
   min-width:20px; height:18px; padding:0 6px; display:inline-flex; align-items:center; justify-content:center;
   border-radius:999px; background:#f0f0f0; color:#555; font-size:10.5px; font-weight:600;
@@ -107,9 +107,9 @@ section,
    page's own class) always wins. This replaces the old global
    `button:not(:disabled)` rule, which beat every page's own styles. */
 :where(button:not([class]):not(:disabled)) {
-  background-color: #111111;
+  background-color: #197935;
   color: #ffffff;
-  border: 1px solid #111111;
+  border: 1px solid #197935;
   border-radius: var(--btn-radius);
   padding: 8px 14px;
   cursor: pointer;
@@ -147,7 +147,10 @@ a {
   color: #111111;
 }
 
-a:hover {
+/* Only plain links darken on hover. Links that carry a class (buttons, tabs,
+   cards...) keep the colour their own class gives them, so e.g. white text
+   on a green button never turns black. */
+:where(a:not([class])):hover {
   color: #000000;
 }
 

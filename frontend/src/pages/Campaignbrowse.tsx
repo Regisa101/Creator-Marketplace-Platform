@@ -20,6 +20,9 @@ import {
 
 import { useAuth } from '../context/AuthContext';
 import { AppLayout } from '../components/AppLayout';
+import { LogoMark } from '../components/Logo';
+import { brandDisplayName, isCreatorHub } from '../utils/brand';
+import { categoryImage } from '../utils/categoryArt';
 import { Campaigns } from './Campaigns';
 
 type CampaignTabKey = 'all' | 'current' | 'draft' | 'completed' | 'closed';
@@ -432,27 +435,25 @@ export function CampaignBrowse() {
                             to={`/brands/${campaign.business_id}`}
                             className="cb-business-profile-link"
                             onClick={(event) => event.stopPropagation()}
-                            aria-label={`View ${publicCampaign.brand_name || 'Business'} business profile`}
+                            aria-label={`View ${brandDisplayName(publicCampaign.brand_name, 'Business')} business profile`}
                           >
                             <div className="cb-business-avatar">
-                              {publicCampaign.brand_logo ? (
+                              {isCreatorHub(publicCampaign.brand_name) ? (
+                                <LogoMark size={22} />
+                              ) : (
                                 <img
-                                  src={publicCampaign.brand_logo}
+                                  src={
+                                    publicCampaign.brand_logo ||
+                                    categoryImage(publicCampaign.category, publicCampaign.brand_name)
+                                  }
                                   alt={`${publicCampaign.brand_name || 'Business'} logo`}
                                 />
-                              ) : (
-                                <span>
-                                  {(publicCampaign.brand_name || 'Business')
-                                    .trim()
-                                    .slice(0, 1)
-                                    .toUpperCase()}
-                                </span>
                               )}
                             </div>
 
                             <div className="cb-business-copy">
                               <strong>
-                                {publicCampaign.brand_name || 'Business'}
+                                {brandDisplayName(publicCampaign.brand_name, 'Business')}
                               </strong>
 
                               {!isBusiness && publicCampaign.brand_location && (
@@ -649,9 +650,9 @@ const STYLE = `
   gap:7px;
   min-height:40px;
   padding:0 15px;
-  background:#111;
+  background:#197935;
   color:#fff;
-  border:1px solid #111;
+  border:1px solid #197935;
   border-radius:8px;
   text-decoration:none;
   font-size:12px;
@@ -673,7 +674,7 @@ const STYLE = `
 }
 
 .cb-primary:hover{
-  background:#2b2b2b;
+  background:#15672d;
 }
 
 /* TABS */
@@ -706,9 +707,9 @@ const STYLE = `
 }
 
 .cb-tab.active{
-  background:#111;
+  background:#197935;
   color:#fff;
-  border-color:#111;
+  border-color:#197935;
 }
 
 .cb-tab-count{
@@ -1194,7 +1195,7 @@ const STYLE = `
 .cb-apply{
   flex:none;
   padding:7px 15px;
-  background:#111;
+  background:#197935;
   color:#fff;
   border-radius:8px;
   font-size:11px;
@@ -1202,7 +1203,7 @@ const STYLE = `
 }
 
 .cb-card:hover .cb-apply{
-  background:#2b2b2b;
+  background:#15672d;
 }
 
 /* RESPONSIVE */

@@ -1,4 +1,17 @@
 import axios from 'axios';
+import {
+  createDemoApplication,
+  filterDemoCampaigns,
+  getDemoApplications,
+  getDemoBusinessProfile,
+  getDemoCampaign,
+  getDemoSavedEntries,
+  isDemoApplicationId,
+  isDemoCampaignId,
+  removeDemoApplication,
+  saveDemoCampaign,
+  unsaveDemoCampaign,
+} from './demoCampaigns';
 
 const API_BASE_URL = '/api';
 
@@ -287,6 +300,7 @@ export interface PublicBusinessProfile {
   website?: string | null;
   description?: string | null;
   logo_url?: string | null;
+  cover_url?: string | null;
   social_links?: Record<string, string | undefined>;
   interested_categories: string[];
   preferred_content_types: string[];
@@ -571,11 +585,59 @@ export const getCampaignDefaults = async (): Promise<CampaignDefaults | null> =>
 };
 export const saveCampaignDefaults = (data: CampaignDefaults) => unwrap(api.patch<CampaignDefaults>('/onboarding/business/campaign-defaults', data));
 
-export const getPublicBusinessProfile = (businessId: number | string) => unwrap(api.get<PublicBusinessProfile>(`/businesses/${businessId}/public-profile`));
+export const getPublicBusinessProfile = async (businessId: number | string) => {
+  if (isDemoCampaignId(businessId)) {
+    const sample = getDemoBusinessProfile(businessId);
+    if (sample) return sample;
+  }
+  return unwrap(api.get<PublicBusinessProfile>(`/businesses/${businessId}/public-profile`));
+};
 export const getCampaigns = (params?: CampaignListParams) => unwrap(api.get<CampaignListResponse>('/campaigns', { params }));
-export const getPublicCampaigns = (params?: PublicCampaignListParams) => unwrap(api.get<PublicCampaignListResponse>('/campaigns/public', { params }));
-export const getPublicCampaign = (id: number | string) => unwrap(api.get<PublicCampaign>(`/campaigns/public/${id}`));
-export const getCampaign = (id: number | string) => unwrap(api.get<Campaign>(`/campaigns/${id}`));
+export const getPublicCampaigns = async (params?: PublicCampaignListParams): Promise<PublicCampaignListResponse> => {
+  // Real campaigns always come first. Sample campaigns are appended after the
+  // last real one (see api/demoCampaigns.ts).
+  const samples = filterDemoCampaigns(params);
+  const page = params?.page ?? 1;
+
+  let real: PublicCampaignListResponse;
+  try {
+    real = await unwrap(api.get<PublicCampaignListResponse>('/campaigns/public', { params }));
+  } catch (error) {
+    // A page past the last real page may be rejected by the API; in that case
+    // read page 1 only to learn how many real campaigns exist.
+    if (page > 1 && samples.length) {
+      const first = await unwrap(api.get<PublicCampaignListResponse>('/campaigns/public', { params: { ...params, page: 1 } }));
+      real = { ...first, campaigns: [] };
+    } else {
+      throw error;
+    }
+  }
+
+  if (!samples.length) return real;
+
+  const limit = params?.limit ?? real.limit ?? (real.campaigns.length || samples.length);
+  const realTotal = real.total ?? real.campaigns.length;
+  const offset = (page - 1) * limit;
+
+  let campaigns = real.campaigns;
+  if (campaigns.length < limit && offset + campaigns.length >= realTotal) {
+    const start = Math.max(0, offset + campaigns.length - realTotal);
+    campaigns = [...campaigns, ...samples.slice(start, start + limit - campaigns.length)];
+  }
+
+  const total = realTotal + samples.length;
+  return { ...real, campaigns, total, page, limit, pages: Math.max(1, Math.ceil(total / limit)) };
+};
+export const getPublicCampaign = async (id: number | string): Promise<PublicCampaign> => {
+  const sample = isDemoCampaignId(id) ? getDemoCampaign(id) : null;
+  if (sample) return sample;
+  return unwrap(api.get<PublicCampaign>(`/campaigns/public/${id}`));
+};
+export const getCampaign = async (id: number | string): Promise<Campaign> => {
+  const sample = isDemoCampaignId(id) ? getDemoCampaign(id) : null;
+  if (sample) return sample;
+  return unwrap(api.get<Campaign>(`/campaigns/${id}`));
+};
 export const createCampaign = (data: CampaignCreateData) => unwrap(api.post<Campaign>('/campaigns', data));
 export const duplicateCampaign = (id: number | string) => unwrap(api.post<Campaign>(`/campaigns/${id}/duplicate`, {}));
 export const updateCampaign = (id: number | string, data: Partial<CampaignCreateData>) => unwrap(api.put<Campaign>(`/campaigns/${id}`, data));
@@ -583,8 +645,22 @@ export const publishCampaign = (id: number | string) => unwrap(api.put<Campaign>
 export const deleteCampaign = async (id: number | string) => { await api.delete(`/campaigns/${id}`); };
 export const closeCampaign = (id: number | string) => unwrap(api.put<Campaign>(`/campaigns/${id}/close`, {}));
 
-export const createApplication = (data: ApplicationCreateData) => unwrap(api.post<Application>('/applications', data));
-export const getApplications = (params?: { campaign_id?: number; status?: string }) => unwrap(api.get<Application[]>('/applications', { params }));
+export const createApplication = async (data: ApplicationCreateData): Promise<Application> => {
+  // Sample campaigns: the application is kept in this browser only.
+  if (isDemoCampaignId(data.campaign_id)) return createDemoApplication(data);
+  return unwrap(api.post<Application>('/applications', data));
+};
+export const getApplications = async (params?: { campaign_id?: number; status?: string }): Promise<Application[]> => {
+  if (params?.campaign_id != null && isDemoCampaignId(params.campaign_id)) {
+    return getDemoApplications(params.campaign_id);
+  }
+
+  const real = await unwrap(api.get<Application[]>('/applications', { params }));
+  if (params?.campaign_id != null) return real;
+
+  const samples = getDemoApplications().filter((a) => !params?.status || a.status === params.status);
+  return [...real, ...samples];
+};
 export interface SelectionResult {
   application_id: number;
   contract_id: number;
@@ -597,7 +673,13 @@ export interface SelectionResult {
 export const selectApplication = (id: number) =>
   unwrap(api.post<SelectionResult>(`/applications/${id}/select`));
 export const updateApplicationStatus = (id: number, status: 'rejected') => unwrap(api.put<Application>(`/applications/${id}`, { status }));
-export const withdrawApplication = (id: number) => unwrap(api.delete<{ message: string }>(`/applications/${id}`));
+export const withdrawApplication = async (id: number): Promise<{ message: string }> => {
+  if (isDemoApplicationId(id)) {
+    removeDemoApplication(id);
+    return { message: 'Application withdrawn' };
+  }
+  return unwrap(api.delete<{ message: string }>(`/applications/${id}`));
+};
 
 export const getContracts = (status?: string) => unwrap(api.get<Contract[]>('/contracts', { params: status ? { status } : undefined }));
 export const getContract = (id: number) => unwrap(api.get<Contract>(`/contracts/${id}`));
@@ -681,15 +763,28 @@ function notifyWishlistChanged() {
   window.dispatchEvent(new Event('ch:wishlist-changed'));
 }
 export const saveCampaign = async (campaignId: number) => {
+  if (isDemoCampaignId(campaignId)) {
+    const sample = saveDemoCampaign(campaignId);
+    notifyWishlistChanged();
+    return sample;
+  }
   const result = await unwrap(api.post<SavedCampaignEntry>('/saved-campaigns/', { campaign_id: campaignId }));
   notifyWishlistChanged();
   return result;
 };
 export const unsaveCampaign = async (campaignId: number) => {
+  if (isDemoCampaignId(campaignId)) {
+    unsaveDemoCampaign(campaignId);
+    notifyWishlistChanged();
+    return;
+  }
   await api.delete(`/saved-campaigns/${campaignId}`);
   notifyWishlistChanged();
 };
-export const getSavedCampaigns = () => unwrap(api.get<SavedCampaignEntry[]>('/saved-campaigns/'));
+export const getSavedCampaigns = async (): Promise<SavedCampaignEntry[]> => {
+  const real = await unwrap(api.get<SavedCampaignEntry[]>('/saved-campaigns/'));
+  return [...real, ...getDemoSavedEntries()];
+};
 
 export const getCreatorProfile = (id: number | string) => unwrap(api.get<PublicCreatorProfile>(`/creators/${id}`));
 

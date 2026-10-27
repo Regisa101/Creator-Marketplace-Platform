@@ -18,6 +18,7 @@ import {
 } from '../api/client';
 import { useAuth } from '../context/AuthContext';
 import { PublicNavbar } from '../components/PublicNavbar';
+import { brandDisplayName } from '../utils/brand';
 
 const API_ORIGIN = 'http://localhost:8000';
 
@@ -199,8 +200,8 @@ export function CreatorDashboard() {
         .cd2-head{display:flex;justify-content:space-between;align-items:flex-start;gap:16px;margin-bottom:22px}
         .cd2-head h1{margin:0;font:600 24px 'League Spartan',Poppins,sans-serif;letter-spacing:-.02em}
         .cd2-head p{margin:4px 0 0;font-size:12px;color:#777}
-        .cd2-btn{display:inline-flex;align-items:center;justify-content:center;gap:7px;min-height:38px;padding:0 16px;border-radius:9px;border:1px solid #111;background:#111;color:#fff;font:500 12px Poppins,sans-serif;text-decoration:none;cursor:pointer}
-        .cd2-btn:hover{background:#000;color:#fff}
+        .cd2-btn{display:inline-flex;align-items:center;justify-content:center;gap:7px;min-height:38px;padding:0 16px;border-radius:9px;border:1px solid #197935;background:#197935;color:#fff;font:500 12px Poppins,sans-serif;text-decoration:none;cursor:pointer}
+        .cd2-btn:hover{background:#15672d;color:#fff}
         .cd2-btn--ghost{background:#fff;color:#111;border-color:#ddd;width:100%}
         .cd2-btn--ghost:hover{background:#f5f5f5;color:#111}
         .cd2-stats{display:grid;grid-template-columns:repeat(4,1fr);gap:16px;margin-bottom:30px}
@@ -373,7 +374,7 @@ export function CreatorDashboard() {
                             }
                           }}
                         >
-                          {c.brand_name || 'Brand'}
+                          {brandDisplayName(c.brand_name)}
                         </span>
                       </small>
                       <div className="cd2-tags">

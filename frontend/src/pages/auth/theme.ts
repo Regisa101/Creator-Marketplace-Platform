@@ -19,8 +19,8 @@ export const ROLE_THEME: Record<Role, RoleTheme> = {
   creator: {
     role: "creator",
     label: "Creator",
-    accent: "#111111",
-    accentHover: "#000000",
+    accent: "#197935",
+    accentHover: "#15672d",
     accentSoft: "#F5F5F5",
     gradientFrom: "#F8C6C2",
     gradientTo: "#FFF7F6",
@@ -33,8 +33,8 @@ export const ROLE_THEME: Record<Role, RoleTheme> = {
   business: {
     role: "business",
     label: "Brand",
-    accent: "#111111",
-    accentHover: "#000000",
+    accent: "#197935",
+    accentHover: "#15672d",
     accentSoft: "#F3F3F3",
     gradientFrom: "#D3D3D3",
     gradientTo: "#F9F9F9",

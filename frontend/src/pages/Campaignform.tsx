@@ -2394,9 +2394,9 @@ const CSS = `
   flex:0 0 auto;
   min-width:115px;
   padding:11px 16px;
-  border:1px solid #111 !important;
+  border:1px solid #197935 !important;
   border-radius:8px;
-  background:#111 !important;
+  background:#197935 !important;
   color:#fff !important;
   font:500 12px Poppins,Arial,sans-serif !important;
 }
@@ -3537,8 +3537,8 @@ const CSS = `
   justify-content:center!important;
   gap:7px!important;
   min-height:40px;
-  border:1px solid #111!important;
-  background:#111!important;
+  border:1px solid #197935!important;
+  background:#197935!important;
   color:#fff!important;
   border-radius:8px;
   padding:11px 18px;
@@ -3568,8 +3568,8 @@ const CSS = `
 }
 
 .cf-btn.black:hover:not(:disabled){
-  border-color:#111!important;
-  background:#111!important;
+  border-color:#15672d!important;
+  background:#15672d!important;
   color:#fff!important;
   transform:translateY(-1px);
   box-shadow:none!important;
@@ -3588,8 +3588,8 @@ const CSS = `
 .cf-btn.black:focus,
 .cf-btn.black:focus-visible,
 .cf-btn.black:active{
-  border-color:#111!important;
-  background:#111!important;
+  border-color:#15672d!important;
+  background:#15672d!important;
   color:#fff!important;
   outline:none!important;
   box-shadow:none!important;

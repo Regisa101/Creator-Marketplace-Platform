@@ -166,8 +166,8 @@ export function KhaltiPaymentForm({
           transition: background-color .15s ease, border-color .15s ease, opacity .15s ease;
         }
         .kp-btn:disabled { opacity: .55; cursor: not-allowed; }
-        .kp-btn-primary { flex: 1; border: 1px solid #111; background: #111; color: #fff; }
-        .kp-btn-primary:hover:not(:disabled) { background: #000; }
+        .kp-btn-primary { flex: 1; border: 1px solid #197935; background: #197935; color: #fff; }
+        .kp-btn-primary:hover:not(:disabled) { background: #15672d; }
         .kp-btn-secondary { padding: 0 20px; border: 1px solid #dcdcdc; background: #fff; color: #333; }
         .kp-btn-secondary:hover:not(:disabled) { background: #f5f5f5; border-color: #c4c4c4; }
 

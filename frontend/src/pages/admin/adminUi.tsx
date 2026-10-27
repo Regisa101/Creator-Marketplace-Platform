@@ -778,7 +778,7 @@ const ADMIN_CSS = `
 .adm-pills .adm-pill { box-sizing: border-box; appearance: none; -webkit-appearance: none; display: inline-flex; align-items: center; justify-content: center; flex: 0 0 auto; gap: 6px; width: auto; height: 34px; min-height: 34px; max-height: 34px; margin: 0; padding: 0 14px; border: 1px solid #e0e0e0; border-radius: 999px; background: #fff; color: #555; font: 500 12px/1 Poppins, sans-serif; letter-spacing: 0; text-transform: none; text-align: center; white-space: nowrap; vertical-align: middle; box-shadow: none; outline: none; cursor: pointer; transition: background .15s, color .15s, border-color .15s; }
 .adm-pills .adm-pill:hover { background: #fff; border-color: #bbb; color: #111; box-shadow: none; }
 .adm-pills .adm-pill:focus-visible { outline: 2px solid #111; outline-offset: 2px; }
-.adm-pills .adm-pill.active, .adm-pills .adm-pill.active:hover { background: #111; border-color: #111; color: #fff; }
+.adm-pills .adm-pill.active, .adm-pills .adm-pill.active:hover { background: #197935; border-color: #197935; color: #fff; }
 .adm-pills .adm-pill-count { display: inline-block; font-size: 10px; line-height: 1; opacity: .65; }
 
 .adm-table-wrap { width: 100%; overflow-x: auto; }
