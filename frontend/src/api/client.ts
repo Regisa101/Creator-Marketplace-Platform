@@ -661,6 +661,41 @@ export const getApplications = async (params?: { campaign_id?: number; status?: 
   const samples = getDemoApplications().filter((a) => !params?.status || a.status === params.status);
   return [...real, ...samples];
 };
+export type TrackerStatusGroup = 'under_review' | 'accepted' | 'rejected' | 'withdrawn';
+
+export interface TrackerApplication {
+  id: number;
+  campaign_id: number;
+  campaign_title?: string | null;
+  campaign_category?: string | null;
+  brand_name?: string | null;
+  brand_logo?: string | null;
+  platforms: string[];
+  applied_platform?: string | null;
+  compensation?: string | null;
+  raw_status: string;
+  status_group: TrackerStatusGroup;
+  can_withdraw: boolean;
+  contract_id?: number | null;
+  created_at: string;
+  updated_at?: string | null;
+}
+
+export interface ApplicationTracker {
+  summary: {
+    total: number;
+    under_review: number;
+    accepted: number;
+    rejected: number;
+    withdrawn: number;
+  };
+  applications: TrackerApplication[];
+}
+
+/** The signed-in creator's own applications (real records only, no sample data). */
+export const getApplicationTracker = (sort: 'newest' | 'oldest' = 'newest') =>
+  unwrap(api.get<ApplicationTracker>('/applications/tracker', { params: { sort } }));
+
 export interface SelectionResult {
   application_id: number;
   contract_id: number;

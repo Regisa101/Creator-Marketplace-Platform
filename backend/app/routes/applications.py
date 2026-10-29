@@ -16,7 +16,14 @@ from app.dependencies.auth import (
 )
 from app.models import User, Campaign, Application
 from app.models.campaign import CampaignStatus
-from app.schemas.application import ApplicationCreate, ApplicationResponse, ApplicationUpdate
+from app.schemas.application import (
+    ApplicationCreate,
+    ApplicationResponse,
+    ApplicationUpdate,
+    TrackerApplication,
+    TrackerResponse,
+    TrackerSummary,
+)
 from app.services.notifications import create_notification
 from app.services.pricing import (
     campaign_fee_rate,
@@ -212,6 +219,134 @@ async def get_applications(
     return [_response(app, app.campaign) for app in applications]
 
 
+# ============================================================
+# CREATOR APPLICATION TRACKER
+# ============================================================
+
+# Every backend status maps to exactly ONE bucket, so the summary cards
+# always add up to the total (no double counting).
+_STATUS_GROUPS = {
+    "pending": "under_review",
+    "selected": "under_review",
+    "payment_pending": "under_review",
+    "accepted": "accepted",
+    "completed": "accepted",
+    "rejected": "rejected",
+    "withdrawn": "withdrawn",
+}
+
+
+def _status_group(status: str | None) -> str:
+    return _STATUS_GROUPS.get((status or "").lower(), "under_review")
+
+
+def _money(value) -> str:
+    n = float(value)
+    return f"NPR {n:,.0f}" if n == int(n) else f"NPR {n:,.2f}"
+
+
+def _compensation_label(app: Application, campaign: Campaign | None) -> str | None:
+    """Only real stored values are used; returns None when nothing is known."""
+    if app.rate_locked and app.agreed_rate is not None:
+        return _money(app.agreed_rate)
+    if not campaign:
+        return None
+    if campaign.budget is not None:
+        return _money(campaign.budget)
+    if campaign.budget_min is not None and campaign.budget_max is not None:
+        return f"{_money(campaign.budget_min)} – {_money(campaign.budget_max)}"
+    return (campaign.compensation_description or "").strip() or None
+
+
+def _campaign_platforms(campaign: Campaign | None) -> list[str]:
+    # required_platform(s) are DB columns that may not be mapped on the model,
+    # so read them defensively.
+    if not campaign:
+        return []
+    many = getattr(campaign, "required_platforms", None)
+    if isinstance(many, list) and many:
+        return [str(p) for p in many if p]
+    one = getattr(campaign, "required_platform", None)
+    return [str(one)] if one else []
+
+
+def _applied_platform(link: str | None) -> str | None:
+    host = (link or "").lower()
+    if "instagram.com" in host or "instagr.am" in host:
+        return "Instagram"
+    if "tiktok.com" in host:
+        return "TikTok"
+    if "facebook.com" in host or "fb.com" in host:
+        return "Facebook"
+    return None
+
+
+@router.get("/tracker", response_model=TrackerResponse)
+async def get_application_tracker(
+    sort: str = Query("newest", pattern="^(newest|oldest)$"),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_creator),
+):
+    """The authenticated creator's own applications, with summary counts.
+
+    Scoped by creator_id from the JWT, so one creator can never see another's data.
+    """
+    from app.models import Contract
+
+    order = Application.created_at.asc() if sort == "oldest" else Application.created_at.desc()
+    apps = (
+        db.query(Application)
+        .filter(Application.creator_id == current_user.id)
+        .order_by(order, Application.id.desc())
+        .all()
+    )
+
+    contracts = {}
+    if apps:
+        rows = db.query(Contract).filter(Contract.application_id.in_([a.id for a in apps])).all()
+        contracts = {c.application_id: c for c in rows}
+
+    summary = TrackerSummary(total=len(apps))
+    items: list[TrackerApplication] = []
+    for a in apps:
+        group = _status_group(a.status)
+        setattr(summary, group, getattr(summary, group) + 1)
+
+        campaign = a.campaign
+        business = campaign.business if campaign else None
+        profile = (business.profile or {}) if business else {}
+        brand_name = (
+            "CreatorHub" if business is not None and business.role == "admin"
+            else profile.get("company_name") or (business.full_name if business else None)
+        )
+        contract = contracts.get(a.id)
+        # Creators may only withdraw while the application is still pending and
+        # the brand has not started a contract for it.
+        can_withdraw = a.status == "pending" and contract is None
+
+        items.append(
+            TrackerApplication(
+                id=a.id,
+                campaign_id=a.campaign_id,
+                campaign_title=campaign.title if campaign else None,
+                campaign_category=campaign.category if campaign else None,
+                brand_name=brand_name,
+                brand_logo=profile.get("logo_url"),
+                platforms=_campaign_platforms(campaign),
+                applied_platform=_applied_platform(a.social_link),
+                compensation=_compensation_label(a, campaign),
+                raw_status=a.status or "pending",
+                status_group=group,
+                can_withdraw=can_withdraw,
+                contract_id=contract.id if contract and contract.status in ("active", "completed") else None,
+                created_at=a.created_at,
+                updated_at=a.updated_at,
+            )
+        )
+
+    return TrackerResponse(summary=summary, applications=items)
+
+
 def build_evidence_snapshot(campaign, application, rate) -> dict:
     """Immutable record of what was agreed when a creator is selected."""
     return {
@@ -373,11 +508,35 @@ async def withdraw_application(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_creator),
 ):
+    from app.models import Contract
+
     application = db.query(Application).filter(Application.id == application_id).first()
     if not application or application.creator_id != current_user.id:
         raise HTTPException(status_code=404, detail="Application not found.")
     if application.status != "pending":
         raise HTTPException(status_code=400, detail="Only pending applications can be withdrawn.")
+
+    # Once the brand has started a contract for this application it is no longer
+    # a plain pending application, so the creator cannot pull out from here.
+    has_contract = db.query(Contract).filter(Contract.application_id == application.id).first()
+    if has_contract:
+        raise HTTPException(
+            status_code=400,
+            detail="The brand has already started a contract for this application, so it can no longer be withdrawn.",
+        )
+
     application.status = "withdrawn"
+    campaign = application.campaign
+    if campaign:
+        create_notification(
+            db,
+            user_id=campaign.business_id,
+            type="application_withdrawn",
+            title="Application withdrawn",
+            message=f"{current_user.full_name} withdrew their application to {campaign.title}.",
+            link=f"/applications?campaign={campaign.id}",
+            reference_id=application.id,
+            event_key=f"application-withdrawn:{application.id}",
+        )
     db.commit()
     return {"message": "Application withdrawn successfully."}

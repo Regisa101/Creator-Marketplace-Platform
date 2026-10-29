@@ -455,7 +455,9 @@ export function CampaignDetail() {
   };
 
   const renderFrame = (content: ReactNode) => {
-    if (fromLanding) {
+    // Creators always get the landing-page navbar (the same one used on the
+    // dashboard and campaign browse pages), never the brand dashboard shell.
+    if (fromLanding || isCreator) {
       // Reuse the exact navbar used by the home page. Do not duplicate or
       // restyle the navbar here.
       return (
@@ -582,7 +584,7 @@ export function CampaignDetail() {
   ) : null;
 
   return renderFrame(
-    <main className="cd-page">
+    <main className={`cd-page${isCreator ? ' cd-page--white' : ''}`}>
       <style>{STYLE}</style>
       <div className="cd-shell">
         {/* BACK */}
@@ -1782,6 +1784,9 @@ const STYLE = `
 
 /* Mobile apply bar */
 .cd-mobilebar{display:none}
+
+/* Creators see a plain white page background */
+.cd-page--white{background:#fff}
 
 @media(max-width:960px){
   .cd-layout{grid-template-columns:1fr}

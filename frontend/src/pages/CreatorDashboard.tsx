@@ -195,7 +195,7 @@ export function CreatorDashboard() {
   return (
     <div className="cd2-page">
       <style>{`
-        .cd2-page{min-height:100vh;background:#fcfaf9;font-family:Poppins,sans-serif;color:#111}
+        .cd2-page{min-height:100vh;background:#fff;font-family:Poppins,sans-serif;color:#111}
         .cd2-wrap{max-width:1180px;margin:0 auto;padding:100px 24px 60px}
         .cd2-head{display:flex;justify-content:space-between;align-items:flex-start;gap:16px;margin-bottom:22px}
         .cd2-head h1{margin:0;font:600 24px 'League Spartan',Poppins,sans-serif;letter-spacing:-.02em}
@@ -291,6 +291,9 @@ export function CreatorDashboard() {
           <div className="cd2-stat">
             <div className="cd2-stat-label"><span>Applications</span></div>
             <div className="cd2-stat-value">{applications.length}</div>
+            <Link to="/applications" className="cd2-link" style={{ display: 'inline-block', marginTop: 6 }}>
+              Track applications
+            </Link>
           </div>
 
           <div className="cd2-stat">
@@ -446,5 +449,3 @@ export function CreatorDashboard() {
     </div>
   );
 }
-
-export default CreatorDashboard;
