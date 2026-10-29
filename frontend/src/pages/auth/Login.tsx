@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { ArrowRight, Eye, EyeOff } from "lucide-react";
 import { useAuth } from "../../context/AuthContext";
 import { AuthLayout } from "./AuthLayout";
@@ -9,6 +9,7 @@ const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 export function Login() {
   const navigate = useNavigate();
+  const [params] = useSearchParams();
   const { loginUser } = useAuth();
 
   const [email, setEmail] = useState("");
@@ -16,6 +17,15 @@ export function Login() {
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+
+  // Set when the user clicked "Apply" while logged out. It points back to the
+  // campaign page with ?apply=true so the application popup opens after login.
+  // Only internal paths are accepted (blocks //evil.com style open redirects).
+  const redirect = params.get("redirect");
+  const safeRedirect =
+    redirect && redirect.startsWith("/") && !redirect.startsWith("//")
+      ? redirect
+      : null;
 
   const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -48,13 +58,20 @@ export function Login() {
         password,
       });
 
-      const current = JSON.parse(localStorage.getItem('user') || '{}');
-      if (current.role === 'admin') {
-        navigate('/admin', { replace: true });
-      } else if (current.role === 'business') {
-        navigate('/dashboard', { replace: true });
+      // Came from an "Apply" click: go back to that campaign (popup opens).
+      if (safeRedirect) {
+        navigate(safeRedirect, { replace: true });
+        return;
+      }
+
+      // Normal login: homepage for creators, dashboards for the others.
+      const current = JSON.parse(localStorage.getItem("user") || "{}");
+      if (current.role === "admin") {
+        navigate("/admin", { replace: true });
+      } else if (current.role === "business") {
+        navigate("/dashboard", { replace: true });
       } else {
-        navigate('/', { replace: true });
+        navigate("/", { replace: true });
       }
     } catch (err: any) {
       setError(

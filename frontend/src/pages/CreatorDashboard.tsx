@@ -19,6 +19,7 @@ import {
 import { useAuth } from '../context/AuthContext';
 import { PublicNavbar } from '../components/PublicNavbar';
 import { brandDisplayName } from '../utils/brand';
+import { buildSuggestions, norm } from '../utils/recommend';
 
 const API_ORIGIN = 'http://localhost:8000';
 
@@ -28,8 +29,6 @@ function mediaUrl(value?: string | null) {
   if (value.startsWith('/api/')) return `${API_ORIGIN}${value}`;
   return `${API_ORIGIN}/${value.replace(/^\/+/, '')}`;
 }
-
-const norm = (v?: string | null) => (v || '').trim().toLowerCase();
 
 /* ------------------------------------------------------------
    Profile completion: share of key profile fields that are filled.
@@ -54,34 +53,6 @@ function profileCompletion(profile: any, socials: any[]) {
   ];
 
   return Math.round((checks.filter(Boolean).length / checks.length) * 100);
-}
-
-/* ------------------------------------------------------------
-   Recommendation basis (kept simple and explainable):
-   +3  campaign category matches one of the creator's niches
-   +2  campaign requires a platform the creator has connected
-   +1  campaign is aimed at the creator's creator type
-   Campaigns the creator already applied to, or whose application
-   deadline has passed, are left out. Ties go to the newest campaign.
-   If nothing matches, the newest open campaigns are shown instead.
------------------------------------------------------------- */
-function scoreCampaign(c: PublicCampaign, niches: string[], platforms: string[], creatorType: string) {
-  let score = 0;
-  let nicheMatch = false;
-
-  if (niches.includes(norm(c.category))) {
-    score += 3;
-    nicheMatch = true;
-  }
-
-  const required = [...(c.required_platforms || []), c.required_platform || '']
-    .map(norm)
-    .filter(Boolean);
-  if (required.some((p) => platforms.includes(p))) score += 2;
-
-  if (creatorType && (c.creator_types || []).map(norm).includes(creatorType)) score += 1;
-
-  return { score, nicheMatch };
 }
 
 function campaignTags(c: PublicCampaign) {
@@ -130,7 +101,7 @@ export function CreatorDashboard() {
         getCreatorProgress(),
         getApplications(),
         getSavedCampaigns(),
-        getPublicCampaigns({ limit: 30 }),
+        getPublicCampaigns({ page: 1, limit: 100 }),
         getContracts(),
       ]);
 
@@ -162,30 +133,10 @@ export function CreatorDashboard() {
   const completion = profileCompletion(profile, socials);
 
   const { recommended, personalised } = useMemo(() => {
-    const niches = (profile?.categories || []).map(norm);
-    const platforms = socials.map((s) => norm(s.platform));
-    const creatorType = norm(profile?.creator_type);
     const applied = new Set(applications.map((a) => a.campaign_id));
-    const now = Date.now();
-
-    const open = campaigns.filter(
-      (c) =>
-        !applied.has(c.id) &&
-        (!c.application_deadline || new Date(c.application_deadline).getTime() >= now),
-    );
-
-    const scored = open
-      .map((c) => ({ c, ...scoreCampaign(c, niches, platforms, creatorType) }))
-      .sort(
-        (a, b) =>
-          b.score - a.score ||
-          new Date(b.c.created_at).getTime() - new Date(a.c.created_at).getTime(),
-      );
-
-    const matched = scored.filter((s) => s.score > 0);
-    const list = (matched.length > 0 ? matched : scored).slice(0, 6);
-
-    return { recommended: list, personalised: matched.length > 0 };
+    const { list, personalised } = buildSuggestions(campaigns, profile, socials, applied);
+    // Only real matches: no fallback to "latest campaigns".
+    return { recommended: personalised ? list.slice(0, 6) : [], personalised };
   }, [campaigns, profile, socials, applications]);
 
   const firstName =
@@ -336,26 +287,22 @@ export function CreatorDashboard() {
             <section className="cd2-section">
               <div className="cd2-section-head">
                 <h2>Recommended Campaigns</h2>
-                <Link to="/campaigns" className="cd2-viewall">View all</Link>
+                {personalised && (
+                  <Link to="/campaigns?suggested=true" className="cd2-viewall">Show more</Link>
+                )}
               </div>
-              <p className="cd2-section-sub">
-                {personalised
-                  ? 'Picked from your niches, connected platforms and creator type.'
-                  : 'Latest open campaigns. Add niches and social accounts to your profile for better matches.'}
-              </p>
 
               {!loading && recommended.length === 0 ? (
                 <div className="cd2-empty">
-                  <h3>No open campaigns right now</h3>
-                  <p>New campaigns appear here as brands publish them.</p>
+                  <h3>No suggestions yet</h3>
+                  <p>Add your niches and connect social accounts in your profile so we can suggest campaigns for you.</p>
                 </div>
               ) : (
                 <div className="cd2-reco">
-                  {recommended.map(({ c, nicheMatch }) => (
+                  {recommended.map(({ c }) => (
                     <Link key={c.id} to={`/campaigns/${c.id}?source=dashboard`} className="cd2-card">
                       <div className="cd2-card-top">
                         <span>{compensationLabel(c)}</span>
-                        {nicheMatch && <span className="cd2-badge">Matches your niche</span>}
                       </div>
                       <h3>{c.title}</h3>
                       <small>

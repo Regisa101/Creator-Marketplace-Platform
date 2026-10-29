@@ -1,9 +1,10 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { parseSocialLink } from '../utils/Social';
-import { Check, ChevronDown, FileSignature, Loader2, X, ExternalLink, ZoomIn } from 'lucide-react';
+import { Check, ChevronDown, FileSignature, Loader2, Sparkles, X, ExternalLink, ZoomIn } from 'lucide-react';
 import { Link, useSearchParams } from 'react-router-dom';
-import { getApplications, selectApplication, updateApplicationStatus, finalizeContract, getContract, getCreatorProfile, getPublicBusinessProfile, type Application, type Contract } from '../api/client';
+import { getApplications, getCampaign, getPublicCampaigns, selectApplication, updateApplicationStatus, finalizeContract, getContract, getCreatorProfile, getPublicBusinessProfile, type Application, type Contract, type PublicCreatorProfile } from '../api/client';
+import { scoreCreator, type CreatorMatch } from '../utils/creatorMatch';
 import { AppLayout } from '../components/AppLayout';
 import { useAuth } from '../context/AuthContext';
 import { KhaltiPaymentForm } from '../components/KhaltiPaymentForm';
@@ -118,7 +119,7 @@ export function ApplicationsInbox() {
   const load = async (silent = false) => {
     if (!silent) setLoading(true);
     setError('');
-    try { setApplications(await getApplications(campaignFilter ? { campaign_id: campaignFilter } : undefined)); }
+    try { setApplications(await getApplications()); }
     catch (err: any) { setError(err?.response?.data?.detail || 'Could not load applications.'); }
     finally { setLoading(false); }
   };
@@ -128,6 +129,92 @@ export function ApplicationsInbox() {
     const timer = window.setInterval(() => { if (document.visibilityState === 'visible') void load(true); }, 12000);
     return () => window.clearInterval(timer);
   }, [user?.role, campaignFilter]);
+
+  /* ------------------------------------------------------------
+     CREATOR MATCH
+     Each applicant is scored against the campaign they applied to
+     (see utils/creatorMatch.ts). Profiles and campaigns are fetched
+     once and cached, so the 12-second refresh does not refetch them.
+  ------------------------------------------------------------ */
+  const [sortMode, setSortMode] = useState<'suggested' | 'newest'>('suggested');
+  // Campaign filter (also opened from ?campaign=ID)
+  const [campaignSel, setCampaignSel] = useState(campaignFilter ? String(campaignFilter) : '');
+  const [profiles, setProfiles] = useState<Record<number, PublicCreatorProfile | null>>({});
+  const [campaignInfo, setCampaignInfo] = useState<Record<number, any>>({});
+  const [ranking, setRanking] = useState(false);
+  const inflight = useRef<Set<string>>(new Set());
+  const alive = useRef(true);
+  useEffect(() => { alive.current = true; return () => { alive.current = false; }; }, []);
+
+  useEffect(() => {
+    if (user?.role !== 'business' || applications.length === 0) return;
+
+    const creatorIds = [...new Set(applications.map(a => a.creator_id))]
+      .filter(id => !(id in profiles) && !inflight.current.has(`p:${id}`));
+    const campaignIds = [...new Set(applications.map(a => a.campaign_id))]
+      .filter(id => !(id in campaignInfo) && !inflight.current.has(`c:${id}`));
+    if (creatorIds.length === 0 && campaignIds.length === 0) return;
+
+    creatorIds.forEach(id => inflight.current.add(`p:${id}`));
+    campaignIds.forEach(id => inflight.current.add(`c:${id}`));
+    setRanking(true);
+
+    (async () => {
+      const [profileResults, campaignResults, publicList] = await Promise.all([
+        Promise.allSettled(creatorIds.map(id => getCreatorProfile(id))),
+        Promise.allSettled(campaignIds.map(id => getCampaign(id))),
+        // the public list also carries the required platforms / creator requirements
+        campaignIds.length > 0
+          ? getPublicCampaigns({ page: 1, limit: 100 }).then(r => r.campaigns || []).catch(() => [])
+          : Promise.resolve([]),
+      ]);
+      if (!alive.current) return;
+
+      const publicById = new Map<number, any>((publicList as any[]).map(c => [c.id, c]));
+
+      setProfiles(prev => {
+        const next = { ...prev };
+        creatorIds.forEach((id, i) => {
+          const r = profileResults[i];
+          next[id] = r.status === 'fulfilled' ? r.value : null;
+        });
+        return next;
+      });
+      setCampaignInfo(prev => {
+        const next = { ...prev };
+        campaignIds.forEach((id, i) => {
+          const r = campaignResults[i];
+          const base = r.status === 'fulfilled' ? r.value : null;
+          const pub = publicById.get(id);
+          next[id] = base || pub ? { ...(base || {}), ...(pub || {}) } : null;
+        });
+        return next;
+      });
+      creatorIds.forEach(id => inflight.current.delete(`p:${id}`));
+      campaignIds.forEach(id => inflight.current.delete(`c:${id}`));
+      setRanking(false);
+    })();
+  }, [applications, user?.role]);
+
+  const matches = useMemo(() => {
+    const result: Record<number, CreatorMatch> = {};
+    applications.forEach(app => {
+      const creator = profiles[app.creator_id];
+      const campaign = campaignInfo[app.campaign_id];
+      if (creator && campaign) result[app.id] = scoreCreator(campaign, creator, app.rate);
+    });
+    return result;
+  }, [applications, profiles, campaignInfo]);
+
+  const campaignOptions = useMemo(() => {
+    const map = new Map<number, { id: number; title: string; count: number }>();
+    applications.forEach(app => {
+      const entry = map.get(app.campaign_id) || { id: app.campaign_id, title: app.campaign_title || `Campaign #${app.campaign_id}`, count: 0 };
+      entry.count += 1;
+      map.set(app.campaign_id, entry);
+    });
+    return [...map.values()].sort((a, b) => a.title.localeCompare(b.title));
+  }, [applications]);
 
   const reject = async (app: Application) => {
     setBusy(app.id); setError('');
@@ -206,6 +293,7 @@ export function ApplicationsInbox() {
   // ---- tab counts, search + filtered list ----
   const query = search.trim().toLowerCase();
   const searched = applications.filter(app => {
+    if (campaignSel && String(app.campaign_id) !== campaignSel) return false;
     if (!query) return true;
     return [app.creator_name, app.campaign_title, statusLabel(app.status)]
       .filter(Boolean)
@@ -220,12 +308,125 @@ export function ApplicationsInbox() {
 
   const visible = searched.filter(app => tab === 'all' || appTabOf(app.status) === tab);
 
+  // "Best match first": pending applications on top, then highest match score.
+  const byNewest = (a: Application, b: Application) =>
+    new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
+  const ordered = sortMode === 'suggested'
+    ? [...visible].sort((a, b) =>
+        Number(b.status === 'pending') - Number(a.status === 'pending') ||
+        (matches[b.id]?.score ?? -1) - (matches[a.id]?.score ?? -1) ||
+        byNewest(a, b))
+    : [...visible].sort(byNewest);
+  // When ONE campaign is selected, its strong matches (Top / Good) that are still
+  // pending are shown in their own "Suggested creators" section above the rest.
+  const isSuggestedApp = (app: Application) =>
+    app.status === 'pending' && (matches[app.id]?.tier ?? 'none') !== 'none';
+  const showSuggested = !!campaignSel && (tab === 'all' || tab === 'pending');
+  const suggestedApps = showSuggested
+    ? visible.filter(isSuggestedApp).sort((a, b) => (matches[b.id]?.score ?? 0) - (matches[a.id]?.score ?? 0))
+    : [];
+  const otherApps = showSuggested ? ordered.filter(app => !isSuggestedApp(app)) : ordered;
+  const pendingCount = applications.filter(app => app.status === 'pending' && (!campaignSel || String(app.campaign_id) === campaignSel)).length;
+
   const toggleExpanded = (id: number) =>
     setExpanded(prev => {
       const next = new Set(prev);
       if (next.has(id)) next.delete(id); else next.add(id);
       return next;
     });
+
+  const renderCard = (app: Application) => {
+          const works = ((app.selected_portfolio || []) as any[]).filter(w => w?.media_url);
+          const isOpen = expanded.has(app.id);
+          const answers = app.application_answers || [];
+          const social = parseSocialLink(app.social_link);
+          const match = matches[app.id];
+          return <article className="ab-card" key={app.id}>
+            <div className="ab-row-card">
+              <Link className="ab-person" to={`/creators/${app.creator_id}`}>
+                <div className="ab-avatar">{app.creator_avatar ? <img src={mediaUrl(app.creator_avatar)} alt=""/> : (app.creator_name || 'C').slice(0,1).toUpperCase()}</div>
+                <div className="ab-person-text">
+                  <div className="ab-name">{app.creator_name || `Creator #${app.creator_id}`}<ExternalLink size={11} color="#999"/></div>
+                  <div className="ab-date">Applied {new Date(app.created_at).toLocaleDateString()}</div>
+                  {match && app.status === 'pending' && (
+                    <span className={`ab-match ab-match--${match.tier}`}>
+                      {match.tier !== 'none' && <Sparkles size={10}/>} {match.tier === 'top' ? 'Top match' : match.tier === 'good' ? 'Good match' : 'Low match'} · {match.score}%
+                    </span>
+                  )}
+                </div>
+              </Link>
+
+              <div className="ab-info">
+                <div className="ab-campaign">{app.campaign_title || `Campaign #${app.campaign_id}`}</div>
+                {social && (
+                  <a className="ab-social" href={social.url} target="_blank" rel="noopener noreferrer nofollow" onClick={e => e.stopPropagation()}>
+                    {social.platform} · {social.handle} <ExternalLink size={11}/>
+                  </a>
+                )}
+                <div className="ab-amounts">
+                  {[
+                    app.campaign_budget != null ? `Budget NPR ${Number(app.campaign_budget).toLocaleString()}` : '',
+                    app.rate != null ? `Proposed NPR ${Number(app.rate).toLocaleString()}` : '',
+                  ].filter(Boolean).join('  ·  ') || 'No amounts added'}
+                </div>
+                {match && match.reasons.length > 0 && app.status === 'pending' && (
+                  <div className="ab-reasons">{match.reasons.join('  ·  ')}</div>
+                )}
+              </div>
+
+              <span className={`ab-status ab-status--${app.status}`}>{statusLabel(app.status)}</span>
+
+              <div className="ab-actions">
+                <button type="button" className="btn btn-ghost btn-sm" onClick={() => toggleExpanded(app.id)} aria-expanded={isOpen}>
+                  Details <ChevronDown size={14} className={`ab-chevron ${isOpen ? 'open' : ''}`}/>
+                </button>
+                {app.status === 'pending' && <>
+                  <button type="button" className="btn btn-primary btn-sm" disabled={busy === app.id} onClick={() => void select(app)}>
+                    {busy === app.id ? <Loader2 size={14} className="ab-spin"/> : <FileSignature size={14}/>} Create contract
+                  </button>
+                  <button type="button" className="btn btn-secondary btn-sm" disabled={busy === app.id} onClick={() => void reject(app)}>
+                    <X size={14}/> Reject
+                  </button>
+                </>}
+              </div>
+            </div>
+
+            {isOpen && <div className="ab-details">
+              <div>
+                <div className="ab-heading">Social profile</div>
+                <div className="ab-answer">
+                  {social
+                    ? <a className="ab-social" href={social.url} target="_blank" rel="noopener noreferrer nofollow">{social.platform} · {social.handle} <ExternalLink size={11}/></a>
+                    : 'No social profile was added.'}
+                </div>
+                <div className="ab-heading">Screening answers</div>
+                {answers.length === 0
+                  ? <div className="ab-answer">No screening questions were added.</div>
+                  : answers.map((answer,i)=><div className="ab-answer" key={i}><strong>{answer.question}</strong><br/>{answer.answer}</div>)}
+              </div>
+              <div>
+                <div className="ab-heading">Work sample</div>
+                {works.length === 0
+                  ? <div className="ab-answer">No work image attached.</div>
+                  : <div className="ab-works">
+                      {works.map((work, i) => (
+                        <button
+                          type="button"
+                          key={`${work.media_url}-${i}`}
+                          className="ab-work"
+                          onClick={() => setPreview({ src: mediaUrl(work.media_url), title: work.title || 'Work sample' })}
+                          aria-label={`View ${work.title || 'work sample'} full size`}
+                        >
+                          <img src={mediaUrl(work.media_url)} alt={work.title || 'Work sample'}/>
+                          <span className="ab-work-zoom"><ZoomIn size={13}/> View</span>
+                          <span className="ab-work-title">{work.title || 'Work sample'}</span>
+                        </button>
+                      ))}
+                    </div>}
+              </div>
+            </div>}
+          </article>;
+  };
 
   return <AppLayout
     title="Applications"
@@ -235,7 +436,7 @@ export function ApplicationsInbox() {
     searchPlaceholder="Search applications"
   >
     <style>{`
-      .ab-wrap{max-width:1040px;margin:0 auto;padding-bottom:50px}
+      .ab-wrap{width:100%;margin:0;padding:0 24px 50px;box-sizing:border-box}
       .ab-error{padding:11px 13px;background:#f8eeee;color:#ad2929;border-radius:9px;font:500 12px Poppins,sans-serif;margin-bottom:14px}
       .ab-empty{padding:48px 20px;text-align:center;color:#777;font:500 13px Poppins,sans-serif}
       .ab-list{display:flex;flex-direction:column;gap:8px}
@@ -253,6 +454,20 @@ export function ApplicationsInbox() {
       .ab-social{display:inline-flex;align-items:center;gap:5px;margin-top:2px;font:500 11.5px Poppins,sans-serif;color:#111;text-decoration:underline;text-underline-offset:3px;max-width:100%;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
       .ab-social:hover{color:#000}
       .ab-amounts{margin-top:2px;font:400 11px Poppins,sans-serif;color:#777;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+      .ab-group{display:flex;align-items:center;gap:7px;margin:10px 2px 2px;font:600 12.5px Poppins,sans-serif;color:#15672d}
+      .ab-group span{display:inline-flex;align-items:center;justify-content:center;min-width:20px;height:20px;padding:0 6px;border-radius:999px;background:#e8f5ec;font:600 10.5px Poppins,sans-serif}
+      .ab-group--other{color:#666;margin-top:14px}
+      .ab-group--other span{background:#f1f1f1;color:#666}
+      .ab-sortnote{font:400 11.5px Poppins,sans-serif;color:#777}
+      .ab-toolbar{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-bottom:14px}
+      .ab-toolbar .tab-row{margin-bottom:0}
+      .ab-filters{display:flex;align-items:center;gap:8px}
+      .ab-filters select{height:36px;max-width:240px;padding:0 10px;border:1px solid #ddd;border-radius:8px;background:#fff;color:#111;font:500 12px Poppins,sans-serif;cursor:pointer}
+      .ab-match{display:inline-flex;align-items:center;gap:4px;margin-top:4px;padding:2px 8px;border-radius:999px;font:600 10px Poppins,sans-serif;white-space:nowrap}
+      .ab-match--top{background:#e8f5ec;color:#15672d}
+      .ab-match--none{background:#f3f3f3;color:#777}
+      .ab-match--good{background:#eef3fb;color:#2a5aa5}
+      .ab-reasons{margin-top:2px;font:400 11px Poppins,sans-serif;color:#15672d;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
       .ab-status{display:inline-flex;align-items:center;padding:4px 10px;border-radius:999px;font:500 11px Poppins,sans-serif;background:#f3f3f3;color:#555;white-space:nowrap}
       .ab-status--pending,.ab-status--selected{background:#fff6e5;color:#9a6a08}
       .ab-status--accepted{background:#e9f6ee;color:#1e8a4c}
@@ -278,7 +493,6 @@ export function ApplicationsInbox() {
       .ab-lightbox img{display:block;max-width:100%;max-height:calc(100vh - 110px);border-radius:12px;background:#fff;object-fit:contain}
       .ab-lightbox-title{color:#fff;font:500 12px Poppins,sans-serif}
       .ab-lightbox-close{position:absolute;top:-12px;right:-12px;width:34px;height:34px;border-radius:50%;border:0;background:#fff;color:#111;display:flex;align-items:center;justify-content:center;cursor:pointer;box-shadow:0 2px 10px rgba(0,0,0,.25)}
-      .ab-selected-note{display:inline-flex;align-items:center;gap:5px;font:500 11px Poppins,sans-serif;color:#1e8a4c}
       .ab-modal-backdrop{position:fixed;inset:0;z-index:20000;background:rgba(15,15,18,.52);display:flex;align-items:center;justify-content:center;padding:24px;backdrop-filter:blur(3px)}
       .ab-modal{width:min(900px,100%);max-height:calc(100vh - 48px);display:flex;flex-direction:column;background:#fff;border:1px solid #e7e7e7;border-radius:20px;box-shadow:0 28px 80px rgba(0,0,0,.26);position:relative;overflow:hidden;font-family:Poppins,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}
       .ab-modal-head{display:flex;align-items:center;justify-content:space-between;gap:16px;padding:20px 28px;border-bottom:1px solid #eee}
@@ -340,21 +554,44 @@ export function ApplicationsInbox() {
       {error && <div className="ab-error">{error}</div>}
 
       {!loading && applications.length > 0 && (
-        <div className="tab-row" role="tablist" aria-label="Application status">
-          {APP_TABS.map(item => (
-            <button
-              key={item.key}
-              type="button"
-              role="tab"
-              aria-selected={tab === item.key}
-              className={`tab-pill ${tab === item.key ? 'active' : ''}`}
-              onClick={() => setTab(item.key)}
-            >
-              {item.label}
-              {tabCounts[item.key] > 0 && <span className="tab-count">{tabCounts[item.key]}</span>}
-            </button>
-          ))}
+        <div className="ab-toolbar">
+          <div className="tab-row" role="tablist" aria-label="Application status">
+            {APP_TABS.map(item => (
+              <button
+                key={item.key}
+                type="button"
+                role="tab"
+                aria-selected={tab === item.key}
+                className={`tab-pill ${tab === item.key ? 'active' : ''}`}
+                onClick={() => setTab(item.key)}
+              >
+                {item.label}
+                {tabCounts[item.key] > 0 && <span className="tab-count">{tabCounts[item.key]}</span>}
+              </button>
+            ))}
+          </div>
+
+          <div className="ab-filters">
+            {campaignOptions.length > 1 && (
+              <select aria-label="Filter by campaign" value={campaignSel} onChange={e => setCampaignSel(e.target.value)}>
+                <option value="">All campaigns</option>
+                {campaignOptions.map(c => (
+                  <option key={c.id} value={String(c.id)}>{c.title} ({c.count})</option>
+                ))}
+              </select>
+            )}
+            {pendingCount > 1 && (
+              <select aria-label="Sort applications" value={sortMode} onChange={e => setSortMode(e.target.value as 'suggested' | 'newest')}>
+                <option value="suggested">Best match first</option>
+                <option value="newest">Newest first</option>
+              </select>
+            )}
+          </div>
         </div>
+      )}
+
+      {!loading && ranking && sortMode === 'suggested' && pendingCount > 0 && (
+        <div className="ab-sortnote" style={{ marginBottom: 10 }}>Ranking creators by fit…</div>
       )}
 
       {loading && <div className="ab-empty">Loading applications…</div>}
@@ -363,95 +600,21 @@ export function ApplicationsInbox() {
         <div className="ab-empty">
           {query
             ? 'No applications match your search.'
-            : `No ${APP_TABS.find(t => t.key === tab)?.label.toLowerCase()} yet.`}
+            : campaignSel
+              ? 'No applications for this campaign in this view.'
+              : `No ${APP_TABS.find(t => t.key === tab)?.label.toLowerCase()} yet.`}
         </div>
       )}
 
       <div className="ab-list">
-        {!loading && visible.map(app => {
-          const works = ((app.selected_portfolio || []) as any[]).filter(w => w?.media_url);
-          const isOpen = expanded.has(app.id);
-          const answers = app.application_answers || [];
-          const social = parseSocialLink(app.social_link);
-          return <article className="ab-card" key={app.id}>
-            <div className="ab-row-card">
-              <Link className="ab-person" to={`/creators/${app.creator_id}`}>
-                <div className="ab-avatar">{app.creator_avatar ? <img src={mediaUrl(app.creator_avatar)} alt=""/> : (app.creator_name || 'C').slice(0,1).toUpperCase()}</div>
-                <div className="ab-person-text">
-                  <div className="ab-name">{app.creator_name || `Creator #${app.creator_id}`}<ExternalLink size={11} color="#999"/></div>
-                  <div className="ab-date">Applied {new Date(app.created_at).toLocaleDateString()}</div>
-                </div>
-              </Link>
-
-              <div className="ab-info">
-                <div className="ab-campaign">{app.campaign_title || `Campaign #${app.campaign_id}`}</div>
-                {social && (
-                  <a className="ab-social" href={social.url} target="_blank" rel="noopener noreferrer nofollow" onClick={e => e.stopPropagation()}>
-                    {social.platform} · {social.handle} <ExternalLink size={11}/>
-                  </a>
-                )}
-                <div className="ab-amounts">
-                  {[
-                    app.campaign_budget != null ? `Budget NPR ${Number(app.campaign_budget).toLocaleString()}` : '',
-                    app.rate != null ? `Proposed NPR ${Number(app.rate).toLocaleString()}` : '',
-                  ].filter(Boolean).join('  ·  ') || 'No amounts added'}
-                </div>
-              </div>
-
-              <span className={`ab-status ab-status--${app.status}`}>{statusLabel(app.status)}</span>
-
-              <div className="ab-actions">
-                <button type="button" className="btn btn-ghost btn-sm" onClick={() => toggleExpanded(app.id)} aria-expanded={isOpen}>
-                  Details <ChevronDown size={14} className={`ab-chevron ${isOpen ? 'open' : ''}`}/>
-                </button>
-                {app.status === 'pending' && <>
-                  <button type="button" className="btn btn-primary btn-sm" disabled={busy === app.id} onClick={() => void select(app)}>
-                    {busy === app.id ? <Loader2 size={14} className="ab-spin"/> : <FileSignature size={14}/>} Create contract
-                  </button>
-                  <button type="button" className="btn btn-secondary btn-sm" disabled={busy === app.id} onClick={() => void reject(app)}>
-                    <X size={14}/> Reject
-                  </button>
-                </>}
-                {app.status === 'accepted' && <span className="ab-selected-note"><Check size={13}/> Creator selected</span>}
-              </div>
-            </div>
-
-            {isOpen && <div className="ab-details">
-              <div>
-                <div className="ab-heading">Social profile</div>
-                <div className="ab-answer">
-                  {social
-                    ? <a className="ab-social" href={social.url} target="_blank" rel="noopener noreferrer nofollow">{social.platform} · {social.handle} <ExternalLink size={11}/></a>
-                    : 'No social profile was added.'}
-                </div>
-                <div className="ab-heading">Screening answers</div>
-                {answers.length === 0
-                  ? <div className="ab-answer">No screening questions were added.</div>
-                  : answers.map((answer,i)=><div className="ab-answer" key={i}><strong>{answer.question}</strong><br/>{answer.answer}</div>)}
-              </div>
-              <div>
-                <div className="ab-heading">Work sample</div>
-                {works.length === 0
-                  ? <div className="ab-answer">No work image attached.</div>
-                  : <div className="ab-works">
-                      {works.map((work, i) => (
-                        <button
-                          type="button"
-                          key={`${work.media_url}-${i}`}
-                          className="ab-work"
-                          onClick={() => setPreview({ src: mediaUrl(work.media_url), title: work.title || 'Work sample' })}
-                          aria-label={`View ${work.title || 'work sample'} full size`}
-                        >
-                          <img src={mediaUrl(work.media_url)} alt={work.title || 'Work sample'}/>
-                          <span className="ab-work-zoom"><ZoomIn size={13}/> View</span>
-                          <span className="ab-work-title">{work.title || 'Work sample'}</span>
-                        </button>
-                      ))}
-                    </div>}
-              </div>
-            </div>}
-          </article>;
-        })}
+        {!loading && suggestedApps.length > 0 && (
+          <div className="ab-group"><Sparkles size={14}/> Suggested creators <span>{suggestedApps.length}</span></div>
+        )}
+        {!loading && suggestedApps.map(renderCard)}
+        {!loading && suggestedApps.length > 0 && otherApps.length > 0 && (
+          <div className="ab-group ab-group--other">Other applicants <span>{otherApps.length}</span></div>
+        )}
+        {!loading && otherApps.map(renderCard)}
       </div>
     </div>
 

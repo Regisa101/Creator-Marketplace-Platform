@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
+import { createPortal } from 'react-dom';
 
 import { parseSocialLink } from '../utils/Social';
 
@@ -12,6 +13,7 @@ import {
   type CreatorPortfolioItemData,
 } from '../api/client';
 import { isDemoCampaignId } from '../api/demoCampaigns';
+import { mediaUrl } from './PublicProfileKit';
 
 type Props = {
   isOpen: boolean;
@@ -23,24 +25,6 @@ type Props = {
 // Maximum number of work images a creator can send with one application.
 // Keep this in sync with MAX_WORKS in backend routers/applications.py.
 const MAX_WORKS = 5;
-
-function mediaUrl(value?: string | null) {
-  if (!value) return '';
-
-  if (
-    /^(https?:)?\/\//i.test(value) ||
-    value.startsWith('data:') ||
-    value.startsWith('blob:')
-  ) {
-    return value;
-  }
-
-  if (value.startsWith('/api/')) {
-    return `http://localhost:8000${value}`;
-  }
-
-  return `http://localhost:8000/${value.replace(/^\/+/, '')}`;
-}
 
 function errorMessage(error: any, fallback: string) {
   return error?.response?.data?.detail || fallback;
@@ -119,6 +103,7 @@ export function ApplyModal({
     };
   }, [isOpen, campaign.id]);
 
+  // Lock background scroll while the popup is open.
   useEffect(() => {
     if (!isOpen) return;
 
@@ -182,9 +167,7 @@ export function ApplyModal({
 
       setSelected((current) => [...current, newIndex]);
     } catch (err) {
-      setError(
-        errorMessage(err, 'Could not upload the work image.'),
-      );
+      setError(errorMessage(err, 'Could not upload the work image.'));
     } finally {
       setUploading(false);
     }
@@ -218,9 +201,7 @@ export function ApplyModal({
       return;
     }
 
-    const missing = questions.findIndex(
-      (_, index) => !answers[index]?.trim(),
-    );
+    const missing = questions.findIndex((_, index) => !answers[index]?.trim());
 
     if (missing !== -1) {
       setError(`Please answer question ${missing + 1}.`);
@@ -257,14 +238,14 @@ export function ApplyModal({
     }
   };
 
-  return (
+  // Rendered in a portal on document.body so it is always positioned against
+  // the screen (never against a transformed/animated parent) and therefore
+  // shows exactly where the user currently is, on any page.
+  return createPortal(
     <div
       className="apply-overlay"
       onMouseDown={(e) => {
-        if (
-          e.target === e.currentTarget &&
-          !submitting
-        ) {
+        if (e.target === e.currentTarget && !submitting) {
           onClose();
         }
       }}
@@ -276,28 +257,24 @@ export function ApplyModal({
 
         .apply-overlay {
           position: fixed;
-
-          /*
-           * IMPORTANT:
-           * Keep the overlay below the navbar.
-           * Change 76px only if your actual navbar
-           * height is different.
-           */
-          top: 76px;
+          top: 0;
           left: 0;
           right: 0;
           bottom: 0;
 
-          z-index: 900;
+          /* above navbars and every other layer */
+          z-index: 20000;
 
           background: rgba(15, 15, 18, 0.52);
           backdrop-filter: blur(5px);
+          -webkit-backdrop-filter: blur(5px);
 
+          /* centered in the visible screen */
           display: flex;
-          align-items: flex-start;
+          align-items: center;
           justify-content: center;
 
-          padding: 24px 18px 30px;
+          padding: 24px 18px;
 
           overflow-y: auto;
           box-sizing: border-box;
@@ -305,13 +282,7 @@ export function ApplyModal({
 
         .apply-modal {
           width: min(620px, 100%);
-
-          /*
-           * Since the navbar occupies 76px,
-           * keep the modal inside the remaining viewport.
-           */
-          max-height: calc(100vh - 120px);
-
+          max-height: calc(100vh - 48px);
           overflow-y: auto;
 
           background: #fff;
@@ -339,10 +310,6 @@ export function ApplyModal({
 
           border-bottom: 1px solid #eee;
 
-          /*
-           * Sticky only inside the modal.
-           * It will NOT overlap the navbar.
-           */
           position: sticky;
           top: 0;
 
@@ -362,38 +329,27 @@ export function ApplyModal({
 
         .apply-title {
           margin: 5px 0 0;
-
           font: 700 21px/1.15 Poppins, sans-serif;
-
           color: #111;
         }
 
         .apply-sub {
           margin: 5px 0 0;
-
           font: 400 12px/1.5 Poppins, sans-serif;
-
           color: #777;
         }
 
         .apply-close {
           width: 34px;
           height: 34px;
-
           flex: none;
-
           border: 1px solid #e5e5e5;
-
           border-radius: 50%;
-
           background: #fff;
-
           display: flex;
           align-items: center;
           justify-content: center;
-
           cursor: pointer;
-
           color: #111;
         }
 
@@ -412,7 +368,6 @@ export function ApplyModal({
 
         .apply-body {
           padding: 22px 24px 24px;
-
           box-sizing: border-box;
         }
 
@@ -427,15 +382,12 @@ export function ApplyModal({
         .apply-section-title {
           font: 700 13px Poppins, sans-serif;
           color: #171717;
-
           margin-bottom: 9px;
         }
 
         .apply-help {
           font: 400 11.5px/1.55 Poppins, sans-serif;
-
           color: #85818c;
-
           margin: 0 0 10px;
         }
 
@@ -451,11 +403,8 @@ export function ApplyModal({
 
         .apply-label {
           font: 600 12px Poppins, sans-serif;
-
           color: #222;
-
           display: block;
-
           margin-bottom: 6px;
         }
 
@@ -470,16 +419,11 @@ export function ApplyModal({
         .apply-rate {
           width: 100%;
           height: 42px;
-
           border: 1px solid #ddd;
           border-radius: 10px;
-
           padding: 0 11px;
-
           outline: none;
-
           font: 400 12.5px Poppins, sans-serif;
-
           box-sizing: border-box;
         }
 
@@ -489,20 +433,13 @@ export function ApplyModal({
 
         .apply-textarea {
           width: 100%;
-
           min-height: 88px;
-
           border: 1px solid #ddd;
           border-radius: 10px;
-
           padding: 10px 11px;
-
           resize: vertical;
-
           outline: none;
-
           font: 400 12.5px/1.5 Poppins, sans-serif;
-
           box-sizing: border-box;
         }
 
@@ -516,27 +453,18 @@ export function ApplyModal({
 
         .apply-grid {
           display: grid;
-
           grid-template-columns: repeat(3, 1fr);
-
           gap: 9px;
         }
 
         .apply-work {
           position: relative;
-
           border: 1px solid #e2e2e2;
-
           border-radius: 10px;
-
           overflow: hidden;
-
           background: #fafafa;
-
           cursor: pointer;
-
           padding: 0;
-
           text-align: left;
         }
 
@@ -550,43 +478,29 @@ export function ApplyModal({
 
         .apply-work img {
           display: block;
-
           width: 100%;
-
           aspect-ratio: 1;
-
           object-fit: cover;
         }
 
         .apply-work-name {
           font: 500 9.5px Poppins, sans-serif;
-
           padding: 6px;
-
           white-space: nowrap;
-
           overflow: hidden;
-
           text-overflow: ellipsis;
-
           color: #444;
         }
 
         .apply-check {
           position: absolute;
-
           right: 6px;
           top: 6px;
-
           width: 22px;
           height: 22px;
-
           border-radius: 50%;
-
           background: #111;
-
           color: #fff;
-
           display: flex;
           align-items: center;
           justify-content: center;
@@ -598,25 +512,16 @@ export function ApplyModal({
 
         .apply-upload {
           border: 1px dashed #cfcfcf;
-
           border-radius: 10px;
-
           min-height: 90px;
-
           display: flex;
           align-items: center;
           justify-content: center;
-
           gap: 8px;
-
           cursor: pointer;
-
           font: 600 11px Poppins, sans-serif;
-
           color: #555;
-
           margin-top: 10px;
-
           box-sizing: border-box;
         }
 
@@ -635,15 +540,10 @@ export function ApplyModal({
 
         .apply-error {
           padding: 10px 12px;
-
           border-radius: 9px;
-
           background: #f7eeee;
-
           color: #b12828;
-
           font: 500 11.5px/1.45 Poppins, sans-serif;
-
           margin-bottom: 14px;
         }
 
@@ -653,36 +553,25 @@ export function ApplyModal({
 
         .apply-actions {
           display: flex;
-
           justify-content: flex-end;
-
           gap: 9px;
-
           border-top: 1px solid #eee;
-
           padding-top: 17px;
-
           margin-top: 4px;
         }
 
         .apply-cancel,
         .apply-submit {
           height: 40px;
-
           padding: 0 16px;
-
           border-radius: 9px;
-
           font: 600 12px Poppins, sans-serif;
-
           cursor: pointer;
         }
 
         .apply-cancel {
           background: #fff;
-
           border: 1px solid #ddd;
-
           color: #555;
         }
 
@@ -693,14 +582,10 @@ export function ApplyModal({
 
         .apply-submit {
           background: #197935;
-
           border: 1px solid #197935;
-
           color: #fff;
-
           display: flex;
           align-items: center;
-
           gap: 7px;
         }
 
@@ -710,7 +595,6 @@ export function ApplyModal({
 
         .apply-submit:disabled {
           opacity: 0.55;
-
           cursor: not-allowed;
         }
 
@@ -720,22 +604,16 @@ export function ApplyModal({
 
         .apply-success {
           text-align: center;
-
           padding: 48px 30px 42px;
         }
 
         .apply-success-icon {
           width: 58px;
           height: 58px;
-
           margin: 0 auto 16px;
-
           border-radius: 50%;
-
           background: #111;
-
           color: #fff;
-
           display: flex;
           align-items: center;
           justify-content: center;
@@ -743,39 +621,26 @@ export function ApplyModal({
 
         .apply-success h2 {
           font: 700 22px Poppins, sans-serif;
-
           margin: 0 0 8px;
-
           color: #111;
         }
 
         .apply-success p {
           max-width: 400px;
-
           margin: 0 auto;
-
           font: 400 13px/1.65 Poppins, sans-serif;
-
           color: #777;
         }
 
         .apply-success button {
           margin-top: 24px;
-
           height: 40px;
-
           padding: 0 20px;
-
           border: 0;
-
           border-radius: 9px;
-
           background: #197935;
-
           color: #fff;
-
           font: 600 12px Poppins, sans-serif;
-
           cursor: pointer;
         }
 
@@ -803,30 +668,23 @@ export function ApplyModal({
 
         @media (max-width: 760px) {
           .apply-overlay {
-            top: 70px;
-
-            padding: 16px 12px 24px;
+            padding: 16px 12px;
           }
 
           .apply-modal {
-            max-height: calc(100vh - 90px);
-
+            max-height: calc(100vh - 32px);
             border-radius: 17px;
           }
         }
 
         @media (max-width: 560px) {
           .apply-overlay {
-            top: 70px;
-
-            padding: 10px 8px 18px;
+            padding: 10px 8px;
           }
 
           .apply-modal {
             width: 100%;
-
-            max-height: calc(100vh - 82px);
-
+            max-height: calc(100vh - 20px);
             border-radius: 15px;
           }
 
@@ -851,7 +709,6 @@ export function ApplyModal({
           .apply-cancel,
           .apply-submit {
             width: 100%;
-
             justify-content: center;
           }
         }
@@ -874,15 +731,12 @@ export function ApplyModal({
               </p>
             ) : (
               <p>
-                Your application has been sent to the brand. We’ll
-                notify you when the brand makes a decision.
+                Your application has been sent to the brand. We’ll notify you
+                when the brand makes a decision.
               </p>
             )}
 
-            <button
-              type="button"
-              onClick={onClose}
-            >
+            <button type="button" onClick={onClose}>
               Done
             </button>
           </div>
@@ -890,17 +744,12 @@ export function ApplyModal({
           <>
             <div className="apply-head">
               <div>
-                <div className="apply-eyebrow">
-                  Apply to campaign
-                </div>
+                <div className="apply-eyebrow">Apply to campaign</div>
 
-                <h2 className="apply-title">
-                  {campaign.title}
-                </h2>
+                <h2 className="apply-title">{campaign.title}</h2>
 
                 <p className="apply-sub">
-                  Answer the questions and send your most
-                  relevant work.
+                  Answer the questions and send your most relevant work.
                 </p>
               </div>
 
@@ -917,29 +766,20 @@ export function ApplyModal({
 
             <div className="apply-body">
               {loading ? (
-                <div
-                  style={{
-                    padding: '35px 0',
-                    textAlign: 'center',
-                  }}
-                >
-                  <Loader2
-                    className="spin"
-                    size={20}
-                  />
+                <div style={{ padding: '35px 0', textAlign: 'center' }}>
+                  <Loader2 className="spin" size={20} />
                 </div>
               ) : (
                 <>
                   {/* WORK IMAGES */}
                   <section className="apply-section">
                     <div className="apply-section-title">
-                      1. Your work images * (
-                      {selected.length}/{MAX_WORKS})
+                      1. Your work images * ({selected.length}/{MAX_WORKS})
                     </div>
 
                     <p className="apply-help">
-                      Choose up to {MAX_WORKS} images that best
-                      represent work relevant to this campaign.
+                      Choose up to {MAX_WORKS} images that best represent work
+                      relevant to this campaign.
                     </p>
 
                     {portfolio.length > 0 && (
@@ -949,22 +789,13 @@ export function ApplyModal({
                             type="button"
                             key={`${item.media_url}-${index}`}
                             className={`apply-work ${
-                              selected.includes(index)
-                                ? 'selected'
-                                : ''
+                              selected.includes(index) ? 'selected' : ''
                             }`}
-                            onClick={() =>
-                              toggleWork(index)
-                            }
+                            onClick={() => toggleWork(index)}
                           >
                             <img
-                              src={mediaUrl(
-                                item.media_url,
-                              )}
-                              alt={
-                                item.title ||
-                                'Work sample'
-                              }
+                              src={mediaUrl(item.media_url)}
+                              alt={item.title || 'Work sample'}
                             />
 
                             {selected.includes(index) && (
@@ -974,8 +805,7 @@ export function ApplyModal({
                             )}
 
                             <div className="apply-work-name">
-                              {item.title ||
-                                'Work sample'}
+                              {item.title || 'Work sample'}
                             </div>
                           </button>
                         ))}
@@ -987,8 +817,7 @@ export function ApplyModal({
                         type="file"
                         accept="image/*"
                         onChange={(e) => {
-                          const file =
-                            e.target.files?.[0];
+                          const file = e.target.files?.[0];
 
                           if (file) {
                             void uploadWork(file);
@@ -999,10 +828,7 @@ export function ApplyModal({
                       />
 
                       {uploading ? (
-                        <Loader2
-                          size={16}
-                          className="spin"
-                        />
+                        <Loader2 size={16} className="spin" />
                       ) : (
                         <ImagePlus size={17} />
                       )}
@@ -1018,9 +844,8 @@ export function ApplyModal({
                     </div>
 
                     <p className="apply-help">
-                      Add your Instagram, TikTok or Facebook
-                      profile so the brand can check your
-                      content. This is required.
+                      Add your Instagram, TikTok or Facebook profile so the
+                      brand can check your content. This is required.
                     </p>
 
                     <input
@@ -1028,26 +853,19 @@ export function ApplyModal({
                       type="url"
                       inputMode="url"
                       value={socialLink}
-                      onChange={(e) =>
-                        setSocialLink(e.target.value)
-                      }
+                      onChange={(e) => setSocialLink(e.target.value)}
                       placeholder="https://instagram.com/yourname"
                     />
 
-                    {socialLink.trim() &&
-                      !parseSocialLink(socialLink) && (
-                        <div
-                          className="apply-help"
-                          style={{
-                            marginTop: 6,
-                            color: '#ad2929',
-                          }}
-                        >
-                          Use a profile link from
-                          instagram.com, tiktok.com or
-                          facebook.com.
-                        </div>
-                      )}
+                    {socialLink.trim() && !parseSocialLink(socialLink) && (
+                      <div
+                        className="apply-help"
+                        style={{ marginTop: 6, color: '#ad2929' }}
+                      >
+                        Use a profile link from instagram.com, tiktok.com or
+                        facebook.com.
+                      </div>
+                    )}
                   </section>
 
                   {/* SCREENING QUESTIONS */}
@@ -1058,35 +876,25 @@ export function ApplyModal({
                       </div>
 
                       <div className="apply-questions">
-                        {questions.map(
-                          (question, index) => (
-                            <label
-                              key={`${question}-${index}`}
-                            >
-                              <span className="apply-label">
-                                {question}{' '}
-                                <b>*</b>
-                              </span>
+                        {questions.map((question, index) => (
+                          <label key={`${question}-${index}`}>
+                            <span className="apply-label">
+                              {question} <b>*</b>
+                            </span>
 
-                              <textarea
-                                className="apply-textarea"
-                                value={
-                                  answers[index] || ''
-                                }
-                                onChange={(e) =>
-                                  setAnswers(
-                                    (current) => ({
-                                      ...current,
-                                      [index]:
-                                        e.target.value,
-                                    }),
-                                  )
-                                }
-                                placeholder="Your answer..."
-                              />
-                            </label>
-                          ),
-                        )}
+                            <textarea
+                              className="apply-textarea"
+                              value={answers[index] || ''}
+                              onChange={(e) =>
+                                setAnswers((current) => ({
+                                  ...current,
+                                  [index]: e.target.value,
+                                }))
+                              }
+                              placeholder="Your answer..."
+                            />
+                          </label>
+                        ))}
                       </div>
                     </section>
                   )}
@@ -1094,24 +902,16 @@ export function ApplyModal({
                   {/* PROPOSED COMPENSATION */}
                   <section className="apply-section">
                     <div className="apply-section-title">
-                      {questions.length > 0 ? '4' : '3'}.
-                      {' '}
-                      Proposed compensation{' '}
-                      <span
-                        style={{
-                          fontWeight: 400,
-                          color: '#999',
-                        }}
-                      >
+                      {questions.length > 0 ? '4' : '3'}. Proposed compensation{' '}
+                      <span style={{ fontWeight: 400, color: '#999' }}>
                         (optional)
                       </span>
                     </div>
 
                     <p className="apply-help">
-                      If you have a preferred rate, enter it
-                      here. For negotiable campaigns you can
-                      leave this blank and discuss the final
-                      amount with the brand after selection.
+                      If you have a preferred rate, enter it here. For
+                      negotiable campaigns you can leave this blank and discuss
+                      the final amount with the brand after selection.
                     </p>
 
                     <input
@@ -1120,27 +920,18 @@ export function ApplyModal({
                       min="0"
                       step="0.01"
                       value={rate}
-                      onChange={(e) =>
-                        setRate(e.target.value)
-                      }
+                      onChange={(e) => setRate(e.target.value)}
                       placeholder="e.g. 40000"
                     />
 
-                    <div
-                      className="apply-help"
-                      style={{ marginTop: 6 }}
-                    >
-                      Amount in NPR. This is your proposed
-                      rate, not a payment to CreatorHub.
+                    <div className="apply-help" style={{ marginTop: 6 }}>
+                      Amount in NPR. This is your proposed rate, not a payment
+                      to CreatorHub.
                     </div>
                   </section>
 
                   {/* ERROR */}
-                  {error && (
-                    <div className="apply-error">
-                      {error}
-                    </div>
-                  )}
+                  {error && <div className="apply-error">{error}</div>}
 
                   {/* ACTIONS */}
                   <div className="apply-actions">
@@ -1157,22 +948,15 @@ export function ApplyModal({
                       type="button"
                       className="apply-submit"
                       onClick={() => void submit()}
-                      disabled={
-                        submitting || uploading
-                      }
+                      disabled={submitting || uploading}
                     >
                       {submitting ? (
-                        <Loader2
-                          size={15}
-                          className="spin"
-                        />
+                        <Loader2 size={15} className="spin" />
                       ) : (
                         <Upload size={15} />
                       )}
 
-                      {submitting
-                        ? 'Sending...'
-                        : 'Send application'}
+                      {submitting ? 'Sending...' : 'Send application'}
                     </button>
                   </div>
                 </>
@@ -1181,7 +965,8 @@ export function ApplyModal({
           </>
         )}
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 }
 

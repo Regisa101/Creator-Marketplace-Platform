@@ -3,10 +3,12 @@ import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import {
   ArrowLeft,
   ArrowRight,
-  ChevronDown,
   Bookmark,
+  ChevronDown,
   MapPin,
   Search,
+  SlidersHorizontal,
+  X,
 } from "lucide-react";
 
 import { LogoMark } from "../components/Logo";
@@ -16,7 +18,11 @@ import { PublicNavbar } from "../components/PublicNavbar";
 import { brandDisplayName, isCreatorHub } from "../utils/brand";
 import { useAuth } from "../context/AuthContext";
 
+import { buildSuggestions } from "../utils/recommend";
+
 import {
+  getApplications,
+  getCreatorProgress,
   getPublicCampaigns,
   getSavedCampaigns,
   saveCampaign,
@@ -27,6 +33,12 @@ import {
 
 const API_ORIGIN = "http://localhost:8000";
 const CAMPAIGNS_PER_PAGE = 15;
+
+// Budget filter limits (NPR)
+const BUDGET_MIN = 1000;
+const BUDGET_MAX = 100000;
+
+const digitsOnly = (value: string) => value.replace(/\D/g, "");
 
 /* ============================================================
    HELPERS
@@ -140,76 +152,23 @@ function tagsFor(campaign: PublicCampaign) {
   return [...new Set(tags)].slice(0, 3);
 }
 
-/* ============================================================
-   SORT DROPDOWN
-============================================================ */
+/*
+  Filter text match: if the text is exactly one of the dropdown options
+  (picked from the list) it must match exactly; otherwise whatever the
+  creator typed is treated as "contains", so typing "kath" finds Kathmandu.
+*/
+function textMatches(
+  field: string | null | undefined,
+  query: string,
+  options: string[]
+) {
+  const q = query.trim().toLowerCase();
+  if (!q) return true;
 
-function SortDropdown({
-  value,
-  onChange,
-}: {
-  value: string;
-  onChange: (value: string) => void;
-}) {
-  const [open, setOpen] = useState(false);
+  const value = (field || "").trim().toLowerCase();
+  const exact = options.some((option) => option.trim().toLowerCase() === q);
 
-  const options = [
-    { value: "newest", label: "Newest" },
-    { value: "oldest", label: "Oldest" },
-    { value: "price-low", label: "Price: low" },
-    { value: "price-high", label: "Price: high" },
-  ];
-
-  const selected =
-    options.find((item) => item.value === value)?.label || "Newest";
-
-  return (
-    <div className="campaign-sort">
-      <button
-        type="button"
-        className="campaign-sort-button"
-        onClick={() => setOpen((current) => !current)}
-        aria-haspopup="listbox"
-        aria-expanded={open}
-      >
-        <span>{selected}</span>
-        <ChevronDown size={14} className={open ? "sort-open" : ""} />
-      </button>
-
-      {open && (
-        <>
-          <button
-            type="button"
-            className="sort-backdrop"
-            onClick={() => setOpen(false)}
-            aria-label="Close sort menu"
-          />
-
-          <div className="campaign-sort-menu" role="listbox">
-            {options.map((option) => (
-              <button
-                key={option.value}
-                type="button"
-                role="option"
-                aria-selected={value === option.value}
-                className={
-                  value === option.value
-                    ? "sort-option selected"
-                    : "sort-option"
-                }
-                onClick={() => {
-                  onChange(option.value);
-                  setOpen(false);
-                }}
-              >
-                {option.label}
-              </button>
-            ))}
-          </div>
-        </>
-      )}
-    </div>
-  );
+  return exact ? value === q : value.includes(q);
 }
 
 /* ============================================================
@@ -406,10 +365,14 @@ function CampaignCard({
 
 export function Campaigns() {
   const { user } = useAuth();
-  const [searchParams] = useSearchParams();
+  const [searchParams, setSearchParams] = useSearchParams();
 
   const isCreator = user?.role === "creator";
   const isAuthenticated = Boolean(user);
+
+  // /campaigns?suggested=true  →  only campaigns suggested for this creator
+  const suggestedMode =
+    isCreator && searchParams.get("suggested") === "true";
 
   const [campaigns, setCampaigns] = useState<PublicCampaign[]>([]);
   const [saved, setSaved] = useState<SavedCampaignEntry[]>([]);
@@ -423,7 +386,15 @@ export function Campaigns() {
   const [engagement, setEngagement] = useState("");
   const [experience, setExperience] = useState("");
   const [creatorType, setCreatorType] = useState("");
-  const [sort, setSort] = useState("newest");
+  // "default" = Best match in suggested mode, Newest otherwise
+  const [sort, setSort] = useState("default");
+  const [showFilters, setShowFilters] = useState(false);
+
+  // Creator profile data, used only to work out suggested campaigns
+  const [profile, setProfile] = useState<any>(null);
+  const [socials, setSocials] = useState<any[]>([]);
+  const [appliedIds, setAppliedIds] = useState<Set<number>>(new Set());
+  const [profileLoaded, setProfileLoaded] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
 
   /* ==========================================================
@@ -478,6 +449,67 @@ export function Campaigns() {
         console.error("Could not load saved campaigns", err);
       });
   }, [isCreator]);
+
+  useEffect(() => {
+    if (!isCreator) {
+      setProfileLoaded(true);
+      return;
+    }
+
+    let cancelled = false;
+
+    Promise.allSettled([getCreatorProgress(), getApplications()]).then(
+      ([progress, apps]) => {
+        if (cancelled) return;
+
+        if (progress.status === "fulfilled" && progress.value) {
+          setProfile(progress.value.profile);
+          setSocials(progress.value.socials || []);
+        } else if (user?.profile) {
+          setProfile(user.profile);
+        }
+
+        if (apps.status === "fulfilled") {
+          setAppliedIds(new Set((apps.value || []).map((a) => a.campaign_id)));
+        }
+
+        setProfileLoaded(true);
+      }
+    );
+
+    return () => {
+      cancelled = true;
+    };
+  }, [isCreator, user?.id]);
+
+  const suggestions = useMemo(
+    () =>
+      isCreator
+        ? buildSuggestions(campaigns, profile, socials, appliedIds)
+        : { list: [], personalised: false },
+    [isCreator, campaigns, profile, socials, appliedIds]
+  );
+
+  const suggestedScores = useMemo(
+    () =>
+      new Map(
+        // Only real matches count. No fallback to "all campaigns".
+        (suggestions.personalised ? suggestions.list : []).map((entry) => [
+          entry.c.id,
+          entry,
+        ])
+      ),
+    [suggestions]
+  );
+
+  const setSuggestedMode = (on: boolean) => {
+    const next = new URLSearchParams(searchParams);
+    if (on) next.set("suggested", "true");
+    else next.delete("suggested");
+    setSearchParams(next, { replace: true });
+    setSort("default");
+    setCurrentPage(1);
+  };
 
   const savedIds = useMemo(
     () => new Set(saved.map((item) => item.campaign_id)),
@@ -564,8 +596,12 @@ export function Campaigns() {
   const filteredCampaigns = useMemo(() => {
     const search = searchParams.get("search")?.trim().toLowerCase() || "";
 
-    const minimum = minPrice ? Number(minPrice) : null;
-    const maximum = maxPrice ? Number(maxPrice) : null;
+    // A budget below NPR 1,000 is not valid, so it is ignored until the
+    // creator finishes typing a valid amount.
+    const minimum =
+      minPrice && Number(minPrice) >= BUDGET_MIN ? Number(minPrice) : null;
+    const maximum =
+      maxPrice && Number(maxPrice) >= BUDGET_MIN ? Number(maxPrice) : null;
 
     const result = campaigns.filter((campaign) => {
       /*
@@ -573,6 +609,8 @@ export function Campaigns() {
         expired and should disappear from the public marketplace.
       */
       if (isExpiredWithoutApplications(campaign)) return false;
+
+      if (suggestedMode && !suggestedScores.has(campaign.id)) return false;
 
       if (search) {
         const text = [
@@ -592,14 +630,16 @@ export function Campaigns() {
         if (!text.includes(search)) return false;
       }
 
-      if (category && campaign.category !== category) return false;
-      if (location && getLocation(campaign) !== location) return false;
-      if (engagement && campaign.engagement_type !== engagement) return false;
-      if (experience && campaign.experience_level !== experience) return false;
+      if (!textMatches(campaign.category, category, categories)) return false;
+      if (!textMatches(getLocation(campaign), location, locations)) return false;
+      if (!textMatches(campaign.engagement_type, engagement, engagements)) return false;
+      if (!textMatches(campaign.experience_level, experience, experiences)) return false;
 
       if (
-        creatorType &&
-        !(campaign.creator_types || []).includes(creatorType)
+        creatorType.trim() &&
+        !(campaign.creator_types || []).some((type) =>
+          textMatches(type, creatorType, creatorTypes)
+        )
       ) {
         return false;
       }
@@ -618,7 +658,17 @@ export function Campaigns() {
       return true;
     });
 
+    const byNewest = (a: PublicCampaign, b: PublicCampaign) =>
+      new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
+
     result.sort((a, b) => {
+      if (sort === "default" && suggestedMode) {
+        return (
+          (suggestedScores.get(b.id)?.score ?? 0) -
+            (suggestedScores.get(a.id)?.score ?? 0) || byNewest(a, b)
+        );
+      }
+
       if (sort === "oldest") {
         return (
           new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
@@ -650,6 +700,13 @@ export function Campaigns() {
     experience,
     creatorType,
     sort,
+    suggestedMode,
+    suggestedScores,
+    categories,
+    locations,
+    engagements,
+    experiences,
+    creatorTypes,
   ]);
 
   /* ==========================================================
@@ -694,7 +751,7 @@ export function Campaigns() {
     setEngagement("");
     setExperience("");
     setCreatorType("");
-    setSort("newest");
+    setSort("default");
     setCurrentPage(1);
   };
 
@@ -708,6 +765,64 @@ export function Campaigns() {
       creatorType
   );
 
+  /* Budget inputs: digits only, never above 100,000 while typing, and
+     never below 1,000 once the field is left. */
+  const onMinPriceChange = (raw: string) => {
+    let value = digitsOnly(raw);
+    if (value && Number(value) > BUDGET_MAX) value = String(BUDGET_MAX);
+    setMinPrice(value);
+  };
+
+  const onMaxPriceChange = (raw: string) => {
+    let value = digitsOnly(raw);
+    if (value && Number(value) > BUDGET_MAX) value = String(BUDGET_MAX);
+    setMaxPrice(value);
+  };
+
+  const commitMinPrice = () => {
+    if (!minPrice) return;
+    const value = Math.max(BUDGET_MIN, Number(minPrice));
+    if (maxPrice && value > Number(maxPrice)) {
+      setMaxPrice(String(value));
+    }
+    setMinPrice(String(value));
+  };
+
+  const commitMaxPrice = () => {
+    if (!maxPrice) return;
+    let value = Math.max(BUDGET_MIN, Number(maxPrice));
+    if (minPrice && value < Number(minPrice)) value = Number(minPrice);
+    setMaxPrice(String(value));
+  };
+
+  const minError = Boolean(minPrice) && Number(minPrice) < BUDGET_MIN;
+  const maxError = Boolean(maxPrice) && Number(maxPrice) < BUDGET_MIN;
+
+  const chips: { key: string; label: string; clear: () => void }[] = [];
+  if (category) chips.push({ key: "category", label: category, clear: () => setCategory("") });
+  if (location) chips.push({ key: "location", label: location, clear: () => setLocation("") });
+  if ((minPrice && !minError) || (maxPrice && !maxError)) {
+    chips.push({
+      key: "price",
+      label: `NPR ${minPrice && !minError ? minPrice : "1000"} – ${maxPrice && !maxError ? maxPrice : "any"}`,
+      clear: () => {
+        setMinPrice("");
+        setMaxPrice("");
+      },
+    });
+  }
+  if (engagement) chips.push({ key: "engagement", label: engagement, clear: () => setEngagement("") });
+  if (experience) chips.push({ key: "experience", label: experience, clear: () => setExperience("") });
+  if (creatorType) chips.push({ key: "creatorType", label: creatorType, clear: () => setCreatorType("") });
+
+  const sortOptions = [
+    ...(suggestedMode ? [{ value: "default", label: "Best match" }] : []),
+    { value: suggestedMode ? "newest" : "default", label: "Newest" },
+    { value: "oldest", label: "Oldest" },
+    { value: "price-low", label: "Price: low to high" },
+    { value: "price-high", label: "Price: high to low" },
+  ];
+
   /* ==========================================================
      RENDER
   ========================================================== */
@@ -719,143 +834,194 @@ export function Campaigns() {
       <main className="campaigns-main">
         <div className="campaigns-container">
           <div className="campaigns-layout">
-            {/* SIDEBAR */}
+            <div className="campaigns-grid">
+              <div className="campaign-left">
+                {/* VIEW TABS (creators only) */}
 
-            <aside className="campaign-sidebar">
-              <div className="sidebar-sort-label">Sort by:</div>
+                {isCreator && (
+                  <div className="campaign-tabs" role="tablist">
+                    <button
+                      type="button"
+                      role="tab"
+                      aria-selected={!suggestedMode}
+                      className={!suggestedMode ? "active" : ""}
+                      onClick={() => setSuggestedMode(false)}
+                    >
+                      All campaigns
+                    </button>
 
-              <SortDropdown value={sort} onChange={setSort} />
+                    <button
+                      type="button"
+                      role="tab"
+                      aria-selected={suggestedMode}
+                      className={suggestedMode ? "active" : ""}
+                      onClick={() => setSuggestedMode(true)}
+                    >
+                      Suggested for you
+                    </button>
+                  </div>
+                )}
 
-              <FilterSection title="Category">
-                <RadioRow
-                  label="All categories"
-                  checked={!category}
-                  onClick={() => setCategory("")}
-                />
-
-                {categories.map((item) => (
-                  <RadioRow
-                    key={item}
-                    label={item}
-                    checked={category === item}
-                    onClick={() => setCategory(item)}
-                  />
-                ))}
-              </FilterSection>
-
-              <FilterSection title="Location">
-                <div className="location-input">
-                  <MapPin size={13} />
-
-                  <input
-                    value={location}
-                    onChange={(e) => setLocation(e.target.value)}
-                    placeholder="e.g. Kathmandu"
-                  />
-                </div>
-
-                {locations.map((item) => (
-                  <RadioRow
-                    key={item}
-                    label={item}
-                    checked={location === item}
-                    onClick={() => setLocation(item)}
-                  />
-                ))}
-              </FilterSection>
-
-              <FilterSection title="Price">
-                <div className="price-inputs">
-                  <input
-                    type="number"
-                    min="0"
-                    value={minPrice}
-                    onChange={(e) => setMinPrice(e.target.value)}
-                    placeholder="NPR 0"
-                  />
-
-                  <span>to</span>
-
-                  <input
-                    type="number"
-                    min="0"
-                    value={maxPrice}
-                    onChange={(e) => setMaxPrice(e.target.value)}
-                    placeholder="NPR 50000"
-                  />
-                </div>
-              </FilterSection>
-
-              <FilterSection title="Engagement">
-                <RadioRow
-                  label="All engagement types"
-                  checked={!engagement}
-                  onClick={() => setEngagement("")}
-                />
-
-                {engagements.map((item) => (
-                  <RadioRow
-                    key={item}
-                    label={item}
-                    checked={engagement === item}
-                    onClick={() => setEngagement(item)}
-                  />
-                ))}
-              </FilterSection>
-
-              <FilterSection title="Experience">
-                <RadioRow
-                  label="All experience levels"
-                  checked={!experience}
-                  onClick={() => setExperience("")}
-                />
-
-                {experiences.map((item) => (
-                  <RadioRow
-                    key={item}
-                    label={item}
-                    checked={experience === item}
-                    onClick={() => setExperience(item)}
-                  />
-                ))}
-              </FilterSection>
-
-              <FilterSection title="Creator type">
-                <RadioRow
-                  label="All creator types"
-                  checked={!creatorType}
-                  onClick={() => setCreatorType("")}
-                />
-
-                {creatorTypes.map((item) => (
-                  <RadioRow
-                    key={item}
-                    label={item}
-                    checked={creatorType === item}
-                    onClick={() => setCreatorType(item)}
-                  />
-                ))}
-              </FilterSection>
-
-              {hasFilters && (
                 <button
                   type="button"
-                  className="clear-filters"
-                  onClick={clearFilters}
+                  className="filters-toggle"
+                  onClick={() => setShowFilters((open) => !open)}
+                  aria-expanded={showFilters}
                 >
-                  Clear all filters
+                  <SlidersHorizontal size={14} />
+                  {showFilters ? "Hide filters" : "Show filters"}
+                  {chips.length > 0 && <b>{chips.length}</b>}
                 </button>
-              )}
-            </aside>
+
+                  {/* FILTERS (left) */}
+
+                  <aside
+                    className={
+                      showFilters ? "campaign-sidebar open" : "campaign-sidebar"
+                    }
+                  >
+                    <div className="sidebar-title">
+                      <SlidersHorizontal size={14} />
+                      Filters
+                      {hasFilters && (
+                        <button
+                          type="button"
+                          className="sidebar-clear"
+                          onClick={clearFilters}
+                        >
+                          Clear all
+                        </button>
+                      )}
+                    </div>
+
+                    <ComboFilter
+                      label="Category"
+                      value={category}
+                      onChange={setCategory}
+                      placeholder="Search or select"
+                      options={categories}
+                    />
+
+                    <ComboFilter
+                      label="Location"
+                      value={location}
+                      onChange={setLocation}
+                      placeholder="Search or select"
+                      options={locations}
+                    />
+
+                    <div className="tb-field">
+                      <span>Budget (NPR)</span>
+                      <div className="price-inputs">
+                        <input
+                          type="text"
+                          inputMode="numeric"
+                          value={minPrice}
+                          onChange={(e) => onMinPriceChange(e.target.value)}
+                          onBlur={commitMinPrice}
+                          onKeyDown={(e) => {
+                            if (e.key === "Enter") commitMinPrice();
+                          }}
+                          placeholder="1000"
+                          className={minError ? "price-error" : ""}
+                          aria-label="Minimum budget"
+                        />
+                        <span>to</span>
+                        <input
+                          type="text"
+                          inputMode="numeric"
+                          value={maxPrice}
+                          onChange={(e) => onMaxPriceChange(e.target.value)}
+                          onBlur={commitMaxPrice}
+                          onKeyDown={(e) => {
+                            if (e.key === "Enter") commitMaxPrice();
+                          }}
+                          placeholder="100000"
+                          className={maxError ? "price-error" : ""}
+                          aria-label="Maximum budget"
+                        />
+                      </div>
+                      <small
+                        className={
+                          minError || maxError
+                            ? "price-hint price-hint-error"
+                            : "price-hint"
+                        }
+                      >
+                        {minError || maxError
+                          ? "Budget must be at least NPR 1,000"
+                          : "Between NPR 1,000 and 1,00,000"}
+                      </small>
+                    </div>
+
+                    <DropdownFilter
+                      label="Engagement"
+                      value={engagement}
+                      onChange={setEngagement}
+                      options={engagements}
+                    />
+
+                    <DropdownFilter
+                      label="Experience"
+                      value={experience}
+                      onChange={setExperience}
+                      options={experiences}
+                    />
+
+                    <ComboFilter
+                      label="Creator type"
+                      value={creatorType}
+                      onChange={setCreatorType}
+                      placeholder="Search or select"
+                      options={creatorTypes}
+                    />
+                  </aside>
+              </div>
 
             {/* RESULTS */}
 
             <section className="campaign-results">
-              <div className="results-heading">
-                {loading
-                  ? "Loading campaigns..."
-                  : `Showing ${first}–${last} of ${filteredCampaigns.length} campaigns`}
+              <div className="results-bar">
+                <div className="results-heading">
+                  {loading || (suggestedMode && !profileLoaded)
+                    ? "Loading campaigns..."
+                    : `Showing ${first}–${last} of ${filteredCampaigns.length} ${
+                        suggestedMode ? "suggested " : ""
+                      }campaigns`}
+                </div>
+
+                {/* SORT (right) */}
+
+                <label className="results-sort">
+                  <span>Sort by</span>
+                  <select
+                    value={sort}
+                    onChange={(e) => setSort(e.target.value)}
+                  >
+                    {sortOptions.map((option) => (
+                      <option key={option.value} value={option.value}>
+                        {option.label}
+                      </option>
+                    ))}
+                  </select>
+                </label>
               </div>
+
+              {chips.length > 0 && (
+                <div className="filter-chips">
+                  {chips.map((chip) => (
+                    <button
+                      key={chip.key}
+                      type="button"
+                      onClick={chip.clear}
+                      aria-label={`Remove filter ${chip.label}`}
+                    >
+                      {chip.label}
+                      <X size={12} />
+                    </button>
+                  ))}
+                </div>
+              )}
 
               {loading && (
                 <div className="campaign-state">Loading campaigns...</div>
@@ -869,9 +1035,33 @@ export function Campaigns() {
                 <div className="campaign-empty">
                   <Search size={22} />
 
-                  <h2>No campaigns found</h2>
+                  <h2>
+                    {suggestedMode && !suggestions.personalised
+                      ? "No suggestions yet"
+                      : suggestedMode && !hasFilters
+                      ? "No suggestions right now"
+                      : "No campaigns found"}
+                  </h2>
 
-                  <p>Try changing your filters.</p>
+                  <p>
+                    {suggestedMode && !suggestions.personalised
+                      ? "Add your niches and connect social accounts in your profile so we can match campaigns to you."
+                      : suggestedMode && !hasFilters
+                      ? "New campaigns that fit your profile will show up here."
+                      : "Try changing your filters."}
+                  </p>
+
+                  {suggestedMode && !suggestions.personalised && (
+                    <Link to="/profile" className="campaign-empty-link">
+                      Update my profile
+                    </Link>
+                  )}
+
+                  {suggestedMode && (
+                    <button type="button" onClick={() => setSuggestedMode(false)}>
+                      Browse all campaigns
+                    </button>
+                  )}
 
                   {hasFilters && (
                     <button type="button" onClick={clearFilters}>
@@ -937,6 +1127,7 @@ export function Campaigns() {
                 </div>
               )}
             </section>
+            </div>
           </div>
         </div>
       </main>
@@ -963,166 +1154,302 @@ export function Campaigns() {
         }
 
         .campaigns-layout {
+          display: block;
+        }
+
+        /* TABS */
+
+        /* Fully rounded pill. Its outer edge (border included) is exactly
+           the same width as the filter fields below, so left and right
+           edges line up. */
+        .campaign-tabs {
           display: grid;
-          grid-template-columns: 245px minmax(0, 1fr);
+          grid-template-columns: 1fr 1fr;
+          gap: 2px;
+          width: 100%;
+          height: 40px;
+          margin: 0 0 18px;
+          padding: 3px;
+          border: 1px solid #cfe3d5;
+          border-radius: 999px;
+          background: #eef5f0;
+        }
+
+        .campaign-tabs button {
+          min-width: 0;
+          height: 100%;
+          padding: 0 6px;
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          overflow: hidden;
+          white-space: nowrap;
+          text-overflow: ellipsis;
+          border: 0;
+          border-radius: 999px;
+          background: transparent;
+          color: #3f5a47;
+          font: 500 11px Poppins, sans-serif;
+          cursor: pointer;
+          transition: background .15s ease, color .15s ease;
+        }
+
+        .campaign-tabs button:hover:not(.active) {
+          color: #15672d;
+        }
+
+        .campaign-tabs button.active {
+          background: #15672d;
+          color: #fff;
+        }
+
+        .suggested-note {
+          margin: 0 0 14px;
+          color: #666;
+          font-size: 12px;
+          line-height: 1.5;
+        }
+
+        /* FILTERS (left) */
+
+        .campaigns-grid {
+          display: grid;
+          grid-template-columns: 270px minmax(0, 1fr);
           gap: 30px;
           align-items: start;
         }
 
-        /* SIDEBAR */
-
-        .campaign-sidebar {
+        .campaign-left {
           padding-right: 24px;
           border-right: 1px solid #e9e9e9;
         }
 
-        /* "Sort by:" and "Showing x–y" share one height so the
-           sort button and the first card start on the same line */
-        .sidebar-sort-label,
-        .results-heading {
-          height: 20px;
-          margin: 0 0 12px;
+        .campaign-sidebar {
+          display: flex;
+          flex-direction: column;
+          gap: 16px;
+        }
+
+        .sidebar-title {
           display: flex;
           align-items: center;
-          font-size: 12px;
-          font-weight: 500;
-          line-height: 1;
-        }
-
-        .campaign-sort {
-          position: relative;
-          margin-bottom: 28px;
-        }
-
-        .campaign-sort-button {
-          width: 100%;
-          height: 40px;
-          padding: 0 12px;
-          display: flex;
-          align-items: center;
-          justify-content: space-between;
-          border: 1px solid #ddd;
-          border-radius: 8px;
-          background: #fff;
-          color: #111;
-          font: 500 11px Poppins, sans-serif;
-          cursor: pointer;
-          transition: border-color .15s ease;
-        }
-
-        .campaign-sort-button:hover {
-          border-color: #aaa;
-        }
-
-        .campaign-sort-button svg {
-          color: #777;
-          transition: transform .15s ease;
-        }
-
-        .sort-open {
-          transform: rotate(180deg);
-        }
-
-        .sort-backdrop {
-          position: fixed;
-          inset: 0;
-          z-index: 10;
-          border: 0;
-          background: transparent;
-        }
-
-        .campaign-sort-menu {
-          position: absolute;
-          top: 46px;
-          left: 0;
-          right: 0;
-          z-index: 20;
-          overflow: hidden;
-          border: 1px solid #ddd;
-          border-radius: 8px;
-          background: #fff;
-          box-shadow: 0 12px 28px rgba(0,0,0,.08);
-        }
-
-        .sort-option {
-          width: 100%;
-          height: 38px;
-          padding: 0 12px;
-          border: 0;
-          border-bottom: 1px solid #f0f0f0;
-          background: #fff;
-          text-align: left;
-          font: 400 11px Poppins, sans-serif;
-          color: #555;
-          cursor: pointer;
-        }
-
-        .sort-option:last-child {
-          border-bottom: 0;
-        }
-
-        .sort-option:hover {
-          background: #f7f7f7;
-          color: #111;
-        }
-
-        .sort-option.selected {
-          background: #f7f7f7;
-          color: #111;
+          gap: 7px;
+          font-size: 13px;
           font-weight: 600;
         }
 
-        .campaign-filter-section {
-          margin-bottom: 28px;
-        }
-
-        .campaign-filter-section h3 {
-          margin: 0 0 11px;
-          font-size: 12px;
-          font-weight: 500;
-        }
-
-        .radio-row {
-          min-height: 28px;
-          display: flex;
-          align-items: center;
-          gap: 8px;
-          color: #555;
-          font-size: 11px;
+        .sidebar-clear {
+          margin-left: auto;
+          border: 0;
+          background: transparent;
+          color: #15672d;
+          font: 500 11px Poppins, sans-serif;
+          text-decoration: underline;
           cursor: pointer;
         }
 
-        .radio-row input {
-          flex: 0 0 14px;
-          width: 14px;
-          height: 14px;
-          margin: 0;
-          accent-color: #111;
+        .filters-toggle {
+          display: none;
         }
 
-        .location-input {
+        .tb-field {
+          display: flex;
+          flex-direction: column;
+          gap: 5px;
+        }
+
+        .tb-field > span {
+          font-size: 11px;
+          font-weight: 500;
+          color: #666;
+        }
+
+        .combo {
+          position: relative;
+        }
+
+        .combo-box {
           height: 40px;
-          margin-bottom: 6px;
           padding: 0 10px;
           display: flex;
           align-items: center;
           gap: 6px;
           border: 1px solid #ddd;
           border-radius: 8px;
-          color: #999;
+          background: #fff;
         }
 
-        .location-input svg {
-          flex: 0 0 auto;
+        .combo-box:focus-within,
+        .combo-box.combo-active {
+          border-color: #111;
         }
 
-        .location-input input {
-          width: 100%;
+        /* the global input:focus ring would draw a second grey box
+           inside the field, so switch it off here */
+        .combo-box input,
+        .combo-box input:focus {
+          border: 0 !important;
+          box-shadow: none !important;
+          outline: none !important;
+          background: transparent !important;
+          padding: 0 !important;
+          border-radius: 0 !important;
+        }
+
+        .combo-box input {
+          flex: 1;
+          min-width: 0;
           border: 0;
           outline: 0;
           background: transparent;
-          font: 400 10px Poppins, sans-serif;
-          color: #222;
+          color: #111;
+          font: 500 12px Poppins, sans-serif;
+        }
+
+        .combo-button {
+          width: 100%;
+          justify-content: space-between;
+          text-align: left;
+          cursor: pointer;
+        }
+
+        .combo-value,
+        .combo-placeholder {
+          overflow: hidden;
+          text-overflow: ellipsis;
+          white-space: nowrap;
+          font: 500 12px Poppins, sans-serif;
+        }
+
+        .combo-value {
+          color: #111;
+        }
+
+        .combo-placeholder {
+          color: #9a9a9a;
+        }
+
+        .price-inputs input.price-error,
+        .price-inputs input.price-error:focus {
+          border-color: #c62828 !important;
+          box-shadow: 0 0 0 2px rgba(198, 40, 40, 0.12) !important;
+        }
+
+        .price-hint-error {
+          color: #c62828 !important;
+        }
+
+        .price-hint {
+          color: #999;
+          font-size: 10px;
+        }
+
+        .combo-chevron {
+          flex: 0 0 auto;
+          color: #777;
+        }
+
+        .combo-clear {
+          flex: 0 0 auto;
+          width: 22px;
+          height: 22px;
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          border: 0;
+          border-radius: 50%;
+          background: #f0f0f0;
+          color: #444;
+          cursor: pointer;
+        }
+
+        .combo-menu {
+          position: absolute;
+          top: 100%;
+          left: 0;
+          right: 0;
+          z-index: 30;
+          margin-top: 4px;
+          max-height: 220px;
+          overflow-y: auto;
+          border: 1px solid #ddd;
+          border-radius: 8px;
+          background: #fff;
+          box-shadow: 0 12px 28px rgba(0, 0, 0, 0.08);
+        }
+
+        .combo-option {
+          width: 100%;
+          padding: 9px 12px;
+          border: 0;
+          border-bottom: 1px solid #f3f3f3;
+          background: #fff;
+          color: #444;
+          text-align: left;
+          font: 400 12px Poppins, sans-serif;
+          cursor: pointer;
+        }
+
+        .combo-option:last-child {
+          border-bottom: 0;
+        }
+
+        .combo-option:hover,
+        .combo-option.selected {
+          background: #f7f7f7;
+          color: #111;
+        }
+
+        .combo-empty {
+          padding: 10px 12px;
+          color: #888;
+          font-size: 12px;
+        }
+
+        /* RESULTS BAR: count on the left, sort on the right */
+
+        .results-bar {
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          gap: 12px;
+          margin-bottom: 12px;
+        }
+
+        .results-bar .results-heading {
+          margin: 0;
+        }
+
+        .results-sort {
+          display: inline-flex;
+          align-items: center;
+          gap: 8px;
+          font-size: 12px;
+          font-weight: 500;
+          color: #666;
+        }
+
+        .results-sort select {
+          height: 38px;
+          padding: 0 10px;
+          border: 1px solid #ddd;
+          border-radius: 8px;
+          background: #fff;
+          color: #111;
+          font: 500 12px Poppins, sans-serif;
+          cursor: pointer;
+        }
+
+        .campaign-empty-link {
+          display: inline-block;
+          margin: 4px 8px 0 0;
+          padding: 9px 16px;
+          border-radius: 8px;
+          background: #111;
+          color: #fff;
+          font-size: 12px;
+          font-weight: 500;
+          text-decoration: none;
         }
 
         .price-inputs {
@@ -1136,32 +1463,72 @@ export function Campaigns() {
           width: 100%;
           min-width: 0;
           height: 40px;
-          padding: 0 8px;
+          padding: 0 10px;
           border: 1px solid #ddd;
           border-radius: 8px;
           outline: 0;
-          font: 400 10px Poppins, sans-serif;
+          font: 400 12px Poppins, sans-serif;
         }
 
         .price-inputs span {
-          font-size: 9px;
+          font-size: 11px;
           color: #777;
         }
 
-        .clear-filters {
-          width: 100%;
-          height: 40px;
-          border: 1px solid #111;
-          border-radius: 8px;
+        .filter-chips {
+          display: flex;
+          flex-wrap: wrap;
+          align-items: center;
+          gap: 8px;
+          margin-bottom: 14px;
+        }
+
+        .filter-chips button {
+          height: 30px;
+          padding: 0 12px;
+          display: inline-flex;
+          align-items: center;
+          gap: 6px;
+          border: 1px solid #ddd;
+          border-radius: 999px;
           background: #fff;
           color: #111;
-          font: 500 10px Poppins, sans-serif;
+          font: 500 11px Poppins, sans-serif;
           cursor: pointer;
         }
 
-        .clear-filters:hover {
-          background: #15672d;
-          color: #fff;
+        .filter-chips button:hover {
+          border-color: #111;
+        }
+
+        .filter-chips .chips-clear {
+          border: 0;
+          background: transparent;
+          color: #15672d;
+          text-decoration: underline;
+        }
+
+        .campaign-match-badge {
+          display: inline-flex;
+          align-items: center;
+          gap: 4px;
+          margin-bottom: 8px;
+          padding: 3px 9px;
+          border-radius: 999px;
+          background: #e8f5ec;
+          color: #15672d;
+          font-size: 10px;
+          font-weight: 600;
+        }
+
+        .results-heading {
+          height: 20px;
+          margin: 0 0 12px;
+          display: flex;
+          align-items: center;
+          font-size: 12px;
+          font-weight: 500;
+          line-height: 1;
         }
 
         /* RESULTS */
@@ -1532,8 +1899,52 @@ export function Campaigns() {
             display: block;
           }
 
+          .campaigns-grid {
+            display: block;
+          }
+
+          .filters-toggle {
+            width: 100%;
+            height: 42px;
+            margin-bottom: 14px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 7px;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            background: #fff;
+            font: 500 12px Poppins, sans-serif;
+            cursor: pointer;
+          }
+
+          .filters-toggle b {
+            min-width: 18px;
+            height: 18px;
+            padding: 0 5px;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 999px;
+            background: #111;
+            color: #fff;
+            font-size: 10px;
+          }
+
+          .campaign-left {
+            padding-right: 0;
+            border-right: 0;
+          }
+
           .campaign-sidebar {
             display: none;
+            margin-bottom: 18px;
+            padding: 0 0 18px;
+            border-bottom: 1px solid #e9e9e9;
+          }
+
+          .campaign-sidebar.open {
+            display: flex;
           }
 
           .campaign-card-inner {
@@ -1569,36 +1980,162 @@ export function Campaigns() {
    SMALL COMPONENTS
 ============================================================ */
 
-function FilterSection({
-  title,
-  children,
-}: {
-  title: string;
-  children: React.ReactNode;
-}) {
-  return (
-    <section className="campaign-filter-section">
-      <h3>{title}</h3>
-      {children}
-    </section>
-  );
-}
-
-function RadioRow({
+function ComboFilter({
   label,
-  checked,
-  onClick,
+  value,
+  onChange,
+  placeholder,
+  options,
 }: {
   label: string;
-  checked: boolean;
-  onClick: () => void;
+  value: string;
+  onChange: (value: string) => void;
+  placeholder: string;
+  options: string[];
 }) {
+  const [open, setOpen] = useState(false);
+
+  const q = value.trim().toLowerCase();
+  const shown = options.filter(
+    (option) => !q || option.toLowerCase().includes(q)
+  );
+
   return (
-    <label className="radio-row">
-      <input type="radio" checked={checked} onChange={onClick} />
+    <div className="tb-field combo">
       <span>{label}</span>
-    </label>
+
+      <div className={value ? "combo-box combo-active" : "combo-box"}>
+        <input
+          value={value}
+          placeholder={placeholder}
+          onChange={(e) => {
+            onChange(e.target.value);
+            setOpen(true);
+          }}
+          onFocus={() => setOpen(true)}
+          onBlur={() => setOpen(false)}
+          onKeyDown={(e) => {
+            if (e.key === "Escape") setOpen(false);
+          }}
+          autoComplete="off"
+        />
+
+        {value ? (
+          <button
+            type="button"
+            className="combo-clear"
+            aria-label={`Clear ${label}`}
+            onMouseDown={(e) => {
+              e.preventDefault();
+              onChange("");
+            }}
+          >
+            <X size={13} />
+          </button>
+        ) : (
+          <ChevronDown size={14} className="combo-chevron" />
+        )}
+      </div>
+
+      {open && (
+        <div className="combo-menu" role="listbox">
+          {shown.length === 0 ? (
+            <div className="combo-empty">No match</div>
+          ) : (
+            shown.map((option) => (
+              <button
+                key={option}
+                type="button"
+                role="option"
+                aria-selected={option === value}
+                className={option === value ? "combo-option selected" : "combo-option"}
+                onMouseDown={(e) => {
+                  e.preventDefault();
+                  onChange(option);
+                  setOpen(false);
+                }}
+              >
+                {option}
+              </button>
+            ))
+          )}
+        </div>
+      )}
+    </div>
   );
 }
 
-export default Campaigns;
+/* Dropdown only (no typing): used for short fixed lists */
+function DropdownFilter({
+  label,
+  value,
+  onChange,
+  options,
+}: {
+  label: string;
+  value: string;
+  onChange: (value: string) => void;
+  options: string[];
+}) {
+  const [open, setOpen] = useState(false);
+
+  return (
+    <div className="tb-field combo">
+      <span>{label}</span>
+
+      <button
+        type="button"
+        className={
+          value ? "combo-box combo-button combo-active" : "combo-box combo-button"
+        }
+        onClick={() => setOpen((current) => !current)}
+        onBlur={() => setOpen(false)}
+        onKeyDown={(e) => {
+          if (e.key === "Escape") setOpen(false);
+        }}
+        aria-haspopup="listbox"
+        aria-expanded={open}
+      >
+        <span className={value ? "combo-value" : "combo-placeholder"}>
+          {value || "Select"}
+        </span>
+        <ChevronDown size={14} className="combo-chevron" />
+      </button>
+
+      {open && (
+        <div className="combo-menu" role="listbox">
+          <button
+            type="button"
+            role="option"
+            aria-selected={!value}
+            className={!value ? "combo-option selected" : "combo-option"}
+            onMouseDown={(e) => {
+              e.preventDefault();
+              onChange("");
+              setOpen(false);
+            }}
+          >
+            Any
+          </button>
+
+          {options.map((option) => (
+            <button
+              key={option}
+              type="button"
+              role="option"
+              aria-selected={option === value}
+              className={option === value ? "combo-option selected" : "combo-option"}
+              onMouseDown={(e) => {
+                e.preventDefault();
+                onChange(option);
+                setOpen(false);
+              }}
+            >
+              {option}
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}

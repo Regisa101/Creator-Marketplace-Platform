@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
+import { createPortal } from 'react-dom';
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom';
 
 import { Bookmark, BookmarkCheck, Loader2, Share2, X } from 'lucide-react';
@@ -130,7 +131,7 @@ function tomorrowInputValue() {
 export function CampaignDetail() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const [searchParams] = useSearchParams();
+  const [searchParams, setSearchParams] = useSearchParams();
 
   // The detail page keeps the exact navigation of the place that opened it.
   // Landing/home -> PublicNavbar. Dashboard -> AppLayout.
@@ -138,7 +139,7 @@ export function CampaignDetail() {
   const fromDashboard = searchParams.get('source') === 'dashboard';
   const wantsApply = searchParams.get('apply') === 'true';
   const backHref = fromLanding ? '/#campaigns' : '/campaigns';
-  const { user } = useAuth();
+  const { user, loading: authLoading } = useAuth();
 
   const [campaign, setCampaign] = useState<Campaign | PublicCampaign | null>(null);
   const [business, setBusiness] = useState<PublicBusinessProfile | null>(null);
@@ -171,7 +172,9 @@ export function CampaignDetail() {
 
   const isCreator = user?.role === 'creator';
 
-  // Opened from a campaign card's "Apply now": show the application popup once.
+  // Opened with ?apply=true (from a campaign card's "Apply now", or after
+  // logging in from this page): show the application popup once, then remove
+  // the flag from the URL so a refresh does not reopen it.
   useEffect(() => {
     if (
       !wantsApply ||
@@ -184,9 +187,42 @@ export function CampaignDetail() {
     ) {
       return;
     }
+
     autoApplyHandled.current = true;
     setShowApply(true);
+
+    const next = new URLSearchParams(searchParams);
+    next.delete('apply');
+    setSearchParams(next, { replace: true });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [wantsApply, loading, campaign, isCreator, application]);
+
+  // Arrived with ?apply=true but not logged in (e.g. "Apply" on a campaign
+  // card): send them to login first. After login they return to this exact
+  // URL, and the effect above opens the application popup.
+  useEffect(() => {
+    if (!wantsApply || authLoading || user) return;
+
+    const returnTo = `/campaigns/${id}?${searchParams.toString()}`;
+
+    navigate(`/login?redirect=${encodeURIComponent(returnTo)}`, {
+      replace: true,
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [wantsApply, authLoading, user, id]);
+
+  // Lock background scroll while the extension popup is open.
+  // (ApplyModal locks scroll by itself.)
+  useEffect(() => {
+    if (!showExtend) return;
+
+    const previous = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+
+    return () => {
+      document.body.style.overflow = previous;
+    };
+  }, [showExtend]);
 
   const deadlinePassed = isDeadlinePassed(campaign?.application_deadline);
   const hasAcceptedCreator = ownerApplications.some(
@@ -454,6 +490,17 @@ export function CampaignDetail() {
     setShowExtend(true);
   };
 
+  // Not logged in: go to login, and come back to this campaign with
+  // ?apply=true so the application popup opens right after login.
+  const goLoginToApply = () => {
+    const params = new URLSearchParams(searchParams);
+    params.set('apply', 'true');
+
+    const returnTo = `/campaigns/${id}?${params.toString()}`;
+
+    navigate(`/login?redirect=${encodeURIComponent(returnTo)}`);
+  };
+
   const renderFrame = (content: ReactNode) => {
     // Creators always get the landing-page navbar (the same one used on the
     // dashboard and campaign browse pages), never the brand dashboard shell.
@@ -578,7 +625,7 @@ export function CampaignDetail() {
       Apply now
     </button>
   ) : !user ? (
-    <button className="cd-apply cd-apply--big" onClick={() => navigate('/login')}>
+    <button className="cd-apply cd-apply--big" onClick={goLoginToApply}>
       Apply now
     </button>
   ) : null;
@@ -968,138 +1015,144 @@ export function CampaignDetail() {
           </div>
         )}
 
-      {showApply && (
-        <ApplyModal
-          isOpen={showApply}
-          campaign={campaign}
-          onClose={() => setShowApply(false)}
-          onSuccess={async () => {
-            try {
-              const applications = await getApplications({ campaign_id: campaign.id });
-              setApplication(
-                applications.find((item) => item.creator_id === user?.id) || null,
-              );
-            } catch {
-              // The success state is still shown even if the refresh is unavailable.
-            }
-          }}
-        />
-      )}
+        {/* ApplyModal portals itself to document.body, so it always opens
+            over the part of the page the user is currently looking at. */}
+        {showApply && (
+          <ApplyModal
+            isOpen={showApply}
+            campaign={campaign}
+            onClose={() => setShowApply(false)}
+            onSuccess={async () => {
+              try {
+                const applications = await getApplications({ campaign_id: campaign.id });
+                setApplication(
+                  applications.find((item) => item.creator_id === user?.id) || null,
+                );
+              } catch {
+                // The success state is still shown even if the refresh is unavailable.
+              }
+            }}
+          />
+        )}
 
-      {showExtend && canExtendCampaign && (
-        <div
-          className="cd-extension-backdrop"
-          role="dialog"
-          aria-modal="true"
-          aria-labelledby="cd-extension-title"
-          onMouseDown={(event) => {
-            if (event.target === event.currentTarget && !extending) {
-              setShowExtend(false);
-            }
-          }}
-        >
-          <div className="cd-extension-modal">
-            <div className="cd-extension-header">
-              <div className="cd-extension-header-content">
-                <div className="cd-extension-eyebrow">Extend campaign</div>
-                <h2 id="cd-extension-title" className="cd-extension-title">
-                  Extend the application deadline
-                </h2>
-                <p className="cd-extension-description">
-                  No creators applied before the previous deadline. Choose a new date to keep this campaign open for applications.
-                </p>
-              </div>
+        {showExtend &&
+          canExtendCampaign &&
+          createPortal(
+            <div
+              className="cd-extension-backdrop"
+              role="dialog"
+              aria-modal="true"
+              aria-labelledby="cd-extension-title"
+              onMouseDown={(event) => {
+                if (event.target === event.currentTarget && !extending) {
+                  setShowExtend(false);
+                }
+              }}
+            >
+              <style>{EXTENSION_STYLE}</style>
+              <div className="cd-extension-modal">
+                <div className="cd-extension-header">
+                  <div className="cd-extension-header-content">
+                    <div className="cd-extension-eyebrow">Extend campaign</div>
+                    <h2 id="cd-extension-title" className="cd-extension-title">
+                      Extend the application deadline
+                    </h2>
+                    <p className="cd-extension-description">
+                      No creators applied before the previous deadline. Choose a new date to keep this campaign open for applications.
+                    </p>
+                  </div>
 
-              <button
-                type="button"
-                className="cd-extension-close"
-                onClick={() => setShowExtend(false)}
-                disabled={extending}
-                aria-label="Close"
-              >
-                <X size={15} />
-              </button>
-            </div>
+                  <button
+                    type="button"
+                    className="cd-extension-close"
+                    onClick={() => setShowExtend(false)}
+                    disabled={extending}
+                    aria-label="Close"
+                  >
+                    <X size={15} />
+                  </button>
+                </div>
 
-            <div className="cd-extension-date-comparison">
-              <div className="cd-extension-date-block">
-                <div className="cd-extension-date-label">Current deadline</div>
-                <div className="cd-extension-date-value">
-                  {dateLabel(campaign.application_deadline) || 'Not specified'}
+                <div className="cd-extension-date-comparison">
+                  <div className="cd-extension-date-block">
+                    <div className="cd-extension-date-label">Current deadline</div>
+                    <div className="cd-extension-date-value">
+                      {dateLabel(campaign.application_deadline) || 'Not specified'}
+                    </div>
+                  </div>
+
+                  <div className="cd-extension-date-arrow">
+                    to
+                  </div>
+
+                  <div className="cd-extension-date-block">
+                    <div className="cd-extension-date-label">New deadline</div>
+                    <div className="cd-extension-date-value">
+                      {extensionDate ? dateLabel(extensionDate) : 'Choose a date'}
+                    </div>
+                  </div>
+                </div>
+
+                <div className="cd-extension-form">
+                  <label className="cd-extension-field">
+                    <span className="cd-extension-field-label">
+                      Extend applications until
+                    </span>
+
+                    <input
+                      className="cd-extension-date-input"
+                      type="date"
+                      value={extensionDate}
+                      min={tomorrowInputValue()}
+                      onChange={(event) => setExtensionDate(event.target.value)}
+                      disabled={extending}
+                      required
+                    />
+
+                    <span className="cd-extension-help">
+                      Choose any future date for the new application deadline.
+                    </span>
+                  </label>
+
+                  <div className="cd-extension-confirmation">
+                    <span>
+                      Once extended, creators will be able to apply again until the new deadline.
+                    </span>
+                  </div>
+
+                  <div className="cd-extension-actions">
+                    <button
+                      type="button"
+                      className="cd-extension-cancel"
+                      onClick={() => setShowExtend(false)}
+                      disabled={extending}
+                    >
+                      Cancel
+                    </button>
+
+                    <button
+                      type="button"
+                      className="cd-extension-submit"
+                      onClick={() => void extendCampaign()}
+                      disabled={!extensionDate || extending}
+                    >
+                      {extending ? (
+                        <>
+                          <Loader2 size={14} className="spin" />
+                          Extending...
+                        </>
+                      ) : (
+                        <>
+                          Extend campaign
+                        </>
+                      )}
+                    </button>
+                  </div>
                 </div>
               </div>
-
-              <div className="cd-extension-date-arrow">
-                to
-              </div>
-
-              <div className="cd-extension-date-block">
-                <div className="cd-extension-date-label">New deadline</div>
-                <div className="cd-extension-date-value">
-                  {extensionDate ? dateLabel(extensionDate) : 'Choose a date'}
-                </div>
-              </div>
-            </div>
-
-            <div className="cd-extension-form">
-              <label className="cd-extension-field">
-                <span className="cd-extension-field-label">
-                  Extend applications until
-                </span>
-
-                <input
-                  className="cd-extension-date-input"
-                  type="date"
-                  value={extensionDate}
-                  min={tomorrowInputValue()}
-                  onChange={(event) => setExtensionDate(event.target.value)}
-                  disabled={extending}
-                  required
-                />
-
-                <span className="cd-extension-help">
-                  Choose any future date for the new application deadline.
-                </span>
-              </label>
-
-              <div className="cd-extension-confirmation">
-                <span>
-                  Once extended, creators will be able to apply again until the new deadline.
-                </span>
-              </div>
-
-              <div className="cd-extension-actions">
-                <button
-                  type="button"
-                  className="cd-extension-cancel"
-                  onClick={() => setShowExtend(false)}
-                  disabled={extending}
-                >
-                  Cancel
-                </button>
-
-                <button
-                  type="button"
-                  className="cd-extension-submit"
-                  onClick={() => void extendCampaign()}
-                  disabled={!extensionDate || extending}
-                >
-                  {extending ? (
-                    <>
-                      <Loader2 size={14} className="spin" />
-                      Extending...
-                    </>
-                  ) : (
-                    <>
-                      Extend campaign
-                    </>
-                  )}
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
+            </div>,
+            document.body,
+          )}
       </div>
     </main>,
   );
@@ -1134,6 +1187,66 @@ function DetailItem({
     </div>
   );
 }
+
+/*
+ * Extension popup styles live in their own string because the popup is
+ * rendered in a portal on document.body (outside the page's <style> tag
+ * scope is not an issue for CSS, but this keeps the portal self-contained).
+ */
+const EXTENSION_STYLE = `
+.cd-extension-backdrop{
+  position:fixed;top:0;right:0;bottom:0;left:0;z-index:20000;
+  display:flex;align-items:center;justify-content:center;padding:24px;box-sizing:border-box;
+  background:rgba(0,0,0,.42);backdrop-filter:blur(2px);-webkit-backdrop-filter:blur(2px);overflow-y:auto;
+  font-family:Poppins,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
+}
+.cd-extension-modal{
+  width:min(500px,calc(100vw - 48px));max-height:calc(100vh - 48px);overflow-y:auto;
+  background:#fff;border-radius:14px;box-shadow:0 24px 70px rgba(0,0,0,.20),0 4px 20px rgba(0,0,0,.08);position:relative;
+  animation:cd-extension-in .18s ease-out;
+}
+@keyframes cd-extension-in{from{opacity:0;transform:translateY(8px) scale(.985)}to{opacity:1;transform:translateY(0) scale(1)}}
+.cd-extension-header{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;padding:20px 24px 8px}
+.cd-extension-header-content{min-width:0}
+.cd-extension-eyebrow{margin-bottom:7px;color:#999;font-size:9px;font-weight:700;letter-spacing:.13em;text-transform:uppercase}
+.cd-extension-title{margin:0;color:#111;font-size:20px;line-height:1.2;font-weight:700}
+.cd-extension-description{margin:7px 0 0;color:#777;font-size:12px;line-height:1.55}
+.cd-extension-close{flex:0 0 auto;width:30px;height:30px;margin-left:12px;display:flex;align-items:center;justify-content:center;border:0;border-radius:50%;background:#197935;color:#fff;cursor:pointer}
+.cd-extension-close:disabled{opacity:.5;cursor:not-allowed}
+.cd-extension-date-comparison{margin:12px 24px 18px;display:grid;grid-template-columns:1fr 32px 1fr;align-items:center;padding:14px;border:1px solid #e4e4e4;border-radius:10px;background:#fafafa}
+.cd-extension-date-block{min-width:0}
+.cd-extension-date-label{margin-bottom:5px;color:#999;font-size:9px;font-weight:500}
+.cd-extension-date-value{color:#222;font-size:12px;font-weight:700}
+.cd-extension-date-arrow{display:flex;align-items:center;justify-content:center;color:#aaa}
+.cd-extension-form{padding:0 24px 22px}
+.cd-extension-field{display:flex;flex-direction:column;gap:7px}
+.cd-extension-field-label{color:#333;font-size:12px;font-weight:700}
+.cd-extension-date-input{width:100%;height:43px;padding:0 12px;box-sizing:border-box;border:1px solid #d8d8d8;border-radius:8px;background:#fff;color:#222;font-family:inherit;font-size:13px;outline:none}
+.cd-extension-date-input:focus{border-color:#111;box-shadow:0 0 0 2px rgba(0,0,0,.05)}
+.cd-extension-date-input:disabled{opacity:.65}
+.cd-extension-help{color:#999;font-size:10px;line-height:1.4}
+.cd-extension-confirmation{display:flex;align-items:center;gap:9px;margin-top:14px;padding:10px 12px;border-radius:7px;background:#f7f7f7;color:#777;font-size:10px;line-height:1.4}
+.cd-extension-confirmation svg{flex:0 0 auto;color:#333}
+.cd-extension-actions{display:flex;justify-content:flex-end;align-items:center;gap:7px;margin-top:18px}
+.cd-extension-cancel,.cd-extension-submit{height:37px;padding:0 15px;display:inline-flex;align-items:center;justify-content:center;gap:7px;border-radius:7px;font-family:inherit;font-size:11px;font-weight:600;cursor:pointer}
+.cd-extension-cancel{border:1px solid #ddd;background:#fff;color:#222}
+.cd-extension-submit{border:1px solid #197935;background:#197935;color:#fff}
+.cd-extension-submit:disabled,.cd-extension-cancel:disabled{opacity:.5;cursor:not-allowed}
+.spin{animation:cd-spin 1s linear infinite}
+@keyframes cd-spin{to{transform:rotate(360deg)}}
+
+@media(max-width:600px){
+  .cd-extension-backdrop{padding:14px}
+  .cd-extension-modal{width:calc(100vw - 28px);max-height:calc(100vh - 28px);border-radius:12px}
+  .cd-extension-header{padding:18px 18px 8px}
+  .cd-extension-title{font-size:18px}
+  .cd-extension-description{font-size:11px}
+  .cd-extension-date-comparison{margin:10px 18px 16px;padding:12px}
+  .cd-extension-form{padding:0 18px 18px}
+  .cd-extension-actions{flex-direction:column-reverse;width:100%}
+  .cd-extension-cancel,.cd-extension-submit{width:100%}
+}
+`;
 
 const STYLE = `
 .cd-page{
@@ -1521,45 +1634,6 @@ const STYLE = `
 .spin{animation:cd-spin 1s linear infinite}
 @keyframes cd-spin{to{transform:rotate(360deg)}}
 
-/* Apply / extension modal */
-.cd-extension-backdrop{
-  position:fixed;top:51px;right:0;bottom:0;left:0;z-index:2000;
-  display:flex;align-items:center;justify-content:center;padding:24px;box-sizing:border-box;
-  background:rgba(0,0,0,.42);backdrop-filter:blur(2px);-webkit-backdrop-filter:blur(2px);overflow-y:auto;
-}
-.cd-extension-modal{
-  width:min(500px,calc(100vw - 48px));max-height:calc(100vh - 99px);overflow-y:auto;
-  background:#fff;border-radius:14px;box-shadow:0 24px 70px rgba(0,0,0,.20),0 4px 20px rgba(0,0,0,.08);position:relative;
-  animation:cd-extension-in .18s ease-out;
-}
-@keyframes cd-extension-in{from{opacity:0;transform:translateY(8px) scale(.985)}to{opacity:1;transform:translateY(0) scale(1)}}
-.cd-extension-header{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;padding:20px 24px 8px}
-.cd-extension-header-content{min-width:0}
-.cd-extension-eyebrow{margin-bottom:7px;color:#999;font-size:9px;font-weight:700;letter-spacing:.13em;text-transform:uppercase}
-.cd-extension-title{margin:0;color:#111;font-size:20px;line-height:1.2;font-weight:700}
-.cd-extension-description{margin:7px 0 0;color:#777;font-size:12px;line-height:1.55}
-.cd-extension-close{flex:0 0 auto;width:30px;height:30px;margin-left:12px;display:flex;align-items:center;justify-content:center;border:0;border-radius:50%;background:#197935;color:#fff;cursor:pointer}
-.cd-extension-close:disabled{opacity:.5;cursor:not-allowed}
-.cd-extension-date-comparison{margin:12px 24px 18px;display:grid;grid-template-columns:1fr 32px 1fr;align-items:center;padding:14px;border:1px solid #e4e4e4;border-radius:10px;background:#fafafa}
-.cd-extension-date-block{min-width:0}
-.cd-extension-date-label{margin-bottom:5px;color:#999;font-size:9px;font-weight:500}
-.cd-extension-date-value{color:#222;font-size:12px;font-weight:700}
-.cd-extension-date-arrow{display:flex;align-items:center;justify-content:center;color:#aaa}
-.cd-extension-form{padding:0 24px 22px}
-.cd-extension-field{display:flex;flex-direction:column;gap:7px}
-.cd-extension-field-label{color:#333;font-size:12px;font-weight:700}
-.cd-extension-date-input{width:100%;height:43px;padding:0 12px;box-sizing:border-box;border:1px solid #d8d8d8;border-radius:8px;background:#fff;color:#222;font-family:inherit;font-size:13px;outline:none}
-.cd-extension-date-input:focus{border-color:#111;box-shadow:0 0 0 2px rgba(0,0,0,.05)}
-.cd-extension-date-input:disabled{opacity:.65}
-.cd-extension-help{color:#999;font-size:10px;line-height:1.4}
-.cd-extension-confirmation{display:flex;align-items:center;gap:9px;margin-top:14px;padding:10px 12px;border-radius:7px;background:#f7f7f7;color:#777;font-size:10px;line-height:1.4}
-.cd-extension-confirmation svg{flex:0 0 auto;color:#333}
-.cd-extension-actions{display:flex;justify-content:flex-end;align-items:center;gap:7px;margin-top:18px}
-.cd-extension-cancel,.cd-extension-submit{height:37px;padding:0 15px;display:inline-flex;align-items:center;justify-content:center;gap:7px;border-radius:7px;font-family:inherit;font-size:11px;font-weight:600;cursor:pointer}
-.cd-extension-cancel{border:1px solid #ddd;background:#fff;color:#222}
-.cd-extension-submit{border:1px solid #197935;background:#197935;color:#fff}
-.cd-extension-submit:disabled,.cd-extension-cancel:disabled{opacity:.5;cursor:not-allowed}
-
 @media(max-width:760px){
   .cd-page{padding:10px 16px 55px}
   .cd-header{grid-template-columns:1fr;gap:15px}
@@ -1579,15 +1653,6 @@ const STYLE = `
 @media(max-width:600px){
   .cd-header h1{font-size:25px}
   .cd-header-meta{flex-direction:column;gap:7px}
-  .cd-extension-backdrop{top:51px;padding:14px}
-  .cd-extension-modal{width:calc(100vw - 28px);max-height:calc(100vh - 79px);border-radius:12px}
-  .cd-extension-header{padding:18px 18px 8px}
-  .cd-extension-title{font-size:18px}
-  .cd-extension-description{font-size:11px}
-  .cd-extension-date-comparison{margin:10px 18px 16px;padding:12px}
-  .cd-extension-form{padding:0 18px 18px}
-  .cd-extension-actions{flex-direction:column-reverse;width:100%}
-  .cd-extension-cancel,.cd-extension-submit{width:100%}
 }
 
 /* ===================== REDESIGN ===================== */
@@ -1818,6 +1883,5 @@ const STYLE = `
   .cd-brandchip{left:12px;bottom:12px}
 }
 `;
-
 
 export default CampaignDetail;
