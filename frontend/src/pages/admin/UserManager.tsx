@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import type { ReactNode } from 'react';
 
 import type { AdminListParams, AdminUserList, AdminUserStatus, ComplaintSummary, RestrictPayload } from '../../api/client';
@@ -11,6 +12,7 @@ import {
   EmptyState,
   ErrorBanner,
   FilterPills,
+  FilterSelect,
   LoadingBlock,
   Pagination,
   errorMessage,
@@ -65,6 +67,7 @@ export default function UserManager<R extends ManagedUser, D extends ManagedUser
   setRestricted,
   renderDetail,
 }: UserManagerProps<R, D>) {
+  const navigate = useNavigate();
   const [search, setSearch] = useState('');
   const [status, setStatus] = useState('all');
   const [sort, setSort] = useState<'newest' | 'oldest'>('newest');
@@ -166,27 +169,38 @@ export default function UserManager<R extends ManagedUser, D extends ManagedUser
     >
       <div className="adm-toolbar">
         <FilterPills
-          label="Account status"
-          value={status}
-          onChange={changeStatus}
+          label="People"
+          value={nounPlural}
+          onChange={(v) => navigate(v === 'creators' ? '/admin/creators' : '/admin/businesses')}
           options={[
-            { value: 'all', label: 'All', count: counts?.all },
-            { value: 'active', label: 'Active', count: counts?.active },
-            { value: 'restricted', label: 'Restricted', count: counts?.restricted },
+            { value: 'creators', label: 'Creators' },
+            { value: 'businesses', label: 'Businesses' },
           ]}
         />
-        <FilterPills
-          label="Sort order"
-          value={sort}
-          onChange={(v) => {
-            setSort(v as 'newest' | 'oldest');
-            setPage(1);
-          }}
-          options={[
-            { value: 'newest', label: 'Newest' },
-            { value: 'oldest', label: 'Oldest' },
-          ]}
-        />
+        <div className="adm-filters-end">
+          <FilterSelect
+            label="Status"
+            value={status}
+            onChange={changeStatus}
+            options={[
+              { value: 'all', label: 'All', count: counts?.all },
+              { value: 'active', label: 'Active', count: counts?.active },
+              { value: 'restricted', label: 'Restricted', count: counts?.restricted },
+            ]}
+          />
+          <FilterSelect
+            label="Sort"
+            value={sort}
+            onChange={(v) => {
+              setSort(v as 'newest' | 'oldest');
+              setPage(1);
+            }}
+            options={[
+              { value: 'newest', label: 'Newest' },
+              { value: 'oldest', label: 'Oldest' },
+            ]}
+          />
+        </div>
       </div>
 
       <ErrorBanner message={list.error || actionError} />

@@ -229,13 +229,10 @@ export function ApplicationsInbox() {
 
   return <AppLayout
     title="Applications"
-    subtitle="Review creators, select one, then agree the final contract terms."
     showNotifications
     searchValue={search}
     onSearchChange={setSearch}
     searchPlaceholder="Search applications"
-    actionLabel="New Campaign"
-    actionTo="/campaigns/new"
   >
     <style>{`
       .ab-wrap{max-width:1040px;margin:0 auto;padding-bottom:50px}
@@ -354,7 +351,7 @@ export function ApplicationsInbox() {
               onClick={() => setTab(item.key)}
             >
               {item.label}
-              <span className="tab-count">{tabCounts[item.key]}</span>
+              {tabCounts[item.key] > 0 && <span className="tab-count">{tabCounts[item.key]}</span>}
             </button>
           ))}
         </div>

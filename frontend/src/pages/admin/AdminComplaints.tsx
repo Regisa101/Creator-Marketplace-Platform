@@ -10,7 +10,7 @@ import {
 } from '../../api/client';
 import type { ComplaintStatus, RestrictPayload } from '../../api/client';
 import {
-  AdminShell, Card, DetailGrid, Drawer, EmptyState, ErrorBanner, FilterPills, LoadingBlock, Pagination, RestrictModal,
+  AdminShell, Card, DetailGrid, Drawer, EmptyState, ErrorBanner, FilterPills, FilterSelect, FilterToggle, LoadingBlock, Pagination, RestrictModal,
   errorMessage, formatDate, formatDateTime, useAdminData, useDebounced,
 } from './adminUi';
 
@@ -129,23 +129,20 @@ export default function AdminComplaints() {
             { value: 'dismissed', label: 'Dismissed', count: counts?.dismissed },
           ]}
         />
-        <FilterPills
-          label="Complaint about"
-          value={targetType}
-          onChange={(v) => { setTargetType(v); setPage(1); }}
-          options={[
-            { value: 'all', label: 'Everything' },
-            { value: 'user', label: 'People' },
-            { value: 'campaign', label: 'Campaigns' },
-            { value: 'platform', label: 'Platform' },
-          ]}
-        />
-        <FilterPills
-          label="Repeat problems"
-          value={flagged ? 'flagged' : 'all'}
-          onChange={(v) => { setFlagged(v === 'flagged'); setPage(1); }}
-          options={[{ value: 'all', label: 'All' }, { value: 'flagged', label: 'Repeat problems only' }]}
-        />
+        <div className="adm-filters-end">
+          <FilterSelect
+            label="About"
+            value={targetType}
+            onChange={(v) => { setTargetType(v); setPage(1); }}
+            options={[
+              { value: 'all', label: 'Everything' },
+              { value: 'user', label: 'People' },
+              { value: 'campaign', label: 'Campaigns' },
+              { value: 'platform', label: 'Platform' },
+            ]}
+          />
+          <FilterToggle label="Repeat problems only" checked={flagged} onChange={(v) => { setFlagged(v); setPage(1); }} />
+        </div>
       </div>
 
       <ErrorBanner message={list.error} />

@@ -1324,7 +1324,9 @@ export function PublicNavbar({
                       aria-label="Profile"
                     >
 
-                      {avatar ? (
+                      {user?.role === 'admin' ? (
+                        <LogoMark size={22} />
+                      ) : avatar ? (
                         <img src={avatar} alt="" />
                       ) : (
                         initials(user?.full_name)

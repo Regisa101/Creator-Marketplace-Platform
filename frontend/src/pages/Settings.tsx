@@ -418,7 +418,7 @@ export function BusinessSettings() {
 
   if (user && user.role !== 'business') {
     return (
-      <AppLayout title="Settings" subtitle="Manage your account preferences." showSearch={false}>
+      <AppLayout title="Settings" subtitle="Manage your account preferences.">
         <style>{styles}</style>
         <div className="st-wrap">
           <section className="st-card">

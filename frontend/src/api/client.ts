@@ -1050,6 +1050,44 @@ export const restrictAdminCampaign = (id: number, payload: RestrictPayload) =>
 export const selectAdminCampaignCreator = (campaignId: number, applicationId: number) =>
   api.post(`/admin/campaigns/${campaignId}/applications/${applicationId}/select`).then((r) => r.data);
 
+export interface PlatformApplicationRow {
+  id: number;
+  campaign_id: number;
+  campaign: string;
+  creator_id: number;
+  creator: string | null;
+  status: string;
+  rate: number | null;
+  applied_at: string | null;
+  can_select: boolean;
+}
+export interface PlatformApplicationList extends AdminPage {
+  items: PlatformApplicationRow[];
+  counts: Record<string, number>;
+}
+export interface PlatformPaymentRow {
+  id: number;
+  campaign_id: number;
+  campaign: string;
+  creator_id: number;
+  creator: string | null;
+  amount: number;
+  status: string;
+  start_date: string | null;
+  end_date: string | null;
+  created_at: string | null;
+}
+export interface PlatformPaymentList extends AdminPage {
+  summary: { total_committed: number; active: number; completed: number; contracts: number };
+  items: PlatformPaymentRow[];
+  counts: Record<string, number>;
+}
+
+export const getPlatformApplications = (params: { search?: string; status?: string; page?: number; page_size?: number }) =>
+  api.get<PlatformApplicationList>('/admin/platform/applications', { params }).then((r) => r.data);
+export const getPlatformPayments = (params: { status?: string; page?: number; page_size?: number }) =>
+  api.get<PlatformPaymentList>('/admin/platform/payments', { params }).then((r) => r.data);
+
 export const getAdminRevenue = (params: { range: AdminRevenueRange; page?: number; page_size?: number }) =>
   api.get<AdminRevenueData>('/admin/revenue', { params }).then((r) => r.data);
 
@@ -1152,4 +1190,14 @@ export const updateAdminComplaint = (id: number, data: { status?: ComplaintStatu
 
 export const fileComplaint = (data: ComplaintInput) =>
   api.post<MyComplaint>('/complaints', data).then((r) => r.data);
+export interface ReceivedComplaint {
+  id: number;
+  category_label: string;
+  about: string;
+  status: string;
+  created_at: string;
+}
+export const getReceivedComplaints = () =>
+  api.get<ReceivedComplaint[]>('/complaints/received').then((r) => r.data);
+
 export const getMyComplaints = () => api.get<MyComplaint[]>('/complaints/mine').then((r) => r.data);

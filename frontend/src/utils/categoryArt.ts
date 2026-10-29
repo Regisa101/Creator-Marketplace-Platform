@@ -1,3 +1,4 @@
+import { realLogoUrl, registerFallback, wikiPhoto } from './photos';
 // ---------------------------------------------------------------------------
 // Pictures by company type.
 //
@@ -227,8 +228,8 @@ export function categoryKey(...hints: Array<string | null | undefined>): string 
 
 const asDataUri = (svg: string) => `data:image/svg+xml;utf8,${encodeURIComponent(svg)}`;
 
-/** Square picture for a company type, used where a logo would go. */
-export function categoryImage(...hints: Array<string | null | undefined>): string {
+/** Drawn square picture for a company type (last-resort fallback). */
+export function categoryImageArt(...hints: Array<string | null | undefined>): string {
   const { bg, art, ground } = ART[categoryKey(...hints)];
   return asDataUri(
     `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200">` +
@@ -250,8 +251,8 @@ function seeded(text: string) {
   };
 }
 
-/** Wide banner picture for a company type, used as a profile cover. */
-export function categoryCover(name: string, ...hints: Array<string | null | undefined>): string {
+/** Drawn wide banner for a company type (last-resort fallback). */
+export function categoryCoverArt(name: string, ...hints: Array<string | null | undefined>): string {
   const { bg, art, coverGround } = ART[categoryKey(...hints)];
   const rand = seeded(name.toLowerCase());
   const W = 1600;
@@ -291,4 +292,31 @@ export function categoryCover(name: string, ...hints: Array<string | null | unde
     `</svg>`;
 
   return asDataUri(svg);
+}
+
+/**
+ * Picture used where a logo would go: the real logo for well-known brands,
+ * otherwise a real photo for the business. Every page calls this, so a brand
+ * looks the same everywhere. The drawn picture is only a last fallback.
+ */
+export function categoryImage(...hints: Array<string | null | undefined>): string {
+  const art = categoryImageArt(...hints);
+  const logo = realLogoUrl(...hints);
+  const photo = wikiPhoto(categoryKey(...hints), hints, 'logo');
+
+  if (logo) {
+    registerFallback(logo, ...(photo ? [photo] : []), art);
+    if (photo) registerFallback(photo, art);
+    return logo;
+  }
+  if (photo) {
+    registerFallback(photo, art);
+    return photo;
+  }
+  return art;
+}
+
+/** Real wide photo for a business, used as a profile cover. */
+export function categoryCover(name: string, ...hints: Array<string | null | undefined>): string {
+  return wikiPhoto(categoryKey(...hints), [name, ...hints], 'cover') || categoryCoverArt(name, ...hints);
 }

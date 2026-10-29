@@ -1,6 +1,6 @@
 // frontend/src/components/AppLayout.tsx
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { ReactNode } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 
@@ -21,14 +21,21 @@ import {
   Bell,
   Plus,
   Users,
-  Building2,
   Wallet,
+  CreditCard,
   Flag,
 } from "lucide-react";
 
 import { useAuth } from "../context/AuthContext";
 import { LogoMark } from "./Logo";
-import { getApplications, getNotifications, getUnreadNotificationCount, markNotificationRead } from "../api/client";
+import {
+  getApplications,
+  getNotifications,
+  getUnreadNotificationCount,
+  markAllNotificationsRead,
+  markNotificationRead,
+  type Notification as AppNotification,
+} from "../api/client";
 
 const C = {
   sidebar: "#FFFFFF",
@@ -166,7 +173,6 @@ type AppLayoutProps = {
 export function AppLayout({
   children,
   title,
-  subtitle,
   headerActions,
   searchValue = "",
   onSearchChange,
@@ -258,6 +264,71 @@ export function AppLayout({
 
   const [unreadNotifications, setUnreadNotifications] =
     useState(0);
+
+  // Notification dropdown (like Instagram / YouTube): opens under the bell.
+  const [notifOpen, setNotifOpen] = useState(false);
+  const [notifItems, setNotifItems] = useState<AppNotification[] | null>(null);
+  const notifRef = useRef<HTMLDivElement>(null);
+
+  const toggleNotifications = async () => {
+    const next = !notifOpen;
+    setNotifOpen(next);
+    if (!next) return;
+    try {
+      setNotifItems(await getNotifications(false));
+    } catch {
+      setNotifItems([]);
+    }
+  };
+
+  const openNotification = async (n: AppNotification) => {
+    setNotifOpen(false);
+    if (!n.is_read) {
+      try {
+            await markNotificationRead(n.id);
+        setUnreadNotifications((c) => Math.max(0, c - 1));
+      } catch {
+        /* the notification still opens even if marking it read fails */
+      }
+    }
+    if (n.link) navigate(n.link);
+  };
+
+  const readAllNotifications = async () => {
+    try {
+      await markAllNotificationsRead();
+      setUnreadNotifications(0);
+      setNotifItems((list) => (list ? list.map((n) => ({ ...n, is_read: true })) : list));
+    } catch {
+      /* ignore */
+    }
+  };
+
+  useEffect(() => {
+    if (!notifOpen) return;
+    const onDown = (e: MouseEvent) => {
+      if (notifRef.current && !notifRef.current.contains(e.target as Node)) setNotifOpen(false);
+    };
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setNotifOpen(false);
+    };
+    document.addEventListener("mousedown", onDown);
+    document.addEventListener("keydown", onKey);
+    return () => {
+      document.removeEventListener("mousedown", onDown);
+      document.removeEventListener("keydown", onKey);
+    };
+  }, [notifOpen]);
+
+  const timeAgo = (value: string) => {
+    const mins = Math.floor((Date.now() - new Date(value).getTime()) / 60000);
+    if (mins < 1) return "now";
+    if (mins < 60) return `${mins}m`;
+    const hrs = Math.floor(mins / 60);
+    if (hrs < 24) return `${hrs}h`;
+    const days = Math.floor(hrs / 24);
+    return days < 7 ? `${days}d` : new Date(value).toLocaleDateString("en-GB", { day: "numeric", month: "short" });
+  };
   const [paymentSuccessNotice, setPaymentSuccessNotice] =
     useState<{ id: number; title: string; message: string; link?: string | null } | null>(null);
 
@@ -450,11 +521,11 @@ export function AppLayout({
 
   const adminNav = [
     { label: "Overview", icon: LayoutDashboard, to: "/admin" },
-    { label: "Creators", icon: Users, to: "/admin/creators" },
-    { label: "Businesses", icon: Building2, to: "/admin/businesses" },
     { label: "Campaigns", icon: Megaphone, to: "/admin/campaigns" },
+    { label: "People", icon: Users, to: "/admin/creators", also: ["/admin/businesses"] },
+    { label: "Money", icon: Wallet, to: "/admin/money" },
+    { label: "Analytics", icon: BarChart3, to: "/admin/analytics" },
     { label: "Complaints", icon: Flag, to: "/admin/complaints" },
-    { label: "Revenue", icon: Wallet, to: "/admin/revenue" },
   ];
 
   const nav = isAdmin
@@ -499,6 +570,11 @@ export function AppLayout({
             to: "/applications",
           },
           {
+            label: "Payments",
+            icon: CreditCard,
+            to: "/payments",
+          },
+          {
             label: "Analytics",
             icon: BarChart3,
             to: "/analytics",
@@ -510,10 +586,26 @@ export function AppLayout({
           },
         ];
 
-  const defaultSearchPlaceholder =
-    role === "creator"
-      ? "Search campaigns…"
-      : "Search campaigns, creators…";
+  const defaultSearchPlaceholder = "Search campaigns…";
+
+  // Pages that run their own search pass searchValue/onSearchChange. On every
+  // other page the box still works: it keeps its own text and, on Enter, opens
+  // the campaigns page filtered by what was typed.
+  const [localSearch, setLocalSearch] = useState("");
+  const pageControlsSearch = Boolean(onSearchChange);
+  const shownSearch = pageControlsSearch ? searchValue : localSearch;
+
+  const submitSearch = (value: string) => {
+    if (onSearchSubmit) {
+      onSearchSubmit(value);
+      return;
+    }
+    if (pageControlsSearch) return;
+
+    const q = value.trim();
+    const base = isAdmin ? "/admin/campaigns" : "/campaigns";
+    navigate(q ? `${base}?search=${encodeURIComponent(q)}` : base);
+  };
 
   /*
    * =====================================================
@@ -883,7 +975,9 @@ export function AppLayout({
 
           border-radius: 50%;
 
-          background: ${primarySoft};
+          background: ${isAdmin ? "#fff" : primarySoft};
+
+          border: ${isAdmin ? "1px solid #e5e5e5" : "0"};
 
           color: ${primary};
 
@@ -1413,6 +1507,22 @@ export function AppLayout({
             right: -6px;
           }
         }
+        .app-notif-wrap { position: relative; display: flex; }
+        .app-notif-panel { position: absolute; top: calc(100% + 10px); right: -8px; z-index: 60; width: 360px; max-width: calc(100vw - 24px); background: #fff; border: 1px solid #e5e5e5; border-radius: 14px; box-shadow: 0 18px 44px rgba(0, 0, 0, .14); overflow: hidden; }
+        .app-notif-head { display: flex; align-items: center; justify-content: space-between; padding: 14px 16px; border-bottom: 1px solid #f0f0f0; font: 500 14px Poppins, sans-serif; color: #111; }
+        .app-notif-head button { border: 0; background: none; color: #197935; font: 500 12px Poppins, sans-serif; cursor: pointer; padding: 0; }
+        .app-notif-head button:hover { text-decoration: underline; }
+        .app-notif-list { max-height: 420px; overflow-y: auto; }
+        .app-notif-item { display: flex; align-items: flex-start; gap: 10px; width: 100%; padding: 12px 16px; border: 0; border-bottom: 1px solid #f5f5f5; background: #fff; text-align: left; cursor: pointer; font-family: Poppins, sans-serif; }
+        .app-notif-item:hover { background: #f8f8f8; }
+        .app-notif-item.unread { background: #f3faf5; }
+        .app-notif-dot { width: 8px; height: 8px; border-radius: 50%; margin-top: 6px; flex: none; background: transparent; }
+        .app-notif-item.unread .app-notif-dot { background: #197935; }
+        .app-notif-body { display: flex; flex-direction: column; gap: 2px; min-width: 0; flex: 1; }
+        .app-notif-title { font-size: 13px; font-weight: 500; color: #111; }
+        .app-notif-msg { font-size: 12px; color: #666; line-height: 1.45; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+        .app-notif-time { font-size: 11px; color: #999; flex: none; margin-top: 2px; }
+        .app-notif-empty { padding: 36px 16px; text-align: center; color: #888; font: 400 12.5px Poppins, sans-serif; }
         .app-payment-modal-backdrop { position: fixed; inset: 0; z-index: 9999; background: rgba(20, 18, 30, .48); display: flex; align-items: center; justify-content: center; padding: 20px; }
         .app-payment-modal { position: relative; width: min(430px, 100%); background: #fff; border-radius: 18px; padding: 30px 28px 26px; text-align: center; box-shadow: 0 24px 70px rgba(25, 20, 40, .22); }
         .app-payment-modal-close { position: absolute; top: 12px; right: 12px; width: 34px; height: 34px; border: 0; border-radius: 50%; background: #F5F5F5; color: #6B6478; display: flex; align-items: center; justify-content: center; cursor: pointer; }
@@ -1457,9 +1567,8 @@ export function AppLayout({
                 key={item.to}
                 to={item.to}
                 className={`app-nav-link ${
-                  isRouteActive(
-                    location.pathname,
-                    item.to
+                  [item.to, ...(("also" in item && item.also) || [])].some((t) =>
+                    isRouteActive(location.pathname, t)
                   )
                     ? "active"
                     : ""
@@ -1619,17 +1728,17 @@ export function AppLayout({
                   <Search size={14} />
 
                   <input
-                    value={searchValue}
-                    onChange={(event) =>
-                      onSearchChange?.(
-                        event.target.value
-                      )
-                    }
+                    value={shownSearch}
+                    onChange={(event) => {
+                      if (pageControlsSearch) {
+                        onSearchChange?.(event.target.value);
+                      } else {
+                        setLocalSearch(event.target.value);
+                      }
+                    }}
                     onKeyDown={(event) => {
                       if (event.key === "Enter") {
-                        onSearchSubmit?.(
-                          event.currentTarget.value
-                        );
+                        submitSearch(event.currentTarget.value);
                       }
                     }}
                     placeholder={
@@ -1660,25 +1769,63 @@ export function AppLayout({
               {/* NOTIFICATION BELL */}
 
               {showNotifications && (
-                <Link
-                  to="/notifications"
-                  className="app-notification"
-                  aria-label={
-                    unreadNotifications > 0
-                      ? `${unreadNotifications} unread notifications`
-                      : "Notifications"
-                  }
-                >
+                <div className="app-notif-wrap" ref={notifRef}>
+                  <button
+                    type="button"
+                    className="app-notification"
+                    onClick={() => void toggleNotifications()}
+                    aria-haspopup="true"
+                    aria-expanded={notifOpen}
+                    aria-label={
+                      unreadNotifications > 0
+                        ? `${unreadNotifications} unread notifications`
+                        : "Notifications"
+                    }
+                  >
+                    <Bell size={20} />
 
-                  <Bell size={20} />
+                    {unreadNotifications > 0 && (
+                      <span className="app-notification-badge">
+                        {notificationBadge}
+                      </span>
+                    )}
+                  </button>
 
-                  {unreadNotifications > 0 && (
-                    <span className="app-notification-badge">
-                      {notificationBadge}
-                    </span>
+                  {notifOpen && (
+                    <div className="app-notif-panel" role="menu">
+                      <div className="app-notif-head">
+                        <strong>Notifications</strong>
+                        {unreadNotifications > 0 && (
+                          <button type="button" onClick={() => void readAllNotifications()}>
+                            Mark all as read
+                          </button>
+                        )}
+                      </div>
+
+                      <div className="app-notif-list">
+                        {!notifItems && <div className="app-notif-empty">Loading…</div>}
+                        {notifItems && notifItems.length === 0 && (
+                          <div className="app-notif-empty">No notifications yet.</div>
+                        )}
+                        {notifItems?.slice(0, 10).map((n) => (
+                          <button
+                            type="button"
+                            key={n.id}
+                            className={`app-notif-item${n.is_read ? "" : " unread"}`}
+                            onClick={() => void openNotification(n)}
+                          >
+                            <span className="app-notif-dot" />
+                            <span className="app-notif-body">
+                              <span className="app-notif-title">{n.title}</span>
+                              <span className="app-notif-msg">{n.message}</span>
+                            </span>
+                            <span className="app-notif-time">{timeAgo(n.created_at)}</span>
+                          </button>
+                        ))}
+                      </div>
+                    </div>
                   )}
-
-                </Link>
+                </div>
               )}
 
               {/* ACTION */}
@@ -1771,7 +1918,9 @@ export function AppLayout({
 
                   <div className="app-avatar">
 
-                    {avatarUrl && !avatarError ? (
+                    {isAdmin ? (
+                      <LogoMark size={20} />
+                    ) : avatarUrl && !avatarError ? (
                       <img
                         src={avatarUrl}
                         alt=""
@@ -1807,9 +1956,6 @@ export function AppLayout({
                 <h1>{title}</h1>
               )}
 
-              {subtitle && (
-                <p>{subtitle}</p>
-              )}
             </div>
 
             {headerActions && (

@@ -5,6 +5,8 @@ import { getPublicBusinessProfile, type PublicBusinessProfile } from '../api/cli
 import { PublicNavbar } from '../components/PublicNavbar';
 import { brandCoverStyle } from '../utils/brandCover';
 import { categoryImage } from '../utils/categoryArt';
+import { LogoMark } from '../components/Logo';
+import { isCreatorHub } from '../utils/brand';
 import {
   Lightbox,
   PublicProfileStyles,
@@ -68,7 +70,9 @@ export function BrandProfile() {
                 className="pp-cover"
                 style={{
                   height: 200,
-                  ...brandCoverStyle(
+                  ...(isCreatorHub(profile.company_name)
+                    ? { backgroundImage: 'linear-gradient(135deg,#111 0%,#2b2b2b 55%,#197935 140%)' }
+                    : brandCoverStyle(
                     {
                       name: profile.company_name,
                       category: profile.industry,
@@ -76,12 +80,16 @@ export function BrandProfile() {
                       coverUrl: profile.cover_url,
                     },
                     mediaUrl,
-                  ),
+                  )),
                 }}
               />
 
               <div className="pp-header">
-                {logo ? (
+                {isCreatorHub(profile.company_name) ? (
+                  <div className="pp-avatar is-square" style={{ background: '#fff', display: 'grid', placeItems: 'center' }}>
+                    <LogoMark size={44} />
+                  </div>
+                ) : logo ? (
                   <button
                     type="button"
                     className="pp-avatar is-square"

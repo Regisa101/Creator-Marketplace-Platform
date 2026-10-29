@@ -904,6 +904,154 @@ async def select_creator_for_platform_campaign(
 
 
 # ------------------------------------------------------------------
+# CREATORHUB'S OWN CAMPAIGNS: applications + creator payments
+# ------------------------------------------------------------------
+
+@router.get("/platform/applications")
+async def platform_applications(
+    search: Optional[str] = Query(None, max_length=100),
+    status: str = Query("all"),
+    page: int = Query(1, ge=1),
+    page_size: int = Query(20, ge=1, le=100),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_admin),
+):
+    """Applications received by the campaigns CreatorHub posts itself."""
+    owner = aliased(User)
+    creator = aliased(User)
+    base = (
+        db.query(Application, Campaign, creator.full_name, CreatorProfile.display_name)
+        .join(Campaign, Campaign.id == Application.campaign_id)
+        .join(owner, owner.id == Campaign.business_id)
+        .join(creator, creator.id == Application.creator_id)
+        .outerjoin(CreatorProfile, CreatorProfile.user_id == creator.id)
+        .filter(owner.role == "admin")
+    )
+    if search and search.strip():
+        term = _like(search)
+        base = base.filter(or_(
+            Campaign.title.ilike(term, escape="\\"),
+            creator.full_name.ilike(term, escape="\\"),
+            CreatorProfile.display_name.ilike(term, escape="\\"),
+        ))
+
+    grouped = base.order_by(None).with_entities(Application.status, func.count(Application.id)).group_by(Application.status).all()
+    counts = {"all": 0, "pending": 0, "accepted": 0, "rejected": 0}
+    for st, n in grouped:
+        counts["all"] += int(n)
+        key = st if st in counts else None
+        if key:
+            counts[key] += int(n)
+
+    q = base
+    if status != "all":
+        q = q.filter(Application.status == status)
+    q = q.order_by(Application.created_at.desc(), Application.id.desc())
+
+    rows, meta = _paginate(q, page, page_size)
+    accepted_by_campaign = {
+        cid: int(n) for cid, n in db.query(Application.campaign_id, func.count(Application.id))
+        .filter(Application.status == "accepted").group_by(Application.campaign_id).all()
+    }
+    items = []
+    for a, c, full_name, display_name in rows:
+        rate = a.agreed_rate if a.agreed_rate is not None else a.rate
+        items.append({
+            "id": a.id,
+            "campaign_id": c.id,
+            "campaign": c.title,
+            "creator_id": a.creator_id,
+            "creator": display_name or full_name,
+            "status": a.status,
+            "rate": _money(rate) if rate is not None else None,
+            "applied_at": a.created_at,
+            "can_select": (
+                a.status == "pending"
+                and not c.is_restricted
+                and accepted_by_campaign.get(c.id, 0) < int(c.creators_needed or 1)
+            ),
+        })
+    return {"items": items, "counts": counts, **meta}
+
+
+@router.get("/platform/payments")
+async def platform_payments(
+    status: str = Query("all"),
+    page: int = Query(1, ge=1),
+    page_size: int = Query(20, ge=1, le=100),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_admin),
+):
+    """What CreatorHub owes the creators it selected for its own campaigns.
+
+    CreatorHub never pays itself a fee, so there are no Payment rows for these
+    campaigns. The amounts come from each creator's contract.
+    """
+    owner = aliased(User)
+    creator = aliased(User)
+    base = (
+        db.query(Contract, Campaign.title, creator.full_name, CreatorProfile.display_name)
+        .join(Campaign, Campaign.id == Contract.campaign_id)
+        .join(owner, owner.id == Contract.business_id)
+        .join(creator, creator.id == Contract.creator_id)
+        .outerjoin(CreatorProfile, CreatorProfile.user_id == creator.id)
+        .filter(owner.role == "admin")
+    )
+
+    def total_for(*statuses):
+        q = (
+            db.query(func.coalesce(func.sum(Contract.total_value), 0))
+            .join(owner, owner.id == Contract.business_id)
+            .filter(owner.role == "admin")
+        )
+        if statuses:
+            q = q.filter(Contract.status.in_(statuses))
+        else:
+            q = q.filter(Contract.status != "cancelled")
+        return _money(q.scalar())
+
+    grouped = base.order_by(None).with_entities(Contract.status, func.count(Contract.id)).group_by(Contract.status).all()
+    counts = {"all": 0, "active": 0, "completed": 0}
+    for st, n in grouped:
+        counts["all"] += int(n)
+        if st in counts:
+            counts[st] += int(n)
+
+    q = base
+    if status != "all":
+        q = q.filter(Contract.status == status)
+    q = q.order_by(Contract.created_at.desc(), Contract.id.desc())
+
+    rows, meta = _paginate(q, page, page_size)
+    items = [
+        {
+            "id": ct.id,
+            "campaign_id": ct.campaign_id,
+            "campaign": title,
+            "creator_id": ct.creator_id,
+            "creator": display_name or full_name,
+            "amount": _money(ct.total_value if ct.total_value is not None else ct.agreed_rate),
+            "status": ct.status,
+            "start_date": ct.start_date,
+            "end_date": ct.end_date,
+            "created_at": ct.created_at,
+        }
+        for ct, title, full_name, display_name in rows
+    ]
+    return {
+        "summary": {
+            "total_committed": total_for(),
+            "active": total_for("active"),
+            "completed": total_for("completed"),
+            "contracts": counts["all"],
+        },
+        "items": items,
+        "counts": counts,
+        **meta,
+    }
+
+
+# ------------------------------------------------------------------
 # REVENUE
 # ------------------------------------------------------------------
 

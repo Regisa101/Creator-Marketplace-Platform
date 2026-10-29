@@ -1,14 +1,11 @@
-
 // frontend/src/pages/AboutUs.tsx
 
 import { Link } from "react-router-dom";
 import {
   ArrowRight,
   BriefcaseBusiness,
-  Check,
   CircleDollarSign,
   Handshake,
-  Search,
   Sparkles,
   Users,
 } from "lucide-react";
@@ -1109,4 +1106,3 @@ export function AboutUs() {
 }
 
 export default AboutUs;
-

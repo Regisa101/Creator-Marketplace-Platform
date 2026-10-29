@@ -1,5 +1,5 @@
 import type { CSSProperties } from 'react';
-import { categoryCover } from './categoryArt';
+import { categoryCover, categoryCoverArt } from './categoryArt';
 
 // ---------------------------------------------------------------------------
 // Cover images for brand profiles.
@@ -26,10 +26,14 @@ export function brandCoverStyle(
   resolveUrl?: (url?: string | null) => string,
 ): CSSProperties {
   const own = options.coverUrl ? (resolveUrl ? resolveUrl(options.coverUrl) : options.coverUrl) : '';
-  const image = own || makeBrandCover(options);
+  const hints = [options.category, ...(options.hints || []), options.name];
+  // Real photo on top; the drawn banner sits underneath as a fallback.
+  const layers = own
+    ? [own]
+    : [makeBrandCover(options), categoryCoverArt(options.name || 'brand', ...hints)];
 
   return {
-    backgroundImage: `url("${image}")`,
+    backgroundImage: layers.map((u) => `url("${u}")`).join(', '),
     backgroundSize: 'cover',
     backgroundPosition: 'center',
     backgroundRepeat: 'no-repeat',

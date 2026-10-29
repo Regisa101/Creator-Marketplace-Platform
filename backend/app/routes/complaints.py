@@ -12,6 +12,7 @@ from typing import Optional
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
 from sqlalchemy import func
+from sqlalchemy import or_
 from sqlalchemy.orm import Session
 
 from app.database import get_db
@@ -234,3 +235,50 @@ async def my_complaints(
         .all()
     )
     return [_serialize(db, c) for c in rows]
+
+
+@router.get("/received")
+async def received_complaints(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Complaints other people filed about this user or their campaigns.
+
+    The reporter's name and what they wrote stay private. The person only sees
+    what kind of problem it was, when it was filed, and where it stands.
+    """
+    my_campaign_ids = [
+        row[0] for row in db.query(Campaign.id).filter(Campaign.business_id == current_user.id).all()
+    ]
+    conditions = [
+        (Complaint.target_type == "user") & (Complaint.target_user_id == current_user.id)
+    ]
+    if my_campaign_ids:
+        conditions.append(
+            (Complaint.target_type == "campaign") & (Complaint.target_campaign_id.in_(my_campaign_ids))
+        )
+
+    rows = (
+        db.query(Complaint)
+        .filter(or_(*conditions))
+        .order_by(Complaint.created_at.desc())
+        .limit(100)
+        .all()
+    )
+
+    titles = {}
+    if rows:
+        ids = {c.target_campaign_id for c in rows if c.target_campaign_id}
+        if ids:
+            titles = {cid: t for cid, t in db.query(Campaign.id, Campaign.title).filter(Campaign.id.in_(ids)).all()}
+
+    return [
+        {
+            "id": c.id,
+            "category_label": category_label(c.category),
+            "about": titles.get(c.target_campaign_id, "Your campaign") if c.target_type == "campaign" else "You",
+            "status": c.status,
+            "created_at": c.created_at,
+        }
+        for c in rows
+    ]

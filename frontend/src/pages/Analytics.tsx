@@ -1,7 +1,7 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import type { MouseEvent } from 'react';
 import { Link } from 'react-router-dom';
-import { ArrowRight, BarChart3, CheckCircle2, Plus } from 'lucide-react';
+import { BarChart3, Plus } from 'lucide-react';
 import { AppLayout } from '../components/AppLayout';
 import {
   getBusinessAnalytics,
@@ -30,32 +30,8 @@ const RANGE_HINT: Record<AnalyticsRange, string> = {
   all: 'All time',
 };
 
-const INITIAL_ROWS = 5;
-
-type AppFilter = 'all' | 'open' | 'closed' | 'with';
-
-const APP_FILTERS: { key: AppFilter; label: string }[] = [
-  { key: 'all', label: 'All' },
-  { key: 'open', label: 'Open' },
-  { key: 'closed', label: 'Closed' },
-  { key: 'with', label: 'With applications' },
-];
-
-type FillFilter = 'all' | 'open' | 'filled' | 'closed';
-
-const FILL_FILTERS: { key: FillFilter; label: string }[] = [
-  { key: 'all', label: 'All' },
-  { key: 'open', label: 'Open' },
-  { key: 'filled', label: 'Fully hired' },
-  { key: 'closed', label: 'Closed' },
-];
-
 function money(value?: number | null) {
   return `NPR ${Math.round(Number(value || 0)).toLocaleString()}`;
-}
-
-function plural(count: number, one: string, many: string) {
-  return count === 1 ? one : many;
 }
 
 function periodLabel(period: string, granularity: 'day' | 'month') {
@@ -71,59 +47,15 @@ function periodLabel(period: string, granularity: 'day' | 'month') {
   );
 }
 
-function startOfDay(date: Date) {
-  return new Date(date.getFullYear(), date.getMonth(), date.getDate());
-}
-
-function closesIn(deadline: string | null) {
-  if (!deadline) return 'soon';
-  const days = Math.round(
-    (startOfDay(new Date(deadline)).getTime() - startOfDay(new Date()).getTime()) / 86400000
-  );
-  if (days <= 0) return 'today';
-  if (days === 1) return 'tomorrow';
-  return `in ${days} days`;
-}
-
 function pctNote(value: number | null, suffix: string) {
   return value === null ? '—' : `${value}% ${suffix}`;
-}
-
-function isActiveCampaign(status: string) {
-  return status === 'published' || status === 'in_progress';
-}
-
-function matchesAppFilter(campaign: BusinessAnalytics['campaigns'][number], filter: AppFilter) {
-  switch (filter) {
-    case 'open':
-      return isActiveCampaign(campaign.status);
-    case 'closed':
-      return campaign.status === 'closed' || campaign.status === 'completed';
-    case 'with':
-      return campaign.applications > 0;
-    default:
-      return true;
-  }
-}
-
-function matchesFillFilter(campaign: BusinessAnalytics['campaigns'][number], filter: FillFilter) {
-  switch (filter) {
-    case 'open':
-      return isActiveCampaign(campaign.status);
-    case 'filled':
-      return campaign.hired >= Math.max(1, campaign.creators_needed);
-    case 'closed':
-      return campaign.status === 'closed' || campaign.status === 'completed';
-    default:
-      return true;
-  }
 }
 
 /* ============================================================
    Spend over time (pie chart, plain SVG - no chart library needed)
 ============================================================ */
 
-const PIE_COLORS = ['#111111', '#4a4a4a', '#7a7a7a', '#a3a3a3', '#c6c6c6', '#e1e1e1'];
+const PIE_COLORS = ['#14602a', '#197935', '#3c9a58', '#68b37e', '#9acfaa', '#c9e6d2'];
 
 function SpendPie({ spend }: { spend: BusinessAnalytics['spend_over_time'] }) {
   const { points, granularity } = spend;
@@ -242,9 +174,20 @@ function CampaignStatusChart({ statuses }: { statuses: BusinessAnalytics['campai
   const [active, setActive] = useState<number | null>(null);
   const [tip, setTip] = useState<{ x: number; y: number; label: string; count: number } | null>(null);
 
-  const W = 900;
-  const H = 250;
-  const pad = { top: 22, right: 12, bottom: 34, left: 36 };
+  // Draw at the card's real width so text is the same size as in every other chart.
+  const wrapRef = useRef<HTMLDivElement>(null);
+  const [W, setW] = useState(640);
+  useEffect(() => {
+    const el = wrapRef.current;
+    if (!el) return;
+    const measure = () => setW(Math.max(260, Math.round(el.getBoundingClientRect().width)));
+    measure();
+    const observer = new ResizeObserver(measure);
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, []);
+  const H = 260;
+  const pad = { top: 24, right: 12, bottom: 34, left: 40 };
   const innerW = W - pad.left - pad.right;
   const innerH = H - pad.top - pad.bottom;
   const max = niceTop(Math.max(...statuses.map((s) => s.count), 0));
@@ -254,8 +197,8 @@ function CampaignStatusChart({ statuses }: { statuses: BusinessAnalytics['campai
   const y = (v: number) => pad.top + innerH - (v / max) * innerH;
 
   return (
-    <div className="an-sc-wrap" onMouseLeave={() => { setActive(null); setTip(null); }}>
-      <svg className="an-sc-svg" viewBox={`0 0 ${W} ${H}`} role="img" aria-label="Campaigns by status">
+    <div className="an-sc-wrap" ref={wrapRef} onMouseLeave={() => { setActive(null); setTip(null); }}>
+      <svg className="an-sc-svg" width={W} height={H} viewBox={`0 0 ${W} ${H}`} role="img" aria-label="Campaigns by status">
         {ticks.map((t) => (
           <g key={t}>
             <line x1={pad.left} x2={W - pad.right} y1={y(t)} y2={y(t)} stroke="#eee" />
@@ -274,7 +217,7 @@ function CampaignStatusChart({ statuses }: { statuses: BusinessAnalytics['campai
                 width={barW}
                 height={Math.max(h, s.count > 0 ? 2 : 0)}
                 rx="3"
-                fill={active === i ? '#000' : '#2b2b2b'}
+                fill={active === i ? '#14602a' : '#197935'}
                 opacity={active === null || active === i ? 1 : 0.55}
               />
               {s.count > 0 && (
@@ -342,88 +285,6 @@ function Funnel({ funnel }: { funnel: BusinessAnalytics['funnel'] }) {
 }
 
 /* ============================================================
-   Needs your attention
-============================================================ */
-
-function Attention({ attention }: { attention: BusinessAnalytics['attention'] }) {
-  const { pending_applications: pending, unpaid_selected: unpaid, closing_soon: closing } = attention;
-
-  if (attention.count === 0) {
-    return (
-      <div className="an-caught-up">
-        <CheckCircle2 size={18} />
-        You're all caught up.
-      </div>
-    );
-  }
-
-  return (
-    <div className="an-attention">
-      {pending.count > 0 && (
-        <div className="an-att-item">
-          <div className="an-att-text">
-            <div className="an-att-title">
-              {pending.count} {plural(pending.count, 'application has', 'applications have')} been pending for
-              more than {pending.older_than_days} days.
-            </div>
-            {pending.oldest_days !== null && (
-              <div className="an-att-sub">Oldest has been waiting {pending.oldest_days} days.</div>
-            )}
-          </div>
-          <Link className="an-att-link" to={pending.link}>
-            Review <ArrowRight size={13} />
-          </Link>
-        </div>
-      )}
-
-      {unpaid.count > 0 && (
-        <div className="an-att-group">
-          <div className="an-att-title">
-            {unpaid.count} selected {plural(unpaid.count, 'creator is', 'creators are')} waiting for payment.
-          </div>
-          {unpaid.items.map((item) => (
-            <div key={item.contract_id} className="an-att-item an-att-nested">
-              <div className="an-att-text">
-                <div className="an-att-sub-strong">
-                  {item.creator_name || 'A creator'}
-                  {item.campaign_title ? ` · ${item.campaign_title}` : ''}
-                </div>
-                <div className="an-att-sub">
-                  {item.status === 'pending_payment'
-                    ? `Platform fee${item.fee_amount !== null ? ` ${money(item.fee_amount)}` : ''} not paid yet`
-                    : 'Contract terms not finalized yet'}
-                </div>
-              </div>
-              <Link className="an-att-link" to={item.link}>
-                {item.status === 'pending_payment' ? 'Pay fee' : 'Finalize'} <ArrowRight size={13} />
-              </Link>
-            </div>
-          ))}
-          {unpaid.count > unpaid.items.length && (
-            <Link className="an-att-more" to="/contracts">
-              View all contracts <ArrowRight size={13} />
-            </Link>
-          )}
-        </div>
-      )}
-
-      {closing.items.map((item) => (
-        <div key={item.campaign_id} className="an-att-item">
-          <div className="an-att-text">
-            <div className="an-att-title">
-              {item.title} closes {closesIn(item.deadline)}.
-            </div>
-          </div>
-          <Link className="an-att-link" to={item.link}>
-            View <ArrowRight size={13} />
-          </Link>
-        </div>
-      ))}
-    </div>
-  );
-}
-
-/* ============================================================
    Page
 ============================================================ */
 
@@ -433,10 +294,6 @@ export function Analytics() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [reloadKey, setReloadKey] = useState(0);
-  const [showAllApps, setShowAllApps] = useState(false);
-  const [showAllFill, setShowAllFill] = useState(false);
-  const [appFilter, setAppFilter] = useState<AppFilter>('all');
-  const [fillFilter, setFillFilter] = useState<FillFilter>('all');
 
   useEffect(() => {
     let cancelled = false;
@@ -463,60 +320,6 @@ export function Analytics() {
     };
   }, [range, reloadKey]);
 
-  // Applications per campaign: most applications first.
-  const applicationRows = useMemo(
-    () =>
-      [...(data?.campaigns ?? [])].sort(
-        (a, b) => b.applications - a.applications || a.title.localeCompare(b.title)
-      ),
-    [data]
-  );
-
-  // Fill progress: open campaigns first, then the ones with the most empty spots.
-  const fillRows = useMemo(
-    () =>
-      (data?.campaigns ?? [])
-        .filter((c) => c.status !== 'cancelled')
-        .sort((a, b) => {
-          const active = Number(isActiveCampaign(b.status)) - Number(isActiveCampaign(a.status));
-          if (active !== 0) return active;
-          const remaining = b.creators_needed - b.hired - (a.creators_needed - a.hired);
-          return remaining || a.title.localeCompare(b.title);
-        }),
-    [data]
-  );
-
-  const appCounts = useMemo(
-    () => ({
-      all: applicationRows.length,
-      open: applicationRows.filter((c) => matchesAppFilter(c, 'open')).length,
-      closed: applicationRows.filter((c) => matchesAppFilter(c, 'closed')).length,
-      with: applicationRows.filter((c) => matchesAppFilter(c, 'with')).length,
-    }),
-    [applicationRows]
-  );
-  const filteredApps = useMemo(
-    () => applicationRows.filter((c) => matchesAppFilter(c, appFilter)),
-    [applicationRows, appFilter]
-  );
-  const maxApplications = Math.max(1, ...filteredApps.map((c) => c.applications));
-  const visibleApps = showAllApps ? filteredApps : filteredApps.slice(0, INITIAL_ROWS);
-  const fillCounts = useMemo(
-    () => ({
-      all: fillRows.length,
-      open: fillRows.filter((c) => matchesFillFilter(c, 'open')).length,
-      filled: fillRows.filter((c) => matchesFillFilter(c, 'filled')).length,
-      closed: fillRows.filter((c) => matchesFillFilter(c, 'closed')).length,
-    }),
-    [fillRows]
-  );
-  const filteredFill = useMemo(
-    () => fillRows.filter((c) => matchesFillFilter(c, fillFilter)),
-    [fillRows, fillFilter]
-  );
-  const visibleFill = showAllFill ? filteredFill : filteredFill.slice(0, INITIAL_ROWS);
-  const noApplicationsInRange = applicationRows.every((c) => c.applications === 0);
-
   return (
     <AppLayout
       title="Analytics"
@@ -531,6 +334,10 @@ export function Analytics() {
 
         .an-toolbar{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin:0 0 16px}
         .an-toolbar-note{font-size:12px;color:#6b6b6b}
+        .an-select{display:inline-flex;align-items:center;gap:8px;font:400 12px 'Poppins',sans-serif;color:#777}
+        .an-select select{height:34px;padding:0 30px 0 12px;border:1px solid #ddd;border-radius:999px;background:#fff;color:#111;font:500 12px 'Poppins',sans-serif;cursor:pointer}
+        .an-select select:hover{border-color:#bbb}
+        .an-select--inline{margin:0 0 14px}
         .an-ranges{display:flex;gap:8px;flex-wrap:wrap}
         .an-range{height:32px;padding:0 14px;border:1px solid #dedede;border-radius:999px;background:#fff;color:#111;font:500 12.5px 'Poppins',sans-serif;cursor:pointer;transition:background-color .15s ease,border-color .15s ease}
         .an-range:hover{background:#f5f5f5;border-color:#c4c4c4}
@@ -553,9 +360,9 @@ export function Analytics() {
         .an-pie-legend em{min-width:32px;text-align:right;color:#999;font-style:normal;font-weight:400}
         .an-pie-dot{width:10px;height:10px;border-radius:50%;border:1px solid rgba(0,0,0,.08)}
         .an-sc-wrap{position:relative;width:100%}
-        .an-sc-svg{width:100%;height:auto;display:block}
-        .an-sc-axis{font:400 10.5px 'Poppins',sans-serif;fill:#8a8a8a}
-        .an-sc-value{font:500 11px 'Poppins',sans-serif;fill:#111}
+        .an-sc-svg{display:block;max-width:100%}
+        .an-sc-axis{font:400 12px 'Poppins',sans-serif;fill:#555}
+        .an-sc-value{font:500 12px 'Poppins',sans-serif;fill:#111}
         .an-sc-tip{position:absolute;z-index:5;transform:translate(12px,-110%);pointer-events:none;display:flex;flex-direction:column;gap:1px;padding:6px 10px;border-radius:8px;background:#111;color:#fff;white-space:nowrap;box-shadow:0 6px 18px rgba(0,0,0,.25);font:400 11px 'Poppins',sans-serif}
         .an-sc-tip strong{font-weight:600;font-size:12.5px}
         .an-grid{display:grid;gap:16px;margin:0 0 16px}
@@ -586,7 +393,7 @@ export function Analytics() {
         .an-funnel-label{font-size:13px;font-weight:500;color:#111}
         .an-funnel-value{font-family:'League Spartan',sans-serif;font-size:20px;color:#111}
         .an-track{height:8px;border-radius:999px;background:#f0f0f0;overflow:hidden}
-        .an-fill{height:100%;border-radius:999px;background:#111;transition:width .3s ease}
+        .an-fill{height:100%;border-radius:999px;background:#197935;transition:width .3s ease}
         .an-funnel-note{font-size:11.5px;color:#8a8a8a;margin-top:5px}
 
         .an-chips{display:flex;gap:8px;flex-wrap:wrap;margin:0 0 14px}
@@ -669,20 +476,14 @@ export function Analytics() {
           <>
             {/* ---------- Date range ---------- */}
             <div className="an-toolbar">
-              <div className="an-ranges" role="tablist" aria-label="Date range">
-                {RANGES.map((item) => (
-                  <button
-                    key={item.key}
-                    type="button"
-                    role="tab"
-                    aria-selected={range === item.key}
-                    className={`an-range${range === item.key ? ' active' : ''}`}
-                    onClick={() => setRange(item.key)}
-                  >
-                    {item.label}
-                  </button>
-                ))}
-              </div>
+              <label className="an-select">
+                <span>Time range</span>
+                <select value={range} onChange={(e) => setRange(e.target.value as typeof range)}>
+                  {RANGES.map((item) => (
+                    <option key={item.key} value={item.key}>{item.label}</option>
+                  ))}
+                </select>
+              </label>
             </div>
 
             {/* ---------- Row 1: summary cards ---------- */}
@@ -713,12 +514,12 @@ export function Analytics() {
               </div>
             </section>
 
-            {/* ---------- Campaign overview (by status) ---------- */}
-            <div className="an-grid">
+            {/* ---------- Campaigns by status + spend ---------- */}
+            <div className="an-grid row-2">
               <section className="an-panel" aria-label="Campaign overview">
                 <div className="an-panel-head">
-                  <h2>Campaign Overview</h2>
-                  <span className="an-panel-sub">Campaigns created · {RANGE_HINT[range].toLowerCase()}, by current status</span>
+                  <h2>Campaigns</h2>
+                  <span className="an-panel-sub">By current status</span>
                 </div>
                 {data.campaign_statuses.every((s) => s.count === 0) ? (
                   <div className="an-empty">No campaigns were created in this period. Try a longer range.</div>
@@ -726,161 +527,25 @@ export function Analytics() {
                   <CampaignStatusChart statuses={data.campaign_statuses} />
                 )}
               </section>
-            </div>
 
-            {/* ---------- Row 2: spend + funnel ---------- */}
-            <div className="an-grid row-2">
               <section className="an-panel" aria-label="Spend over time">
                 <div className="an-panel-head">
-                  <h2>Spend Over Time</h2>
+                  <h2>Spending</h2>
                   <span className="an-panel-sub">
-                    Share of spend by {data.spend_over_time.granularity === 'day' ? 'day' : 'month'} · NPR
+                    Share of spend by {data.spend_over_time.granularity === 'day' ? 'day' : 'month'}
                   </span>
                 </div>
                 <SpendPie spend={data.spend_over_time} />
               </section>
-
-              <section className="an-panel" aria-label="Hiring funnel">
-                <div className="an-panel-head">
-                  <h2>Hiring Funnel</h2>
-                  <span className="an-panel-sub">{RANGE_HINT[range]}</span>
-                </div>
-                <Funnel funnel={data.funnel} />
-              </section>
             </div>
 
-            {/* ---------- Row 3: applications per campaign + attention ---------- */}
-            <div className="an-grid row-3">
-              <section className="an-panel" aria-label="Applications per campaign">
-                <div className="an-panel-head">
-                  <h2>Applications Per Campaign</h2>
-                  <span className="an-panel-sub">{RANGE_HINT[range]}</span>
-                </div>
-
-                <div className="an-chips" role="tablist" aria-label="Filter campaigns">
-                  {APP_FILTERS.map((item) => (
-                    <button
-                      key={item.key}
-                      type="button"
-                      role="tab"
-                      aria-selected={appFilter === item.key}
-                      className={`an-chip${appFilter === item.key ? ' active' : ''}`}
-                      onClick={() => {
-                        setAppFilter(item.key);
-                        setShowAllApps(false);
-                      }}
-                    >
-                      {item.label} ({appCounts[item.key]})
-                    </button>
-                  ))}
-                </div>
-
-                {noApplicationsInRange ? (
-                  <div className="an-empty">No applications in this period.</div>
-                ) : filteredApps.length === 0 ? (
-                  <div className="an-empty">No campaigns match this filter.</div>
-                ) : (
-                  <div className="an-list">
-                    {visibleApps.map((campaign) => (
-                      <Link key={campaign.id} className="an-row" to={`/applications?campaign=${campaign.id}`}>
-                        <div className="an-row-head">
-                          <span className="an-row-title">{campaign.title}</span>
-                          <span className="an-row-value">{campaign.applications.toLocaleString()}</span>
-                        </div>
-                        <div className="an-track">
-                          <div
-                            className="an-fill"
-                            style={{
-                              width: `${
-                                campaign.applications > 0
-                                  ? Math.max(2, (campaign.applications / maxApplications) * 100)
-                                  : 0
-                              }%`,
-                            }}
-                          />
-                        </div>
-                      </Link>
-                    ))}
-                    {filteredApps.length > INITIAL_ROWS && (
-                      <button type="button" className="an-more" onClick={() => setShowAllApps((v) => !v)}>
-                        {showAllApps ? 'Show fewer' : `Show all ${filteredApps.length} campaigns`}
-                      </button>
-                    )}
-                  </div>
-                )}
-              </section>
-
-              <section className="an-panel" aria-label="Needs your attention">
-                <div className="an-panel-head">
-                  <h2>Needs Your Attention</h2>
-                </div>
-                <Attention attention={data.attention} />
-              </section>
-            </div>
-
-            {/* ---------- Row 4: campaign fill progress ---------- */}
-            <section className="an-panel" aria-label="Campaign fill progress">
+            {/* ---------- Hiring funnel ---------- */}
+            <section className="an-panel" aria-label="Hiring funnel">
               <div className="an-panel-head">
-                <h2>Campaign Fill Progress</h2>
-                <span className="an-panel-sub">Creators hired vs. creators needed</span>
+                <h2>Hiring Funnel</h2>
+                <span className="an-panel-sub">From application to completed work</span>
               </div>
-
-              <div className="an-chips" role="tablist" aria-label="Filter campaigns">
-                {FILL_FILTERS.map((item) => (
-                  <button
-                    key={item.key}
-                    type="button"
-                    role="tab"
-                    aria-selected={fillFilter === item.key}
-                    className={`an-chip${fillFilter === item.key ? ' active' : ''}`}
-                    onClick={() => {
-                      setFillFilter(item.key);
-                      setShowAllFill(false);
-                    }}
-                  >
-                    {item.label} ({fillCounts[item.key]})
-                  </button>
-                ))}
-              </div>
-
-              {fillRows.length === 0 ? (
-                <div className="an-empty">No campaigns to show yet.</div>
-              ) : filteredFill.length === 0 ? (
-                <div className="an-empty">No campaigns match this filter.</div>
-              ) : (
-                <div className="an-list">
-                  {visibleFill.map((campaign) => {
-                    const needed = Math.max(1, campaign.creators_needed);
-                    const pct = Math.min(100, (campaign.hired / needed) * 100);
-                    return (
-                      <Link key={campaign.id} className="an-row" to={`/campaigns/${campaign.id}`}>
-                        <div className="an-row-head">
-                          <span className="an-row-title">{campaign.title}</span>
-                          <span className="an-row-value">
-                            {campaign.hired} / {needed} {plural(needed, 'creator', 'creators')} hired
-                          </span>
-                        </div>
-                        <div className="an-track">
-                          <div className="an-fill" style={{ width: `${campaign.hired > 0 ? Math.max(2, pct) : 0}%` }} />
-                        </div>
-                        <div className="an-row-meta">
-                          <span className={`an-badge${isActiveCampaign(campaign.status) ? '' : ' muted'}`}>
-                            {isActiveCampaign(campaign.status)
-                              ? 'Open'
-                              : campaign.status.charAt(0).toUpperCase() + campaign.status.slice(1)}
-                          </span>
-                          <span>{campaign.hired >= needed ? 'Fully hired' : `${needed - campaign.hired} to go`}</span>
-                        </div>
-                      </Link>
-                    );
-                  })}
-                  {filteredFill.length > INITIAL_ROWS && (
-                    <button type="button" className="an-more" onClick={() => setShowAllFill((v) => !v)}>
-                      {showAllFill ? 'Show fewer' : `Show all ${filteredFill.length} campaigns`}
-                    </button>
-                  )}
-                </div>
-              )}
+              <Funnel funnel={data.funnel} />
             </section>
           </>
         )}

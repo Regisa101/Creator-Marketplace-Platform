@@ -51,7 +51,9 @@ import AdminDashboard from './pages/AdminDashboard';
 import AdminCreators from './pages/admin/AdminCreators';
 import AdminBusinesses from './pages/admin/AdminBusinesses';
 import AdminCampaigns from './pages/admin/AdminCampaigns';
-import AdminRevenue from './pages/admin/AdminRevenue';
+import AdminMoney from './pages/admin/AdminMoney';
+import AdminAnalytics from './pages/admin/AdminAnalytics';
+import BusinessPayments from './pages/BusinessPayments';
 import AdminComplaints from './pages/admin/AdminComplaints';
 import MyComplaints from './pages/MyComplaints';
 
@@ -369,14 +371,25 @@ export default function App() {
             }
           />
 
+          <Route path="/admin/revenue" element={<Navigate to="/admin/money" replace />} />
+          <Route path="/admin/applications" element={<Navigate to="/admin/campaigns" replace />} />
           <Route
-            path="/admin/revenue"
+            path="/admin/analytics"
             element={
               <ProtectedRoute roles={['admin']}>
-                <AdminRevenue />
+                <AdminAnalytics />
               </ProtectedRoute>
             }
           />
+          <Route
+            path="/admin/money"
+            element={
+              <ProtectedRoute roles={['admin']}>
+                <AdminMoney />
+              </ProtectedRoute>
+            }
+          />
+          <Route path="/admin/payments" element={<Navigate to="/admin/money" replace />} />
           <Route
             path="/admin/complaints"
             element={
@@ -507,6 +520,15 @@ export default function App() {
                 to="/dashboard"
                 replace
               />
+            }
+          />
+
+          <Route
+            path="/payments"
+            element={
+              <ProtectedRoute roles={['business']}>
+                <BusinessPayments />
+              </ProtectedRoute>
             }
           />
 

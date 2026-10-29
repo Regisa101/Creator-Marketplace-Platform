@@ -7,6 +7,7 @@ import {
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { AppLayout } from '../components/AppLayout';
+import { mediaUrl } from '../components/PublicProfileKit';
 import {
   getApplications,
   getBusinessAnalytics,
@@ -173,11 +174,12 @@ export function Dashboard() {
     [applications]
   );
 
-  // Pending applications are what actually need a business's attention —
-  // everything else in the funnel (accepted/rejected/etc.) has already
-  // been acted on.
-  const pendingCount = useMemo(
-    () => applications.filter((a) => String((a as any).status) === 'pending').length,
+  // The applications that are actually waiting for a decision, newest first.
+  const pendingApplications = useMemo(
+    () =>
+      applications
+        .filter((a) => String((a as any).status) === 'pending')
+        .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()),
     [applications]
   );
 
@@ -271,6 +273,19 @@ export function Dashboard() {
 
         .applications-section{margin-top:26px;padding-top:22px;border-top:1px solid #e4e1d9}
         .applications-heading{font-family:'League Spartan',sans-serif;font-size:24px;font-weight:400;letter-spacing:-0.02em;margin:0 0 8px;color:#111}
+        .review-row{display:grid;grid-template-columns:minmax(0,1.3fr) minmax(0,1.3fr) 120px 96px;gap:14px;align-items:center;padding:14px 0;border-top:1px solid #e4e1d9}
+        .review-row:first-of-type{border-top:0}
+        .review-person{display:flex;align-items:center;gap:12px;min-width:0;text-decoration:none;color:inherit}
+        .review-avatar{width:38px;height:38px;border-radius:50%;background:#e9f6ee;color:#1e8a4c;display:grid;place-items:center;font-size:14px;font-weight:600;overflow:hidden;flex:none}
+        .review-avatar img{width:100%;height:100%;object-fit:cover}
+        .review-name{font-size:14px;font-weight:500;color:#111;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+        .review-date{font-size:12px;color:#777;margin-top:2px}
+        .review-campaign{font-size:13px;color:#333;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+        .review-rate{font-size:13px;font-weight:500;color:#111}
+        .review-rate small{display:block;font-size:11px;font-weight:400;color:#777;margin-top:2px}
+        .review-more{display:inline-block;margin-top:10px;font-size:13px;font-weight:500;color:#197935;text-decoration:none}
+        .review-more:hover{text-decoration:underline}
+        @media(max-width:720px){.review-row{grid-template-columns:minmax(0,1fr) 88px}.review-campaign,.review-rate{display:none}}
       `}</style>
 
       <main className="brand-home">
@@ -286,8 +301,8 @@ export function Dashboard() {
             <div className="overview-label">Active Campaigns</div>
           </Link>
           <Link className="overview-item" to="/applications">
-            <div className="overview-value">{loading ? '—' : applications.length}</div>
-            <div className="overview-label">Applications</div>
+            <div className="overview-value">{loading ? '—' : pendingApplications.length}</div>
+            <div className="overview-label">To Review</div>
           </Link>
           <Link className="overview-item" to="/applications">
             <div className="overview-value">{loading ? '—' : inProgressCount}</div>
@@ -395,13 +410,54 @@ export function Dashboard() {
           the "dash" separator from the campaigns table above it.
         */}
         <section className="applications-section" aria-label="Applications">
-          <h2 className="applications-heading">Applications</h2>
-          <Link className="btn btn-secondary" to="/applications">
-            {loading ? '—' : pendingCount} application{pendingCount === 1 ? '' : 's'} to review
-            <span className="review-arrow">
-              <ArrowRight size={13} />
-            </span>
-          </Link>
+          <h2 className="applications-heading">Applications to review</h2>
+
+          {loading ? (
+            <div className="brand-empty">Loading…</div>
+          ) : pendingApplications.length === 0 ? (
+            <div className="brand-empty">Nothing waiting for review right now.</div>
+          ) : (
+            <>
+              {pendingApplications.slice(0, 5).map((app) => {
+                const name = app.creator_name || `Creator #${app.creator_id}`;
+                const rate = app.rate ?? app.campaign_budget;
+                return (
+                  <div className="review-row" key={app.id}>
+                    <Link className="review-person" to={`/creators/${app.creator_id}`}>
+                      <div className="review-avatar">
+                        {app.creator_avatar ? (
+                          <img src={mediaUrl(app.creator_avatar)} alt="" />
+                        ) : (
+                          name.charAt(0).toUpperCase()
+                        )}
+                      </div>
+                      <div style={{ minWidth: 0 }}>
+                        <div className="review-name">{name}</div>
+                        <div className="review-date">Applied {formatDueDate(app.created_at) || ''}</div>
+                      </div>
+                    </Link>
+
+                    <div className="review-campaign">{app.campaign_title || `Campaign #${app.campaign_id}`}</div>
+
+                    <div className="review-rate">
+                      {rate != null ? money(rate) : '—'}
+                      <small>{app.rate != null ? 'Proposed' : 'Budget'}</small>
+                    </div>
+
+                    <Link className="btn btn-primary" to={`/applications?campaign=${app.campaign_id}`}>
+                      Review
+                    </Link>
+                  </div>
+                );
+              })}
+
+              {pendingApplications.length > 5 && (
+                <Link className="review-more" to="/applications">
+                  View all {pendingApplications.length} applications
+                </Link>
+              )}
+            </>
+          )}
         </section>
       </main>
     </AppLayout>

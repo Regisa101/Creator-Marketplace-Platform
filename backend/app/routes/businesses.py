@@ -1,3 +1,5 @@
+from types import SimpleNamespace
+
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
@@ -15,7 +17,37 @@ async def get_public_business_profile(business_id: int, db: Session = Depends(ge
         BusinessProfile.is_published.is_(True),
     ).first()
     if not profile:
-        raise HTTPException(status_code=404, detail="Business profile not found")
+        # CreatorHub's own campaigns are posted by the platform admin, who has
+        # no business profile and never goes through onboarding. Give those
+        # campaigns a built-in CreatorHub page instead of a 404.
+        admin = db.query(User).filter(
+            User.id == business_id,
+            User.role == "admin",
+        ).first()
+        if not admin:
+            raise HTTPException(status_code=404, detail="Business profile not found")
+
+        profile = SimpleNamespace(
+            user_id=admin.id,
+            company_name="CreatorHub",
+            business_type="Platform",
+            industry="Creator Marketplace",
+            location="Nepal",
+            website=None,
+            social_links={},
+            description=(
+                "CreatorHub connects Nepali brands with creators. These are "
+                "campaigns posted by the CreatorHub team itself."
+            ),
+            logo_url=None,
+            interested_categories=[],
+            preferred_content_types=[],
+            team_size=None,
+            year_established=None,
+            is_onboarding_complete=True,
+            is_published=True,
+            typical_budget=None,
+        )
 
     campaigns = db.query(Campaign).filter(
         Campaign.business_id == business_id,

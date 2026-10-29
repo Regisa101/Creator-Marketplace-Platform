@@ -147,7 +147,6 @@ export function AdminShell({
       title={title}
       subtitle={subtitle}
       headerActions={headerActions}
-      showSearch={Boolean(search)}
       searchValue={search?.value}
       onSearchChange={search?.onChange}
       onSearchSubmit={search?.onSubmit}
@@ -187,7 +186,7 @@ export function EmptyState({ title, hint }: { title: string; hint?: string }) {
 export function StatCard({ icon, label, value, sub }: { icon: ReactNode; label: string; value: ReactNode; sub?: ReactNode }) {
   return (
     <div className="adm-stat">
-      <div className="adm-icon">{icon}</div>
+      {icon && <div className="adm-icon">{icon}</div>}
       <div className="adm-label">{label}</div>
       <div className="adm-value">{value}</div>
       {sub && <div className="adm-sub">{sub}</div>}
@@ -254,10 +253,47 @@ export function FilterPills({
           onClick={() => onChange(o.value)}
         >
           {o.label}
-          {o.count !== undefined && <span className="adm-pill-count">{o.count}</span>}
+          {o.count !== undefined && o.count > 0 && <span className="adm-pill-count">{o.count}</span>}
         </button>
       ))}
     </div>
+  );
+}
+
+/** Small dropdown for a secondary filter, so pills stay for the one main filter. */
+export function FilterSelect({
+  label,
+  value,
+  onChange,
+  options,
+}: {
+  label: string;
+  value: string;
+  onChange: (value: string) => void;
+  options: PillOption[];
+}) {
+  return (
+    <label className="adm-select">
+      <span>{label}</span>
+      <select value={value} onChange={(e) => onChange(e.target.value)}>
+        {options.map((o) => (
+          <option key={o.value} value={o.value}>
+            {o.label}
+            {o.count ? ` (${o.count})` : ''}
+          </option>
+        ))}
+      </select>
+    </label>
+  );
+}
+
+/** Simple on/off filter. */
+export function FilterToggle({ label, checked, onChange }: { label: string; checked: boolean; onChange: (checked: boolean) => void }) {
+  return (
+    <label className="adm-check">
+      <input type="checkbox" checked={checked} onChange={(e) => onChange(e.target.checked)} />
+      <span>{label}</span>
+    </label>
   );
 }
 
@@ -672,22 +708,34 @@ export function BarChart({
   formatValue?: (value: number) => string;
   ariaLabel: string;
 }) {
-  const W = 640;
+  // Draw at the card's real pixel width so text is the same size in every chart.
   const H = 260;
   const pad = { top: 22, right: 12, bottom: 34, left: 52 };
+  const { wrapRef, show, hide, node } = useChartTooltip();
+  const [W, setW] = useState(640);
+  useEffect(() => {
+    const el = wrapRef.current;
+    if (!el) return;
+    const measure = () => setW(Math.max(260, Math.round(el.getBoundingClientRect().width)));
+    measure();
+    const observer = new ResizeObserver(measure);
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, [wrapRef]);
+
   const innerW = W - pad.left - pad.right;
   const innerH = H - pad.top - pad.bottom;
   const max = niceMax(Math.max(...data.map((d) => d.value), 0));
   const ticks = [0, 0.25, 0.5, 0.75, 1].map((f) => f * max);
   const slot = innerW / data.length;
   const barW = Math.min(44, slot * 0.6);
-  const labelEvery = Math.max(1, Math.ceil(data.length / 8));
-  const { wrapRef, show, hide, node } = useChartTooltip();
+  // Few bars (like campaign statuses): always label every bar. Many bars (daily dates): thin the labels out.
+  const labelEvery = data.length <= 8 ? 1 : Math.max(1, Math.ceil(76 / slot));
   const [active, setActive] = useState<number | null>(null);
 
   return (
     <div className="adm-chart-wrap" ref={wrapRef}>
-      <svg className="adm-bars" viewBox={`0 0 ${W} ${H}`} role="img" aria-label={ariaLabel}>
+      <svg className="adm-bars" width={W} height={H} viewBox={`0 0 ${W} ${H}`} role="img" aria-label={ariaLabel}>
         {ticks.map((t) => {
           const y = pad.top + innerH - (t / max) * innerH;
           return (
@@ -711,7 +759,7 @@ export function BarChart({
                 width={barW}
                 height={Math.max(h, d.value > 0 ? 2 : 0)}
                 rx="3"
-                fill={active === i ? '#000' : '#2b2b2b'}
+                fill={active === i ? '#14602a' : '#197935'}
                 opacity={active === null || active === i ? 1 : 0.55}
               />
               {i % labelEvery === 0 && (
@@ -774,6 +822,12 @@ const ADMIN_CSS = `
 .adm-toolbar { display: flex; align-items: center; justify-content: flex-start; gap: 12px 28px; flex-wrap: wrap; }
 .adm-toolbar-group { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
 
+.adm-filters-end { display: flex; align-items: center; gap: 10px 16px; flex-wrap: wrap; margin-left: auto; }
+.adm-select { display: inline-flex; align-items: center; gap: 8px; font-size: 12px; color: #777; }
+.adm-select select { height: 34px; padding: 0 30px 0 12px; border: 1px solid #ddd; border-radius: 999px; background: #fff; color: #111; font: 500 12px 'Poppins', sans-serif; cursor: pointer; }
+.adm-select select:hover { border-color: #bbb; }
+.adm-check { display: inline-flex; align-items: center; gap: 7px; font-size: 12px; color: #444; cursor: pointer; }
+.adm-check input { accent-color: #197935; width: 15px; height: 15px; }
 .adm-pills { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin: 0; padding: 0; }
 .adm-pills .adm-pill { box-sizing: border-box; appearance: none; -webkit-appearance: none; display: inline-flex; align-items: center; justify-content: center; flex: 0 0 auto; gap: 6px; width: auto; height: 34px; min-height: 34px; max-height: 34px; margin: 0; padding: 0 14px; border: 1px solid #e0e0e0; border-radius: 999px; background: #fff; color: #555; font: 500 12px/1 Poppins, sans-serif; letter-spacing: 0; text-transform: none; text-align: center; white-space: nowrap; vertical-align: middle; box-shadow: none; outline: none; cursor: pointer; transition: background .15s, color .15s, border-color .15s; }
 .adm-pills .adm-pill:hover { background: #fff; border-color: #bbb; color: #111; box-shadow: none; }
@@ -864,7 +918,7 @@ const ADMIN_CSS = `
 .adm-dot { width: 10px; height: 10px; border-radius: 50%; }
 
 .adm-chart-wrap { position: relative; width: 100%; }
-.adm-bars { width: 100%; height: auto; display: block; }
+.adm-bars { display: block; max-width: 100%; }
 .adm-bars rect { transition: opacity .12s ease, fill .12s ease; }
 .adm-slice { cursor: pointer; transition: stroke-width .12s ease; }
 .adm-legend li { padding: 4px 6px; margin: -4px -6px; border-radius: 8px; transition: background .12s; }
@@ -872,7 +926,7 @@ const ADMIN_CSS = `
 
 .adm-tooltip { position: absolute; z-index: 5; transform: translate(12px, -110%); pointer-events: none; display: flex; flex-direction: column; gap: 1px; padding: 6px 10px; border-radius: 8px; background: #111; color: #fff; white-space: nowrap; box-shadow: 0 6px 18px rgba(0,0,0,.25); font: 400 11px Poppins, sans-serif; }
 .adm-tooltip strong { font-weight: 600; font-size: 12.5px; }
-.adm-axis { font: 400 10px Poppins, sans-serif; fill: #999; }
+.adm-axis { font: 400 12px Poppins, sans-serif; fill: #555; }
 .adm-axis-strong { fill: #444; font-weight: 500; }
 
 .adm-activity { margin: 0; padding: 0; list-style: none; }

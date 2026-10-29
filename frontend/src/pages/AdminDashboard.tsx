@@ -1,193 +1,71 @@
-import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { BadgeDollarSign, Building2, Megaphone, Users } from 'lucide-react';
+import { Link } from 'react-router-dom';
 
 import { useAuth } from '../context/AuthContext';
-import { getAdminOverview } from '../api/client';
-import type { AdminRange } from '../api/client';
 import {
-  AdminShell,
-  BarChart,
-  Card,
-  DATE_RANGE_OPTIONS,
-  DonutChart,
-  EmptyState,
-  ErrorBanner,
-  FilterPills,
-  LoadingBlock,
-  StatCard,
-  campaignStatusLabel,
-  formatDateTime,
-  formatNPR,
-  useAdminData,
-} from './admin/adminUi';
+  getAdminComplaints,
+  getAdminRevenue,
+  getPlatformApplications,
+  getPlatformPayments,
+} from '../api/client';
+import { AdminShell, Card, ErrorBanner, LoadingBlock, StatCard, formatNPR, useAdminData } from './admin/adminUi';
 
-const ACTIVITY_STEP = 5;
-
-const RANGE_TEXT: Record<AdminRange, string> = {
-  '7d': 'Last 7 days',
-  '30d': 'Last 30 days',
-  '90d': 'Last 90 days',
-  all: 'All time',
-};
-
-/** Admin landing page: platform health at a glance. All numbers come from /api/admin/overview. */
+/** Admin landing page: three numbers and a short list of things to do. */
 export default function AdminDashboard() {
   const { user } = useAuth();
-  const navigate = useNavigate();
-  const [range, setRange] = useState<AdminRange>('30d');
-  const [searchText, setSearchText] = useState('');
-  const [visibleActivity, setVisibleActivity] = useState(ACTIVITY_STEP);
 
-  const { data, loading, error } = useAdminData(() => getAdminOverview(range), [range]);
+  const { data, loading, error } = useAdminData(async () => {
+    const [revenue, owed, applications, complaints] = await Promise.all([
+      getAdminRevenue({ range: 'all', page: 1, page_size: 1 }),
+      getPlatformPayments({ status: 'all', page: 1, page_size: 1 }),
+      getPlatformApplications({ status: 'pending', page: 1, page_size: 1 }),
+      getAdminComplaints({ status: 'new', page: 1, page_size: 1 }),
+    ]);
+    return {
+      earnedThisMonth: revenue.summary.revenue_this_month,
+      owedAmount: owed.summary.active,
+      owedCount: owed.counts.active ?? 0,
+      newComplaints: complaints.total,
+      pendingApplications: applications.counts.pending ?? 0,
+    };
+  }, []);
 
   if (user?.role !== 'admin') return null;
 
-  const cards = data?.cards;
-  const rangeText = RANGE_TEXT[range];
-  const campaignTotal = data?.campaign_statuses.reduce((sum, s) => sum + s.count, 0) ?? 0;
-  const revenuePoints = data?.revenue_trend.points ?? [];
-  const hasRevenue = revenuePoints.some((p) => p.revenue > 0);
-  const userTotal = (data?.users.creators ?? 0) + (data?.users.businesses ?? 0);
+  const todo = data
+    ? [
+        { count: data.pendingApplications, text: `creator${data.pendingApplications === 1 ? '' : 's'} applied to CreatorHub campaigns`, to: '/admin/campaigns', action: 'Review' },
+        { count: data.owedCount, text: `creator${data.owedCount === 1 ? '' : 's'} waiting to be paid`, to: '/admin/money', action: 'Open Money' },
+        { count: data.newComplaints, text: `new complaint${data.newComplaints === 1 ? '' : 's'}`, to: '/admin/complaints', action: 'Review' },
+      ].filter((t) => t.count > 0)
+    : [];
 
   return (
-    <AdminShell
-      title="Admin overview"
-      subtitle="Monitor creators, businesses, campaigns and CreatorHub revenue."
-      search={{
-        value: searchText,
-        onChange: setSearchText,
-        placeholder: 'Search campaigns… (press Enter)',
-        onSubmit: (v) => {
-          const q = v.trim();
-          navigate(q ? `/admin/campaigns?search=${encodeURIComponent(q)}` : '/admin/campaigns');
-        },
-      }}
-    >
-      <div className="adm-page-actions">
-        <span className="adm-muted" style={{ fontSize: 12 }}>
-          Showing: {rangeText}
-        </span>
-        <FilterPills
-          label="Time range"
-          options={DATE_RANGE_OPTIONS}
-          value={range}
-          onChange={(v) => {
-            setRange(v as AdminRange);
-            setVisibleActivity(ACTIVITY_STEP);
-          }}
-        />
-      </div>
-
+    <AdminShell title="Overview" subtitle="What's happening on CreatorHub right now.">
       <ErrorBanner message={error} />
-      {!data && loading && <LoadingBlock label="Loading overview…" />}
+      {!data && loading && <LoadingBlock />}
 
-      {data && cards && (
+      {data && (
         <>
           <div className="adm-grid-4">
-            <StatCard
-              icon={<Users size={16} />}
-              label="Total Creators"
-              value={cards.total_creators.toLocaleString()}
-              sub={`+${cards.new_creators} new · ${rangeText.toLowerCase()}`}
-            />
-            <StatCard
-              icon={<Building2 size={16} />}
-              label="Total Businesses"
-              value={cards.total_businesses.toLocaleString()}
-              sub={`+${cards.new_businesses} new · ${rangeText.toLowerCase()}`}
-            />
-            <StatCard
-              icon={<Megaphone size={16} />}
-              label="Active Campaigns"
-              value={cards.active_campaigns.toLocaleString()}
-              sub="Published or in progress"
-            />
-            <StatCard
-              icon={<BadgeDollarSign size={16} />}
-              label="Platform Revenue"
-              value={formatNPR(cards.platform_revenue)}
-              sub={`${rangeText.toLowerCase()} · ${cards.paid_contracts} paid contract${cards.paid_contracts === 1 ? '' : 's'}`}
-            />
+            <StatCard icon={null} label="Earned this month" value={formatNPR(data.earnedThisMonth)} sub="10% fees from businesses" />
+            <StatCard icon={null} label="Owed to creators" value={formatNPR(data.owedAmount)} sub="Contracts still running" />
+            <StatCard icon={null} label="New complaints" value={data.newComplaints.toLocaleString()} sub="Not reviewed yet" />
           </div>
 
-          <div className="adm-grid-2">
-            <Card title="Campaign Overview" note={`Campaigns created · ${rangeText.toLowerCase()}, by current status`}>
-              {campaignTotal === 0 ? (
-                <EmptyState title="No campaigns found" hint="Try a longer time range." />
-              ) : (
-                <BarChart
-                  ariaLabel="Campaigns by status"
-                  data={data.campaign_statuses.map((s) => ({ label: campaignStatusLabel(s.status), value: s.count }))}
-                />
-              )}
-            </Card>
-
-            <Card
-              title="Platform Revenue"
-              note={`CreatorHub platform fees only · ${rangeText.toLowerCase()} · ${data.revenue_trend.granularity === 'day' ? 'daily' : 'monthly'}`}
-            >
-              {!hasRevenue ? (
-                <EmptyState title="No platform revenue yet" hint="Fees appear here once a business pays for a contract." />
-              ) : (
-                <BarChart
-                  ariaLabel="Platform revenue over time in NPR"
-                  data={revenuePoints.map((p) => ({ label: p.label, value: p.revenue }))}
-                  formatValue={formatNPR}
-                />
-              )}
-            </Card>
-          </div>
-
-          <div className="adm-grid-2">
-            <Card title="Platform Users" note="All registered accounts">
-              {userTotal === 0 ? (
-                <EmptyState title="No creators yet" />
-              ) : (
-                <DonutChart
-                  centerLabel="users"
-                  slices={[
-                    { label: 'Creators', value: data.users.creators, color: '#111111' },
-                    { label: 'Businesses', value: data.users.businesses, color: '#b5b5b5' },
-                  ]}
-                />
-              )}
-            </Card>
-
-            <Card title="Recent Activity" note={rangeText}>
-              {data.recent_activity.length === 0 ? (
-                <EmptyState title="No recent activity" />
-              ) : (
-                <>
-                  <ul className="adm-activity">
-                    {data.recent_activity.slice(0, visibleActivity).map((a, i) => (
-                      <li key={`${a.type}-${a.at}-${i}`}>
-                        <div>
-                          <strong>{a.title}</strong>
-                          {a.subject && <span className="subject">{a.subject}</span>}
-                        </div>
-                        <time dateTime={a.at}>{formatDateTime(a.at)}</time>
-                      </li>
-                    ))}
-                  </ul>
-                  {data.recent_activity.length > ACTIVITY_STEP && (
-                    <div className="adm-more">
-                      {visibleActivity < data.recent_activity.length && (
-                        <button type="button" onClick={() => setVisibleActivity((n) => n + ACTIVITY_STEP)}>
-                          Show more
-                        </button>
-                      )}
-                      {visibleActivity > ACTIVITY_STEP && (
-                        <button type="button" onClick={() => setVisibleActivity(ACTIVITY_STEP)}>
-                          Show less
-                        </button>
-                      )}
-                    </div>
-                  )}
-                </>
-              )}
-            </Card>
-          </div>
+          <Card title="Needs your attention">
+            {todo.length === 0 ? (
+              <p className="adm-muted" style={{ margin: 0, fontSize: 13 }}>You're all caught up.</p>
+            ) : (
+              <ul className="adm-mini-list">
+                {todo.map((t) => (
+                  <li key={t.to}>
+                    <span><strong>{t.count}</strong> {t.text}</span>
+                    <Link to={t.to}>{t.action}</Link>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </Card>
         </>
       )}
     </AdminShell>

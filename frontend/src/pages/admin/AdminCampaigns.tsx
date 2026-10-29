@@ -6,7 +6,7 @@ import type { RestrictPayload } from '../../api/client';
 import { getAdminCampaign, getAdminCampaigns, restrictAdminCampaign, selectAdminCampaignCreator } from '../../api/client';
 import {
   AdminShell, Card, CAMPAIGN_STATUS_OPTIONS, ConfirmModal, RestrictModal, DATE_RANGE_OPTIONS, DetailGrid, Drawer, EmptyState, ErrorBanner,
-  FilterPills, LoadingBlock, Pagination, StatusBadge, TagList, errorMessage, formatDate, formatNPR, useAdminData, useDebounced,
+  FilterPills, FilterSelect, LoadingBlock, Pagination, StatusBadge, TagList, errorMessage, formatDate, formatNPR, useAdminData, useDebounced,
 } from './adminUi';
 
 const PAGE_SIZE = 20;
@@ -105,7 +105,9 @@ export default function AdminCampaigns() {
           onChange={(v) => { setStatus(v); setPage(1); }}
           options={[{ value: 'all', label: 'All', count: counts?.all }, ...CAMPAIGN_STATUS_OPTIONS.map((o) => ({ ...o, count: counts?.[o.value] }))]}
         />
-        <FilterPills label="Created within" value={range} onChange={(v) => { setRange(v); setPage(1); }} options={DATE_RANGE_OPTIONS} />
+        <div className="adm-filters-end">
+          <FilterSelect label="Created" value={range} onChange={(v) => { setRange(v); setPage(1); }} options={DATE_RANGE_OPTIONS} />
+        </div>
       </div>
 
       <ErrorBanner message={list.error} />

@@ -2,20 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom';
 
-import {
-  ArrowLeft,
-  Bookmark,
-  BookmarkCheck,
-  CalendarDays,
-  Check,
-  ChevronRight,
-  Clock,
-  Loader2,
-  MapPin,
-  Send,
-  Users,
-  X,
-} from 'lucide-react';
+import { Bookmark, BookmarkCheck, Loader2, Share2, X } from 'lucide-react';
 
 import {
   deleteCampaign,
@@ -41,6 +28,8 @@ import { AppLayout } from '../components/AppLayout';
 import { LogoMark } from '../components/Logo';
 import { brandDisplayName, isCreatorHub } from '../utils/brand';
 import { categoryImage } from '../utils/categoryArt';
+import { brandCoverStyle } from '../utils/brandCover';
+import { mediaUrl } from '../components/PublicProfileKit';
 import { ApplyModal } from '../components/ApplyModels';
 
 function money(value?: number | null) {
@@ -87,17 +76,29 @@ function getBudgetLabel(campaign: Campaign) {
   return money(campaign.budget) || 'Budget not specified';
 }
 
-function getPlatform(campaign: Campaign) {
-  const publicCampaign = campaign as PublicCampaign;
+const PLATFORM_COLORS: Record<string, string> = {
+  instagram: '#e1306c',
+  tiktok: '#111111',
+  youtube: '#ff0000',
+  facebook: '#1877f2',
+  linkedin: '#0a66c2',
+  x: '#111111',
+  twitter: '#1d9bf0',
+};
 
-  if (publicCampaign.required_platforms?.length) {
-    return publicCampaign.required_platforms.join(' · ');
-  }
-
-  return publicCampaign.required_platform || null;
+function platformColor(name: string) {
+  return PLATFORM_COLORS[name.trim().toLowerCase()] || '#197935';
 }
 
-
+/** Whole days until the deadline (0 = today, negative = passed), or null. */
+function getDaysLeft(value?: string | null) {
+  if (!value) return null;
+  const end = /^\d{4}-\d{2}-\d{2}$/.test(value)
+    ? new Date(`${value}T23:59:59.999`)
+    : new Date(value);
+  if (Number.isNaN(end.getTime())) return null;
+  return Math.ceil((end.getTime() - Date.now()) / 86400000) - (end.getTime() < Date.now() ? 1 : 0);
+}
 
 function localDateInputValue(value?: string | null) {
   if (!value) return '';
@@ -158,6 +159,7 @@ export function CampaignDetail() {
 
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [showMore, setShowMore] = useState(false);
 
   const [manageAction, setManageAction] = useState('');
   const [error, setError] = useState('');
@@ -503,12 +505,81 @@ export function CampaignDetail() {
   }
 
   const budgetLabel = getBudgetLabel(campaign);
-  const platform = getPlatform(campaign);
   const publicCampaign = campaign as PublicCampaign;
   const businessName = brandDisplayName(
     business?.company_name || publicCampaign.brand_name,
     'Business'
   );
+  // CreatorHub's own campaigns (posted by the platform admin).
+  const isHub = isCreatorHub(businessName) || isCreatorHub(publicCampaign.brand_name);
+
+  const platforms: string[] = publicCampaign.required_platforms?.length
+    ? publicCampaign.required_platforms
+    : publicCampaign.required_platform
+      ? [publicCampaign.required_platform]
+      : [];
+
+  const daysLeft = getDaysLeft(campaign.application_deadline);
+  const deadlineText =
+    daysLeft == null
+      ? 'Open'
+      : daysLeft < 0
+        ? 'Closed'
+        : daysLeft === 0
+          ? 'Last day'
+          : daysLeft === 1
+            ? '1 day left'
+            : `${daysLeft} days left`;
+
+  const needed = Number(campaign.creators_needed || 1);
+  const applied = Number(campaign.application_count ?? 0);
+  const canApply = !isOwner && campaign.status === 'published';
+
+  const aboutText =
+    campaign.description || 'The business has not provided additional campaign details yet.';
+  const longAbout = aboutText.length > 420;
+
+  const sourceQuery = fromLanding ? '?source=landing' : fromDashboard ? '?source=dashboard' : '';
+  const campaignHref = (campaignId: number) => `/campaigns/${campaignId}${sourceQuery}`;
+  const moreFromBrand = (business?.campaigns || [])
+    .filter((c) => c.id !== campaign.id && c.status === 'published')
+    .slice(0, 3);
+
+  const shareCampaign = async () => {
+    const url = window.location.href;
+    try {
+      if (navigator.share) {
+        await navigator.share({ title: campaign.title, url });
+      } else {
+        await navigator.clipboard.writeText(url);
+        setNotice('Campaign link copied to clipboard.');
+      }
+    } catch {
+      // Sharing was cancelled or is unavailable; nothing to do.
+    }
+  };
+
+  const applyControl = !canApply ? null : application ? (
+    <div className="cd-applied">
+      Application submitted
+    </div>
+  ) : deadlinePassed ? (
+    <div className="cd-closed">Applications closed</div>
+  ) : isCreator ? (
+    <button
+      className="cd-apply cd-apply--big"
+      onClick={() => {
+        setError('');
+        setShowApply(true);
+      }}
+    >
+      Apply now
+    </button>
+  ) : !user ? (
+    <button className="cd-apply cd-apply--big" onClick={() => navigate('/login')}>
+      Apply now
+    </button>
+  ) : null;
 
   return renderFrame(
     <main className="cd-page">
@@ -516,103 +587,129 @@ export function CampaignDetail() {
       <div className="cd-shell">
         {/* BACK */}
         <Link to={backHref} className="cd-back">
-          <ArrowLeft size={15} />
           Back to campaigns
         </Link>
 
         {/* ALERTS */}
         {error && (
           <div className="cd-alert cd-alert--error">
-            <X size={15} />
             {error}
           </div>
         )}
 
         {notice && (
           <div className="cd-alert">
-            <Check size={15} />
             {notice}
           </div>
         )}
 
-        {/* HEADER */}
-        <header className="cd-header">
-          <div className="cd-header-main">
+        {/* HERO: cover photo + business + title */}
+        <header className="cd-hero">
+          <div
+            className="cd-cover"
+            style={isHub ? { backgroundImage: 'linear-gradient(135deg,#111 0%,#2b2b2b 55%,#197935 140%)' } : brandCoverStyle(
+              {
+                name: businessName,
+                category: business?.industry || campaign.category,
+                hints: [campaign.category, business?.business_type, ...(business?.interested_categories || [])],
+                coverUrl: business?.cover_url,
+              },
+              mediaUrl,
+            )}
+          >
+            <div className="cd-cover-shade" />
+            <Link
+              to={`/brands/${campaign.business_id}`}
+              className="cd-brandchip"
+              aria-label={`View ${businessName} business profile`}
+            >
+              <span className="cd-brandchip-logo">
+                {isHub ? (
+                  <LogoMark size={28} />
+                ) : (
+                  <img
+                    src={
+                      business?.logo_url ||
+                      categoryImage(business?.industry, campaign.category, businessName)
+                    }
+                    alt=""
+                  />
+                )}
+              </span>
+              <span className="cd-brandchip-text">
+                <strong>{businessName}</strong>
+                <small>
+                  {business?.location || publicCampaign.brand_location || campaign.location || 'Nepal'}
+                </small>
+              </span>
+            </Link>
+          </div>
+
+          <div className="cd-hero-body">
             <div className="cd-tags">
-              {campaign.category && <span>{campaign.category}</span>}
+              {campaign.category && <span className="cd-tag-main">{campaign.category}</span>}
               {campaign.engagement_type && <span>{campaign.engagement_type}</span>}
               {campaign.work_arrangement && <span>{campaign.work_arrangement}</span>}
+              {campaign.experience_level && <span>{campaign.experience_level}</span>}
+              {campaign.status !== 'published' && (
+                <span className="cd-tag-status">{campaign.status}</span>
+              )}
             </div>
 
             <div className="cd-title-row">
               <h1>{campaign.title}</h1>
 
-              {isCreator && (
+              <div className="cd-title-actions">
                 <button
-                  className="cd-save"
-                  onClick={() => void toggleSave()}
-                  disabled={saving}
-                  aria-label={saved ? 'Unsave campaign' : 'Save campaign'}
+                  className="cd-text-btn"
+                  onClick={() => void shareCampaign()}
+                  aria-label="Share campaign"
+                  title="Share"
                 >
-                  {saved ? <BookmarkCheck size={18} /> : <Bookmark size={18} />}
+                  <Share2 size={17} />
                 </button>
-              )}
+                {isCreator && (
+                  <button
+                    className={`cd-text-btn${saved ? ' is-on' : ''}`}
+                    onClick={() => void toggleSave()}
+                    disabled={saving}
+                    aria-label={saved ? 'Unsave campaign' : 'Save campaign'}
+                    title={saved ? 'Saved' : 'Save'}
+                  >
+                    {saved ? <BookmarkCheck size={17} /> : <Bookmark size={17} />}
+                  </button>
+                )}
+              </div>
             </div>
 
             <p className="cd-intro">{campaign.description}</p>
 
-            <div className="cd-header-meta">
-              <span>
-                <MapPin size={13} />
-                {campaign.location || 'Remote / flexible'}
-              </span>
-              <span>
-                <Users size={13} />
-                {campaign.creators_needed || 1} creators needed
-              </span>
-              <span>
-                <Clock size={13} />
-                {campaign.duration || 'Flexible duration'}
-              </span>
-              {campaign.application_deadline && (
-                <span>
-                  <CalendarDays size={13} />
-                  Apply by {dateLabel(campaign.application_deadline)}
-                </span>
-              )}
-            </div>
-
-            {!isOwner && campaign.status === 'published' && (
-              <div className="cd-header-apply">
-                {isCreator && !application ? (
-                  <button
-                    className="cd-apply cd-apply--header"
-                    onClick={() => {
-                      setError('');
-                      setShowApply(true);
-                    }}
-                  >
-                    <Send size={14} />
-                    Apply now
-                  </button>
-                ) : !user ? (
-                  <button className="cd-apply cd-apply--header" onClick={() => navigate('/login')}>
-                    <Send size={14} />
-                    Apply now
-                  </button>
-                ) : application ? (
-                  <div className="cd-header-applied">
-                    <Check size={14} />
-                    Application submitted
-                  </div>
-                ) : null}
+            {/* KEY FACTS: the four things a creator wants to know first */}
+            <div className="cd-facts">
+              <div className="cd-fact cd-fact--budget">
+                <small>Budget</small>
+                <strong>{budgetLabel}</strong>
               </div>
-            )}
+              <div className={`cd-fact${daysLeft != null && daysLeft >= 0 && daysLeft <= 3 ? ' cd-fact--urgent' : ''}`}>
+                <small>Apply by</small>
+                <strong>{deadlineText}</strong>
+                {campaign.application_deadline && <em>{dateLabel(campaign.application_deadline)}</em>}
+              </div>
+              <div className="cd-fact">
+                <small>Creators needed</small>
+                <strong>{needed} {needed === 1 ? 'creator' : 'creators'}</strong>
+                {isOwner && applied > 0 && <em>{applied} applied</em>}
+              </div>
+              <div className="cd-fact">
+                <small>Duration</small>
+                <strong>{campaign.duration || 'Flexible'}</strong>
+                <em>{campaign.engagement_type || 'One-time'}</em>
+              </div>
+            </div>
           </div>
 
           {isOwner && deadlinePassed && (
             <div className="cd-deadline-notice" role="status">
-              <CalendarDays size={16} />
               <div className="cd-deadline-notice-text">
                 <strong>Application deadline has passed</strong>
                 <span>{deadlineNoticeText}</span>
@@ -625,7 +722,6 @@ export function CampaignDetail() {
                   onClick={openExtensionModal}
                   disabled={!!manageAction}
                 >
-                  <CalendarDays size={14} />
                   Extend deadline
                 </button>
               )}
@@ -667,106 +763,139 @@ export function CampaignDetail() {
           )}
         </header>
 
-        {/* BODY: exact two-column campaign information structure */}
+        {/* BODY */}
         <div className="cd-layout">
-          <div className="cd-column">
-            <Section title="About the campaign">
+          <div className="cd-main">
+            <Section title="About this campaign">
               <p className="cd-copy">
-                {campaign.description ||
-                  'The business has not provided additional campaign details yet.'}
+                {longAbout && !showMore ? `${aboutText.slice(0, 380).trimEnd()}…` : aboutText}
               </p>
+              {longAbout && (
+                <button type="button" className="cd-more" onClick={() => setShowMore((v) => !v)}>
+                  {showMore ? 'Show less' : 'Read more'}
+                </button>
+              )}
             </Section>
 
             <Section title="What you'll do">
               <p className="cd-copy">
                 {campaign.responsibilities ||
-                  campaign.description ||
                   'The selected creator will work with the business to complete the campaign requirements.'}
               </p>
             </Section>
 
-            <Section title="Deliverables">
+            <Section title="What you'll deliver">
               {campaign.deliverables?.length ? (
-                <ul className="cd-list">
+                <div className="cd-deliver">
                   {campaign.deliverables.map((item: string, index: number) => (
-                    <li key={`${item}-${index}`}>
-                      <span className="cd-check"><Check size={13} /></span>
+                    <div className="cd-deliver-item" key={`${item}-${index}`}>
+                      <span className="cd-deliver-no">{index + 1}</span>
                       <span>{item}</span>
-                    </li>
+                    </div>
                   ))}
-                </ul>
+                </div>
               ) : (
                 <p className="cd-muted">Deliverables will be agreed with the selected creator.</p>
               )}
             </Section>
 
-            <Section title="Requirements">
-              {campaign.requirements ? (
-                <p className="cd-copy">{campaign.requirements}</p>
-              ) : (
-                <div className="cd-info-list cd-info-list--compact">
-                  <DetailItem label="Work arrangement" value={campaign.work_arrangement || 'Not specified'} />
-                  <DetailItem label="Location" value={campaign.location || 'Remote / flexible'} />
+            <Section title="Who we're looking for">
+              <div className="cd-looking">
+                <div>
+                  <small>Creator type</small>
+                  <div className="cd-chips">
+                    {campaign.creator_types?.length ? (
+                      campaign.creator_types.map((type: string) => (
+                        <span className="cd-chip cd-chip--green" key={type}>{type}</span>
+                      ))
+                    ) : (
+                      <span className="cd-chip">Open to any creator</span>
+                    )}
+                  </div>
+                </div>
+
+                <div>
+                  <small>Platforms</small>
+                  <div className="cd-chips">
+                    {platforms.length ? (
+                      platforms.map((p) => (
+                        <span className="cd-chip cd-chip--platform" key={p}>
+                          <i style={{ background: platformColor(p) }} />
+                          {p}
+                        </span>
+                      ))
+                    ) : (
+                      <span className="cd-chip">Any platform</span>
+                    )}
+                  </div>
+                </div>
+
+                <div>
+                  <small>Skills</small>
+                  <div className="cd-chips">
+                    {campaign.required_skills?.length ? (
+                      campaign.required_skills.map((skill: string) => (
+                        <span className="cd-chip" key={skill}>{skill}</span>
+                      ))
+                    ) : (
+                      <span className="cd-chip">No specific skills</span>
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              {campaign.requirements && (
+                <div className="cd-req">
+                  <small>Requirements</small>
+                  <p className="cd-copy">{campaign.requirements}</p>
                 </div>
               )}
             </Section>
+
+            {moreFromBrand.length > 0 && (
+              <Section title={`More from ${businessName}`}>
+                <div className="cd-more-list">
+                  {moreFromBrand.map((c) => (
+                    <Link key={c.id} to={campaignHref(c.id)} className="cd-more-card">
+                      <div>
+                        <strong>{c.title}</strong>
+                        <small>{c.category}</small>
+                      </div>
+                      <span>{c.budget != null ? money(c.budget) : 'View'}</span>
+                    </Link>
+                  ))}
+                </div>
+              </Section>
+            )}
           </div>
 
-          <div className="cd-column">
-            <Section title="Campaign details">
-              <div className="cd-info-list">
+          <aside className="cd-side">
+            <div className="cd-applycard">
+              <small>Campaign budget</small>
+              <div className="cd-applycard-budget">{budgetLabel}</div>
+
+              <div className={`cd-countdown${daysLeft != null && daysLeft >= 0 && daysLeft <= 3 ? ' is-urgent' : ''}${daysLeft != null && daysLeft < 0 ? ' is-closed' : ''}`}>
+                {daysLeft == null ? 'Open for applications' : deadlineText}
+              </div>
+
+              <div className="cd-applycard-stats">
+                <span>{needed} {needed === 1 ? 'spot' : 'spots'} available</span>
+                {isOwner && <span>{applied} applied</span>}
+              </div>
+
+              {applyControl}
+
+              {!applyControl && !isOwner && (
+                <p className="cd-muted">Sign in as a creator to apply to this campaign.</p>
+              )}
+
+              <div className="cd-applycard-list">
                 <DetailItem label="Compensation" value={campaign.compensation_type || 'Not specified'} />
-                <DetailItem label="Pricing" value={budgetLabel} />
-                <DetailItem label="Location" value={campaign.location || 'Remote / flexible'} />
                 <DetailItem label="Experience" value={campaign.experience_level || 'Not specified'} />
-                <DetailItem label="Creators needed" value={String(campaign.creators_needed || 1)} />
+                <DetailItem label="Location" value={campaign.location || 'Remote / flexible'} />
+                <DetailItem label="Work style" value={campaign.work_arrangement || 'Flexible'} />
               </div>
-            </Section>
-
-            <Section title="Creator type">
-              {campaign.creator_types?.length ? (
-                <div className="cd-choice-list">
-                  {campaign.creator_types.map((type: string) => (
-                    <span key={type}>{type}</span>
-                  ))}
-                </div>
-              ) : (
-                <p className="cd-muted">Open to any creator type</p>
-              )}
-            </Section>
-
-            <Section title="Skills">
-              {campaign.required_skills?.length ? (
-                <div className="cd-skills">
-                  {campaign.required_skills.map((skill: string) => (
-                    <span key={skill}>{skill}</span>
-                  ))}
-                </div>
-              ) : (
-                <p className="cd-muted">No specific skills were listed.</p>
-              )}
-
-              {platform && (
-                <div className="cd-platform-box">
-                  <small>Required platform</small>
-                  <strong>{platform}</strong>
-                </div>
-              )}
-            </Section>
-
-            <Section title="Timeline">
-              <div className="cd-timeline">
-                {campaign.start_date || campaign.end_date ? (
-                  <>
-                    <TimelineItem label="Campaign starts" value={dateLabel(campaign.start_date)} />
-                    <TimelineItem label="Campaign ends" value={dateLabel(campaign.end_date)} />
-                  </>
-                ) : (
-                  <TimelineItem label="Campaign duration" value="Ongoing – starts once selected" />
-                )}
-                <TimelineItem label="Applications close" value={dateLabel(campaign.application_deadline)} />
-              </div>
-            </Section>
+            </div>
 
             <div className="cd-business-card">
               <div className="cd-business-card-title">About the business</div>
@@ -777,8 +906,8 @@ export function CampaignDetail() {
                 aria-label={`View ${businessName} business profile`}
               >
                 <div className="cd-business-card-avatar">
-                  {isCreatorHub(businessName) ? (
-                    <LogoMark size={26} />
+                  {isHub ? (
+                    <LogoMark size={28} />
                   ) : (
                     <img
                       src={
@@ -795,22 +924,47 @@ export function CampaignDetail() {
                   {business?.industry && <span>{business.industry}</span>}
                   {business?.location && (
                     <span className="cd-business-location">
-                      <MapPin size={11} />
                       {business.location}
                     </span>
                   )}
                 </div>
 
-                <ChevronRight size={15} className="cd-business-profile-arrow" />
               </Link>
+
+              {business && (
+                <div className="cd-business-stats">
+                  <div>
+                    <strong>{business.campaigns?.length ?? 0}</strong>
+                    <small>Campaigns</small>
+                  </div>
+                  <div>
+                    <strong>{business.completed_collaborations ?? 0}</strong>
+                    <small>Collaborations</small>
+                  </div>
+                  <div>
+                    <strong>{business.creators_worked_with ?? 0}</strong>
+                    <small>Creators</small>
+                  </div>
+                </div>
+              )}
 
               <Link to={`/brands/${campaign.business_id}`} className="cd-business-see-more">
                 See business profile
-                <ChevronRight size={13} />
               </Link>
             </div>
-          </div>
+          </aside>
         </div>
+
+        {/* Mobile: apply bar that stays at the bottom of the screen */}
+        {canApply && (
+          <div className="cd-mobilebar">
+            <div>
+              <small>Budget</small>
+              <strong>{budgetLabel}</strong>
+            </div>
+            {applyControl}
+          </div>
+        )}
 
       {showApply && (
         <ApplyModal
@@ -874,7 +1028,7 @@ export function CampaignDetail() {
               </div>
 
               <div className="cd-extension-date-arrow">
-                <ChevronRight size={18} />
+                to
               </div>
 
               <div className="cd-extension-date-block">
@@ -907,7 +1061,6 @@ export function CampaignDetail() {
               </label>
 
               <div className="cd-extension-confirmation">
-                <Check size={15} />
                 <span>
                   Once extended, creators will be able to apply again until the new deadline.
                 </span>
@@ -936,7 +1089,6 @@ export function CampaignDetail() {
                     </>
                   ) : (
                     <>
-                      <CalendarDays size={14} />
                       Extend campaign
                     </>
                   )}
@@ -977,21 +1129,6 @@ function DetailItem({
     <div className="cd-detail-item">
       <small>{label}</small>
       <strong>{value}</strong>
-    </div>
-  );
-}
-
-function TimelineItem({
-  label,
-  value,
-}: {
-  label: string;
-  value: string | null;
-}) {
-  return (
-    <div className="cd-timeline-item">
-      <small>{label}</small>
-      <strong>{value || 'Not specified'}</strong>
     </div>
   );
 }
@@ -1449,6 +1586,231 @@ const STYLE = `
   .cd-extension-form{padding:0 18px 18px}
   .cd-extension-actions{flex-direction:column-reverse;width:100%}
   .cd-extension-cancel,.cd-extension-submit{width:100%}
+}
+
+/* ===================== REDESIGN ===================== */
+.cd-page{padding:8px 20px 90px}
+.cd-shell{max-width:1120px;animation:cdIn .45s ease both}
+@keyframes cdIn{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
+.cd-back{font-size:12px;color:#666;margin-bottom:14px}
+
+/* Hero */
+.cd-hero{margin-bottom:22px}
+.cd-cover{
+  position:relative;
+  height:230px;
+  border-radius:18px 18px 0 0;
+  overflow:hidden;
+  background-color:#d9ded9;
+}
+.cd-cover-shade{
+  position:absolute;inset:0;
+  background:linear-gradient(180deg,rgba(0,0,0,.05) 35%,rgba(0,0,0,.62) 100%);
+}
+.cd-brandchip{
+  position:absolute;left:20px;bottom:18px;
+  display:flex;align-items:center;gap:12px;
+  padding:9px 14px 9px 9px;
+  background:rgba(255,255,255,.96);
+  border-radius:14px;
+  color:#111;text-decoration:none;
+  box-shadow:0 8px 24px rgba(0,0,0,.22);
+  max-width:calc(100% - 40px);
+  transition:transform .15s;
+}
+.cd-brandchip:hover{transform:translateY(-1px)}
+.cd-brandchip-logo{
+  width:46px;height:46px;border-radius:11px;overflow:hidden;
+  background:#fff;border:1px solid #eee;display:grid;place-items:center;flex:none;
+}
+.cd-brandchip-logo img{width:100%;height:100%;object-fit:cover;display:block}
+.cd-brandchip-text{display:flex;flex-direction:column;min-width:0}
+.cd-brandchip-text strong{font-size:14px;font-weight:600;line-height:1.2;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.cd-brandchip-text small{display:flex;align-items:center;gap:4px;color:#777;font-size:11.5px;margin-top:2px}
+
+.cd-hero-body{
+  background:#fff;
+  border:1px solid #e6e3dd;
+  border-top:0;
+  border-radius:0 0 18px 18px;
+  padding:22px 26px 26px;
+}
+.cd-tags{margin-bottom:12px;gap:7px}
+.cd-tags span{padding:5px 11px;font-size:11px;border-color:#e3e3e3;background:#fafafa;color:#555}
+.cd-tags .cd-tag-main{background:#e8f5ec;border-color:#cfe8d6;color:#197935;font-weight:600}
+.cd-tags .cd-tag-status{background:#fff4e0;border-color:#f3dcae;color:#9a6200;font-weight:600}
+.cd-title-row{align-items:flex-start;justify-content:space-between;gap:16px}
+.cd-hero h1{
+  margin:0;max-width:780px;
+  font-size:34px;line-height:1.15;letter-spacing:-.03em;font-weight:600;color:#111;
+}
+.cd-title-actions{display:flex;gap:8px;flex:none}
+.cd-text-btn{
+  display:inline-grid;place-items:center;
+  width:40px;height:40px;padding:0;border:1px solid #ddd;border-radius:10px;background:#fff;color:#222;
+  font-family:inherit;font-size:13px;font-weight:500;cursor:pointer;transition:all .15s;
+}
+.cd-text-btn:hover{border-color:#197935;color:#197935}
+.cd-text-btn.is-on{background:#e8f5ec;border-color:#197935;color:#197935}
+.cd-text-btn:disabled{opacity:.5;cursor:not-allowed}
+.cd-hero .cd-intro{
+  max-width:780px;margin:12px 0 22px;color:#555;font-size:14px;line-height:1.7;
+  display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden;
+}
+
+/* Key facts */
+.cd-facts{display:grid;grid-template-columns:1.3fr 1fr 1fr 1fr;gap:12px}
+.cd-fact{
+  position:relative;
+  padding:14px 16px;
+  border:1px solid #ebe8e1;border-radius:14px;background:#faf9f6;
+  display:flex;flex-direction:column;gap:2px;min-width:0;
+}
+.cd-fact small{color:#888;font-size:11px;letter-spacing:.02em}
+.cd-fact strong{font-size:16px;font-weight:600;color:#111;line-height:1.3}
+.cd-fact em{font-style:normal;font-size:11.5px;color:#888}
+.cd-fact--budget{background:#197935;border-color:#197935}
+.cd-fact--budget small{color:rgba(255,255,255,.8)}
+.cd-fact--budget strong{color:#fff;font-size:19px}
+.cd-fact--urgent{background:#fff1ee;border-color:#f6cfc6}
+.cd-fact--urgent strong{color:#d6381f}
+
+/* Layout */
+.cd-layout{
+  display:grid;
+  grid-template-columns:minmax(0,1fr) 350px;
+  gap:24px;
+  align-items:start;
+}
+.cd-main{min-width:0;display:flex;flex-direction:column;gap:16px}
+.cd-side{position:sticky;top:84px;display:flex;flex-direction:column;gap:16px;min-width:0}
+
+/* Section cards */
+.cd-main .cd-section{
+  padding:24px 26px;
+  background:#fff;border:1px solid #e6e3dd;border-radius:16px;
+}
+.cd-section h2{
+  margin:0 0 14px;font-size:17px;font-weight:600;letter-spacing:-.015em;color:#111;
+}
+.cd-main .cd-copy{font-size:14px;line-height:1.8;color:#4d4d4d}
+.cd-main .cd-muted{font-size:13px}
+.cd-more{
+  margin-top:10px;border:0;background:none;color:#197935;font-weight:600;font-size:13px;cursor:pointer;padding:0;
+}
+.cd-more:hover{text-decoration:underline}
+
+/* Deliverables */
+.cd-deliver{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+.cd-deliver-item{
+  display:flex;align-items:center;gap:12px;padding:13px 14px;
+  border:1px solid #ebe8e1;border-radius:12px;background:#faf9f6;font-size:13.5px;color:#222;line-height:1.4;
+}
+.cd-deliver-no{
+  width:26px;height:26px;border-radius:50%;background:#197935;color:#fff;
+  display:grid;place-items:center;font-size:12px;font-weight:600;flex:none;
+}
+
+/* Who we're looking for */
+.cd-looking{display:flex;flex-direction:column;gap:16px}
+.cd-looking small,.cd-req small{display:block;color:#888;font-size:11.5px;margin-bottom:8px;text-transform:uppercase;letter-spacing:.07em}
+.cd-chips{display:flex;flex-wrap:wrap;gap:8px}
+.cd-chip{
+  display:inline-flex;align-items:center;gap:7px;
+  padding:7px 13px;border-radius:999px;border:1px solid #e3e3e3;background:#fafafa;color:#444;font-size:12.5px;
+}
+.cd-chip--green{background:#e8f5ec;border-color:#cfe8d6;color:#14602a;font-weight:500}
+.cd-chip--platform i{width:9px;height:9px;border-radius:50%;display:block}
+.cd-req{margin-top:18px;padding-top:16px;border-top:1px solid #eeeae3}
+
+/* More from brand */
+.cd-more-list{display:flex;flex-direction:column;gap:10px}
+.cd-more-card{
+  display:flex;align-items:center;gap:12px;padding:13px 15px;border:1px solid #ebe8e1;border-radius:12px;
+  text-decoration:none;color:#111;background:#faf9f6;transition:border-color .15s;
+}
+.cd-more-card:hover{border-color:#197935}
+.cd-more-card>div{flex:1;min-width:0;display:flex;flex-direction:column;gap:2px}
+.cd-more-card strong{font-size:13.5px;font-weight:600}
+.cd-more-card small{color:#888;font-size:12px}
+.cd-more-card>span{font-size:12.5px;font-weight:600;color:#197935}
+
+/* Apply card */
+.cd-applycard{
+  padding:22px;background:#fff;border:1px solid #dcd9d1;border-radius:18px;
+  box-shadow:0 14px 34px rgba(20,40,25,.09);
+}
+.cd-applycard>small{color:#888;font-size:12px}
+.cd-applycard-budget{font-size:25px;font-weight:700;letter-spacing:-.02em;color:#111;margin:3px 0 12px;line-height:1.2}
+.cd-countdown{
+  display:flex;align-items:center;gap:8px;padding:9px 12px;border-radius:10px;
+  background:#e8f5ec;color:#14602a;font-size:13px;font-weight:600;
+}
+.cd-countdown.is-urgent{background:#fff1ee;color:#d6381f}
+.cd-countdown.is-closed{background:#f1f1f1;color:#777}
+.cd-applycard-stats{display:flex;gap:16px;margin:14px 0 16px;color:#555;font-size:13px}
+.cd-applycard-stats span{display:inline-flex;align-items:center;gap:6px}
+.cd-apply--big{
+  width:100%;height:50px;border-radius:12px;font-size:15px;
+  display:flex;align-items:center;justify-content:center;gap:8px;cursor:pointer;
+  box-shadow:0 8px 20px rgba(25,121,53,.28);transition:transform .15s,background .15s;
+}
+.cd-apply--big:hover{transform:translateY(-1px)}
+.cd-applied,.cd-closed{
+  display:flex;align-items:center;justify-content:center;gap:7px;height:50px;border-radius:12px;
+  font-size:14px;font-weight:600;
+}
+.cd-applied{background:#e8f5ec;color:#14602a;border:1px solid #cfe8d6}
+.cd-closed{background:#f1f1f1;color:#777;border:1px solid #e3e3e3}
+.cd-applycard .cd-muted{margin-top:10px;text-align:center;font-size:12px}
+.cd-applycard-list{
+  margin-top:18px;padding-top:16px;border-top:1px solid #eeeae3;
+  display:grid;grid-template-columns:1fr 1fr;gap:14px;
+}
+.cd-applycard-list small{font-size:11px;color:#999}
+.cd-applycard-list strong{font-size:13px;font-weight:600;color:#222}
+
+/* Business card */
+.cd-business-card{background:#fff;border:1px solid #e6e3dd;border-radius:16px;padding:20px}
+.cd-business-card-title{font-size:15px;font-weight:600;margin-bottom:12px;color:#111}
+.cd-business-stats{
+  display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin:14px 0 4px;
+  padding:12px 0;border-top:1px solid #eeeae3;border-bottom:1px solid #eeeae3;text-align:center;
+}
+.cd-business-stats strong{display:block;font-size:17px;font-weight:700;color:#111}
+.cd-business-stats small{font-size:11px;color:#888}
+
+/* Mobile apply bar */
+.cd-mobilebar{display:none}
+
+@media(max-width:960px){
+  .cd-layout{grid-template-columns:1fr}
+  .cd-side{position:static}
+  .cd-applycard{display:none}
+  .cd-facts{grid-template-columns:repeat(2,1fr)}
+  .cd-mobilebar{
+    position:fixed;left:0;right:0;bottom:0;z-index:40;
+    display:flex;align-items:center;justify-content:space-between;gap:14px;
+    padding:12px 18px calc(12px + env(safe-area-inset-bottom));
+    background:#fff;border-top:1px solid #e0ddd5;box-shadow:0 -8px 24px rgba(0,0,0,.08);
+  }
+  .cd-mobilebar>div{display:flex;flex-direction:column;min-width:0}
+  .cd-mobilebar small{font-size:11px;color:#888}
+  .cd-mobilebar strong{font-size:15px;font-weight:700;color:#111;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .cd-mobilebar .cd-apply--big,.cd-mobilebar .cd-applied,.cd-mobilebar .cd-closed{width:auto;flex:none;padding:0 22px;height:46px}
+}
+@media(max-width:640px){
+  .cd-page{padding:6px 12px 100px}
+  .cd-cover{height:160px;border-radius:14px 14px 0 0}
+  .cd-hero-body{padding:18px 16px 18px;border-radius:0 0 14px 14px}
+  .cd-hero h1{font-size:25px}
+  .cd-facts{gap:9px}
+  .cd-fact{padding:12px}
+  .cd-fact strong{font-size:14px}
+  .cd-fact--budget strong{font-size:15px}
+  .cd-main .cd-section{padding:18px 16px}
+  .cd-deliver{grid-template-columns:1fr}
+  .cd-brandchip{left:12px;bottom:12px}
 }
 `;
 
