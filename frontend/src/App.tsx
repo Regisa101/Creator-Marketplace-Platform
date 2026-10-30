@@ -41,6 +41,7 @@ import { BrandProfile } from './pages/Brandprofile';
 import CreatorPublicProfile from './pages/CreatorPublicProfile';
 
 import { Notifications } from './pages/Notifications';
+import { Messages } from './pages/Messages';
 
 import PaymentReturn from './pages/PaymentReturn';
 
@@ -435,6 +436,15 @@ export default function App() {
             element={
               <ProtectedRoute>
                 <SavedCampaigns />
+              </ProtectedRoute>
+            }
+          />
+
+          <Route
+            path="/messages"
+            element={
+              <ProtectedRoute roles={['creator', 'business']}>
+                <Messages />
               </ProtectedRoute>
             }
           />

@@ -29,6 +29,26 @@ PLATFORM_FEE_RATE: float = 0.10
 # for backwards compatibility with existing rows / contracts.
 DEFAULT_PRICING_MODEL = "Custom budget"
 
+# Campaign price types (campaigns.price_type). Replaces the confusing
+# "Custom amount" / "Budget range" choice on the campaign form.
+PRICE_FIXED = "fixed"
+PRICE_NEGOTIABLE = "negotiable"
+
+
+def derive_price_type(price_type: Optional[str], compensation_type: Optional[str] = None) -> str:
+    """Explicit price_type wins; legacy rows map "Budget range"/"Negotiable" -> negotiable."""
+    explicit = (price_type or "").strip().lower()
+    if explicit in (PRICE_FIXED, PRICE_NEGOTIABLE):
+        return explicit
+    legacy = (compensation_type or "").strip().lower()
+    return PRICE_NEGOTIABLE if legacy in ("budget range", "negotiable") else PRICE_FIXED
+
+
+def compensation_type_for(price_type: str) -> str:
+    """Keeps contracts/evidence snapshots using the existing compensation_type column."""
+    return "Negotiable" if price_type == PRICE_NEGOTIABLE else "Custom amount"
+
+
 # Value the old campaign form used for the removed fixed-rate option.
 LEGACY_STANDARD_RATE = "CreatorHub standard rate"
 

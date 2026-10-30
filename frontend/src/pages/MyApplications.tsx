@@ -230,6 +230,9 @@ export function MyApplications() {
                     <span className="ma-date">Applied {dateLabel(a.created_at)}</span>
                     <div className="ma-actions">
                       <Link to={`/campaigns/${a.campaign_id}`} className="ma-link">View details</Link>
+                      {a.status_group !== 'withdrawn' && (
+                        <Link to={`/messages?application=${a.id}`} className="ma-link">Message</Link>
+                      )}
                       {a.contract_id && (
                         <Link to={`/contracts/${a.contract_id}`} className="ma-link">Open contract</Link>
                       )}

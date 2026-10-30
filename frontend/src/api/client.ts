@@ -196,6 +196,7 @@ export interface Campaign {
   duration?: string | null;
   pricing_model?: string | null;
   compensation_type?: string | null;
+  price_type?: 'fixed' | 'negotiable' | null;
   /** Platform fee added on top of the creator payment (0.10 = 10%). */
   platform_fee_rate?: number | null;
   budget?: number | null;
@@ -226,6 +227,7 @@ export interface CampaignCreateData {
   work_arrangement?: string;
   pricing_model?: string;
   compensation_type?: string;
+  price_type?: 'fixed' | 'negotiable';
   budget?: number;
   budget_min?: number;
   budget_max?: number;
@@ -328,6 +330,17 @@ export interface ApplicationAnswer {
   answer: string;
 }
 
+export interface ApplicationNegotiation {
+  conversation_id: number;
+  price_type: 'fixed' | 'negotiable';
+  negotiation_status: 'none' | 'open' | 'price_agreed';
+  brand_decision: 'pending' | 'selected' | 'not_selected';
+  agreed_amount: number | null;
+  agreed_total: number | null;
+  platform_fee: number | null;
+  offers: { amount: number; status: string; by: 'brand' | 'creator'; created_at: string | null }[];
+}
+
 export interface Application {
   id: number;
   campaign_id: number;
@@ -343,6 +356,8 @@ export interface Application {
   selected_portfolio?: any[] | null;
   social_link?: string | null;
   creators_needed?: number | null;
+  price_type?: 'fixed' | 'negotiable' | null;
+  negotiation?: ApplicationNegotiation | null;
   status: ApplicationStatus;
   agreed_rate?: number | null;
   rate_locked?: boolean;
@@ -452,6 +467,7 @@ export interface ContractEvidenceSnapshot {
     duration?: string | null;
     pricing_model?: string | null;
     compensation_type?: string | null;
+    price_type?: 'fixed' | 'negotiable' | null;
     budget?: number | null;
     budget_min?: number | null;
     budget_max?: number | null;
@@ -503,6 +519,7 @@ export interface Contract {
   duration?: string | null;
   pricing_model?: string | null;
   compensation_type?: string | null;
+  price_type?: 'fixed' | 'negotiable' | null;
   compensation_description?: string | null;
   agreed_rate?: number | null;
   total_value?: number | null;
@@ -1236,3 +1253,81 @@ export const getReceivedComplaints = () =>
   api.get<ReceivedComplaint[]>('/complaints/received').then((r) => r.data);
 
 export const getMyComplaints = () => api.get<MyComplaint[]>('/complaints/mine').then((r) => r.data);
+
+// ============================================================
+// MESSAGING / NEGOTIATION
+// ============================================================
+export interface ConversationOffer {
+  id: number;
+  proposer_id: number;
+  amount: number;
+  status: 'pending' | 'accepted' | 'declined' | 'superseded';
+  created_at: string | null;
+}
+
+export interface Conversation {
+  id: number;
+  application_id: number;
+  campaign_id: number;
+  campaign_title: string;
+  price_type: 'fixed' | 'negotiable';
+  application_status: string;
+  negotiation_status: 'none' | 'open' | 'price_agreed';
+  brand_decision: 'pending' | 'selected' | 'not_selected';
+  chat_permission_granted: boolean;
+  is_closed: boolean;
+  closed_reason: string | null;
+  awaiting_selection: boolean;
+  counterpart: { id: number | null; name: string; avatar: string | null };
+  my_role: 'creator' | 'business';
+  can_send: boolean;
+  send_block_reason: string | null;
+  creator_messages_used: number;
+  creator_messages_limit: number | null;
+  creator_messages_remaining: number | null;
+  pending_offer: ConversationOffer | null;
+  unread_count: number;
+  last_message: { body: string; kind: string; created_at: string | null } | null;
+  updated_at: string | null;
+  agreed_amount: number | null;
+  agreed_total: number | null;
+  platform_fee: number | null;
+  platform_fee_rate: number;
+  listed_budget: number | null;
+}
+
+export interface ChatMessage {
+  id: number;
+  kind: 'user' | 'system' | 'offer';
+  body: string;
+  sender_id: number | null;
+  mine: boolean;
+  offer_id: number | null;
+  created_at: string | null;
+}
+
+export const getConversations = () => unwrap(api.get<Conversation[]>('/conversations'));
+export const getUnreadMessageCount = async (): Promise<number> => {
+  const res = await api.get<{ count: number }>('/conversations/unread-count');
+  return res.data.count ?? 0;
+};
+export const openConversationForApplication = (applicationId: number) =>
+  unwrap(api.post<Conversation>(`/conversations/by-application/${applicationId}`));
+export const getConversation = (id: number, afterId = 0) =>
+  unwrap(api.get<{ conversation: Conversation; messages: ChatMessage[] }>(`/conversations/${id}`, { params: { after_id: afterId } }));
+export const sendChatMessage = (id: number, body: string) =>
+  unwrap(api.post<{ message: ChatMessage; conversation: Conversation }>(`/conversations/${id}/messages`, { body }));
+export const makePriceOffer = (id: number, amount: number) =>
+  unwrap(api.post<Conversation>(`/conversations/${id}/offers`, { amount }));
+export const acceptPriceOffer = (id: number, offerId: number) =>
+  unwrap(api.post<Conversation>(`/conversations/${id}/offers/${offerId}/accept`));
+export const declinePriceOffer = (id: number, offerId: number) =>
+  unwrap(api.post<Conversation>(`/conversations/${id}/offers/${offerId}/decline`));
+export const selectNegotiatedCreator = (id: number) =>
+  unwrap(api.post<{ conversation: Conversation; contract_id?: number }>(`/conversations/${id}/select`));
+export const notSelectNegotiatedCreator = (id: number) =>
+  unwrap(api.post<Conversation>(`/conversations/${id}/not-select`));
+export const allowFurtherChat = (id: number) =>
+  unwrap(api.post<Conversation>(`/conversations/${id}/allow-chat`));
+export const acceptListedPrice = (id: number) =>
+  unwrap(api.post<Conversation>(`/conversations/${id}/accept-listed-price`));

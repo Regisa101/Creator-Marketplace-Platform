@@ -22,7 +22,13 @@ from app.schemas.campaign import (
     CampaignResponse,
 )
 from app.services.campaign_alerts import check_expired_campaign_deadlines
-from app.services.pricing import DEFAULT_PRICING_MODEL, PLATFORM_FEE_RATE, campaign_fee_rate
+from app.services.pricing import (
+    DEFAULT_PRICING_MODEL,
+    PLATFORM_FEE_RATE,
+    campaign_fee_rate,
+    compensation_type_for,
+    derive_price_type,
+)
 
 
 router = APIRouter(
@@ -322,6 +328,7 @@ async def get_public_campaigns(
 
                 "pricing_model": campaign.pricing_model,
                 "compensation_type": campaign.compensation_type,
+                "price_type": campaign.price_type or "fixed",
                 "platform_fee_rate": campaign_fee_rate(campaign),
                 "budget": (
                     float(campaign.budget)
@@ -438,6 +445,8 @@ async def create_campaign(
         data.start_date = None
         data.end_date = None
 
+    price_type = derive_price_type(data.price_type, data.compensation_type)
+
     if (
         data.budget_min is not None
         and data.budget_max is not None
@@ -490,11 +499,12 @@ async def create_campaign(
         # Compensation
         # Single pricing model: brand's own amount + 10% platform fee on top.
         pricing_model=DEFAULT_PRICING_MODEL,
-        compensation_type=data.compensation_type,
+        compensation_type=compensation_type_for(price_type),
+        price_type=price_type,
         platform_fee_rate=0 if current_user.role == "admin" else PLATFORM_FEE_RATE,
         budget=data.budget,
-        budget_min=data.budget_min,
-        budget_max=data.budget_max,
+        budget_min=None if data.price_type else data.budget_min,
+        budget_max=None if data.price_type else data.budget_max,
         compensation_description=(
             data.compensation_description.strip()
             if data.compensation_description
@@ -659,6 +669,7 @@ async def get_campaigns(
 
                 "pricing_model": campaign.pricing_model,
                 "compensation_type": campaign.compensation_type,
+                "price_type": campaign.price_type or "fixed",
                 "platform_fee_rate": campaign_fee_rate(campaign),
                 "budget": (
                     float(campaign.budget)
@@ -1028,6 +1039,15 @@ async def update_campaign(
     # "Custom budget" model (brand amount + 10% platform fee on top).
     update_data["pricing_model"] = DEFAULT_PRICING_MODEL
 
+    # Fixed / negotiable toggle: keep the legacy compensation_type column in
+    # step with it and retire the old budget-range fields.
+    if update_data.get("price_type") is not None:
+        update_data["compensation_type"] = compensation_type_for(update_data["price_type"])
+        update_data["budget_min"] = None
+        update_data["budget_max"] = None
+    else:
+        update_data.pop("price_type", None)
+
     for key, value in update_data.items():
 
         if key == "title" and value is not None:
@@ -1254,6 +1274,7 @@ async def duplicate_campaign(
 
         pricing_model=DEFAULT_PRICING_MODEL,
         compensation_type=original.compensation_type,
+        price_type=original.price_type or "fixed",
         platform_fee_rate=PLATFORM_FEE_RATE,
         budget=original.budget,
         budget_min=original.budget_min,

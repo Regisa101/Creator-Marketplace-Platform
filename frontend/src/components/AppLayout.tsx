@@ -28,6 +28,7 @@ import {
 
 import { useAuth } from "../context/AuthContext";
 import { LogoMark } from "./Logo";
+import { MessageIconButton } from "./MessageIconButton";
 import {
   getApplications,
   getNotifications,
@@ -1764,6 +1765,11 @@ export function AppLayout({
                 >
                   <Settings size={20} />
                 </Link>
+              )}
+
+              {/* MESSAGES */}
+              {!isAdmin && (
+                <MessageIconButton variant="link" className="app-notification" size={20} />
               )}
 
               {/* NOTIFICATION BELL */}

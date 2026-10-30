@@ -1,6 +1,6 @@
 from datetime import datetime
 from enum import Enum
-from typing import List, Optional
+from typing import List, Literal, Optional
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
@@ -96,6 +96,9 @@ class CampaignBase(BaseModel):
 
     compensation_type: Optional[str] = None
 
+    # "fixed" = creators cannot negotiate; "negotiable" = price offers allowed.
+    price_type: Optional[Literal["fixed", "negotiable"]] = None
+
     budget: Optional[float] = Field(
         default=None,
         gt=0,
@@ -119,7 +122,7 @@ class CampaignBase(BaseModel):
         if is_legacy_standard_rate(value):
             raise ValueError(
                 "Fixed CreatorHub standard rates are no longer available. "
-                "Choose 'Custom amount' or 'Budget range'."
+                "Choose Fixed price or Negotiable."
             )
         return value
 
@@ -199,6 +202,9 @@ class CampaignUpdate(BaseModel):
 
     compensation_type: Optional[str] = None
 
+    # "fixed" = creators cannot negotiate; "negotiable" = price offers allowed.
+    price_type: Optional[Literal["fixed", "negotiable"]] = None
+
     budget: Optional[float] = Field(
         default=None,
         gt=0,
@@ -222,7 +228,7 @@ class CampaignUpdate(BaseModel):
         if is_legacy_standard_rate(value):
             raise ValueError(
                 "Fixed CreatorHub standard rates are no longer available. "
-                "Choose 'Custom amount' or 'Budget range'."
+                "Choose Fixed price or Negotiable."
             )
         return value
 

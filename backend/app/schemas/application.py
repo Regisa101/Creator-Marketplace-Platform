@@ -29,6 +29,10 @@ class ApplicationResponse(ApplicationBase):
     campaign_title: Optional[str] = None
     campaign_budget: Optional[float] = None
     creators_needed: Optional[int] = None
+    # "fixed" or "negotiable" (from the campaign).
+    price_type: Optional[str] = None
+    # Negotiation summary for the brand's Applications screen (None if no chat yet).
+    negotiation: Optional[dict[str, Any]] = None
     agreed_rate: Optional[float] = None
     rate_locked: bool = False
     status: str

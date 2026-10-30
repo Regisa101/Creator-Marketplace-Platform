@@ -173,6 +173,15 @@ class Campaign(Base):
         nullable=True,
     )
 
+    # "fixed"      -> the budget is the price; creators cannot negotiate.
+    # "negotiable" -> creator and brand may exchange price offers.
+    price_type = Column(
+        String(20),
+        nullable=False,
+        default="fixed",
+        server_default="fixed",
+    )
+
     # Used when compensation is fixed.
     budget = Column(
         DECIMAL(12, 2),

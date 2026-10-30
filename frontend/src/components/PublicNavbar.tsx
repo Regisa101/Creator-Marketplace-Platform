@@ -29,6 +29,7 @@ import {
 } from 'lucide-react';
 
 import { LogoMark } from './Logo';
+import { MessageIconButton } from './MessageIconButton';
 import { useAuth } from '../context/AuthContext';
 
 import {
@@ -1290,6 +1291,8 @@ export function PublicNavbar({
 
                   )}
 
+
+                  <MessageIconButton variant="popup" />
 
                   <button
                     type="button"

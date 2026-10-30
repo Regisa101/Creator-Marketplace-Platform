@@ -188,6 +188,15 @@ async def finalize_contract(
     # confirmed when the campaign was created and cannot be changed here, no
     # matter what the client sends.
     fixed_rate = resolve_campaign_rate(campaign)
+    if fixed_rate is None:
+        # A price agreed in the negotiation is locked the same way.
+        from app.models import Conversation
+        conv = db.query(Conversation).filter(
+            Conversation.application_id == contract.application_id,
+            Conversation.negotiation_status == "price_agreed",
+        ).first()
+        if conv and conv.agreed_amount is not None:
+            fixed_rate = float(conv.agreed_amount)
     if fixed_rate is not None:
         agreed_rate = fixed_rate
         total = total_for_rate(fixed_rate, campaign)

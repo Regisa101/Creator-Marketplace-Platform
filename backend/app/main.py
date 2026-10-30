@@ -18,6 +18,7 @@ logging.basicConfig(level=logging.INFO)
 # when creating database metadata.
 from app.models import Notification  # noqa: F401
 from app.models import Complaint  # noqa: F401
+from app.models import Conversation, Message, PriceOffer, ConversationEvent  # noqa: F401
 
 
 # ============================================================
@@ -40,6 +41,7 @@ from app.routes import (
     admin_complaints,
     analytics,
     complaints,
+    messages,
 )
 
 
@@ -412,6 +414,30 @@ def ensure_schema() -> None:
             )
 
 
+        # ====================================================
+        # CAMPAIGN PRICE TYPE (fixed / negotiable toggle)
+        # ====================================================
+
+        for stmt in (
+            """
+            ALTER TABLE campaigns
+            ADD COLUMN IF NOT EXISTS price_type VARCHAR(20) NOT NULL DEFAULT 'fixed'
+            """,
+            # Old "Budget range" campaigns had no single price, so they map
+            # to negotiable. Safe to repeat: new campaigns never store
+            # "Budget range" any more.
+            """
+            UPDATE campaigns SET price_type = 'negotiable'
+            WHERE LOWER(compensation_type) IN ('budget range', 'negotiable')
+              AND price_type = 'fixed'
+            """,
+        ):
+            try:
+                connection.execute(text(stmt))
+            except Exception as exc:
+                print("Campaign price_type migration skipped:", exc)
+
+
 # ============================================================
 # STARTUP
 # ============================================================
@@ -484,6 +510,10 @@ app.include_router(
 
 app.include_router(
     admin_complaints.router
+)
+
+app.include_router(
+    messages.router
 )
 
 

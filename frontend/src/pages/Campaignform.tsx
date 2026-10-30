@@ -104,9 +104,11 @@ export const PRICING_MODELS = [
   "Custom budget",
 ];
 
+// Fixed price: creators cannot negotiate. Negotiable: creator and brand
+// exchange price offers in the application conversation.
 export const COMPENSATION_TYPES = [
-  "Custom amount",
-  "Budget range",
+  "Fixed price",
+  "Negotiable",
 ];
 
 export const EXPERIENCE_LEVELS = [
@@ -138,6 +140,7 @@ type CampaignFormData = {
   work_arrangement: string;
   pricing_model: string;
   compensation_type: string;
+  price_type: "fixed" | "negotiable";
   budget?: number;
   budget_min?: number;
   budget_max?: number;
@@ -165,7 +168,8 @@ const EMPTY: CampaignFormData = {
   duration: "",
   work_arrangement: "",
   pricing_model: "",
-  compensation_type: "",
+  compensation_type: "Custom amount",
+  price_type: "fixed",
   budget: undefined,
   budget_min: undefined,
   budget_max: undefined,
@@ -316,6 +320,15 @@ function CampaignForm({
 
           compensation_type:
             c.compensation_type || "",
+
+          price_type:
+            c.price_type === "negotiable" ||
+            (!c.price_type &&
+              ["budget range", "negotiable"].includes(
+                (c.compensation_type || "").toLowerCase()
+              ))
+              ? "negotiable"
+              : "fixed",
 
           budget:
             c.budget ?? undefined,
@@ -484,23 +497,16 @@ function CampaignForm({
           form.application_deadline
         ),
 
-      budget:
-        form.compensation_type ===
-        "Custom amount"
-          ? form.budget
-          : undefined,
+      // The backend derives compensation_type from price_type.
+      price_type: form.price_type,
+      compensation_type:
+        form.price_type === "negotiable" ? "Negotiable" : "Custom amount",
 
-      budget_min:
-        form.compensation_type ===
-        "Budget range"
-          ? form.budget_min
-          : undefined,
+      budget: form.budget,
 
-      budget_max:
-        form.compensation_type ===
-        "Budget range"
-          ? form.budget_max
-          : undefined,
+      budget_min: undefined,
+
+      budget_max: undefined,
     }),
     [form, questions]
   );
@@ -526,13 +532,9 @@ function CampaignForm({
       if (!form.engagement_type) nextErrors.engagement_type = "Please choose an engagement type.";
       if (!form.work_arrangement) nextErrors.work_arrangement = "Please select a work arrangement.";
       if (!form.pricing_model) nextErrors.pricing_model = "Please select a pricing model.";
-      if (!form.compensation_type) nextErrors.compensation_type = "Please select how the creator will be paid.";
-      if (form.compensation_type === "Custom amount" && (!form.budget || form.budget <= 0)) nextErrors.budget = "Enter a valid custom amount.";
-      if (form.compensation_type === "Budget range") {
-        if (!form.budget_min || form.budget_min <= 0) nextErrors.budget_min = "Enter the minimum budget.";
-        if (!form.budget_max || form.budget_max <= 0) nextErrors.budget_max = "Enter the maximum budget.";
-        if (form.budget_min && form.budget_max && form.budget_max < form.budget_min) nextErrors.budget_max = "Maximum budget must be greater than minimum budget.";
-      }
+      if (!form.price_type) nextErrors.compensation_type = "Please choose Fixed price or Negotiable.";
+      if (form.price_type === "fixed" && (!form.budget || form.budget <= 0)) nextErrors.budget = "Enter the fixed amount you will pay the creator.";
+      if (form.price_type === "negotiable" && form.budget !== undefined && form.budget !== null && form.budget < 0) nextErrors.budget = "Enter a valid starting budget.";
     }
 
     if (s === 4) {
@@ -1236,21 +1238,20 @@ function CampaignForm({
                   label="Compensation"
                   required
                   error={fieldErrors.compensation_type}
-                  hint="Set the creator compensation or budget range. When you hire a creator, CreatorHub charges a 10% service fee; the creator is paid directly by the brand."
+                  hint="Fixed price: creators cannot negotiate, and may only send you 2 messages until you allow further chat. Negotiable: you and the creator can exchange price offers, and you choose whether to select them once a price is agreed. CreatorHub charges a separate 10% service fee when you hire; the creator is paid directly by the brand."
                 >
                   <Options
                     values={
                       COMPENSATION_TYPES
                     }
                     selected={
-                      form.compensation_type
+                      form.price_type === "negotiable" ? "Negotiable" : "Fixed price"
                     }
-                    onSelect={(x) =>
-                      set(
-                        "compensation_type",
-                        x
-                      )
-                    }
+                    onSelect={(x) => {
+                      const negotiable = x === "Negotiable";
+                      set("price_type", negotiable ? "negotiable" : "fixed");
+                      set("compensation_type", negotiable ? "Negotiable" : "Custom amount");
+                    }}
                   />
                 </Field>
 
@@ -1268,68 +1269,17 @@ function CampaignForm({
                   </div>
                 </div>
 
-                {form.compensation_type ===
-                  "Custom amount" && (
-                  <Field
-                    label="Custom amount"
-                    required
-                    error={fieldErrors.budget}
-                  >
-                    <Money
-                      value={form.budget}
-                      onChange={(x) =>
-                        set(
-                          "budget",
-                          x
-                        )
-                      }
-                    />
-                  </Field>
-                )}
-
-                {form.compensation_type ===
-                  "Budget range" && (
-                  <div className="cf-grid-2">
-
-                    <Field
-                      label="Minimum budget"
-                      required
-                      error={fieldErrors.budget_min}
-                    >
-                      <Money
-                        value={
-                          form.budget_min
-                        }
-                        onChange={(x) =>
-                          set(
-                            "budget_min",
-                            x
-                          )
-                        }
-                      />
-                    </Field>
-
-                    <Field
-                      label="Maximum budget"
-                      required
-                      error={fieldErrors.budget_max}
-                      hint="If a creator is selected, the maximum budget is the amount used for payment."
-                    >
-                      <Money
-                        value={
-                          form.budget_max
-                        }
-                        onChange={(x) =>
-                          set(
-                            "budget_max",
-                            x
-                          )
-                        }
-                      />
-                    </Field>
-
-                  </div>
-                )}
+                <Field
+                  label={form.price_type === "negotiable" ? "Starting budget (optional)" : "Fixed amount"}
+                  required={form.price_type !== "negotiable"}
+                  error={fieldErrors.budget}
+                  hint={form.price_type === "negotiable" ? "Shown to creators as a guide. The final price is whatever you and the creator agree in chat." : undefined}
+                >
+                  <Money
+                    value={form.budget}
+                    onChange={(x) => set("budget", x)}
+                  />
+                </Field>
 
                 <Field
                   label="Compensation description"
@@ -1751,11 +1701,13 @@ function CreatorPreview({
   };
 
   const budgetLabel =
-    form.compensation_type === "Custom amount" && form.budget
-      ? `Rs. ${form.budget.toLocaleString()}`
-      : form.compensation_type === "Budget range" && form.budget_min && form.budget_max
-        ? `Rs. ${form.budget_min.toLocaleString()} – Rs. ${form.budget_max.toLocaleString()}`
-        : form.compensation_type || "Compensation not specified";
+    form.price_type === "negotiable"
+      ? form.budget
+        ? `Negotiable · from Rs. ${form.budget.toLocaleString()}`
+        : "Negotiable"
+      : form.budget
+        ? `Rs. ${form.budget.toLocaleString()} (fixed)`
+        : "Compensation not specified";
 
   const deliverables = list(form.deliverables);
   const skills = list(form.required_skills);

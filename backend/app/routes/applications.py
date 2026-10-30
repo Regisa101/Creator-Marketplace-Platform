@@ -28,6 +28,7 @@ from app.services.notifications import create_notification
 from app.services.pricing import (
     campaign_fee_rate,
     candidate_rate_and_status,
+    derive_price_type,
     platform_fee_for,
     resolve_campaign_rate,
     total_for_rate,
@@ -53,6 +54,15 @@ def _creator_avatar(app: Application) -> str | None:
     return None
 
 
+def _negotiation(app: Application):
+    from sqlalchemy.orm import object_session
+    db = object_session(app)
+    if db is None:
+        return None
+    from app.routes.messages import negotiation_summary
+    return negotiation_summary(db, app)
+
+
 def _response(app: Application, campaign: Campaign | None = None) -> ApplicationResponse:
     return ApplicationResponse(
         id=app.id,
@@ -69,6 +79,11 @@ def _response(app: Application, campaign: Campaign | None = None) -> Application
         campaign_title=campaign.title if campaign else (app.campaign.title if app.campaign else None),
         campaign_budget=float(campaign.budget) if campaign and campaign.budget is not None else None,
         creators_needed=campaign.creators_needed if campaign else None,
+        price_type=(
+            derive_price_type(getattr(campaign, "price_type", None), campaign.compensation_type)
+            if campaign else None
+        ),
+        negotiation=_negotiation(app),
         agreed_rate=float(app.agreed_rate) if app.agreed_rate is not None else None,
         rate_locked=bool(app.rate_locked),
         status=app.status,
@@ -155,7 +170,12 @@ async def create_application(
     social_link = _clean_social_link(data.social_link)
 
     proposed_rate = None
-    if data.rate is not None and float(data.rate) > 0:
+    # Fixed-price campaigns do not accept a creator-proposed price at all.
+    if (
+        data.rate is not None
+        and float(data.rate) > 0
+        and derive_price_type(getattr(campaign, "price_type", None), campaign.compensation_type) == "negotiable"
+    ):
         proposed_rate = round(float(data.rate), 2)
     else:
         # Falls back to the campaign's own fixed amount, when it has one
@@ -421,6 +441,17 @@ async def select_application(
         raise HTTPException(status_code=400, detail="This application is no longer pending.")
     if application.creator and application.creator.is_restricted:
         raise HTTPException(status_code=400, detail="This creator's account is currently restricted and cannot be selected.")
+
+    # Negotiable campaigns: the brand may only select after a price was
+    # agreed in the conversation. This blocks bypassing the flow by calling
+    # this endpoint directly.
+    if derive_price_type(getattr(campaign, "price_type", None), campaign.compensation_type) == "negotiable":
+        from app.models import Conversation
+        conv = db.query(Conversation).filter(Conversation.application_id == application.id).first()
+        if not conv or conv.negotiation_status != "price_agreed":
+            raise HTTPException(status_code=400, detail="Agree on a price with this creator before selecting them.")
+        if conv.brand_decision == "not_selected" or conv.is_closed:
+            raise HTTPException(status_code=400, detail="This conversation is closed.")
 
     existing = db.query(Contract).filter(Contract.application_id == application.id).first()
     if existing:

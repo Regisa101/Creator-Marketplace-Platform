@@ -130,7 +130,7 @@ def _finalize_selection(db: Session, payment: Payment, method: str, metadata: di
     other_pending = db.query(Application).filter(
         Application.campaign_id == campaign.id,
         Application.id != application.id,
-        Application.status.in_(["pending", "payment_pending"]),
+        Application.status.in_(["pending", "selected", "payment_pending"]),
     ).all()
     for other in other_pending:
         other.status = "rejected"
@@ -227,7 +227,7 @@ async def verify_payment(
                     other_pending = db.query(Application).filter(
                         Application.campaign_id == campaign.id,
                         Application.id != application.id,
-                        Application.status.in_(["pending", "payment_pending"]),
+                        Application.status.in_(["pending", "selected", "payment_pending"]),
                     ).all()
                     for other in other_pending:
                         other.status = "rejected"

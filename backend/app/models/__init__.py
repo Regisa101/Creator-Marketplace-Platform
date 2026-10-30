@@ -12,6 +12,7 @@ from app.models.payment import Payment
 from app.models.contract import Contract
 from app.models.notification import Notification
 from app.models.complaint import Complaint
+from app.models.conversation import Conversation, Message, PriceOffer, ConversationEvent
 
 
 __all__ = [
@@ -29,4 +30,8 @@ __all__ = [
     "Contract",
     "Notification",
     "Complaint",
+    "Conversation",
+    "Message",
+    "PriceOffer",
+    "ConversationEvent",
 ]

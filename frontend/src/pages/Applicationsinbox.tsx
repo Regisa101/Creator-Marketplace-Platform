@@ -1,9 +1,9 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { parseSocialLink } from '../utils/Social';
-import { Check, ChevronDown, FileSignature, Loader2, Sparkles, X, ExternalLink, ZoomIn } from 'lucide-react';
+import { Check, ChevronDown, FileSignature, Loader2, MessageCircle, Sparkles, X, ExternalLink, ZoomIn } from 'lucide-react';
 import { Link, useSearchParams } from 'react-router-dom';
-import { getApplications, getCampaign, getPublicCampaigns, selectApplication, updateApplicationStatus, finalizeContract, getContract, getCreatorProfile, getPublicBusinessProfile, type Application, type Contract, type PublicCreatorProfile } from '../api/client';
+import { notSelectNegotiatedCreator, selectNegotiatedCreator, getApplications, getCampaign, getPublicCampaigns, selectApplication, updateApplicationStatus, finalizeContract, getContract, getCreatorProfile, getPublicBusinessProfile, type Application, type Contract, type PublicCreatorProfile } from '../api/client';
 import { scoreCreator, type CreatorMatch } from '../utils/creatorMatch';
 import { AppLayout } from '../components/AppLayout';
 import { useAuth } from '../context/AuthContext';
@@ -256,6 +256,37 @@ export function ApplicationsInbox() {
     }
   };
 
+  // Negotiable campaign, price agreed in Messages: the brand decides here too.
+  const selectNegotiated = async (app: Application) => {
+    if (!app.negotiation) return;
+    setBusy(app.id); setError('');
+    try {
+      const res = await selectNegotiatedCreator(app.negotiation.conversation_id);
+      setApplications(items => items.map(item => item.id === app.id
+        ? { ...item, status: 'selected' as Application['status'], negotiation: item.negotiation ? { ...item.negotiation, brand_decision: 'selected' } : item.negotiation }
+        : item));
+      if (res.contract_id) {
+        const draft = await getContract(res.contract_id);
+        setContract(draft);
+        setRate(draft.agreed_rate != null ? String(draft.agreed_rate) : '');
+        setTotal(draft.total_value != null ? String(draft.total_value) : '');
+        setNote(draft.terms_note || '');
+      }
+    } catch (err: any) { setError(err?.response?.data?.detail || 'Could not select this creator.'); }
+    finally { setBusy(null); }
+  };
+
+  const notSelectNegotiated = async (app: Application) => {
+    if (!app.negotiation) return;
+    if (!window.confirm('Do not select this creator? The conversation will close; the history is kept.')) return;
+    setBusy(app.id); setError('');
+    try {
+      await notSelectNegotiatedCreator(app.negotiation.conversation_id);
+      setApplications(items => items.map(item => item.id === app.id ? { ...item, status: 'rejected' as Application['status'] } : item));
+    } catch (err: any) { setError(err?.response?.data?.detail || 'Could not update this application.'); }
+    finally { setBusy(null); }
+  };
+
   const finalize = async () => {
     if (!contract) return;
     // Amount fixed when the campaign was created -> use the contract's own
@@ -375,15 +406,41 @@ export function ApplicationsInbox() {
               </div>
 
               <span className={`ab-status ab-status--${app.status}`}>{statusLabel(app.status)}</span>
+              {app.negotiation?.negotiation_status === 'price_agreed' && (
+                <span className="ab-status ab-status--accepted" title="Price agreed in messages">
+                  Agreed: NPR {Number(app.negotiation.agreed_total ?? app.negotiation.agreed_amount).toLocaleString()}
+                </span>
+              )}
 
               <div className="ab-actions">
                 <button type="button" className="btn btn-ghost btn-sm" onClick={() => toggleExpanded(app.id)} aria-expanded={isOpen}>
                   Details <ChevronDown size={14} className={`ab-chevron ${isOpen ? 'open' : ''}`}/>
                 </button>
+                {app.status !== 'withdrawn' && (
+                  <Link className="btn btn-ghost btn-sm" to={`/messages?application=${app.id}`}>
+                    <MessageCircle size={14}/> Message
+                  </Link>
+                )}
+                {app.status === 'selected' && (
+                  <button type="button" className="btn btn-primary btn-sm" disabled={busy === app.id} onClick={() => void select(app)}>
+                    <FileSignature size={14}/> Continue contract
+                  </button>
+                )}
                 {app.status === 'pending' && <>
+                  {/* Negotiable campaigns: agree a price in Messages first, then choose Select Creator / Do Not Select there. */}
+                  {app.price_type === 'negotiable' && app.negotiation?.negotiation_status === 'price_agreed' && app.negotiation.brand_decision === 'pending' && <>
+                    <button type="button" className="btn btn-primary btn-sm" disabled={busy === app.id} onClick={() => void selectNegotiated(app)}>
+                      <Check size={14}/> Select Creator
+                    </button>
+                    <button type="button" className="btn btn-secondary btn-sm" disabled={busy === app.id} onClick={() => void notSelectNegotiated(app)}>
+                      <X size={14}/> Do Not Select
+                    </button>
+                  </>}
+                  {app.price_type !== 'negotiable' && (
                   <button type="button" className="btn btn-primary btn-sm" disabled={busy === app.id} onClick={() => void select(app)}>
                     {busy === app.id ? <Loader2 size={14} className="ab-spin"/> : <FileSignature size={14}/>} Create contract
                   </button>
+                  )}
                   <button type="button" className="btn btn-secondary btn-sm" disabled={busy === app.id} onClick={() => void reject(app)}>
                     <X size={14}/> Reject
                   </button>
@@ -392,6 +449,24 @@ export function ApplicationsInbox() {
             </div>
 
             {isOpen && <div className="ab-details">
+              {app.negotiation && app.negotiation.price_type === 'negotiable' && (
+                <div>
+                  <div className="ab-heading">Price negotiation</div>
+                  <div className="ab-answer">
+                    {app.negotiation.offers.length === 0 && 'No offers yet.'}
+                    {app.negotiation.offers.map((o, i) => (
+                      <div key={i}>
+                        {o.by === 'creator' ? 'Creator' : 'You'} offered NPR {o.amount.toLocaleString()} · {o.status}
+                      </div>
+                    ))}
+                    {app.negotiation.negotiation_status === 'price_agreed' && (
+                      <div><strong>Agreed: NPR {Number(app.negotiation.agreed_total).toLocaleString()}</strong>
+                        {' '}(+ CreatorHub 10% fee NPR {Number(app.negotiation.platform_fee).toLocaleString()}, paid by you)</div>
+                    )}
+                    <Link to={`/messages?c=${app.negotiation.conversation_id}`}>Open conversation</Link>
+                  </div>
+                </div>
+              )}
               <div>
                 <div className="ab-heading">Social profile</div>
                 <div className="ab-answer">
