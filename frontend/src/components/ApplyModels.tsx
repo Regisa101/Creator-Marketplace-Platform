@@ -46,6 +46,8 @@ export function ApplyModal({
   const [uploading, setUploading] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [success, setSuccess] = useState(false);
+  // True when the proposed rate was outside the brand's budget range.
+  const [rangeHold, setRangeHold] = useState(false);
   const [error, setError] = useState('');
 
   const questions = useMemo(
@@ -211,7 +213,7 @@ export function ApplyModal({
     setSubmitting(true);
 
     try {
-      await createApplication({
+      const created = await createApplication({
         campaign_id: campaign.id,
         proposal: 'Application submitted',
         rate: rate.trim() ? Number(rate) : null,
@@ -225,6 +227,7 @@ export function ApplyModal({
 
       await onSuccess?.();
 
+      setRangeHold(created?.status === 'range_review');
       setSuccess(true);
     } catch (err) {
       setError(
@@ -721,13 +724,20 @@ export function ApplyModal({
               <Check size={28} />
             </div>
 
-            <h2>Application sent!</h2>
+            <h2>{rangeHold ? 'One more step' : 'Application sent!'}</h2>
 
             {isDemoCampaignId(campaign.id) ? (
               <p>
                 This is a sample campaign shown for reference, so your
                 application is saved on this device only and is not sent to a
                 brand. Real campaigns will appear above it.
+              </p>
+            ) : rangeHold ? (
+              <p>
+                Your price is outside the brand's budget range. The CreatorHub
+                assistant has sent you a message in Messages with the range.
+                Agree to a price within it and your application will be sent to
+                the brand.
               </p>
             ) : (
               <p>

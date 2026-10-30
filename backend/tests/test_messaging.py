@@ -82,34 +82,65 @@ def _send(client, cid, headers, who, text="hello"):
 
 
 # ---------- 1-4: fixed-price allowance and brand permission ----------
-def test_fixed_creator_can_send_exactly_two_then_third_rejected(client):
+def test_creator_cannot_type_freely_before_the_deal_is_sealed(client):
     ids, h = _setup("fixed")
     conv = _open(client, ids, h)
-    assert conv["creator_messages_remaining"] == 2
-    assert _send(client, conv["id"], h, "creator", "one").status_code == 200
-    r2 = _send(client, conv["id"], h, "creator", "two")
-    assert r2.status_code == 200
-    assert r2.json()["conversation"]["creator_messages_remaining"] == 0
-    r3 = _send(client, conv["id"], h, "creator", "three")
-    assert r3.status_code == 403  # enforced on the backend
+    assert conv["can_send"] is False and conv["free_chat"] is False
+    assert [q["key"] for q in conv["quick_replies"]][0] == "hi"
+    r = _send(client, conv["id"], h, "creator", "one")
+    assert r.status_code == 403  # enforced on the backend, not just hidden in the UI
+    assert _send(client, conv["id"], h, "brand", "hello").status_code == 403  # brand too
 
 
-def test_brand_replies_do_not_consume_creator_allowance(client):
+def test_quick_replies_work_and_first_hi_triggers_brand_greeting(client):
     ids, h = _setup("fixed")
     conv = _open(client, ids, h)
-    _send(client, conv["id"], h, "creator", "q1")
-    for i in range(3):
-        assert _send(client, conv["id"], h, "brand", f"reply {i}").status_code == 200
-    r = _send(client, conv["id"], h, "creator", "q2")
-    assert r.status_code == 200
-    assert r.json()["conversation"]["creator_messages_remaining"] == 0
+    r = client.post(f"/api/conversations/{conv['id']}/quick-reply", json={"key": "hi"}, headers=h["creator"])
+    assert r.status_code == 200, r.text
+    thread = client.get(f"/api/conversations/{conv['id']}", headers=h["brand"]).json()["messages"]
+    kinds = [x["kind"] for x in thread]
+    assert kinds == ["quick", "auto"]
+    greeting = thread[1]
+    assert greeting["mine"] is True  # sent from the brand side
+    assert "How can I help you" in greeting["body"]
+
+    # a second creator message does not greet again
+    client.post(f"/api/conversations/{conv['id']}/quick-reply", json={"key": "details"}, headers=h["creator"])
+    thread = client.get(f"/api/conversations/{conv['id']}", headers=h["brand"]).json()["messages"]
+    assert [x["kind"] for x in thread].count("auto") == 1
+
+
+def test_brand_greeting_is_not_duplicated_if_brand_spoke_first(client):
+    ids, h = _setup("fixed")
+    conv = _open(client, ids, h)
+    assert client.post(f"/api/conversations/{conv['id']}/quick-reply", json={"key": "hello"}, headers=h["brand"]).status_code == 200
+    client.post(f"/api/conversations/{conv['id']}/quick-reply", json={"key": "hi"}, headers=h["creator"])
+    thread = client.get(f"/api/conversations/{conv['id']}", headers=h["brand"]).json()["messages"]
+    assert [x["kind"] for x in thread].count("auto") == 0
+
+
+def test_quick_reply_keys_are_validated_per_role_and_price_type(client):
+    ids, h = _setup("fixed")
+    conv = _open(client, ids, h)
+    url = f"/api/conversations/{conv['id']}/quick-reply"
+    assert client.post(url, json={"key": "nope"}, headers=h["creator"]).status_code == 400
+    # a creator cannot send a brand-only preset, and fixed campaigns have no negotiation preset
+    assert client.post(url, json={"key": "negotiate"}, headers=h["brand"]).status_code == 400
+    assert client.post(url, json={"key": "hello"}, headers=h["creator"]).status_code == 400
+    assert client.post(url, json={"key": "hi"}, headers=h["stranger"]).status_code == 404
+
+
+def test_brand_can_start_negotiation_with_a_preset_on_negotiable_campaigns(client):
+    ids, h = _setup("negotiable")
+    conv = _open(client, ids, h)
+    r = client.post(f"/api/conversations/{conv['id']}/quick-reply", json={"key": "negotiate"}, headers=h["brand"])
+    assert r.status_code == 200, r.text
+    assert "price" in r.json()["message"]["body"].lower()
 
 
 def test_allow_further_chat_unlocks_without_selecting(client):
     ids, h = _setup("fixed")
     conv = _open(client, ids, h)
-    _send(client, conv["id"], h, "creator")
-    _send(client, conv["id"], h, "creator")
     assert _send(client, conv["id"], h, "creator").status_code == 403
 
     # creator cannot grant permission to themselves
@@ -128,11 +159,9 @@ def test_allow_further_chat_unlocks_without_selecting(client):
     db.close()
 
 
-def test_new_browser_session_cannot_bypass_limit(client):
+def test_new_browser_session_cannot_bypass_guided_chat(client):
     ids, h = _setup("fixed")
     conv = _open(client, ids, h)
-    _send(client, conv["id"], h, "creator")
-    _send(client, conv["id"], h, "creator")
     fresh_session = TestClient(app)  # "another browser"
     assert _send(fresh_session, conv["id"], h, "creator").status_code == 403
 
@@ -194,7 +223,7 @@ def test_select_creator_enables_collaboration_chat(client):
 def test_not_select_closes_chat_but_preserves_history(client):
     ids, h = _setup("negotiable")
     cid, _ = _agree(client, ids, h)
-    _send(client, cid, h, "creator", "before decision")
+    client.post(f"/api/conversations/{cid}/quick-reply", json={"key": "hi"}, headers=h["creator"])
     r = client.post(f"/api/conversations/{cid}/not-select", headers=h["brand"])
     assert r.status_code == 200
     assert r.json()["is_closed"] is True
@@ -202,7 +231,7 @@ def test_not_select_closes_chat_but_preserves_history(client):
     assert _send(client, cid, h, "brand", "x").status_code == 403
     detail = client.get(f"/api/conversations/{cid}", headers=h["creator"]).json()
     bodies = [m["body"] for m in detail["messages"]]
-    assert "before decision" in bodies  # history preserved
+    assert any("interested" in b for b in bodies)  # history preserved
     db = SessionLocal()
     assert db.query(Application).get(ids["application"]).status == "rejected"
     assert db.query(Contract).count() == 0

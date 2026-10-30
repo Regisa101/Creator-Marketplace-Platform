@@ -35,6 +35,56 @@ PRICE_FIXED = "fixed"
 PRICE_NEGOTIABLE = "negotiable"
 
 
+# Minimum fixed price (NPR) per engagement type. A fixed amount must be
+# STRICTLY GREATER than the value here. Mirrors MIN_FIXED_PRICE in
+# frontend/src/pages/Campaignform.tsx. Keep them in sync.
+MIN_FIXED_PRICE = {
+    "one-time": 1000,
+    "weekly": 5000,
+    "monthly": 10000,
+    "yearly": 3000,
+    "long-term": 3000,
+}
+
+
+def min_fixed_price_error(
+    price_type: Optional[str],
+    engagement_type: Optional[str],
+    budget: Optional[float],
+) -> Optional[str]:
+    """Return an error message if a fixed price is below the engagement minimum."""
+    if (price_type or "").strip().lower() != PRICE_FIXED:
+        return None
+    minimum = MIN_FIXED_PRICE.get((engagement_type or "").strip().lower())
+    if minimum is None or budget is None:
+        return None
+    if budget <= minimum:
+        return (
+            f"A fixed price for a {engagement_type} campaign must be "
+            f"greater than Rs. {minimum:,}."
+        )
+    return None
+
+
+def negotiable_range_error(
+    price_type: Optional[str],
+    budget: Optional[float],
+    budget_min: Optional[float],
+    budget_max: Optional[float],
+) -> Optional[str]:
+    """A negotiable starting price must sit inside the brand's budget range."""
+    if (price_type or "").strip().lower() != PRICE_NEGOTIABLE:
+        return None
+    if budget_min is not None and budget_max is not None and budget_max < budget_min:
+        return "Maximum budget cannot be lower than minimum budget."
+    if budget is not None:
+        if budget_min is not None and budget < budget_min:
+            return "Starting price must be within your budget range."
+        if budget_max is not None and budget > budget_max:
+            return "Starting price must be within your budget range."
+    return None
+
+
 def derive_price_type(price_type: Optional[str], compensation_type: Optional[str] = None) -> str:
     """Explicit price_type wins; legacy rows map "Budget range"/"Negotiable" -> negotiable."""
     explicit = (price_type or "").strip().lower()

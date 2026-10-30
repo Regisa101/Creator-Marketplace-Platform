@@ -94,6 +94,34 @@ export const ENGAGEMENT_TYPES = [
   "Yearly",
 ];
 
+// Minimum fixed price (NPR) per engagement type. A fixed amount must be
+// STRICTLY GREATER than this value. Mirrors MIN_FIXED_PRICE in
+// backend/app/services/pricing.py. Keep them in sync.
+export const MIN_FIXED_PRICE: Record<string, number> = {
+  "One-time": 1000,
+  Weekly: 5000,
+  Monthly: 10000,
+  Yearly: 3000,
+  "Long-term": 3000,
+};
+
+function fixedPriceError(
+  priceType: string,
+  engagementType: string,
+  budget?: number
+): string | undefined {
+  if (priceType !== "fixed") return undefined;
+  const min = MIN_FIXED_PRICE[engagementType];
+  if (min === undefined) return undefined;
+  if (!budget || budget <= 0) {
+    return "Enter the fixed amount you will pay the creator.";
+  }
+  if (budget <= min) {
+    return `A fixed price for a ${engagementType} campaign must be greater than Rs. ${min.toLocaleString()}.`;
+  }
+  return undefined;
+}
+
 export const WORK_ARRANGEMENTS = [
   "Full-time",
   "Part-time",
@@ -504,9 +532,12 @@ function CampaignForm({
 
       budget: form.budget,
 
-      budget_min: undefined,
+      // The budget range only applies to negotiable campaigns.
+      budget_min:
+        form.price_type === "negotiable" ? form.budget_min : undefined,
 
-      budget_max: undefined,
+      budget_max:
+        form.price_type === "negotiable" ? form.budget_max : undefined,
     }),
     [form, questions]
   );
@@ -533,8 +564,20 @@ function CampaignForm({
       if (!form.work_arrangement) nextErrors.work_arrangement = "Please select a work arrangement.";
       if (!form.pricing_model) nextErrors.pricing_model = "Please select a pricing model.";
       if (!form.price_type) nextErrors.compensation_type = "Please choose Fixed price or Negotiable.";
-      if (form.price_type === "fixed" && (!form.budget || form.budget <= 0)) nextErrors.budget = "Enter the fixed amount you will pay the creator.";
-      if (form.price_type === "negotiable" && form.budget !== undefined && form.budget !== null && form.budget < 0) nextErrors.budget = "Enter a valid starting budget.";
+      if (form.price_type === "fixed") {
+        const priceError = fixedPriceError(form.price_type, form.engagement_type, form.budget);
+        if (priceError) nextErrors.budget = priceError;
+        else if (!form.budget || form.budget <= 0) nextErrors.budget = "Enter the fixed amount you will pay the creator.";
+      }
+      if (form.price_type === "negotiable") {
+        const { budget: price, budget_min: lo, budget_max: hi } = form;
+        if (!price || price <= 0) nextErrors.budget = "Enter your starting price.";
+        if (!lo || lo <= 0) nextErrors.budget_min = "Enter the minimum budget.";
+        if (!hi || hi <= 0) nextErrors.budget_max = "Enter the maximum budget.";
+        if (lo && hi && hi < lo) nextErrors.budget_max = "Maximum cannot be lower than the minimum.";
+        if (price && lo && !nextErrors.budget_min && price < lo) nextErrors.budget = "Starting price must be within your budget range.";
+        if (price && hi && !nextErrors.budget_max && price > hi) nextErrors.budget = "Starting price must be within your budget range.";
+      }
     }
 
     if (s === 4) {
@@ -1150,6 +1193,14 @@ function CampaignForm({
                     }
                     onSelect={(x) => {
                       set("engagement_type", x);
+                      // The minimum fixed price depends on the engagement type,
+                      // so drop any stale amount error; it is re-checked on Next.
+                      setFieldErrors((v) => {
+                        if (!v.budget) return v;
+                        const next = { ...v };
+                        delete next.budget;
+                        return next;
+                      });
                       if (!DATE_BASED_ENGAGEMENTS.includes(x)) {
                         setForm((v) => ({
                           ...v,
@@ -1234,28 +1285,95 @@ function CampaignForm({
                   />
                 </Field>
 
-                <Field
-                  label="Compensation"
-                  required
-                  error={fieldErrors.compensation_type}
-                  hint="Fixed price: creators cannot negotiate, and may only send you 2 messages until you allow further chat. Negotiable: you and the creator can exchange price offers, and you choose whether to select them once a price is agreed. CreatorHub charges a separate 10% service fee when you hire; the creator is paid directly by the brand."
-                >
-                  <Options
-                    values={
-                      COMPENSATION_TYPES
-                    }
-                    selected={
-                      form.price_type === "negotiable" ? "Negotiable" : "Fixed price"
-                    }
-                    onSelect={(x) => {
-                      const negotiable = x === "Negotiable";
-                      set("price_type", negotiable ? "negotiable" : "fixed");
-                      set("compensation_type", negotiable ? "Negotiable" : "Custom amount");
-                    }}
-                  />
-                </Field>
+                <div className="cf-comp-row">
+                  <Field
+                    label="Compensation"
+                    required
+                    error={fieldErrors.compensation_type}
+                  >
+                    <PriceToggle
+                      negotiable={form.price_type === "negotiable"}
+                      onChange={(negotiable) => {
+                        set("price_type", negotiable ? "negotiable" : "fixed");
+                        set("compensation_type", negotiable ? "Negotiable" : "Custom amount");
+                        // Clear amount / range errors from the other mode.
+                        setFieldErrors((v) => {
+                          const next = { ...v };
+                          delete next.budget;
+                          delete next.budget_min;
+                          delete next.budget_max;
+                          return next;
+                        });
+                      }}
+                    />
+                  </Field>
 
-                <div className="cf-payment-policy">
+                  <Field
+                    label={form.price_type === "negotiable" ? "Starting price" : "Fixed amount"}
+                    required
+                    error={fieldErrors.budget}
+                    hint={
+                      form.price_type === "negotiable"
+                        ? "Your opening price. Creators can counter it in chat."
+                        : MIN_FIXED_PRICE[form.engagement_type] !== undefined
+                          ? `Must be greater than Rs. ${MIN_FIXED_PRICE[form.engagement_type].toLocaleString()} for a ${form.engagement_type} campaign.`
+                          : "Choose an engagement type above to see the minimum fixed price."
+                    }
+                  >
+                    <Money
+                      value={form.budget}
+                      onChange={(x) => {
+                        set("budget", x);
+                        // Live feedback once the brand starts typing a fixed price.
+                        if (form.price_type === "fixed" && x !== undefined) {
+                          const live = fixedPriceError(form.price_type, form.engagement_type, x);
+                          if (live) setFieldErrors((v) => ({ ...v, budget: live }));
+                        }
+                      }}
+                      placeholder={
+                        form.price_type === "fixed" && MIN_FIXED_PRICE[form.engagement_type] !== undefined
+                          ? `e.g. ${(MIN_FIXED_PRICE[form.engagement_type] + 1000).toLocaleString()}`
+                          : "e.g. 2000"
+                      }
+                    />
+                  </Field>
+                </div>
+
+                <p className="cf-comp-note">
+                  Fixed price: creators cannot negotiate, and may only send you 2 messages until you allow further chat. Negotiable: you and the creator can exchange price offers, and you choose whether to select them once a price is agreed.
+                </p>
+
+                {form.price_type === "negotiable" && (
+                  <div className="cf-comp-row">
+                    <Field
+                      label="Minimum budget"
+                      required
+                      error={fieldErrors.budget_min}
+                      hint="The lowest price you would accept in a counter offer."
+                    >
+                      <Money
+                        value={form.budget_min}
+                        onChange={(x) => set("budget_min", x)}
+                        placeholder="e.g. 1500"
+                      />
+                    </Field>
+
+                    <Field
+                      label="Maximum budget"
+                      required
+                      error={fieldErrors.budget_max}
+                      hint="The most you are willing to pay. Guides price talks in chat."
+                    >
+                      <Money
+                        value={form.budget_max}
+                        onChange={(x) => set("budget_max", x)}
+                        placeholder="e.g. 3000"
+                      />
+                    </Field>
+                  </div>
+                )}
+
+                <div className="cf-payment-policy cf-payment-policy-flush">
                   <div className="cf-payment-policy-head">
                     <div>
                       <strong>CreatorHub payment policy</strong>
@@ -1268,18 +1386,6 @@ function CampaignForm({
                     Set the amount you want the creator to receive. When you hire a creator, CreatorHub charges a 10% service fee. The creator's compensation is agreed in the contract and paid directly between the brand and creator; only the CreatorHub service fee is paid through the platform.
                   </div>
                 </div>
-
-                <Field
-                  label={form.price_type === "negotiable" ? "Starting budget (optional)" : "Fixed amount"}
-                  required={form.price_type !== "negotiable"}
-                  error={fieldErrors.budget}
-                  hint={form.price_type === "negotiable" ? "Shown to creators as a guide. The final price is whatever you and the creator agree in chat." : undefined}
-                >
-                  <Money
-                    value={form.budget}
-                    onChange={(x) => set("budget", x)}
-                  />
-                </Field>
 
                 <Field
                   label="Compensation description"
@@ -1703,7 +1809,11 @@ function CreatorPreview({
   const budgetLabel =
     form.price_type === "negotiable"
       ? form.budget
-        ? `Negotiable · from Rs. ${form.budget.toLocaleString()}`
+        ? `Negotiable · starts at Rs. ${form.budget.toLocaleString()}${
+            form.budget_min && form.budget_max
+              ? ` (range Rs. ${form.budget_min.toLocaleString()} – ${form.budget_max.toLocaleString()})`
+              : ""
+          }`
         : "Negotiable"
       : form.budget
         ? `Rs. ${form.budget.toLocaleString()} (fixed)`
@@ -2136,12 +2246,39 @@ function Options({
    MONEY
 ========================================= */
 
+function PriceToggle({
+  negotiable,
+  onChange,
+}: {
+  negotiable: boolean;
+  onChange: (negotiable: boolean) => void;
+}) {
+  return (
+    <div className="cf-toggle-row">
+      <span className={!negotiable ? "on" : ""}>Fixed price</span>
+      <button
+        type="button"
+        role="switch"
+        aria-checked={negotiable}
+        aria-label="Negotiable pricing"
+        className={`cf-switch ${negotiable ? "is-on" : ""}`}
+        onClick={() => onChange(!negotiable)}
+      >
+        <i />
+      </button>
+      <span className={negotiable ? "on" : ""}>Negotiable</span>
+    </div>
+  );
+}
+
 function Money({
   value,
   onChange,
+  placeholder = "e.g. 2000",
 }: {
   value?: number;
   onChange: (v?: number) => void;
+  placeholder?: string;
 }) {
   return (
     <div className="cf-money">
@@ -2164,7 +2301,7 @@ function Money({
                 )
           )
         }
-        placeholder="e.g. 2000"
+        placeholder={placeholder}
       />
 
     </div>
@@ -3279,6 +3416,63 @@ const CSS = `
    MONEY
 ========================================= */
 
+.cf-toggle-row{
+  display:flex;
+  align-items:center;
+  gap:9px;
+  min-height:43px;
+  font:400 11px Poppins,sans-serif;
+  color:#8a8a8a;
+}
+.cf-toggle-row .on{
+  color:#111;
+  font-weight:600;
+}
+.cf-switch{
+  position:relative;
+  flex:none;
+  width:32px;
+  height:18px;
+  border-radius:999px;
+  border:none;
+  background:#cfcfcf;
+  cursor:pointer;
+  padding:0;
+  transition:background .2s;
+}
+.cf-switch.is-on{
+  background:#111;
+}
+.cf-switch i{
+  position:absolute;
+  top:2px;
+  left:2px;
+  width:14px;
+  height:14px;
+  border-radius:50%;
+  background:#fff;
+  transition:transform .2s;
+}
+.cf-switch.is-on i{
+  transform:translateX(14px);
+}
+.cf-comp-row{
+  display:grid;
+  grid-template-columns:1fr 1fr;
+  gap:13px;
+  align-items:start;
+}
+.cf-comp-note{
+  margin:0;
+  font:400 10px/1.5 Poppins,sans-serif;
+  color:#777;
+}
+.cf-payment-policy-flush{
+  margin-top:0;
+}
+@media(max-width:650px){
+  .cf-comp-row{grid-template-columns:1fr}
+}
 .cf-money{
   display:flex;
 

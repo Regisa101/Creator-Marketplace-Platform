@@ -318,6 +318,8 @@ export interface PublicBusinessProfile {
 }
 
 export type ApplicationStatus =
+  | 'range_review'
+  | 'range_declined'
   | 'pending'
   | 'selected'
   | 'accepted'
@@ -1294,11 +1296,18 @@ export interface Conversation {
   platform_fee: number | null;
   platform_fee_rate: number;
   listed_budget: number | null;
+  listed_budget_min?: number | null;
+  listed_budget_max?: number | null;
+  // True while the assistant waits for the creator to answer the budget-range question.
+  range_prompt_open?: boolean;
+  // Guided chat: free typing opens only after the brand selects the creator.
+  free_chat?: boolean;
+  quick_replies?: { key: string; label: string }[];
 }
 
 export interface ChatMessage {
   id: number;
-  kind: 'user' | 'system' | 'offer';
+  kind: 'user' | 'system' | 'offer' | 'assistant' | 'quick' | 'auto';
   body: string;
   sender_id: number | null;
   mine: boolean;
@@ -1329,5 +1338,9 @@ export const notSelectNegotiatedCreator = (id: number) =>
   unwrap(api.post<Conversation>(`/conversations/${id}/not-select`));
 export const allowFurtherChat = (id: number) =>
   unwrap(api.post<Conversation>(`/conversations/${id}/allow-chat`));
+export const sendQuickReply = (id: number, key: string) =>
+  unwrap(api.post<{ message: ChatMessage; conversation: Conversation }>(`/conversations/${id}/quick-reply`, { key }));
+export const respondToRange = (id: number, agree: boolean, amount?: number) =>
+  unwrap(api.post<Conversation>(`/conversations/${id}/range-response`, { agree, amount }));
 export const acceptListedPrice = (id: number) =>
   unwrap(api.post<Conversation>(`/conversations/${id}/accept-listed-price`));

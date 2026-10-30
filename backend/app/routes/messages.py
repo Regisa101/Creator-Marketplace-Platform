@@ -16,7 +16,7 @@ from sqlalchemy.orm import Session
 
 from app.database import get_db
 from app.dependencies.auth import get_current_user
-from app.models import Application, Campaign, Conversation, Message, PriceOffer, User
+from app.models import Application, Campaign, Conversation, ConversationEvent, Message, PriceOffer, User
 from app.services import messaging as m
 from app.services.notifications import create_notification
 
@@ -34,6 +34,15 @@ class SendMessage(BaseModel):
 
 class OfferCreate(BaseModel):
     amount: float = Field(..., gt=0)
+
+
+class QuickReply(BaseModel):
+    key: str = Field(..., min_length=1, max_length=40)
+
+
+class RangeResponse(BaseModel):
+    agree: bool
+    amount: Optional[float] = Field(default=None, gt=0)
 
 
 # ============================================================
@@ -64,7 +73,26 @@ def _load(db: Session, conv_id: int, user: User, lock: bool = False) -> tuple[Co
     campaign = db.query(Campaign).filter(Campaign.id == conv.campaign_id).first()
     if not application or not campaign:
         raise HTTPException(status_code=404, detail="Conversation not found.")
+    # A creator who has not yet agreed to the brand's budget range is invisible to the brand.
+    if user.id == conv.business_id and (application.status or "").lower() in (m.STATUS_RANGE_REVIEW, m.STATUS_RANGE_DECLINED):
+        raise HTTPException(status_code=404, detail="Conversation not found.")
     return conv, application, campaign
+
+
+def _range_prompt_open(db: Session, conv: Conversation, application: Application) -> bool:
+    """True while the assistant is waiting for the creator to answer the range question."""
+    if (application.status or "").lower() == m.STATUS_RANGE_REVIEW:
+        return True
+    last = (
+        db.query(ConversationEvent)
+        .filter(
+            ConversationEvent.conversation_id == conv.id,
+            ConversationEvent.event_type.in_(("range_prompt", "range_resolved")),
+        )
+        .order_by(ConversationEvent.id.desc())
+        .first()
+    )
+    return bool(last and last.event_type == "range_prompt")
 
 
 def _require_brand(conv: Conversation, user: User) -> None:
@@ -139,6 +167,8 @@ def _conv_out(db: Session, conv: Conversation, application: Application, campaig
         "closed_reason": m.closed_reason(conv, application),
         "awaiting_selection": awaiting_selection,
         "listed_budget": float(campaign.budget) if campaign.budget is not None else None,
+        "listed_budget_min": float(campaign.budget_min) if campaign.budget_min is not None else None,
+        "listed_budget_max": float(campaign.budget_max) if campaign.budget_max is not None else None,
         "counterpart": {"id": other.id if other else None, "name": _display_name(other), "avatar": _avatar(other)},
         "my_role": "creator" if viewer.id == conv.creator_id else "business",
         "can_send": decision.allowed,
@@ -148,6 +178,24 @@ def _conv_out(db: Session, conv: Conversation, application: Application, campaig
         "creator_messages_remaining": decision.remaining,
         "pending_offer": _offer_out(pending_offer) if pending_offer else None,
         "unread_count": _unread(db, conv, viewer),
+        "free_chat": m.is_free_chat(conv, application),
+        "quick_replies": (
+            m.quick_replies_for("creator" if viewer.id == conv.creator_id else "brand", conv.price_type)
+            if not closed
+            and not (getattr(viewer, "is_restricted", False) and viewer.role != "admin")
+            and not (
+                viewer.id == conv.creator_id
+                and conv.price_type == "negotiable"
+                and _range_prompt_open(db, conv, application)
+            )
+            else []
+        ),
+        "range_prompt_open": bool(
+            viewer.id == conv.creator_id
+            and conv.price_type == "negotiable"
+            and not closed
+            and _range_prompt_open(db, conv, application)
+        ),
         "last_message": (
             {"body": last.body, "kind": last.kind, "created_at": last.created_at.isoformat() if last.created_at else None}
             if last else None
@@ -236,6 +284,8 @@ async def list_conversations(db: Session = Depends(get_db), user: User = Depends
         application = db.query(Application).filter(Application.id == conv.application_id).first()
         campaign = db.query(Campaign).filter(Campaign.id == conv.campaign_id).first()
         if application and campaign:
+            if user.role == "business" and (application.status or "").lower() in (m.STATUS_RANGE_REVIEW, m.STATUS_RANGE_DECLINED):
+                continue
             rows.append(_conv_out(db, conv, application, campaign, user))
     rows.sort(key=lambda r: r["updated_at"] or "", reverse=True)
     return rows
@@ -267,6 +317,8 @@ async def open_conversation(application_id: int, db: Session = Depends(get_db), 
     application = db.query(Application).filter(Application.id == application_id).first()
     campaign = db.query(Campaign).filter(Campaign.id == application.campaign_id).first() if application else None
     if not application or not campaign or user.id not in (application.creator_id, campaign.business_id):
+        raise HTTPException(status_code=404, detail="Application not found.")
+    if user.id == campaign.business_id and (application.status or "").lower() in (m.STATUS_RANGE_REVIEW, m.STATUS_RANGE_DECLINED):
         raise HTTPException(status_code=404, detail="Application not found.")
     conv = m.get_or_create_conversation(db, application, campaign)
     db.commit()
@@ -319,11 +371,19 @@ async def send_message(
     if not body:
         raise HTTPException(status_code=422, detail="Message cannot be empty.")
 
+    if user.id == conv.creator_id and conv.price_type == "negotiable" and _range_prompt_open(db, conv, application):
+        raise HTTPException(status_code=403, detail="Please answer the assistant's question about the budget range first.")
+
     decision = m.evaluate_send(db, conv, application, user)
     if not decision.allowed:
         db.rollback()
         if decision.reason == m.BLOCK_CLOSED:
             raise HTTPException(status_code=403, detail="This conversation is closed.")
+        if decision.reason == m.BLOCK_GUIDED:
+            raise HTTPException(
+                status_code=403,
+                detail="Free chat opens once the brand selects you. Please choose one of the quick replies for now.",
+            )
         if decision.reason == m.BLOCK_LIMIT:
             raise HTTPException(
                 status_code=403,
@@ -337,6 +397,64 @@ async def send_message(
     db.flush()
 
     if user.id == conv.creator_id and decision.used == 0:
+        create_notification(
+            db,
+            user_id=conv.business_id,
+            type="chat_message",
+            title="New message from a creator",
+            message=f"{_display_name(user)} sent a message about {campaign.title}.",
+            link=f"/messages?c={conv.id}",
+            reference_id=conv.id,
+            event_key=f"chat-first:{conv.id}",
+        )
+    db.commit()
+    db.refresh(conv)
+    return {"message": _message_out(msg, user), "conversation": _conv_out(db, conv, application, campaign, user)}
+
+
+@router.post("/{conversation_id}/quick-reply")
+async def send_quick_reply(
+    conversation_id: int,
+    data: QuickReply,
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    """Guided chat: send one of the preset messages (greeting, details,
+    negotiation...). This is how both sides talk before the deal is sealed.
+    When a creator speaks for the first time the brand side greets them
+    automatically."""
+    conv, application, campaign = _load(db, conversation_id, user, lock=True)
+    role = "creator" if user.id == conv.creator_id else "brand"
+
+    if m.is_closed(conv, application):
+        raise HTTPException(status_code=403, detail="This conversation is closed.")
+    if getattr(user, "is_restricted", False) and user.role != "admin":
+        raise HTTPException(status_code=403, detail="Your account is restricted.")
+    if role == "creator" and conv.price_type == "negotiable" and _range_prompt_open(db, conv, application):
+        raise HTTPException(status_code=403, detail="Please answer the assistant's question about the budget range first.")
+
+    text = m.quick_reply_text(role, data.key, conv.price_type, campaign)
+    if text is None:
+        raise HTTPException(status_code=400, detail="That quick reply is not available.")
+
+    first_creator_message = (
+        role == "creator"
+        and db.query(Message.id)
+        .filter(
+            Message.conversation_id == conv.id,
+            Message.sender_id == conv.creator_id,
+            Message.kind.in_((m.KIND_QUICK, m.KIND_USER)),
+        )
+        .first()
+        is None
+    )
+
+    msg = Message(conversation_id=conv.id, sender_id=user.id, kind=m.KIND_QUICK, body=text, is_read=False)
+    db.add(msg)
+    db.flush()
+
+    if first_creator_message:
+        m.maybe_send_auto_greeting(db, conv, campaign)
         create_notification(
             db,
             user_id=conv.business_id,
@@ -381,6 +499,19 @@ async def make_offer(
     if amount <= 0 or amount > MAX_OFFER:
         raise HTTPException(status_code=422, detail="Enter a valid amount.")
 
+    if user.id == conv.creator_id:
+        if _range_prompt_open(db, conv, application):
+            raise HTTPException(status_code=403, detail="Please answer the assistant's question about the budget range first.")
+        rng = m.budget_range(campaign)
+        if rng and m.outside_range(float(amount), rng):
+            # Do not forward an out-of-range offer to the brand. The assistant
+            # states the brand's range and waits for the creator's answer.
+            m.add_assistant_message(db, conv, m.range_prompt_text(float(amount), rng))
+            m.log_event(db, conv, user.id, "range_prompt", {"amount": float(amount), "min": rng[0], "max": rng[1]})
+            db.commit()
+            db.refresh(conv)
+            return _conv_out(db, conv, application, campaign, user)
+
     for old in db.query(PriceOffer).filter(PriceOffer.conversation_id == conv.id, PriceOffer.status == "pending").all():
         old.status = "superseded"
         old.responded_at = m.now()
@@ -393,6 +524,94 @@ async def make_offer(
         body=f"Offered NPR {amount:,.2f}", is_read=False,
     ))
     m.log_event(db, conv, user.id, "offer_made", {"offer_id": offer.id, "amount": float(amount)})
+    db.commit()
+    db.refresh(conv)
+    return _conv_out(db, conv, application, campaign, user)
+
+
+@router.post("/{conversation_id}/range-response")
+async def respond_to_range(
+    conversation_id: int,
+    data: RangeResponse,
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    """The creator answers the assistant's "continue within the brand's range?" question.
+
+    * agree  -> the creator picks an amount inside the range. A held application
+                is released to the brand (it now appears on their Applications
+                page); during an open negotiation the amount is sent as an offer.
+    * decline -> the assistant replies with a polite sorry message. A held
+                application is withdrawn and never reaches the brand.
+    """
+    conv, application, campaign = _load(db, conversation_id, user, lock=True)
+    if user.id != conv.creator_id:
+        raise HTTPException(status_code=403, detail="Only the creator can answer this.")
+    if conv.price_type != "negotiable" or m.is_closed(conv, application):
+        raise HTTPException(status_code=400, detail="There is nothing to respond to.")
+    if getattr(user, "is_restricted", False):
+        raise HTTPException(status_code=403, detail="Your account is restricted.")
+    rng = m.budget_range(campaign)
+    if not rng or not _range_prompt_open(db, conv, application):
+        raise HTTPException(status_code=400, detail="There is nothing to respond to.")
+
+    held = (application.status or "").lower() == m.STATUS_RANGE_REVIEW
+
+    if not data.agree:
+        m.add_assistant_message(db, conv, m.RANGE_SORRY_TEXT)
+        m.log_event(db, conv, user.id, "range_resolved", {"agree": False})
+        if held:
+            application.status = m.STATUS_RANGE_DECLINED
+            conv.is_closed = True
+            conv.closed_reason = "range_declined"
+            conv.closed_at = m.now()
+        db.commit()
+        db.refresh(conv)
+        return _conv_out(db, conv, application, campaign, user)
+
+    if data.amount is None or data.amount < rng[0] or data.amount > rng[1]:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Choose an amount between NPR {rng[0]:,.0f} and NPR {rng[1]:,.0f}.",
+        )
+    amount = Decimal(str(data.amount)).quantize(Decimal("0.01"))
+
+    if held:
+        application.rate = amount
+        application.status = "pending"
+        m.add_assistant_message(
+            db, conv,
+            f"Thank you! You'll continue at NPR {amount:,.2f}, within the brand's range. "
+            "Your application has now been sent to the brand.",
+        )
+        m.log_event(db, conv, user.id, "range_resolved", {"agree": True, "amount": float(amount)})
+        create_notification(
+            db,
+            user_id=campaign.business_id,
+            type="new_application",
+            title="New application",
+            message=f"{_display_name(user)} applied to {campaign.title}.",
+            link=f"/applications?campaign={campaign.id}",
+            reference_id=application.id,
+            event_key=f"application-created:{application.id}",
+        )
+    else:
+        _require_negotiating(conv, application)
+        for old in db.query(PriceOffer).filter(PriceOffer.conversation_id == conv.id, PriceOffer.status == "pending").all():
+            old.status = "superseded"
+            old.responded_at = m.now()
+        offer = PriceOffer(conversation_id=conv.id, proposer_id=user.id, amount=amount, status="pending")
+        db.add(offer)
+        db.flush()
+        db.add(Message(
+            conversation_id=conv.id, sender_id=user.id, kind=m.KIND_OFFER, offer_id=offer.id,
+            body=f"Offered NPR {amount:,.2f}", is_read=False,
+        ))
+        m.add_assistant_message(
+            db, conv, f"Thank you! Your offer of NPR {amount:,.2f} is within the brand's range and has been sent.",
+        )
+        m.log_event(db, conv, user.id, "offer_made", {"offer_id": offer.id, "amount": float(amount)})
+        m.log_event(db, conv, user.id, "range_resolved", {"agree": True, "amount": float(amount)})
     db.commit()
     db.refresh(conv)
     return _conv_out(db, conv, application, campaign, user)

@@ -28,6 +28,8 @@ from app.services.pricing import (
     campaign_fee_rate,
     compensation_type_for,
     derive_price_type,
+    min_fixed_price_error,
+    negotiable_range_error,
 )
 
 
@@ -447,6 +449,18 @@ async def create_campaign(
 
     price_type = derive_price_type(data.price_type, data.compensation_type)
 
+    price_error = min_fixed_price_error(
+        price_type, data.engagement_type, data.budget
+    )
+    if price_error:
+        raise HTTPException(status_code=400, detail=price_error)
+
+    range_error = negotiable_range_error(
+        price_type, data.budget, data.budget_min, data.budget_max
+    )
+    if range_error:
+        raise HTTPException(status_code=400, detail=range_error)
+
     if (
         data.budget_min is not None
         and data.budget_max is not None
@@ -503,8 +517,9 @@ async def create_campaign(
         price_type=price_type,
         platform_fee_rate=0 if current_user.role == "admin" else PLATFORM_FEE_RATE,
         budget=data.budget,
-        budget_min=None if data.price_type else data.budget_min,
-        budget_max=None if data.price_type else data.budget_max,
+        # The budget range only applies to negotiable campaigns.
+        budget_min=data.budget_min if price_type == "negotiable" else None,
+        budget_max=data.budget_max if price_type == "negotiable" else None,
         compensation_description=(
             data.compensation_description.strip()
             if data.compensation_description
@@ -1039,14 +1054,37 @@ async def update_campaign(
     # "Custom budget" model (brand amount + 10% platform fee on top).
     update_data["pricing_model"] = DEFAULT_PRICING_MODEL
 
+    # Fixed-price minimums depend on the engagement type, so check the
+    # resulting (merged) values, not just the fields sent in this request.
+    price_error = min_fixed_price_error(
+        update_data.get("price_type") or campaign.price_type,
+        update_data.get("engagement_type", campaign.engagement_type),
+        update_data.get("budget", campaign.budget),
+    )
+    if price_error:
+        raise HTTPException(status_code=400, detail=price_error)
+
+    effective_price_type = update_data.get("price_type") or campaign.price_type
+
+    range_error = negotiable_range_error(
+        effective_price_type,
+        update_data.get("budget", campaign.budget),
+        update_data.get("budget_min", campaign.budget_min),
+        update_data.get("budget_max", campaign.budget_max),
+    )
+    if range_error:
+        raise HTTPException(status_code=400, detail=range_error)
+
     # Fixed / negotiable toggle: keep the legacy compensation_type column in
-    # step with it and retire the old budget-range fields.
+    # step with it. The budget range only applies to negotiable campaigns.
     if update_data.get("price_type") is not None:
         update_data["compensation_type"] = compensation_type_for(update_data["price_type"])
-        update_data["budget_min"] = None
-        update_data["budget_max"] = None
     else:
         update_data.pop("price_type", None)
+
+    if effective_price_type != "negotiable":
+        update_data["budget_min"] = None
+        update_data["budget_max"] = None
 
     for key, value in update_data.items():
 

@@ -8,6 +8,8 @@ import {
   getConversation,
   getConversations,
   makePriceOffer,
+  respondToRange,
+  sendQuickReply,
   notSelectNegotiatedCreator,
   openConversationForApplication,
   selectNegotiatedCreator,
@@ -60,6 +62,7 @@ export function MessagesPanel({ compact = false, initialConversationId = null, i
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [draft, setDraft] = useState('');
   const [offerAmount, setOfferAmount] = useState('');
+  const [rangeAmount, setRangeAmount] = useState('');
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
   const [loadingList, setLoadingList] = useState(true);
@@ -215,12 +218,12 @@ export function MessagesPanel({ compact = false, initialConversationId = null, i
     if (active.brand_decision === 'selected') {
       return <div className="dm-banner dm-banner-ok">Selected. Continue the collaboration here.</div>;
     }
-    if (active.price_type === 'fixed' && !active.chat_permission_granted && active.creator_messages_remaining !== null) {
-      if (isBrand) {
+    if (active.free_chat === false) {
+      if (isBrand && active.price_type === 'fixed') {
         return (
           <div className="dm-banner dm-banner-action">
             <span>
-              Fixed price. The creator has sent {active.creator_messages_used} of {active.creator_messages_limit} initial messages.
+              Guided chat: until you select this creator, you both use quick replies. You can open free chat early if you wish.
             </span>
             <button className="dm-btn dm-btn-primary" disabled={busy} onClick={() => run(() => allowFurtherChat(active.id))}>
               Allow Further Chat
@@ -230,17 +233,111 @@ export function MessagesPanel({ compact = false, initialConversationId = null, i
       }
       return (
         <div className="dm-banner">
-          {active.creator_messages_remaining > 0
-            ? `${active.creator_messages_remaining} of ${active.creator_messages_limit} messages remaining`
-            : 'You have used your messages. You can chat again if the brand allows further chat.'}
+          {isBrand
+            ? 'Guided chat: you and the creator use quick replies until the deal is sealed.'
+            : 'Choose a quick reply below. Free chat opens once the brand selects you.'}
         </div>
       );
     }
     return null;
   };
 
+  const renderBudgetStrip = () => {
+    if (!active) return null;
+    const negotiable = active.price_type === 'negotiable';
+    const budget = active.listed_budget;
+    return (
+      <div className="dm-budget">
+        <span>{negotiable ? 'Starting budget' : 'Fixed price'}</span>
+        <strong>
+          {budget != null && budget > 0 ? money(budget) : 'Not set by the brand'}
+        </strong>
+        {negotiable && active.listed_budget_min != null && active.listed_budget_max != null && (
+          <>
+            <span>· Budget range</span>
+            <strong>
+              {money(active.listed_budget_min)} – {money(active.listed_budget_max)}
+            </strong>
+          </>
+        )}
+        {negotiable && (
+          <small>
+            {budget != null && budget > 0
+              ? 'Counter offers are expected within this range. Agree the final price in this chat.'
+              : 'Make an offer to start negotiating.'}
+          </small>
+        )}
+      </div>
+    );
+  };
+
+  // The assistant asked whether the creator will continue within the brand's range.
+  // Guided chat: preset messages instead of a text box until the deal is sealed.
+  const renderQuickReplies = () => {
+    if (!active || active.is_closed || active.free_chat !== false) return null;
+    const options = active.quick_replies ?? [];
+    if (!options.length) return null;
+    return (
+      <div className="dm-quick">
+        {options.map((q) => (
+          <button
+            key={q.key}
+            type="button"
+            className="dm-chip"
+            disabled={busy}
+            onClick={() => void run(() => sendQuickReply(active.id, q.key))}
+          >
+            {q.label}
+          </button>
+        ))}
+      </div>
+    );
+  };
+
+  const renderRangeBar = () => {
+    if (!active || !active.range_prompt_open || active.my_role !== 'creator') return null;
+    const lo = active.listed_budget_min ?? 0;
+    const hi = active.listed_budget_max ?? 0;
+    return (
+      <div className="dm-offerbar dm-rangebar">
+        <form
+          className="dm-offer-form"
+          onSubmit={(e) => {
+            e.preventDefault();
+            const amount = Number(rangeAmount);
+            if (!amount || amount < lo || amount > hi) {
+              return setError(`Enter an amount between ${money(lo)} and ${money(hi)}.`);
+            }
+            void run(() => respondToRange(active.id, true, amount)).then((ok) => ok && setRangeAmount(''));
+          }}
+        >
+          <input
+            type="number"
+            min={lo}
+            max={hi}
+            inputMode="decimal"
+            placeholder={`Your price (${money(lo)} – ${money(hi)})`}
+            value={rangeAmount}
+            onChange={(e) => setRangeAmount(e.target.value)}
+          />
+          <button className="dm-btn dm-btn-primary" type="submit" disabled={busy}>
+            Yes, continue
+          </button>
+          <button
+            className="dm-btn dm-btn-ghost"
+            type="button"
+            disabled={busy}
+            onClick={() => void run(() => respondToRange(active.id, false))}
+          >
+            No thanks
+          </button>
+        </form>
+      </div>
+    );
+  };
+
   const renderOfferBar = () => {
-    if (!active || active.price_type !== 'negotiable' || active.is_closed || active.negotiation_status !== 'open') return null;
+    if (!active || active.price_type !== 'negotiable' || active.is_closed || active.negotiation_status !== 'open' || active.range_prompt_open) return null;
     const offer = active.pending_offer;
     return (
       <div className="dm-offerbar">
@@ -293,6 +390,24 @@ export function MessagesPanel({ compact = false, initialConversationId = null, i
 
   const renderMessage = (m: ChatMessage) => {
     if (m.kind === 'system') return <div key={m.id} className="dm-system">{m.body}</div>;
+    if (m.kind === 'auto')
+      return (
+        <div key={m.id} className={`dm-row ${m.mine ? 'mine' : 'theirs'}`}>
+          <div className="dm-bubble">
+            <small className="dm-auto-label">Automatic greeting</small>
+            {m.body}
+          </div>
+        </div>
+      );
+    if (m.kind === 'assistant')
+      return (
+        <div key={m.id} className="dm-row theirs">
+          <div className="dm-bubble dm-assistant">
+            <small>CreatorHub Assistant</small>
+            {m.body}
+          </div>
+        </div>
+      );
     if (m.kind === 'offer')
       return (
         <div key={m.id} className={`dm-offer-card ${m.mine ? 'mine' : ''}`}>
@@ -359,6 +474,8 @@ export function MessagesPanel({ compact = false, initialConversationId = null, i
               </div>
             </header>
 
+            {renderBudgetStrip()}
+
             {renderBanner()}
 
             <div className="dm-messages">
@@ -368,9 +485,12 @@ export function MessagesPanel({ compact = false, initialConversationId = null, i
             </div>
 
             {error && <p className="dm-error">{error}</p>}
+            {renderRangeBar()}
             {renderOfferBar()}
+            {renderQuickReplies()}
 
             <form
+              hidden={!active.is_closed && active.free_chat === false}
               className="dm-composer"
               onSubmit={(e) => {
                 e.preventDefault();
@@ -380,9 +500,11 @@ export function MessagesPanel({ compact = false, initialConversationId = null, i
               <input
                 value={draft}
                 maxLength={2000}
-                disabled={!active.can_send || busy}
+                disabled={!active.can_send || busy || !!active.range_prompt_open}
                 placeholder={
-                  active.can_send
+                  active.range_prompt_open
+                    ? 'Please answer the assistant above'
+                    : active.can_send
                     ? 'Message...'
                     : active.is_closed
                       ? 'This conversation is closed'
@@ -390,7 +512,7 @@ export function MessagesPanel({ compact = false, initialConversationId = null, i
                 }
                 onChange={(e) => setDraft(e.target.value)}
               />
-              <button type="submit" disabled={!active.can_send || busy || !draft.trim()}>
+              <button type="submit" disabled={!active.can_send || busy || !draft.trim() || !!active.range_prompt_open}>
                 Send
               </button>
             </form>

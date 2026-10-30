@@ -144,7 +144,7 @@ async def create_application(
     existing = db.query(Application).filter(
         Application.campaign_id == campaign.id,
         Application.creator_id == current_user.id,
-        Application.status.notin_(["withdrawn", "rejected"]),
+        Application.status.notin_(["withdrawn", "rejected", "range_declined"]),
     ).first()
     if existing:
         raise HTTPException(status_code=400, detail="You have already applied to this campaign.")
@@ -183,6 +183,19 @@ async def create_application(
         # "Budget range" and "Negotiable" campaigns correctly leave this None.
         proposed_rate = resolve_campaign_rate(campaign)
 
+    # Negotiable campaigns with a budget range: a price outside the range is
+    # held back from the brand until the creator answers the assistant.
+    needs_range_review = False
+    if (
+        data.rate is not None
+        and float(data.rate) > 0
+        and derive_price_type(getattr(campaign, "price_type", None), campaign.compensation_type) == "negotiable"
+    ):
+        from app.services import messaging as msg_service
+        rng = msg_service.budget_range(campaign)
+        if rng and msg_service.outside_range(float(data.rate), rng):
+            needs_range_review = True
+
     application = Application(
         campaign_id=campaign.id,
         creator_id=current_user.id,
@@ -194,11 +207,36 @@ async def create_application(
         application_answers=[{"question": q, "answer": answer_by_question[q]} for q in questions],
         selected_portfolio=items,  # FIX: was [item]
         social_link=social_link,
-        status="pending",
+        status="range_review" if needs_range_review else "pending",
     )
     db.add(application)
     db.commit()
     db.refresh(application)
+
+    if needs_range_review:
+        from app.services import messaging as msg_service
+        conv = msg_service.get_or_create_conversation(db, application, campaign)
+        rng = msg_service.budget_range(campaign)
+        msg_service.add_assistant_message(
+            db, conv, msg_service.range_prompt_text(float(application.rate), rng)
+        )
+        msg_service.log_event(
+            db, conv, current_user.id, "range_prompt",
+            {"amount": float(application.rate), "min": rng[0], "max": rng[1]},
+        )
+        create_notification(
+            db,
+            user_id=current_user.id,
+            type="chat_message",
+            title="Action needed on your application",
+            message=f"The brand's budget range for {campaign.title} differs from your price. Open the chat to continue.",
+            link=f"/messages?c={conv.id}",
+            reference_id=conv.id,
+            event_key=f"range-review:{application.id}",
+        )
+        db.commit()
+        return _response(application, campaign)
+
     create_notification(
         db,
         user_id=campaign.business_id,
@@ -226,7 +264,11 @@ async def get_applications(
         query = query.filter(Application.creator_id == current_user.id)
     elif current_user.role == "business":
         campaign_ids = db.query(Campaign.id).filter(Campaign.business_id == current_user.id).subquery()
-        query = query.filter(Application.campaign_id.in_(campaign_ids))
+        query = query.filter(
+            Application.campaign_id.in_(campaign_ids),
+            # Held until the creator agrees to the brand's budget range.
+            Application.status.notin_(["range_review", "range_declined"]),
+        )
     elif current_user.role != "admin":
         raise HTTPException(status_code=403, detail="Access denied.")
 
@@ -253,6 +295,8 @@ _STATUS_GROUPS = {
     "completed": "accepted",
     "rejected": "rejected",
     "withdrawn": "withdrawn",
+    "range_review": "under_review",
+    "range_declined": "withdrawn",
 }
 
 
