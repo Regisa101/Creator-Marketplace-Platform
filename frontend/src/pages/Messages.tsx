@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { AppLayout } from '../components/AppLayout';
 import { PublicNavbar } from '../components/PublicNavbar';
@@ -15,9 +16,19 @@ export function Messages() {
   const [params] = useSearchParams();
   const c = Number(params.get('c')) || null;
   const application = Number(params.get('application')) || null;
+  // Brands search from the dashboard header; the panel just filters by this text.
+  const [query, setQuery] = useState('');
+  const isCreator = user?.role === 'creator';
 
   const panel = (
-    <MessagesPanel key={`${c}-${application}`} initialConversationId={c} initialApplicationId={application} />
+    <MessagesPanel
+      key={`${c}-${application}`}
+      initialConversationId={c}
+      initialApplicationId={application}
+      searchQuery={isCreator ? undefined : query}
+      onSearchChange={isCreator ? undefined : setQuery}
+      showTitle={isCreator} // the brand's dashboard header already says "Messages"
+    />
   );
 
   if (user?.role === 'creator') {
@@ -30,8 +41,14 @@ export function Messages() {
   }
 
   return (
-    <AppLayout title="Messages" showSearch={false}>
-      {panel}
+    <AppLayout
+      title="Messages"
+      searchValue={query}
+      onSearchChange={setQuery}
+      searchPlaceholder="Search creators, campaigns or messages"
+    >
+      {/* The dashboard header has 24px side padding but the page body has none, so the page adds it. */}
+      <div style={{ padding: '0 24px 24px', ['--dm-h' as string]: 'calc(100vh - 210px)' }}>{panel}</div>
     </AppLayout>
   );
 }

@@ -1,4 +1,5 @@
 // frontend/src/pages/AboutUs.tsx
+// creatorhub about page, styled to match the pricing page.
 
 import { Link } from "react-router-dom";
 import {
@@ -21,7 +22,7 @@ const WHY_ITEMS = [
   {
     number: "02",
     title: "The idea",
-    text: "CreatorHub brings businesses and creators together in one simple marketplace built around real campaign needs.",
+    text: "creatorhub brings businesses and creators together in one simple marketplace built around real campaign needs.",
   },
 ];
 
@@ -80,25 +81,38 @@ export function AboutUs() {
   return (
     <div className="about-page">
       <style>{`
-        @import url('https://fonts.googleapis.com/css2?family=League+Spartan:wght@300;400;500;600&family=Poppins:wght@300;400;500&display=swap');
+        @import url('https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap');
+
+        /* ============================================
+           BASE
+        ============================================ */
 
         .about-page {
           --content-width: 1304px;
           --content-left-space: 32px;
           --content-right-space: 32px;
 
+          --about-ink: #111111;
+          --about-soft: #6b6b6b;
+          --about-green: #1b5e3b;
+          --about-green-dark: #154b30;
+          --about-tint: #eaf4ee;
+          --about-border: #e6e6e6;
+
           min-height: 100vh;
           background: #ffffff;
-          color: #111111;
+          color: #212121;
           font-family: 'Poppins', sans-serif;
           font-weight: 400;
           overflow-x: hidden;
         }
 
+        .about-page,
         .about-page *,
         .about-page *::before,
         .about-page *::after {
           box-sizing: border-box;
+          font-family: 'Poppins', sans-serif;
         }
 
         .about-page a {
@@ -116,7 +130,67 @@ export function AboutUs() {
         .about-divider {
           width: 100%;
           height: 1px;
-          background: #e8e8e8;
+          background: #d6d6d6;
+        }
+
+        /* ============================================
+           PILL HEADER + SECTION HEADINGS
+        ============================================ */
+
+        .about-pill-row {
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          gap: 22px;
+          max-width: 620px;
+          margin: 0 auto 26px;
+        }
+
+        .about-pill-row::before,
+        .about-pill-row::after {
+          content: "";
+          flex: 1;
+          height: 1px;
+          background: #e2e2e2;
+        }
+
+        .about-pill {
+          padding: 8px 22px;
+          border-radius: 999px;
+          background: var(--about-tint);
+          color: var(--about-green);
+          font-size: 13px;
+          font-weight: 500;
+          letter-spacing: .04em;
+          text-transform: uppercase;
+          white-space: nowrap;
+        }
+
+        .about-section {
+          padding: 95px 0;
+        }
+
+        .about-section-heading {
+          max-width: 760px;
+          margin: 0 auto;
+          text-align: center;
+        }
+
+        .about-section-title {
+          margin: 0;
+          color: var(--about-ink);
+          font-size: 44px;
+          font-weight: 500;
+          line-height: 1.12;
+          letter-spacing: -.03em;
+        }
+
+        .about-section-intro {
+          max-width: 640px;
+          margin: 20px auto 0;
+          color: var(--about-soft);
+          font-size: 17px;
+          line-height: 1.7;
         }
 
         /* ============================================
@@ -124,331 +198,395 @@ export function AboutUs() {
         ============================================ */
 
         .about-hero {
-          padding: 126px 0 118px;
+          position: relative;
+          padding: 126px 0 108px;
+          background: #ffffff;
           text-align: center;
+          overflow: hidden;
         }
 
-        .about-eyebrow {
-          margin: 0 0 18px;
-          color: #777777;
-          font-size: 11px;
-          font-weight: 500;
-          letter-spacing: .16em;
-          text-transform: uppercase;
+        .about-hero-curves {
+          position: absolute;
+          inset: 0;
+          width: 100%;
+          height: 100%;
+          pointer-events: none;
+        }
+
+        .about-hero .about-container {
+          position: relative;
+          z-index: 1;
+        }
+
+        .about-hero-inner {
+          display: flex;
+          flex-direction: column;
+          align-items: center;
+          max-width: 860px;
+          margin: 0 auto;
+        }
+
+        .about-badge {
+          display: inline-flex;
+          align-items: center;
+          gap: 8px;
+          padding: 7px 16px;
+          margin-bottom: 30px;
+          border-radius: 999px;
+          background: #f2f2f2;
+          color: #333333;
+          font-size: 12.5px;
+          font-weight: 400;
+        }
+
+        .about-badge-dot {
+          width: 6px;
+          height: 6px;
+          border-radius: 50%;
+          background: var(--about-green);
         }
 
         .about-hero h1 {
-          max-width: 850px;
-          margin: 0 auto;
-          color: #111111;
-          font-family: 'League Spartan', sans-serif;
-          font-size: clamp(48px, 6vw, 72px);
-          font-weight: 400;
-          line-height: .98;
-          letter-spacing: -.04em;
+          margin: 0;
+          color: var(--about-ink);
+          font-size: 62px;
+          font-weight: 500;
+          line-height: 1.12;
+          letter-spacing: -.035em;
+        }
+
+        .about-hero-accent {
+          color: var(--about-green);
         }
 
         .about-hero-copy {
-          max-width: 610px;
-          margin: 28px auto 0;
-          color: #6b6b6b;
-          font-size: 16px;
-          line-height: 1.75;
+          max-width: 580px;
+          margin: 26px 0 0;
+          color: #555555;
+          font-size: 15.5px;
+          line-height: 1.65;
         }
 
-        .about-hero-line {
-          width: 72px;
-          height: 1px;
-          margin: 34px auto 0;
-          background: #111111;
+        .about-hero-actions {
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          gap: 26px;
+          margin-top: 32px;
+          flex-wrap: wrap;
+        }
+
+        .about-btn {
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          gap: 8px;
+          padding: 12px 24px;
+          border-radius: 8px;
+          background: var(--about-green);
+          border: 1px solid var(--about-green);
+          color: #ffffff;
+          font-size: 13.5px;
+          font-weight: 500;
+          transition: background .18s ease, transform .18s ease;
+        }
+
+        .about-btn:hover {
+          background: var(--about-green-dark);
+          border-color: var(--about-green-dark);
+          color: #ffffff;
+          transform: translateY(-2px);
+        }
+
+        .about-btn-outline {
+          background: #ffffff;
+          border-color: #cfcfcf;
+          color: var(--about-ink);
+        }
+
+        .about-btn-outline:hover {
+          background: #ffffff;
+          border-color: var(--about-ink);
+          color: var(--about-ink);
+        }
+
+        .about-hero-link {
+          padding-bottom: 2px;
+          border-bottom: 1px solid var(--about-ink);
+          color: var(--about-ink);
+          font-size: 13.5px;
+          font-weight: 400;
+          transition: opacity .16s ease;
+        }
+
+        .about-hero-link:hover {
+          color: var(--about-ink);
+          opacity: .7;
         }
 
         /* ============================================
            WHY WE BUILT IT
         ============================================ */
 
-        .about-section {
-          padding: 82px 0;
-        }
-
-        .about-section-heading {
-          max-width: 700px;
-        }
-
-        .about-section-label {
-          display: block;
-          margin-bottom: 13px;
-          color: #777777;
-          font-size: 10px;
-          font-weight: 500;
-          letter-spacing: .15em;
-          text-transform: uppercase;
-        }
-
-        .about-section-title {
-          margin: 0;
-          color: #111111;
-          font-family: 'League Spartan', sans-serif;
-          font-size: 42px;
-          font-weight: 400;
-          line-height: 1.05;
-          letter-spacing: -.025em;
-        }
-
-        .about-section-intro {
-          max-width: 620px;
-          margin: 17px 0 0;
-          color: #6b6b6b;
-          font-size: 14px;
-          line-height: 1.75;
-        }
-
         .about-why-grid {
           display: grid;
           grid-template-columns: repeat(2, minmax(0, 1fr));
-          gap: 0;
-          margin-top: 52px;
-          border-top: 1px solid #e5e5e5;
+          gap: 20px;
+          max-width: 1000px;
+          margin: 52px auto 0;
         }
 
         .about-why-item {
           display: grid;
-          grid-template-columns: 54px minmax(0, 1fr);
-          gap: 22px;
-          padding: 32px 34px 32px 0;
+          grid-template-columns: 44px 1px minmax(0, 1fr);
+          gap: 20px;
+          align-items: stretch;
+          padding: 32px 30px;
+          background: #ffffff;
+          border: 1px solid var(--about-border);
+          border-radius: 18px;
+          text-align: left;
+          transition: border-color .18s ease, box-shadow .18s ease;
         }
 
-        .about-why-item + .about-why-item {
-          padding-left: 34px;
-          border-left: 1px solid #e5e5e5;
+        .about-why-item:hover {
+          border-color: #cfe3d5;
+          box-shadow: 0 8px 24px rgba(25, 80, 45, .06);
         }
 
         .about-number {
-          color: #999999;
-          font-family: 'League Spartan', sans-serif;
+          align-self: center;
+          width: 44px;
+          height: 44px;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          border-radius: 50%;
+          background: var(--about-tint);
+          color: var(--about-green);
           font-size: 14px;
-          font-weight: 400;
-          letter-spacing: .02em;
+          font-weight: 500;
+        }
+
+        .about-rule {
+          width: 1px;
+          background: #d9d9d9;
+        }
+
+        .about-why-body {
+          align-self: center;
+          min-width: 0;
         }
 
         .about-why-title {
-          margin: 0 0 9px;
-          color: #111111;
-          font-family: 'League Spartan', sans-serif;
-          font-size: 25px;
-          font-weight: 400;
+          margin: 0 0 8px;
+          color: var(--about-ink);
+          font-size: 20px;
+          font-weight: 500;
+          letter-spacing: -.01em;
         }
 
         .about-why-text {
-          max-width: 480px;
           margin: 0;
-          color: #707070;
-          font-size: 13px;
-          line-height: 1.75;
+          color: var(--about-soft);
+          font-size: 14.5px;
+          line-height: 1.7;
         }
 
         /* ============================================
            OFFER CARDS
         ============================================ */
 
-        .about-offer-section {
-          padding: 82px 0;
-          background: #fafafa;
-        }
-
         .about-offer-grid {
           display: grid;
           grid-template-columns: repeat(4, minmax(0, 1fr));
-          gap: 14px;
-          margin-top: 48px;
+          gap: 20px;
+          margin-top: 52px;
         }
 
         .about-offer-card {
-          min-height: 285px;
-          padding: 25px 23px;
+          min-height: 270px;
+          padding: 30px 26px;
           background: #ffffff;
-          border: 1px solid #e4e4e4;
-          border-radius: 14px;
-          transition: transform .18s ease, box-shadow .18s ease;
+          border: 1px solid var(--about-border);
+          border-radius: 18px;
+          text-align: left;
+          transition: border-color .18s ease, box-shadow .18s ease, transform .18s ease;
         }
 
         .about-offer-card:hover {
+          border-color: #cfe3d5;
+          box-shadow: 0 8px 24px rgba(25, 80, 45, .06);
           transform: translateY(-3px);
-          box-shadow: 0 15px 30px -22px rgba(0,0,0,.28);
         }
 
         .about-offer-icon {
-          width: 40px;
-          height: 40px;
+          width: 48px;
+          height: 48px;
           display: flex;
           align-items: center;
           justify-content: center;
-          margin-bottom: 38px;
-          border: 1px solid #dedede;
-          border-radius: 10px;
-          color: #111111;
-          background: #ffffff;
+          margin-bottom: 34px;
+          border-radius: 50%;
+          background: var(--about-tint);
+          color: var(--about-green);
         }
 
         .about-offer-card h3 {
-          margin: 0 0 11px;
-          color: #111111;
-          font-family: 'League Spartan', sans-serif;
-          font-size: 22px;
-          font-weight: 400;
-          line-height: 1.1;
+          margin: 0 0 10px;
+          color: var(--about-ink);
+          font-size: 19px;
+          font-weight: 500;
+          line-height: 1.25;
+          letter-spacing: -.01em;
         }
 
         .about-offer-card p {
           margin: 0;
-          color: #6c6c6c;
-          font-size: 12px;
-          line-height: 1.7;
+          color: var(--about-soft);
+          font-size: 14px;
+          line-height: 1.65;
         }
 
         /* ============================================
            HOW IT WORKS
         ============================================ */
 
-        .about-how-section {
-          padding: 86px 0;
-        }
-
         .about-steps {
           display: grid;
           grid-template-columns: repeat(5, minmax(0, 1fr));
-          margin-top: 54px;
-          border-top: 1px solid #e3e3e3;
-          border-bottom: 1px solid #e3e3e3;
+          gap: 16px;
+          margin-top: 52px;
         }
 
         .about-step {
-          position: relative;
-          min-height: 245px;
-          padding: 28px 25px 30px 0;
+          padding: 28px 22px 30px;
+          background: #ffffff;
+          border: 1px solid var(--about-border);
+          border-radius: 18px;
+          text-align: left;
+          transition: border-color .18s ease, box-shadow .18s ease;
         }
 
-        .about-step + .about-step {
-          padding-left: 25px;
-          border-left: 1px solid #e3e3e3;
+        .about-step:hover {
+          border-color: #cfe3d5;
+          box-shadow: 0 8px 24px rgba(25, 80, 45, .06);
         }
 
         .about-step-number {
-          display: block;
-          margin-bottom: 48px;
-          color: #999999;
-          font-family: 'League Spartan', sans-serif;
+          width: 40px;
+          height: 40px;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          margin-bottom: 26px;
+          border-radius: 50%;
+          background: var(--about-tint);
+          color: var(--about-green);
           font-size: 13px;
+          font-weight: 500;
         }
 
         .about-step h3 {
-          margin: 0 0 10px;
-          color: #111111;
-          font-family: 'League Spartan', sans-serif;
-          font-size: 24px;
-          font-weight: 400;
+          margin: 0 0 8px;
+          color: var(--about-ink);
+          font-size: 19px;
+          font-weight: 500;
+          letter-spacing: -.01em;
         }
 
         .about-step p {
           margin: 0;
-          color: #707070;
-          font-size: 11.5px;
-          line-height: 1.7;
-        }
-
-        .about-step-arrow {
-          position: absolute;
-          top: 30px;
-          right: -7px;
-          z-index: 2;
-          width: 13px;
-          height: 13px;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          background: #ffffff;
-          color: #777777;
+          color: var(--about-soft);
+          font-size: 13.5px;
+          line-height: 1.65;
         }
 
         /* ============================================
            WHO IT IS FOR
         ============================================ */
 
-        .about-audience-section {
-          padding: 82px 0;
-          background: #fafafa;
-        }
-
         .about-audience-grid {
           display: grid;
           grid-template-columns: repeat(2, minmax(0, 1fr));
-          gap: 16px;
-          margin-top: 48px;
+          gap: 24px;
+          max-width: 1100px;
+          margin: 52px auto 0;
         }
 
         .about-audience-card {
           position: relative;
-          min-height: 340px;
-          padding: 34px;
+          min-height: 330px;
+          padding: 38px;
           overflow: hidden;
           background: #ffffff;
-          border: 1px solid #e3e3e3;
-          border-radius: 16px;
+          border: 1px solid var(--about-border);
+          border-radius: 20px;
+          text-align: left;
         }
 
         .about-audience-card::after {
           content: "";
           position: absolute;
-          right: -80px;
-          bottom: -100px;
-          width: 260px;
-          height: 260px;
-          border: 1px solid #eeeeee;
+          right: -90px;
+          bottom: -110px;
+          width: 270px;
+          height: 270px;
+          background: #f1f8f3;
           border-radius: 50%;
         }
 
         .about-audience-icon {
-          width: 45px;
-          height: 45px;
+          position: relative;
+          z-index: 1;
+          width: 48px;
+          height: 48px;
           display: flex;
           align-items: center;
           justify-content: center;
-          margin-bottom: 72px;
-          border-radius: 11px;
-          background: #111111;
+          margin-bottom: 56px;
+          border-radius: 14px;
+          background: var(--about-green);
           color: #ffffff;
         }
 
         .about-audience-card h3 {
+          position: relative;
+          z-index: 1;
           margin: 0 0 12px;
-          font-family: 'League Spartan', sans-serif;
-          font-size: 31px;
-          font-weight: 400;
+          color: var(--about-ink);
+          font-size: 28px;
+          font-weight: 500;
           letter-spacing: -.02em;
         }
 
         .about-audience-card p {
-          max-width: 470px;
+          position: relative;
+          z-index: 1;
+          max-width: 440px;
           margin: 0;
-          color: #6b6b6b;
-          font-size: 13px;
-          line-height: 1.75;
+          color: var(--about-soft);
+          font-size: 15px;
+          line-height: 1.7;
         }
 
         .about-audience-link {
           position: relative;
-          z-index: 3;
+          z-index: 2;
           display: inline-flex;
           align-items: center;
-          gap: 7px;
-          margin-top: 25px;
-          color: #111111;
-          font-size: 12px;
+          gap: 8px;
+          margin-top: 26px;
+          color: var(--about-green);
+          font-size: 14px;
           font-weight: 500;
+          transition: transform .16s ease, opacity .16s ease;
         }
 
         .about-audience-link:hover {
-          opacity: .65;
+          color: var(--about-green);
+          transform: translateX(4px);
+          opacity: .8;
         }
 
         /* ============================================
@@ -456,26 +594,25 @@ export function AboutUs() {
         ============================================ */
 
         .about-mission {
-          padding: 112px 0;
+          padding: 110px 0;
           text-align: center;
         }
 
         .about-mission h2 {
-          max-width: 850px;
+          max-width: 820px;
           margin: 0 auto;
-          color: #111111;
-          font-family: 'League Spartan', sans-serif;
-          font-size: clamp(38px, 5vw, 58px);
-          font-weight: 400;
-          line-height: 1;
+          color: var(--about-ink);
+          font-size: 52px;
+          font-weight: 500;
+          line-height: 1.12;
           letter-spacing: -.035em;
         }
 
         .about-mission p {
-          max-width: 570px;
-          margin: 25px auto 0;
-          color: #707070;
-          font-size: 14px;
+          max-width: 600px;
+          margin: 26px auto 0;
+          color: var(--about-soft);
+          font-size: 16px;
           line-height: 1.75;
         }
 
@@ -484,76 +621,55 @@ export function AboutUs() {
         ============================================ */
 
         .about-cta {
-          margin-bottom: 0;
-          padding: 72px 0;
-          background: #111111;
-          color: #ffffff;
+          width: calc(100% - 2 * var(--content-left-space));
+          max-width: calc(var(--content-width) - 2 * var(--content-left-space));
+          margin: 64px auto;
+          background: linear-gradient(
+            110deg,
+            #f3f3f3 0%,
+            #fafafa 42%,
+            #ffffff 72%,
+            #f2f2f2 100%
+          );
+          border: 1px solid #e7e7e7;
+          border-radius: 16px;
+          overflow: hidden;
         }
 
         .about-cta-inner {
+          min-height: 340px;
+          padding: 64px 40px;
           display: flex;
+          flex-direction: column;
           align-items: center;
-          justify-content: space-between;
-          gap: 35px;
+          justify-content: center;
+          text-align: center;
         }
 
-        .about-cta-copy h2 {
-          margin: 0 0 9px;
-          color: #ffffff;
-          font-family: 'League Spartan', sans-serif;
-          font-size: 38px;
-          font-weight: 400;
-          letter-spacing: -.025em;
+        .about-cta-inner h2 {
+          max-width: 760px;
+          margin: 0 auto 16px;
+          color: var(--about-ink);
+          font-size: 40px;
+          font-weight: 500;
+          line-height: 1.15;
+          letter-spacing: -.03em;
         }
 
-        .about-cta-copy p {
-          margin: 0;
-          color: #bcbcbc;
-          font-size: 13px;
+        .about-cta-inner p {
+          max-width: 560px;
+          margin: 0 auto 30px;
+          color: var(--about-soft);
+          font-size: 16px;
+          line-height: 1.7;
         }
 
         .about-cta-actions {
           display: flex;
           align-items: center;
-          gap: 9px;
-          flex-shrink: 0;
-        }
-
-        .about-cta-btn {
-          min-height: 44px;
-          display: inline-flex;
-          align-items: center;
           justify-content: center;
-          gap: 8px;
-          padding: 0 18px;
-          border-radius: 8px;
-          font-size: 12px;
-          font-weight: 500;
-          transition: all .18s ease;
-        }
-
-        .about-cta-btn-primary {
-          background: #ffffff;
-          border: 1px solid #ffffff;
-          color: #111111;
-        }
-
-        .about-cta-btn-primary:hover {
-          background: #eeeeee;
-          border-color: #eeeeee;
-          transform: translateY(-1px);
-        }
-
-        .about-cta-btn-secondary {
-          background: transparent;
-          border: 1px solid #666666;
-          color: #ffffff;
-        }
-
-        .about-cta-btn-secondary:hover {
-          border-color: #ffffff;
-          background: rgba(255,255,255,.06);
-          transform: translateY(-1px);
+          gap: 12px;
+          flex-wrap: wrap;
         }
 
         /* ============================================
@@ -561,7 +677,7 @@ export function AboutUs() {
         ============================================ */
 
         .about-footer {
-          padding: 60px 0 22px;
+          padding: 64px 0 22px;
           background: #ffffff;
         }
 
@@ -569,223 +685,254 @@ export function AboutUs() {
           display: flex;
           justify-content: space-between;
           gap: 40px;
-          padding-bottom: 32px;
-          border-bottom: 1px solid #e7e7e7;
+          flex-wrap: wrap;
+          padding-bottom: 36px;
+          border-bottom: 1px solid #e7e0da;
         }
 
         .about-footer-brand {
           display: flex;
           align-items: center;
           gap: 9px;
-          margin-bottom: 10px;
-        }
-
-        .about-footer-brand span {
-          font-family: 'League Spartan', sans-serif;
-          font-size: 19px;
-          font-weight: 400;
+          margin-bottom: 12px;
+          color: var(--about-ink);
+          font-size: 18px;
+          font-weight: 500;
         }
 
         .about-footer-tag {
-          max-width: 280px;
+          max-width: 320px;
           margin: 0;
-          color: #707070;
-          font-size: 13px;
+          color: var(--about-soft);
+          font-size: 14px;
           line-height: 1.6;
         }
 
         .about-footer-cols {
           display: flex;
-          gap: 56px;
+          gap: 64px;
         }
 
         .about-footer-col h4 {
-          margin: 0 0 14px;
-          color: #111111;
-          font-size: 12px;
-          font-weight: 500;
-          letter-spacing: .06em;
+          margin: 0 0 16px;
+          color: var(--about-ink);
+          font-size: 14px;
+          letter-spacing: .08em;
           text-transform: uppercase;
         }
 
         .about-footer-col a {
           display: block;
-          margin-bottom: 10px;
-          color: #707070;
-          font-size: 13px;
+          margin-bottom: 11px;
+          color: var(--about-soft);
+          font-size: 14px;
         }
 
         .about-footer-col a:hover {
-          color: #111111;
+          color: var(--about-ink);
         }
 
         .about-footer-bottom {
           display: flex;
           align-items: center;
           justify-content: space-between;
-          gap: 20px;
-          padding-top: 18px;
-          color: #888888;
-          font-size: 11px;
+          flex-wrap: wrap;
+          gap: 12px;
+          padding-top: 22px;
+          color: var(--about-soft);
+          font-size: 13px;
         }
 
         .about-footer-social {
           display: flex;
-          gap: 10px;
+          gap: 12px;
         }
 
         .about-footer-social a {
-          color: #777777;
+          width: 36px;
+          height: 36px;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          border: 1px solid #dcd4cc;
+          border-radius: 50%;
+          color: var(--about-soft);
+          font-size: 11px;
+          letter-spacing: .3px;
+          transition: border-color .16s ease, color .16s ease, transform .16s ease;
         }
 
         .about-footer-social a:hover {
+          border-color: #111111;
           color: #111111;
+          transform: translateY(-1px);
         }
 
         /* ============================================
            RESPONSIVE
         ============================================ */
 
+        @media (max-width: 1180px) {
+          .about-steps {
+            grid-template-columns: repeat(3, minmax(0, 1fr));
+          }
+        }
+
         @media (max-width: 1050px) {
+          .about-hero h1 {
+            font-size: 54px;
+          }
+
+          .about-section-title {
+            font-size: 40px;
+          }
+
           .about-offer-grid {
             grid-template-columns: repeat(2, minmax(0, 1fr));
           }
 
-          .about-steps {
-            grid-template-columns: repeat(3, minmax(0, 1fr));
-          }
-
-          .about-step:nth-child(4) {
-            border-left: 0;
-            border-top: 1px solid #e3e3e3;
-          }
-
-          .about-step:nth-child(5) {
-            border-top: 1px solid #e3e3e3;
+          .about-offer-card {
+            min-height: 0;
           }
         }
 
-        @media (max-width: 760px) {
-          .about-page {
-            --content-left-space: 20px;
-            --content-right-space: 20px;
-          }
-
-          .about-hero {
-            padding: 90px 0 80px;
-          }
-
-          .about-hero h1 {
-            font-size: 48px;
-          }
-
-          .about-section,
-          .about-offer-section,
-          .about-how-section,
-          .about-audience-section {
-            padding: 64px 0;
-          }
-
-          .about-section-title {
-            font-size: 36px;
-          }
-
-          .about-why-grid {
-            grid-template-columns: 1fr;
-          }
-
-          .about-why-item,
-          .about-why-item + .about-why-item {
-            padding: 27px 0;
-            border-left: 0;
-          }
-
-          .about-why-item + .about-why-item {
-            border-top: 1px solid #e5e5e5;
-          }
-
-          .about-offer-grid {
-            grid-template-columns: 1fr;
-          }
-
-          .about-offer-card {
-            min-height: auto;
-          }
-
-          .about-steps {
-            grid-template-columns: 1fr;
-          }
-
-          .about-step,
-          .about-step + .about-step {
-            min-height: auto;
-            padding: 25px 0;
-            border-left: 0;
-            border-top: 1px solid #e3e3e3;
-          }
-
-          .about-step:first-child {
-            border-top: 0;
-          }
-
-          .about-step-number {
-            margin-bottom: 22px;
-          }
-
-          .about-step-arrow {
-            display: none;
-          }
-
+        @media (max-width: 900px) {
+          .about-why-grid,
           .about-audience-grid {
             grid-template-columns: 1fr;
           }
 
           .about-audience-card {
-            min-height: 310px;
+            min-height: 300px;
           }
 
-          .about-audience-icon {
-            margin-bottom: 50px;
+          .about-mission h2 {
+            font-size: 44px;
+          }
+        }
+
+        @media (max-width: 760px) {
+          .about-page {
+            --content-left-space: 18px;
+            --content-right-space: 18px;
           }
 
-          .about-mission {
-            padding: 82px 0;
+          .about-hero {
+            padding: 96px 0 76px;
           }
 
-          .about-cta {
-            padding: 55px 0;
+          .about-hero h1 {
+            font-size: 44px;
           }
 
-          .about-cta-inner {
-            align-items: flex-start;
-            flex-direction: column;
+          .about-section {
+            padding: 70px 0;
           }
 
-          .about-cta-copy h2 {
+          .about-section-title {
             font-size: 34px;
           }
 
-          .about-footer-top {
-            flex-direction: column;
+          .about-section-intro {
+            font-size: 16px;
+          }
+
+          .about-pill-row {
+            gap: 14px;
+          }
+
+          .about-pill {
+            font-size: 12px;
+            padding: 7px 18px;
+          }
+
+          .about-why-item {
+            padding: 24px 22px;
+          }
+
+          .about-offer-grid,
+          .about-steps {
+            grid-template-columns: 1fr;
+          }
+
+          .about-audience-card {
+            padding: 30px 24px;
+          }
+
+          .about-audience-icon {
+            margin-bottom: 40px;
+          }
+
+          .about-mission {
+            padding: 80px 0;
+          }
+
+          .about-mission h2 {
+            font-size: 36px;
+          }
+
+          .about-cta-inner {
+            min-height: 0;
+            padding: 52px 24px;
+          }
+
+          .about-cta-inner h2 {
+            font-size: 32px;
           }
 
           .about-footer-cols {
-            gap: 42px;
-          }
-
-          .about-footer-bottom {
-            align-items: flex-start;
-            flex-direction: column;
+            gap: 32px;
           }
         }
 
         @media (max-width: 480px) {
           .about-hero h1 {
-            font-size: 42px;
+            font-size: 34px;
           }
 
           .about-hero-copy {
-            font-size: 14px;
+            font-size: 14.5px;
+          }
+
+          .about-badge {
+            font-size: 12px;
+            margin-bottom: 24px;
+          }
+
+          .about-section-title {
+            font-size: 30px;
+          }
+
+          .about-why-item {
+            grid-template-columns: 38px 1px minmax(0, 1fr);
+            gap: 14px;
+            padding: 20px 16px;
+          }
+
+          .about-number {
+            width: 38px;
+            height: 38px;
+            font-size: 13px;
+          }
+
+          .about-mission h2 {
+            font-size: 32px;
+          }
+
+          .about-cta {
+            width: calc(100% - 36px);
+          }
+
+          .about-cta-inner {
+            padding: 44px 20px;
+          }
+
+          .about-cta-inner h2 {
+            font-size: 28px;
+          }
+
+          .about-cta-inner p {
+            font-size: 15px;
           }
 
           .about-cta-actions {
@@ -793,8 +940,17 @@ export function AboutUs() {
             flex-direction: column;
           }
 
-          .about-cta-btn {
+          .about-cta-actions .about-btn {
             width: 100%;
+          }
+
+          .about-footer-top {
+            flex-direction: column;
+          }
+
+          .about-footer-bottom {
+            align-items: flex-start;
+            flex-direction: column;
           }
         }
       `}</style>
@@ -806,17 +962,55 @@ export function AboutUs() {
       ============================================ */}
 
       <section className="about-hero">
+        {/* faint decorative curves */}
+        <svg
+          className="about-hero-curves"
+          viewBox="0 0 1440 460"
+          preserveAspectRatio="none"
+          fill="none"
+          aria-hidden="true"
+        >
+          <path
+            d="M-40 140 C 120 120, 260 200, 330 460"
+            stroke="#ececec"
+            strokeWidth="1.5"
+          />
+          <path
+            d="M1480 120 C 1330 150, 1230 260, 1160 470"
+            stroke="#ececec"
+            strokeWidth="1.5"
+          />
+        </svg>
+
         <div className="about-container">
-          <p className="about-eyebrow">About CreatorHub</p>
+          <div className="about-hero-inner">
+            <span className="about-badge">
+              <span className="about-badge-dot" />
+              About creatorhub
+            </span>
 
-          <h1>Connecting Businesses with Creators</h1>
+            <h1>
+              Connecting Businesses
+              <br />
+              with <span className="about-hero-accent">Creators</span>
+            </h1>
 
-          <p className="about-hero-copy">
-            We make it easier for businesses to find creators and for creators
-            to discover meaningful collaboration opportunities.
-          </p>
+            <p className="about-hero-copy">
+              We make it easier for businesses to find creators and for
+              creators to discover meaningful collaboration opportunities.
+            </p>
 
-          <div className="about-hero-line" aria-hidden="true" />
+            <div className="about-hero-actions">
+              <Link to="/register/business" className="about-btn">
+                Post a Campaign
+                <ArrowRight size={14} />
+              </Link>
+
+              <Link to="/campaigns?source=about" className="about-hero-link">
+                Explore Campaigns
+              </Link>
+            </div>
+          </div>
         </div>
       </section>
 
@@ -829,7 +1023,9 @@ export function AboutUs() {
       <section className="about-section">
         <div className="about-container">
           <div className="about-section-heading">
-            <span className="about-section-label">Why we built it</span>
+            <div className="about-pill-row">
+              <span className="about-pill">Why we built it</span>
+            </div>
 
             <h2 className="about-section-title">
               A simpler way to bring both sides together.
@@ -838,7 +1034,7 @@ export function AboutUs() {
             <p className="about-section-intro">
               Finding the right creator for a campaign can be difficult for
               businesses, while creators often struggle to find relevant
-              opportunities. CreatorHub brings both sides together in one
+              opportunities. creatorhub brings both sides together in one
               simple marketplace.
             </p>
           </div>
@@ -848,7 +1044,9 @@ export function AboutUs() {
               <article className="about-why-item" key={item.number}>
                 <span className="about-number">{item.number}</span>
 
-                <div>
+                <span className="about-rule" aria-hidden="true" />
+
+                <div className="about-why-body">
                   <h3 className="about-why-title">{item.title}</h3>
                   <p className="about-why-text">{item.text}</p>
                 </div>
@@ -864,10 +1062,12 @@ export function AboutUs() {
           WHAT WE OFFER
       ============================================ */}
 
-      <section className="about-offer-section">
+      <section className="about-section">
         <div className="about-container">
           <div className="about-section-heading">
-            <span className="about-section-label">What we offer</span>
+            <div className="about-pill-row">
+              <span className="about-pill">What we offer</span>
+            </div>
 
             <h2 className="about-section-title">
               Everything starts with a real campaign.
@@ -881,7 +1081,7 @@ export function AboutUs() {
               return (
                 <article className="about-offer-card" key={item.title}>
                   <div className="about-offer-icon">
-                    <Icon size={18} strokeWidth={1.5} />
+                    <Icon size={20} strokeWidth={1.6} />
                   </div>
 
                   <h3>{item.title}</h3>
@@ -900,10 +1100,12 @@ export function AboutUs() {
           HOW IT WORKS
       ============================================ */}
 
-      <section className="about-how-section">
+      <section className="about-section">
         <div className="about-container">
           <div className="about-section-heading">
-            <span className="about-section-label">How it works</span>
+            <div className="about-pill-row">
+              <span className="about-pill">How it works</span>
+            </div>
 
             <h2 className="about-section-title">
               From campaign idea to collaboration.
@@ -916,19 +1118,13 @@ export function AboutUs() {
           </div>
 
           <div className="about-steps">
-            {STEPS.map((step, index) => (
+            {STEPS.map((step) => (
               <article className="about-step" key={step.number}>
                 <span className="about-step-number">{step.number}</span>
 
                 <h3>{step.title}</h3>
 
                 <p>{step.text}</p>
-
-                {index < STEPS.length - 1 && (
-                  <span className="about-step-arrow" aria-hidden="true">
-                    <ArrowRight size={13} />
-                  </span>
-                )}
               </article>
             ))}
           </div>
@@ -941,10 +1137,12 @@ export function AboutUs() {
           WHO IT IS FOR
       ============================================ */}
 
-      <section className="about-audience-section">
+      <section className="about-section">
         <div className="about-container">
           <div className="about-section-heading">
-            <span className="about-section-label">Who is it for?</span>
+            <div className="about-pill-row">
+              <span className="about-pill">Who is it for?</span>
+            </div>
 
             <h2 className="about-section-title">
               One marketplace. Two sides.
@@ -954,7 +1152,7 @@ export function AboutUs() {
           <div className="about-audience-grid">
             <article className="about-audience-card">
               <div className="about-audience-icon">
-                <BriefcaseBusiness size={19} strokeWidth={1.5} />
+                <BriefcaseBusiness size={21} strokeWidth={1.6} />
               </div>
 
               <h3>Businesses</h3>
@@ -966,13 +1164,13 @@ export function AboutUs() {
 
               <Link to="/register/business" className="about-audience-link">
                 Post a Campaign
-                <ArrowRight size={14} />
+                <ArrowRight size={15} />
               </Link>
             </article>
 
             <article className="about-audience-card">
               <div className="about-audience-icon">
-                <Users size={19} strokeWidth={1.5} />
+                <Users size={21} strokeWidth={1.6} />
               </div>
 
               <h3>Creators</h3>
@@ -982,9 +1180,12 @@ export function AboutUs() {
                 discover campaigns from businesses looking for creators.
               </p>
 
-              <Link to="/campaigns?source=about" className="about-audience-link">
+              <Link
+                to="/campaigns?source=about"
+                className="about-audience-link"
+              >
                 Explore Campaigns
-                <ArrowRight size={14} />
+                <ArrowRight size={15} />
               </Link>
             </article>
           </div>
@@ -999,9 +1200,14 @@ export function AboutUs() {
 
       <section className="about-mission">
         <div className="about-container">
-          <span className="about-section-label">Our mission</span>
+          <div className="about-pill-row">
+            <span className="about-pill">Our mission</span>
+          </div>
 
-          <h2>Making creator collaboration simple.</h2>
+          <h2>
+            Making creator collaboration{" "}
+            <span className="about-hero-accent">simple.</span>
+          </h2>
 
           <p>
             Our goal is to create a straightforward space where businesses can
@@ -1011,32 +1217,27 @@ export function AboutUs() {
         </div>
       </section>
 
+      <div className="about-divider" />
+
       {/* ============================================
           CTA
       ============================================ */}
 
       <section className="about-cta">
-        <div className="about-container about-cta-inner">
-          <div className="about-cta-copy">
-            <h2>Ready to create something together?</h2>
+        <div className="about-cta-inner">
+          <h2>Ready to create something together?</h2>
 
-            <p>
-              Start with a campaign or discover your next opportunity.
-            </p>
-          </div>
+          <p>Start with a campaign or discover your next opportunity.</p>
 
           <div className="about-cta-actions">
-            <Link
-              to="/register/business"
-              className="about-cta-btn about-cta-btn-primary"
-            >
+            <Link to="/register/business" className="about-btn">
               Post a Campaign
               <ArrowRight size={14} />
             </Link>
 
             <Link
               to="/campaigns?source=about"
-              className="about-cta-btn about-cta-btn-secondary"
+              className="about-btn about-btn-outline"
             >
               Explore Campaigns
               <ArrowRight size={14} />
@@ -1044,6 +1245,8 @@ export function AboutUs() {
           </div>
         </div>
       </section>
+
+      <div className="about-divider" />
 
       {/* ============================================
           FOOTER
@@ -1083,7 +1286,10 @@ export function AboutUs() {
           </div>
 
           <div className="about-footer-bottom">
-            <span>© 2026 Creator Marketplace. All rights reserved.</span>
+            <span>
+              © {new Date().getFullYear()} Creator Marketplace. All rights
+              reserved.
+            </span>
 
             <div className="about-footer-social">
               <a href="#" aria-label="Instagram">

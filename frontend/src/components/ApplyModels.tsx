@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { createPortal } from 'react-dom';
+import { useNavigate } from 'react-router-dom';
 
 import { parseSocialLink } from '../utils/Social';
 
@@ -48,6 +49,11 @@ export function ApplyModal({
   const [success, setSuccess] = useState(false);
   // True when the proposed rate was outside the brand's budget range.
   const [rangeHold, setRangeHold] = useState(false);
+  // What happened to the price typed on the form, and where the chat lives.
+  const [rateNote, setRateNote] = useState<'offer' | 'fixed' | null>(null);
+  const [createdId, setCreatedId] = useState<number | null>(null);
+  const navigate = useNavigate();
+  const isFixed = campaign.price_type === 'fixed';
   const [error, setError] = useState('');
 
   const questions = useMemo(
@@ -228,6 +234,8 @@ export function ApplyModal({
       await onSuccess?.();
 
       setRangeHold(created?.status === 'range_review');
+      setCreatedId(created?.id ?? null);
+      setRateNote(rate.trim() && Number(rate) > 0 ? (isFixed ? 'fixed' : 'offer') : null);
       setSuccess(true);
     } catch (err) {
       setError(
@@ -635,20 +643,46 @@ export function ApplyModal({
           color: #777;
         }
 
-        .apply-success button {
+        .apply-success-actions {
           margin-top: 24px;
-          height: 40px;
-          padding: 0 20px;
-          border: 0;
-          border-radius: 9px;
-          background: #197935;
-          color: #fff;
-          font: 600 12px Poppins, sans-serif;
-          cursor: pointer;
+          display: flex;
+          justify-content: center;
+          align-items: center;
+          flex-wrap: wrap;
+          gap: 12px;
         }
 
-        .apply-success button:hover {
+        .apply-success-actions button {
+          height: 40px;
+          min-width: 112px;
+          padding: 0 22px;
+          border-radius: 9px;
+          font: 600 12px Poppins, sans-serif;
+          cursor: pointer;
+          transition: background 0.15s, color 0.15s, border-color 0.15s;
+        }
+
+        /* Main action: solid green */
+        .apply-success-actions .apply-btn-primary {
+          border: 1.5px solid #197935;
+          background: #197935;
+          color: #fff;
+        }
+
+        .apply-success-actions .apply-btn-primary:hover {
           background: #15672d;
+          border-color: #15672d;
+        }
+
+        /* Secondary action: white with a black outline and black text */
+        .apply-success-actions .apply-btn-secondary {
+          border: 1.5px solid #111;
+          background: #fff;
+          color: #111;
+        }
+
+        .apply-success-actions .apply-btn-secondary:hover {
+          background: #f3f3f3;
         }
 
         /* =========================================
@@ -734,8 +768,8 @@ export function ApplyModal({
               </p>
             ) : rangeHold ? (
               <p>
-                Your price is outside the brand's budget range. The CreatorHub
-                assistant has sent you a message in Messages with the range.
+                Your price is outside the brand's budget range. The brand has
+                sent you a message in Messages with the range.
                 Agree to a price within it and your application will be sent to
                 the brand.
               </p>
@@ -743,12 +777,40 @@ export function ApplyModal({
               <p>
                 Your application has been sent to the brand. We’ll notify you
                 when the brand makes a decision.
+                {rateNote === 'offer' &&
+                  ' The price you proposed was sent to the brand as an offer in Messages.'}
+                {rateNote === 'fixed' &&
+                  ' This campaign has a fixed price, so the brand left you a note about it in Messages.'}
+                {rateNote === null && ' You can say hi to the brand in Messages.'}
               </p>
             )}
 
-            <button type="button" onClick={onClose}>
-              Done
-            </button>
+            {(() => {
+              const canOpenChat = Boolean(createdId) && !isDemoCampaignId(campaign.id);
+              return (
+                <div className="apply-success-actions">
+                  {canOpenChat && (
+                    <button
+                      type="button"
+                      className="apply-btn-primary"
+                      onClick={() => {
+                        onClose();
+                        navigate(`/messages?application=${createdId}`);
+                      }}
+                    >
+                      Open chat
+                    </button>
+                  )}
+                  <button
+                    type="button"
+                    className={canOpenChat ? 'apply-btn-secondary' : 'apply-btn-primary'}
+                    onClick={onClose}
+                  >
+                    Done
+                  </button>
+                </div>
+              );
+            })()}
           </div>
         ) : (
           <>
@@ -919,9 +981,9 @@ export function ApplyModal({
                     </div>
 
                     <p className="apply-help">
-                      If you have a preferred rate, enter it here. For
-                      negotiable campaigns you can leave this blank and discuss
-                      the final amount with the brand after selection.
+                      {isFixed
+                        ? 'This campaign has a fixed price. You can leave this blank; if you enter a different amount, the brand will let you know in Messages that the fixed price applies.'
+                        : 'If you have a preferred rate, enter it here and it will be sent to the brand as an offer in Messages. You can also leave it blank and negotiate after you say hi.'}
                     </p>
 
                     <input
@@ -936,7 +998,7 @@ export function ApplyModal({
 
                     <div className="apply-help" style={{ marginTop: 6 }}>
                       Amount in NPR. This is your proposed rate, not a payment
-                      to CreatorHub.
+                      to creatorhub.
                     </div>
                   </section>
 

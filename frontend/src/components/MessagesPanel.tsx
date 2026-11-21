@@ -1,5 +1,5 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
-import { ArrowLeft, Lock, Send } from 'lucide-react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { ArrowLeft, ChevronDown, ChevronRight, Lock, Search, Send } from 'lucide-react';
 import {
   acceptListedPrice,
   acceptPriceOffer,
@@ -25,6 +25,11 @@ type Props = {
   initialConversationId?: number | null;
   initialApplicationId?: number | null;
   onNavigate?: () => void;
+  /** When set, the page header owns the search box: the panel filters by this text and hides its own box. */
+  searchQuery?: string;
+  onSearchChange?: (value: string) => void;
+  /** Show the "Messages" title above the list (hide it when the page header already says so). */
+  showTitle?: boolean;
 };
 
 const money = (n: number | null | undefined) =>
@@ -45,6 +50,36 @@ function timeAgo(iso: string | null | undefined) {
   return d < 7 ? `${d}d` : new Date(iso).toLocaleDateString();
 }
 
+type Tab = 'all' | 'unread';
+type Pill = { label: string; tone: 'warn' | 'info' | 'ok' | 'mute' };
+
+/** The other side has put a price on the table and is waiting for an answer. */
+const offerWaitingForMe = (c: Conversation) =>
+  !!c.pending_offer && c.counterpart.id != null && c.pending_offer.proposer_id === c.counterpart.id;
+
+/** Something here is waiting on ME (not just unread). */
+const needsMyAction = (c: Conversation) => {
+  if (c.is_closed) return false;
+  if (c.my_role === 'business') return c.awaiting_selection || offerWaitingForMe(c);
+  return !!c.range_prompt_open || offerWaitingForMe(c);
+};
+
+/** One short status label per conversation, so a long list can be scanned at a glance. */
+const statusOf = (c: Conversation): Pill | null => {
+  if (c.is_closed) return { label: 'Closed', tone: 'mute' };
+  const brand = c.my_role === 'business';
+  if (brand && c.awaiting_selection) return { label: 'Choose creator', tone: 'warn' };
+  if (!brand && c.range_prompt_open) return { label: 'Reply needed', tone: 'warn' };
+  if (offerWaitingForMe(c)) return { label: brand ? 'Offer to review' : 'Counter offer', tone: 'warn' };
+  if (!brand && c.awaiting_selection) return { label: 'Waiting for brand', tone: 'info' };
+  if (c.brand_decision === 'selected') return { label: 'Selected', tone: 'ok' };
+  if (c.negotiation_status === 'open' && c.negotiation_started) return { label: 'Negotiating', tone: 'info' };
+  return null;
+};
+
+const lastActivity = (c: Conversation) =>
+  new Date(c.last_message?.created_at || c.updated_at || 0).getTime();
+
 function Avatar({ name, src, size = 44 }: { name: string; src?: string | null; size?: number }) {
   return src ? (
     <img className="dm-avatar" src={src} alt="" style={{ width: size, height: size }} />
@@ -55,8 +90,23 @@ function Avatar({ name, src, size = 44 }: { name: string; src?: string | null; s
   );
 }
 
-export function MessagesPanel({ compact = false, initialConversationId = null, initialApplicationId = null, onNavigate }: Props) {
+export function MessagesPanel({
+  compact = false,
+  initialConversationId = null,
+  initialApplicationId = null,
+  onNavigate,
+  searchQuery,
+  onSearchChange,
+  showTitle = true,
+}: Props) {
   const [list, setList] = useState<Conversation[]>([]);
+  // List filters: search text, one campaign, and a quick tab.
+  const [innerQuery, setInnerQuery] = useState('');
+  const headerSearch = searchQuery !== undefined;
+  const query = headerSearch ? searchQuery : innerQuery;
+  const setQuery = (value: string) => (headerSearch ? onSearchChange?.(value) : setInnerQuery(value));
+  const [tab, setTab] = useState<Tab>('all');
+  const [collapsed, setCollapsed] = useState<Set<number>>(new Set());
   const [activeId, setActiveId] = useState<number | null>(initialConversationId);
   const [active, setActive] = useState<Conversation | null>(null);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
@@ -187,7 +237,7 @@ export function MessagesPanel({ compact = false, initialConversationId = null, i
       return isBrand ? (
         <div className="dm-banner dm-banner-action">
           <div>
-            <strong>Price agreed: {money(active.agreed_total)}</strong>
+            <strong>Price agreed: {agreedBreakdown()}</strong>
             <span>
               Total creator compensation. CreatorHub's separate {Math.round(active.platform_fee_rate * 100)}% service fee
               ({money(active.platform_fee)}) is paid by you when you hire. Choosing is up to you.
@@ -211,7 +261,7 @@ export function MessagesPanel({ compact = false, initialConversationId = null, i
         </div>
       ) : (
         <div className="dm-banner">
-          Price agreed ({money(active.agreed_total)}). Waiting for the brand to decide whether to select you.
+          Price agreed ({agreedBreakdown()}). Waiting for the brand to decide whether to select you.
         </div>
       );
     }
@@ -242,41 +292,15 @@ export function MessagesPanel({ compact = false, initialConversationId = null, i
     return null;
   };
 
-  const renderBudgetStrip = () => {
-    if (!active) return null;
-    const negotiable = active.price_type === 'negotiable';
-    const budget = active.listed_budget;
-    return (
-      <div className="dm-budget">
-        <span>{negotiable ? 'Starting budget' : 'Fixed price'}</span>
-        <strong>
-          {budget != null && budget > 0 ? money(budget) : 'Not set by the brand'}
-        </strong>
-        {negotiable && active.listed_budget_min != null && active.listed_budget_max != null && (
-          <>
-            <span>· Budget range</span>
-            <strong>
-              {money(active.listed_budget_min)} – {money(active.listed_budget_max)}
-            </strong>
-          </>
-        )}
-        {negotiable && (
-          <small>
-            {budget != null && budget > 0
-              ? 'Counter offers are expected within this range. Agree the final price in this chat.'
-              : 'Make an offer to start negotiating.'}
-          </small>
-        )}
-      </div>
-    );
-  };
-
-  // The assistant asked whether the creator will continue within the brand's range.
-  // Guided chat: preset messages instead of a text box until the deal is sealed.
   const renderQuickReplies = () => {
     if (!active || active.is_closed || active.free_chat !== false) return null;
     const options = active.quick_replies ?? [];
-    if (!options.length) return null;
+    if (!options.length) {
+      // Creator has used every option and is waiting on the brand / on the price box.
+      const waiting =
+        !isBrand && !active.range_prompt_open && !(active.price_type === 'negotiable' && active.negotiation_started);
+      return waiting ? <p className="dm-hint">Waiting for the brand to reply.</p> : null;
+    }
     return (
       <div className="dm-quick">
         {options.map((q) => (
@@ -320,17 +344,19 @@ export function MessagesPanel({ compact = false, initialConversationId = null, i
             value={rangeAmount}
             onChange={(e) => setRangeAmount(e.target.value)}
           />
-          <button className="dm-btn dm-btn-primary" type="submit" disabled={busy}>
-            Yes, continue
-          </button>
-          <button
-            className="dm-btn dm-btn-ghost"
-            type="button"
-            disabled={busy}
-            onClick={() => void run(() => respondToRange(active.id, false))}
-          >
-            No thanks
-          </button>
+          <div className="dm-range-actions">
+            <button className="dm-btn dm-btn-primary" type="submit" disabled={busy}>
+              Yes, continue
+            </button>
+            <button
+              className="dm-btn dm-btn-ghost"
+              type="button"
+              disabled={busy}
+              onClick={() => void run(() => respondToRange(active.id, false))}
+            >
+              No thanks
+            </button>
+          </div>
         </form>
       </div>
     );
@@ -338,6 +364,8 @@ export function MessagesPanel({ compact = false, initialConversationId = null, i
 
   const renderOfferBar = () => {
     if (!active || active.price_type !== 'negotiable' || active.is_closed || active.negotiation_status !== 'open' || active.range_prompt_open) return null;
+    // Typed prices open only after "Negotiate price" / "Start negotiation" was chosen.
+    if (!active.negotiation_started) return null;
     const offer = active.pending_offer;
     return (
       <div className="dm-offerbar">
@@ -388,37 +416,135 @@ export function MessagesPanel({ compact = false, initialConversationId = null, i
     );
   };
 
+  // "NPR 21,500 per month × 3 months = NPR 64,500" when the agreed rate is monthly, else just the total.
+  const agreedBreakdown = () => {
+    if (!active || active.agreed_total == null) return '';
+    const rate = active.agreed_amount;
+    const total = active.agreed_total;
+    if (rate != null && rate > 0 && Math.abs(total - rate) > 0.01) {
+      const months = Math.round(total / rate);
+      if (months > 1) return `${money(rate)} per month × ${months} months = ${money(total)}`;
+    }
+    return money(total);
+  };
+
+  // Every line (hi, a typed price, an automatic reply) is an ordinary chat bubble.
+  // "Offered NPR 34,000.00" is shown the way a person would say it.
+  const offerText = (body: string) => `My offer: ${body.replace(/^Offered\s+/, '').replace(/\.00$/, '')}`;
+
   const renderMessage = (m: ChatMessage) => {
     if (m.kind === 'system') return <div key={m.id} className="dm-system">{m.body}</div>;
-    if (m.kind === 'auto')
-      return (
-        <div key={m.id} className={`dm-row ${m.mine ? 'mine' : 'theirs'}`}>
-          <div className="dm-bubble">
-            <small className="dm-auto-label">Automatic greeting</small>
-            {m.body}
-          </div>
-        </div>
-      );
-    if (m.kind === 'assistant')
-      return (
-        <div key={m.id} className="dm-row theirs">
-          <div className="dm-bubble dm-assistant">
-            <small>CreatorHub Assistant</small>
-            {m.body}
-          </div>
-        </div>
-      );
-    if (m.kind === 'offer')
-      return (
-        <div key={m.id} className={`dm-offer-card ${m.mine ? 'mine' : ''}`}>
-          <small>Price offer</small>
-          <strong>{m.body.replace('Offered ', '')}</strong>
-        </div>
-      );
+    // Automatic lines are stored as sent by the brand, so the server already puts them
+    // on the brand's side for both parties (right for the brand, left for the creator).
+    const mine = m.mine;
+    const text = m.kind === 'offer' ? offerText(m.body) : m.body;
     return (
-      <div key={m.id} className={`dm-row ${m.mine ? 'mine' : 'theirs'}`}>
-        <div className="dm-bubble">{m.body}</div>
+      <div key={m.id} className={`dm-row ${mine ? 'mine' : 'theirs'}`}>
+        <div className="dm-bubble">{text}</div>
       </div>
+    );
+  };
+
+  // ---------- list: campaigns, filters, sorting ----------
+  const listRole = list[0]?.my_role;
+  // Two different campaigns can share a title (copies). When that happens, the campaign id is shown
+  // as well so they can never be mistaken for each other.
+  const ambiguousTitles = useMemo(() => {
+    const ids = new Map<string, Set<number>>();
+    list.forEach((c) => ids.set(c.campaign_title, (ids.get(c.campaign_title) ?? new Set()).add(c.campaign_id)));
+    return new Set([...ids].filter(([, v]) => v.size > 1).map(([k]) => k));
+  }, [list]);
+  const campaignSub = (c: Conversation) =>
+    `${c.price_type === 'fixed' ? 'Fixed price' : 'Negotiable'}${ambiguousTitles.has(c.campaign_title) ? ` · #${c.campaign_id}` : ''}`;
+
+  // Search narrows the list; tab counts are taken from that narrowed set.
+  const scoped = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    return list.filter((c) => {
+      if (!q) return true;
+      return [c.counterpart.name, c.campaign_title, c.last_message?.body ?? '']
+        .some((t) => t.toLowerCase().includes(q));
+    });
+  }, [list, query]);
+  const unreadCount = scoped.filter((c) => c.unread_count > 0).length;
+
+  // Needs-action first, then unread, then most recent.
+  const visible = useMemo(() => {
+    const rows = scoped.filter((c) => (tab === 'unread' ? c.unread_count > 0 : true));
+    return rows.sort(
+      (a, b) =>
+        Number(needsMyAction(b)) - Number(needsMyAction(a)) ||
+        Number(b.unread_count > 0) - Number(a.unread_count > 0) ||
+        lastActivity(b) - lastActivity(a),
+    );
+  }, [scoped, tab]);
+  const filtering = query.trim() !== '' || tab !== 'all';
+  const clearFilters = () => {
+    setQuery('');
+    setTab('all');
+  };
+
+  // A brand sees its inbox grouped by campaign (one header per campaign, creators underneath), so the same
+  // creator in two campaigns can never be mistaken for one chat. A creator has one chat per brand/campaign,
+  // so their list stays flat and each row carries the full campaign title.
+  const grouped = listRole === 'business';
+  const groups = useMemo(() => {
+    const map = new Map<number, { id: number; title: string; sample: Conversation; items: Conversation[] }>();
+    visible.forEach((c) => {
+      const g = map.get(c.campaign_id) ?? { id: c.campaign_id, title: c.campaign_title, sample: c, items: [] };
+      g.items.push(c);
+      map.set(c.campaign_id, g);
+    });
+    return [...map.values()]
+      .map((g) => ({
+        ...g,
+        action: g.items.filter(needsMyAction).length,
+        unread: g.items.filter((c) => c.unread_count > 0).length,
+        latest: Math.max(...g.items.map(lastActivity)),
+      }))
+      .sort(
+        (a, b) =>
+          Number(b.action > 0) - Number(a.action > 0) ||
+          Number(b.unread > 0) - Number(a.unread > 0) ||
+          b.latest - a.latest,
+      );
+  }, [visible]);
+
+  const toggleGroup = (id: number) =>
+    setCollapsed((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+
+  const renderRow = (c: Conversation, showCampaign: boolean) => {
+    const pill = statusOf(c);
+    return (
+      <button
+        key={c.id}
+        className={`dm-item ${c.id === activeId ? 'active' : ''} ${needsMyAction(c) ? 'action' : ''}`}
+        onClick={() => setActiveId(c.id)}
+      >
+        <Avatar name={c.counterpart.name} src={c.counterpart.avatar} />
+        <span className="dm-item-text">
+          <span className="dm-item-top">
+            <strong className={c.unread_count ? 'unread' : ''}>{c.counterpart.name}</strong>
+            {pill && <em className={`dm-pill ${pill.tone}`}>{pill.label}</em>}
+            <small className="dm-time">{timeAgo(c.last_message?.created_at || c.updated_at)}</small>
+          </span>
+          {showCampaign && (
+            <>
+              <span className="dm-item-campaign-name" title={c.campaign_title}>{c.campaign_title}</span>
+              <span className="dm-sub">{campaignSub(c)}</span>
+            </>
+          )}
+          <span className="dm-item-preview">
+            <small>{c.last_message ? c.last_message.body : 'No messages yet'}</small>
+            {c.unread_count > 0 && <b className="dm-badge">{c.unread_count > 9 ? '9+' : c.unread_count}</b>}
+          </span>
+        </span>
+      </button>
     );
   };
 
@@ -426,28 +552,99 @@ export function MessagesPanel({ compact = false, initialConversationId = null, i
     <div className={`dm-shell ${compact ? 'dm-compact' : ''} ${showThread ? 'dm-thread-open' : ''}`}>
       {/* ---------- conversation list ---------- */}
       <aside className="dm-list">
-        <header className="dm-list-head">Messages</header>
-        {loadingList && <p className="dm-empty">Loading...</p>}
-        {!loadingList && list.length === 0 && (
-          <p className="dm-empty">
-            No conversations yet. Open an application and choose Message to start one.
-          </p>
+        <header className="dm-list-head">
+          {showTitle && <span className="dm-list-title">Messages</span>}
+          {list.length > 0 && (
+            <div className="dm-tools">
+              {!headerSearch && (
+              <label className="dm-search">
+                <Search size={15} />
+                <input
+                  type="search"
+                  value={query}
+                  onChange={(e) => setQuery(e.target.value)}
+                  placeholder={listRole === 'business' ? 'Search creator or campaign' : 'Search brand or campaign'}
+                />
+              </label>
+              )}
+              <div className="dm-tabs" role="tablist">
+                {([
+                  ['all', `All (${scoped.length})`],
+                  ['unread', `Unread (${unreadCount})`],
+                ] as [Tab, string][]).map(([key, label]) => (
+                  <button
+                    key={key}
+                    type="button"
+                    role="tab"
+                    aria-selected={tab === key}
+                    className={`dm-tab ${tab === key ? 'on' : ''}`}
+                    onClick={() => setTab(key)}
+                  >
+                    {label}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+        </header>
+
+        <div className="dm-items">
+          {loadingList && <p className="dm-empty">Loading...</p>}
+          {!loadingList && list.length === 0 && (
+            <p className="dm-empty">
+              No conversations yet. Open an application and choose Message to start one.
+            </p>
+          )}
+          {!loadingList && list.length > 0 && visible.length === 0 && (
+            <p className="dm-empty">
+              Nothing matches these filters.
+              {filtering && (
+                <>
+                  {' '}
+                  <button type="button" className="dm-link" onClick={clearFilters}>Clear filters</button>
+                </>
+              )}
+            </p>
+          )}
+          {!grouped && visible.map((c) => renderRow(c, true))}
+          {grouped &&
+            groups.map((g) => {
+              // While searching or filtering, every match stays visible, and so does the group you're reading.
+              const open = filtering || !collapsed.has(g.id) || g.items.some((c) => c.id === activeId);
+              return (
+                <section key={g.id} className="dm-group">
+                  <button
+                    type="button"
+                    className="dm-group-head"
+                    aria-expanded={open}
+                    onClick={() => toggleGroup(g.id)}
+                    title={g.title}
+                  >
+                    {open ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
+                    <span className="dm-group-text">
+                      <span className="dm-group-title">{g.title}</span>
+                      <span className="dm-sub">{campaignSub(g.sample)}</span>
+                    </span>
+                    <span className="dm-group-meta">
+                      {g.action > 0 && <em className="dm-pill warn">{g.action} to act on</em>}
+                      {g.unread > 0 && <b className="dm-badge">{g.unread}</b>}
+                      <small>{g.items.length}</small>
+                    </span>
+                  </button>
+                  {open && g.items.map((c) => renderRow(c, false))}
+                </section>
+              );
+            })}
+        </div>
+
+        {compact && onNavigate && (
+          <footer className="dm-list-foot">
+            <button type="button" className="dm-open-inbox" onClick={onNavigate}>
+              Open full inbox
+              <ChevronRight size={15} />
+            </button>
+          </footer>
         )}
-        {list.map((c) => (
-          <button key={c.id} className={`dm-item ${c.id === activeId ? 'active' : ''}`} onClick={() => setActiveId(c.id)}>
-            <Avatar name={c.counterpart.name} src={c.counterpart.avatar} />
-            <span className="dm-item-text">
-              <strong className={c.unread_count ? 'unread' : ''}>{c.counterpart.name}</strong>
-              <small>
-                {c.campaign_title} · {c.last_message ? c.last_message.body : 'No messages yet'}
-              </small>
-            </span>
-            <span className="dm-item-meta">
-              <small>{timeAgo(c.updated_at)}</small>
-              {c.unread_count > 0 && <i className="dm-dot" />}
-            </span>
-          </button>
-        ))}
       </aside>
 
       {/* ---------- thread ---------- */}
@@ -474,12 +671,15 @@ export function MessagesPanel({ compact = false, initialConversationId = null, i
               </div>
             </header>
 
-            {renderBudgetStrip()}
-
+            
             {renderBanner()}
 
             <div className="dm-messages">
-              {messages.length === 0 && <p className="dm-empty">Say hello to start the conversation.</p>}
+              {messages.length === 0 && (
+                <p className="dm-empty">
+                  {isBrand ? 'No messages yet.' : 'Tap "Say hi" below to start the conversation.'}
+                </p>
+              )}
               {messages.map(renderMessage)}
               <div ref={endRef} />
             </div>
@@ -503,7 +703,7 @@ export function MessagesPanel({ compact = false, initialConversationId = null, i
                 disabled={!active.can_send || busy || !!active.range_prompt_open}
                 placeholder={
                   active.range_prompt_open
-                    ? 'Please answer the assistant above'
+                    ? 'Please answer the question above'
                     : active.can_send
                     ? 'Message...'
                     : active.is_closed

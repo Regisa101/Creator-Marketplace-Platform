@@ -77,6 +77,13 @@ def _open(client, ids, headers, who="creator"):
     return r.json()
 
 
+def _start_negotiation(client, cid, headers):
+    """The creator's script: say hi, then choose "Negotiate price"."""
+    url = f"/api/conversations/{cid}/quick-reply"
+    assert client.post(url, json={"key": "hi"}, headers=headers["creator"]).status_code == 200
+    assert client.post(url, json={"key": "negotiate"}, headers=headers["creator"]).status_code == 200
+
+
 def _send(client, cid, headers, who, text="hello"):
     return client.post(f"/api/conversations/{cid}/messages", json={"body": text}, headers=headers[who])
 
@@ -105,9 +112,10 @@ def test_quick_replies_work_and_first_hi_triggers_brand_greeting(client):
     assert "How can I help you" in greeting["body"]
 
     # a second creator message does not greet again
-    client.post(f"/api/conversations/{conv['id']}/quick-reply", json={"key": "details"}, headers=h["creator"])
+    client.post(f"/api/conversations/{conv['id']}/quick-reply", json={"key": "deliverables"}, headers=h["creator"])
     thread = client.get(f"/api/conversations/{conv['id']}", headers=h["brand"]).json()["messages"]
-    assert [x["kind"] for x in thread].count("auto") == 1
+    # ...the greeting is not repeated (the deliverables answer is a different auto-reply)
+    assert sum("How can I help you" in x["body"] for x in thread) == 1
 
 
 def test_brand_greeting_is_not_duplicated_if_brand_spoke_first(client):
@@ -176,6 +184,7 @@ def test_fixed_campaign_rejects_offers(client):
 # ---------- 5-7: negotiable agreement, selection, non-selection ----------
 def _agree(client, ids, h, amount=8000):
     conv = _open(client, ids, h)
+    _start_negotiation(client, conv["id"], h)
     o = client.post(f"/api/conversations/{conv['id']}/offers", json={"amount": amount}, headers=h["creator"])
     assert o.status_code == 200
     offer_id = o.json()["pending_offer"]["id"]
@@ -223,7 +232,6 @@ def test_select_creator_enables_collaboration_chat(client):
 def test_not_select_closes_chat_but_preserves_history(client):
     ids, h = _setup("negotiable")
     cid, _ = _agree(client, ids, h)
-    client.post(f"/api/conversations/{cid}/quick-reply", json={"key": "hi"}, headers=h["creator"])
     r = client.post(f"/api/conversations/{cid}/not-select", headers=h["brand"])
     assert r.status_code == 200
     assert r.json()["is_closed"] is True
@@ -319,6 +327,7 @@ def test_agreed_deal_visible_in_applications_and_brand_chooses_between_creators(
     cid1, _ = _agree(client, ids, h, 8000)
     # creator 2 simply accepts the brand's listed price
     c2 = client.post(f"/api/conversations/by-application/{app2_id}", headers=h2).json()
+    _start_negotiation(client, c2["id"], {"creator": h2})
     r = client.post(f"/api/conversations/{c2['id']}/accept-listed-price", headers=h2)
     assert r.status_code == 200 and r.json()["agreed_total"] == 10000
     # the brand-only action is refused for the brand

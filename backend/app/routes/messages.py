@@ -106,7 +106,8 @@ def _message_out(msg: Message, viewer: User) -> dict:
         "kind": msg.kind,
         "body": msg.body,
         "sender_id": msg.sender_id,
-        "mine": msg.sender_id == viewer.id,
+        "mine": msg.sender_id == viewer.id
+        or (msg.kind == m.KIND_ASSISTANT and msg.sender_id is None and viewer.role == "business"),
         "offer_id": msg.offer_id,
         "created_at": msg.created_at.isoformat() if msg.created_at else None,
     }
@@ -139,9 +140,7 @@ def _conv_out(db: Session, conv: Conversation, application: Application, campaig
     decision = m.evaluate_send(db, conv, application, viewer)
     closed = m.is_closed(conv, application)
     other = conv.business if viewer.id == conv.creator_id else conv.creator
-    last = (
-        db.query(Message).filter(Message.conversation_id == conv.id).order_by(Message.id.desc()).first()
-    )
+    last = db.query(Message).filter(Message.conversation_id == conv.id).order_by(Message.id.desc()).first()
     pending_offer = (
         db.query(PriceOffer)
         .filter(PriceOffer.conversation_id == conv.id, PriceOffer.status == "pending")
@@ -179,8 +178,9 @@ def _conv_out(db: Session, conv: Conversation, application: Application, campaig
         "pending_offer": _offer_out(pending_offer) if pending_offer else None,
         "unread_count": _unread(db, conv, viewer),
         "free_chat": m.is_free_chat(conv, application),
+        "negotiation_started": m.negotiation_started(db, conv),
         "quick_replies": (
-            m.quick_replies_for("creator" if viewer.id == conv.creator_id else "brand", conv.price_type)
+            m.quick_replies_for(db, conv, "creator" if viewer.id == conv.creator_id else "brand")
             if not closed
             and not (getattr(viewer, "is_restricted", False) and viewer.role != "admin")
             and not (
@@ -208,37 +208,8 @@ def _conv_out(db: Session, conv: Conversation, application: Application, campaig
 
 
 
-def _record_agreement(db: Session, conv: Conversation, application: Application, campaign: Campaign, actor: User, offer: PriceOffer) -> None:
-    """Common tail of 'a price was agreed'. Does NOT select the creator, sign
-    or activate anything; the brand still has to choose."""
-    conv.negotiation_status = m.NEG_PRICE_AGREED
-    conv.agreed_amount = offer.amount
-    # Prefills the contract draft later.
-    application.rate = offer.amount
-
-    totals = m.agreed_totals(conv, campaign)
-    m.add_system_message(
-        db, conv,
-        f"Price agreed: NPR {totals['agreed_total']:,.2f} creator compensation. "
-        "Waiting for the brand to decide whether to select this creator.",
-    )
-    m.log_event(db, conv, actor.id, "price_agreed", {"offer_id": offer.id, "amount": float(offer.amount)})
-
-    create_notification(
-        db, user_id=conv.business_id, type="price_agreed", title="Price agreed - choose your creator",
-        message=(
-            f"{_display_name(conv.creator)} and you agreed on NPR {totals['agreed_total']:,.2f} for "
-            f"{campaign.title}. Select the creator or decide not to."
-        ),
-        link=f"/applications?campaign={campaign.id}", reference_id=conv.id, event_key=f"price-agreed:{conv.id}:{offer.id}",
-    )
-    if actor.id == conv.business_id:
-        create_notification(
-            db, user_id=conv.creator_id, type="price_agreed", title="Price agreed",
-            message=f"The brand accepted NPR {totals['agreed_total']:,.2f} for {campaign.title}. "
-                    "They will decide whether to select you.",
-            link=f"/messages?c={conv.id}", reference_id=conv.id, event_key=f"price-agreed-creator:{conv.id}:{offer.id}",
-        )
+# Shared with the automatic negotiator (services/messaging.py).
+_record_agreement = m.record_agreement
 
 
 def negotiation_summary(db: Session, application: Application) -> Optional[dict]:
@@ -296,17 +267,21 @@ async def unread_count(db: Session = Depends(get_db), user: User = Depends(get_c
     if user.role not in ("creator", "business"):
         return {"count": 0}
     column = Conversation.creator_id if user.role == "creator" else Conversation.business_id
-    count = (
+    query = (
         db.query(func.count(Message.id))
         .join(Conversation, Conversation.id == Message.conversation_id)
+        .join(Application, Application.id == Conversation.application_id)
         .filter(
             column == user.id,
             Message.is_read.is_(False),
             Message.kind != m.KIND_SYSTEM,
             Message.sender_id != user.id,
         )
-        .scalar()
     )
+    if user.role == "business":
+        # Applications still on hold for the range question are invisible to the brand.
+        query = query.filter(Application.status.notin_((m.STATUS_RANGE_REVIEW, m.STATUS_RANGE_DECLINED)))
+    count = query.scalar()
     return {"count": int(count or 0)}
 
 
@@ -372,7 +347,7 @@ async def send_message(
         raise HTTPException(status_code=422, detail="Message cannot be empty.")
 
     if user.id == conv.creator_id and conv.price_type == "negotiable" and _range_prompt_open(db, conv, application):
-        raise HTTPException(status_code=403, detail="Please answer the assistant's question about the budget range first.")
+        raise HTTPException(status_code=403, detail="Please answer the question about the budget range first.")
 
     decision = m.evaluate_send(db, conv, application, user)
     if not decision.allowed:
@@ -431,30 +406,31 @@ async def send_quick_reply(
     if getattr(user, "is_restricted", False) and user.role != "admin":
         raise HTTPException(status_code=403, detail="Your account is restricted.")
     if role == "creator" and conv.price_type == "negotiable" and _range_prompt_open(db, conv, application):
-        raise HTTPException(status_code=403, detail="Please answer the assistant's question about the budget range first.")
+        raise HTTPException(status_code=403, detail="Please answer the question about the budget range first.")
 
+    # Server-side script: unknown keys, wrong stage (inquiring before saying
+    # hi), repeats and out-of-turn "negotiate" are all refused here.
+    error = m.quick_reply_error(db, conv, role, data.key)
     text = m.quick_reply_text(role, data.key, conv.price_type, campaign)
-    if text is None:
-        raise HTTPException(status_code=400, detail="That quick reply is not available.")
+    if error or text is None:
+        raise HTTPException(status_code=400, detail=error or "That quick reply is not available.")
 
-    first_creator_message = (
-        role == "creator"
-        and db.query(Message.id)
-        .filter(
-            Message.conversation_id == conv.id,
-            Message.sender_id == conv.creator_id,
-            Message.kind.in_((m.KIND_QUICK, m.KIND_USER)),
-        )
-        .first()
-        is None
-    )
+    first_creator_message = role == "creator" and not m.creator_has_spoken(db, conv)
 
     msg = Message(conversation_id=conv.id, sender_id=user.id, kind=m.KIND_QUICK, body=text, is_read=False)
     db.add(msg)
     db.flush()
+    m.log_event(db, conv, user.id, m.EVENT_QUICK_REPLY, {"key": data.key, "role": role})
+
+    if data.key == "negotiate":
+        # Opens the typed-price box for both sides.
+        m.log_event(db, conv, user.id, m.EVENT_NEGOTIATION_STARTED, {"by": role})
+
+    if role == "creator":
+        # The brand side answers automatically from the campaign's own data.
+        m.auto_reply_for(db, conv, campaign, data.key)
 
     if first_creator_message:
-        m.maybe_send_auto_greeting(db, conv, campaign)
         create_notification(
             db,
             user_id=conv.business_id,
@@ -484,6 +460,16 @@ def _require_negotiating(conv: Conversation, application: Application) -> None:
         raise HTTPException(status_code=400, detail="The price has already been agreed.")
 
 
+def _require_negotiation_started(db: Session, conv: Conversation) -> None:
+    """Price offers (typed amounts) only open once someone chose
+    "Negotiate price" / "Start negotiation"."""
+    if not m.negotiation_started(db, conv):
+        raise HTTPException(
+            status_code=403,
+            detail="Start the negotiation first: choose \"Negotiate price\" from the quick replies.",
+        )
+
+
 @router.post("/{conversation_id}/offers")
 async def make_offer(
     conversation_id: int,
@@ -493,6 +479,7 @@ async def make_offer(
 ):
     conv, application, campaign = _load(db, conversation_id, user, lock=True)
     _require_negotiating(conv, application)
+    _require_negotiation_started(db, conv)
     if getattr(user, "is_restricted", False) and user.role != "admin":
         raise HTTPException(status_code=403, detail="Your account is restricted.")
     amount = Decimal(str(data.amount)).quantize(Decimal("0.01"))
@@ -501,11 +488,12 @@ async def make_offer(
 
     if user.id == conv.creator_id:
         if _range_prompt_open(db, conv, application):
-            raise HTTPException(status_code=403, detail="Please answer the assistant's question about the budget range first.")
+            raise HTTPException(status_code=403, detail="Please answer the question about the budget range first.")
         rng = m.budget_range(campaign)
         if rng and m.outside_range(float(amount), rng):
             # Do not forward an out-of-range offer to the brand. The assistant
             # states the brand's range and waits for the creator's answer.
+            m.add_held_message(db, conv, user.id, m.price_line(float(amount)))
             m.add_assistant_message(db, conv, m.range_prompt_text(float(amount), rng))
             m.log_event(db, conv, user.id, "range_prompt", {"amount": float(amount), "min": rng[0], "max": rng[1]})
             db.commit()
@@ -524,6 +512,8 @@ async def make_offer(
         body=f"Offered NPR {amount:,.2f}", is_read=False,
     ))
     m.log_event(db, conv, user.id, "offer_made", {"offer_id": offer.id, "amount": float(amount)})
+    if user.id == conv.creator_id:
+        m.auto_negotiate(db, conv, application, campaign, offer)  # the brand side answers by itself
     db.commit()
     db.refresh(conv)
     return _conv_out(db, conv, application, campaign, user)
@@ -558,6 +548,8 @@ async def respond_to_range(
     held = (application.status or "").lower() == m.STATUS_RANGE_REVIEW
 
     if not data.agree:
+        # The creator's answer shows up as their own message, then the brand's reply.
+        m.add_held_message(db, conv, user.id, m.RANGE_DECLINE_TEXT)
         m.add_assistant_message(db, conv, m.RANGE_SORRY_TEXT)
         m.log_event(db, conv, user.id, "range_resolved", {"agree": False})
         if held:
@@ -576,13 +568,22 @@ async def respond_to_range(
         )
     amount = Decimal(str(data.amount)).quantize(Decimal("0.01"))
 
+    if not held:
+        _require_negotiating(conv, application)
+        for old in db.query(PriceOffer).filter(PriceOffer.conversation_id == conv.id, PriceOffer.status == "pending").all():
+            old.status = "superseded"
+            old.responded_at = m.now()
+
+    # The in-range price is sent as a normal offer message (same bubble as any other).
+    offer = m.add_creator_offer(db, conv, user.id, float(amount), via="range_response")
+
     if held:
         application.rate = amount
         application.status = "pending"
         m.add_assistant_message(
             db, conv,
-            f"Thank you! You'll continue at NPR {amount:,.2f}, within the brand's range. "
-            "Your application has now been sent to the brand.",
+            f"Thank you! We'll continue at {m.money_text(float(amount))}, which is within our budget range. "
+            "Your application has now been received.",
         )
         m.log_event(db, conv, user.id, "range_resolved", {"agree": True, "amount": float(amount)})
         create_notification(
@@ -596,22 +597,11 @@ async def respond_to_range(
             event_key=f"application-created:{application.id}",
         )
     else:
-        _require_negotiating(conv, application)
-        for old in db.query(PriceOffer).filter(PriceOffer.conversation_id == conv.id, PriceOffer.status == "pending").all():
-            old.status = "superseded"
-            old.responded_at = m.now()
-        offer = PriceOffer(conversation_id=conv.id, proposer_id=user.id, amount=amount, status="pending")
-        db.add(offer)
-        db.flush()
-        db.add(Message(
-            conversation_id=conv.id, sender_id=user.id, kind=m.KIND_OFFER, offer_id=offer.id,
-            body=f"Offered NPR {amount:,.2f}", is_read=False,
-        ))
         m.add_assistant_message(
-            db, conv, f"Thank you! Your offer of NPR {amount:,.2f} is within the brand's range and has been sent.",
+            db, conv, f"Thank you! Your offer of {m.money_text(float(amount))} is within our budget range.",
         )
-        m.log_event(db, conv, user.id, "offer_made", {"offer_id": offer.id, "amount": float(amount)})
         m.log_event(db, conv, user.id, "range_resolved", {"agree": True, "amount": float(amount)})
+    m.auto_negotiate(db, conv, application, campaign, offer)
     db.commit()
     db.refresh(conv)
     return _conv_out(db, conv, application, campaign, user)
@@ -649,6 +639,7 @@ async def accept_listed_price(
     if user.id != conv.creator_id:
         raise HTTPException(status_code=403, detail="Only the creator can accept the listed price.")
     _require_negotiating(conv, application)
+    _require_negotiation_started(db, conv)
     if campaign.budget is None or float(campaign.budget) <= 0:
         raise HTTPException(status_code=400, detail="This campaign has no listed starting budget.")
     if getattr(user, "is_restricted", False):

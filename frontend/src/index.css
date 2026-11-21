@@ -9,6 +9,12 @@ body {
   overflow-x: hidden;
 }
 
+/* Always reserve the scrollbar's space, so pages that scroll and pages that don't have the same
+   width. Without this the header search box and icons jump sideways when you navigate. */
+html {
+  scrollbar-gutter: stable;
+}
+
 html,
 body,
 #root {

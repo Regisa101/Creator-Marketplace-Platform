@@ -1,4 +1,5 @@
-import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom';
+import { useEffect } from 'react';
+import { BrowserRouter, Navigate, Route, Routes, useLocation } from 'react-router-dom';
 import { AuthProvider, useAuth } from './context/AuthContext';
 
 import { Login } from './pages/auth/Login';
@@ -150,12 +151,35 @@ function AnalyticsRouter() {
 
 
 /* ============================================================
+   SCROLL TO TOP
+============================================================ */
+
+/**
+ * React Router keeps the previous page's scroll position, so opening
+ * /campaigns from the bottom of the landing page used to land at the bottom.
+ * Scroll to the top whenever the PATH changes. Query-string changes (filters,
+ * ?suggested=true) and #hash links are left alone so they don't jump.
+ */
+function ScrollToTop() {
+  const { pathname, hash } = useLocation();
+
+  useEffect(() => {
+    if (hash) return;
+    window.scrollTo(0, 0);
+  }, [pathname, hash]);
+
+  return null;
+}
+
+
+/* ============================================================
    APP
 ============================================================ */
 
 export default function App() {
   return (
     <BrowserRouter>
+      <ScrollToTop />
       <AuthProvider>
 
         <Routes>

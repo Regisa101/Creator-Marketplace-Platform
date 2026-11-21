@@ -183,17 +183,16 @@ async def create_application(
         # "Budget range" and "Negotiable" campaigns correctly leave this None.
         proposed_rate = resolve_campaign_rate(campaign)
 
+    price_type = derive_price_type(getattr(campaign, "price_type", None), campaign.compensation_type)
+    typed_rate = round(float(data.rate), 2) if data.rate is not None and float(data.rate) > 0 else None
+
     # Negotiable campaigns with a budget range: a price outside the range is
     # held back from the brand until the creator answers the assistant.
     needs_range_review = False
-    if (
-        data.rate is not None
-        and float(data.rate) > 0
-        and derive_price_type(getattr(campaign, "price_type", None), campaign.compensation_type) == "negotiable"
-    ):
+    if typed_rate is not None and price_type == "negotiable":
         from app.services import messaging as msg_service
         rng = msg_service.budget_range(campaign)
-        if rng and msg_service.outside_range(float(data.rate), rng):
+        if rng and msg_service.outside_range(typed_rate, rng):
             needs_range_review = True
 
     application = Application(
@@ -213,17 +212,13 @@ async def create_application(
     db.commit()
     db.refresh(application)
 
+    # The chat exists from the moment of applying, so the creator can say hi
+    # straight away, and the price proposed on the form shows up in it.
+    from app.services import messaging as msg_service
+    conv = msg_service.get_or_create_conversation(db, application, campaign)
+    msg_service.seed_application_chat(db, conv, application, campaign, current_user.id, typed_rate)
+
     if needs_range_review:
-        from app.services import messaging as msg_service
-        conv = msg_service.get_or_create_conversation(db, application, campaign)
-        rng = msg_service.budget_range(campaign)
-        msg_service.add_assistant_message(
-            db, conv, msg_service.range_prompt_text(float(application.rate), rng)
-        )
-        msg_service.log_event(
-            db, conv, current_user.id, "range_prompt",
-            {"amount": float(application.rate), "min": rng[0], "max": rng[1]},
-        )
         create_notification(
             db,
             user_id=current_user.id,

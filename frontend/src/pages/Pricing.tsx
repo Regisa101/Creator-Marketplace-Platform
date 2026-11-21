@@ -1,10 +1,11 @@
 // frontend/src/pages/Pricing.tsx
-// CreatorHub public pricing page.
-// Centered layout with large typography and creator CTA in hero.
+// creatorhub public pricing page.
+// Centered hero with badge, green highlight word and two actions,
+// then pricing, features, creators, FAQ, CTA.
 
 import { useEffect } from "react";
 import { Link } from "react-router-dom";
-import { ArrowRight, Check } from "lucide-react";
+import { ArrowRight } from "lucide-react";
 import { LogoMark } from "../components/Logo";
 import { PublicNavbar } from "../components/PublicNavbar";
 
@@ -37,9 +38,9 @@ const PRICING_FEATURES = [
 
 const FAQS = [
   {
-    question: "What is the CreatorHub platform fee?",
+    question: "What is the creatorhub platform fee?",
     answer:
-      "CreatorHub charges a 10% platform fee for brands when they hire a creator.",
+      "creatorhub charges a 10% platform fee for brands when they hire a creator.",
   },
   {
     question: "When is the fee charged?",
@@ -49,10 +50,10 @@ const FAQS = [
   {
     question: "Do creators pay to join?",
     answer:
-      "Creators can join CreatorHub and apply for campaigns for free.",
+      "Creators can join creatorhub and apply for campaigns for free.",
   },
   {
-    question: "What do brands get on CreatorHub?",
+    question: "What do brands get on creatorhub?",
     answer:
       "Brands can create campaigns, discover creators, review applications, manage collaborations, track progress, and make payments through the platform.",
   },
@@ -72,28 +73,53 @@ export function Pricing() {
             HERO
         ========================================================== */}
         <section className="pricing-hero">
+          {/* faint decorative curves */}
+          <svg
+            className="pricing-hero-curves"
+            viewBox="0 0 1440 460"
+            preserveAspectRatio="none"
+            fill="none"
+            aria-hidden="true"
+          >
+            <path
+              d="M-40 140 C 120 120, 260 200, 330 460"
+              stroke="#ececec"
+              strokeWidth="1.5"
+            />
+            <path
+              d="M1480 120 C 1330 150, 1230 260, 1160 470"
+              stroke="#ececec"
+              strokeWidth="1.5"
+            />
+          </svg>
+
           <div className="pricing-container">
             <div className="pricing-hero-inner">
+              <span className="pricing-badge">
+                <span className="pricing-badge-dot" />
+                Simple &amp; Transparent Pricing
+              </span>
+
               <h1>
-                Simple pricing for
+                We grow when your
                 <br />
-                real collaborations.
+                <span className="pricing-hero-accent">collaborations</span>{" "}
+                grow.
               </h1>
 
               <p className="pricing-hero-copy">
-                A straightforward platform fee for brands, with creators free
-                to join and apply for campaigns.
+                No subscription plans. No complicated packages. creatorhub
+                earns through a 10% commission on successful collaborations.
               </p>
 
-              <div className="pricing-hero-work">
-                <span>Looking to work?</span>
+              <div className="pricing-hero-actions">
+                <a href="#how-pricing" className="pricing-hero-btn">
+                  Explore How It Works
+                  <ArrowRight size={14} />
+                </a>
 
-                <Link
-                  to="/register"
-                  className="pricing-hero-work-link"
-                >
-                  Join as a brand
-                  <ArrowRight size={16} />
+                <Link to="/register" className="pricing-hero-link">
+                  Join as a Creator
                 </Link>
               </div>
             </div>
@@ -105,17 +131,19 @@ export function Pricing() {
         {/* =========================================================
             MAIN PRICING
         ========================================================== */}
-        <section className="pricing-section">
+        <section className="pricing-section" id="how-pricing">
           <div className="pricing-container">
             <div className="pricing-section-head">
               <div>
-                <p className="pricing-eyebrow">FOR BRANDS</p>
+                <div className="pricing-pill-row">
+                  <span className="pricing-pill">FOR BRANDS</span>
+                </div>
 
                 <h2>Pay when you hire.</h2>
               </div>
 
               <p className="pricing-section-intro">
-                One clear platform fee for using CreatorHub to discover,
+                One clear platform fee for using creatorhub to discover,
                 select, and collaborate with creators.
               </p>
             </div>
@@ -149,7 +177,7 @@ export function Pricing() {
                 </div>
 
                 <div className="pricing-example-row pricing-example-total">
-                  <span>Paid to CreatorHub</span>
+                  <span>Paid to creatorhub</span>
                   <strong>NPR 1,000</strong>
                 </div>
               </div>
@@ -166,13 +194,15 @@ export function Pricing() {
           <div className="pricing-container">
             <div className="pricing-section-head">
               <div>
-                <p className="pricing-eyebrow">WHAT YOU GET</p>
+                <div className="pricing-pill-row">
+                  <span className="pricing-pill">WHAT YOU GET</span>
+                </div>
 
                 <h2>Everything you need to collaborate.</h2>
               </div>
 
               <p className="pricing-section-intro">
-                CreatorHub brings the main parts of a creator collaboration
+                creatorhub brings the main parts of a creator collaboration
                 into one place.
               </p>
             </div>
@@ -184,12 +214,10 @@ export function Pricing() {
                     {String(index + 1).padStart(2, "0")}
                   </span>
 
-                  <div>
-                    <div className="pricing-feature-title-row">
-                      <Check size={18} strokeWidth={1.7} />
+                  <span className="pricing-feature-rule" aria-hidden="true" />
 
-                      <h3>{feature.title}</h3>
-                    </div>
+                  <div className="pricing-feature-body">
+                    <h3>{feature.title}</h3>
 
                     <p>{feature.text}</p>
                   </div>
@@ -208,14 +236,16 @@ export function Pricing() {
           <div className="pricing-container">
             <div className="pricing-section-head">
               <div>
-                <p className="pricing-eyebrow">FOR CREATORS</p>
+                <div className="pricing-pill-row">
+                  <span className="pricing-pill">FOR CREATORS</span>
+                </div>
 
                 <h2>Join and apply for free.</h2>
               </div>
 
               <div className="pricing-creator-copy">
                 <p>
-                  Creators can join CreatorHub, discover relevant campaigns,
+                  Creators can join creatorhub, discover relevant campaigns,
                   and apply for opportunities without a platform fee.
                 </p>
 
@@ -237,13 +267,15 @@ export function Pricing() {
           <div className="pricing-container">
             <div className="pricing-section-head">
               <div>
-                <p className="pricing-eyebrow">FAQ</p>
+                <div className="pricing-pill-row">
+                  <span className="pricing-pill">FAQ</span>
+                </div>
 
                 <h2>Pricing, explained.</h2>
               </div>
 
               <p className="pricing-section-intro">
-                A few quick answers about how the CreatorHub pricing model
+                A few quick answers about how the creatorhub pricing model
                 works.
               </p>
             </div>
@@ -371,7 +403,7 @@ export function Pricing() {
           STYLES
       ========================================================== */}
       <style>{`
-        @import url('https://fonts.googleapis.com/css2?family=League+Spartan:wght@300;400;500;600;700;800&family=Poppins:wght@300;400;500;600;700&display=swap');
+        @import url('https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap');
 
         /* =========================================================
            BASE
@@ -385,6 +417,7 @@ export function Pricing() {
           --pricing-ink: #111111;
           --pricing-soft: #6b6b6b;
           --pricing-line: #e5e5e5;
+          --pricing-green: #1b5e3b;
 
           min-height: 100vh;
 
@@ -402,6 +435,7 @@ export function Pricing() {
         .pricing-page,
         .pricing-page * {
           box-sizing: border-box;
+          font-family: 'Poppins', sans-serif;
         }
 
         .pricing-page a {
@@ -437,13 +471,13 @@ export function Pricing() {
 
           color: #444444;
 
-          font-size: 17px;
+          font-size: 15px;
 
           line-height: 1.3;
 
           font-weight: 500;
 
-          letter-spacing: .18em;
+          letter-spacing: .16em;
 
           text-transform: uppercase;
         }
@@ -452,25 +486,22 @@ export function Pricing() {
            GENERAL HEADINGS
         ========================================================== */
 
-        .pricing-hero h1,
         .pricing-section h2,
         .pricing-cta h2 {
           margin: 0;
 
-          font-family: 'League Spartan', sans-serif;
+          font-weight: 500;
 
-          font-weight: 400;
-
-          letter-spacing: -0.035em;
+          letter-spacing: -0.03em;
 
           color: var(--pricing-ink);
         }
 
         .pricing-section h2,
         .pricing-cta h2 {
-          font-size: 52px;
+          font-size: 44px;
 
-          line-height: 1.02;
+          line-height: 1.12;
         }
 
         /* =========================================================
@@ -478,83 +509,176 @@ export function Pricing() {
         ========================================================== */
 
         .pricing-hero {
-          padding: 120px 0 105px;
+          position: relative;
+
+          padding: 96px 0 104px;
+
+          background: #ffffff;
 
           text-align: center;
+
+          overflow: hidden;
+        }
+
+        .pricing-hero-curves {
+          position: absolute;
+
+          inset: 0;
+
+          width: 100%;
+          height: 100%;
+
+          pointer-events: none;
+        }
+
+        .pricing-hero .pricing-container {
+          position: relative;
+
+          z-index: 1;
         }
 
         .pricing-hero-inner {
-          max-width: 1050px;
+          display: flex;
+
+          flex-direction: column;
+
+          align-items: center;
+
+          max-width: 860px;
 
           margin: 0 auto;
         }
 
+        .pricing-badge {
+          display: inline-flex;
+
+          align-items: center;
+
+          gap: 8px;
+
+          padding: 7px 16px;
+
+          margin-bottom: 30px;
+
+          border-radius: 999px;
+
+          background: #f2f2f2;
+
+          color: #333333;
+
+          font-size: 12.5px;
+
+          font-weight: 400;
+        }
+
+        .pricing-badge-dot {
+          width: 6px;
+
+          height: 6px;
+
+          border-radius: 50%;
+
+          background: var(--pricing-green);
+        }
+
         .pricing-hero h1 {
-          font-size: 88px;
+          margin: 0;
 
-          line-height: .98;
+          font-size: 64px;
 
-          letter-spacing: -0.045em;
+          font-weight: 500;
+
+          line-height: 1.12;
+
+          letter-spacing: -0.035em;
+
+          color: var(--pricing-ink);
+        }
+
+        .pricing-hero-accent {
+          color: var(--pricing-green);
         }
 
         .pricing-hero-copy {
-          max-width: 760px;
+          max-width: 560px;
 
-          margin: 28px auto 0;
+          margin: 26px 0 0;
 
-          color: var(--pricing-soft);
+          color: #555555;
 
-          font-size: 18px;
+          font-size: 15.5px;
 
-          line-height: 1.65;
+          line-height: 1.6;
         }
 
-        /* =========================================================
-           LOOKING TO WORK CTA
-        ========================================================== */
-
-        .pricing-hero-work {
+        .pricing-hero-actions {
           display: flex;
 
           align-items: center;
 
           justify-content: center;
 
-          gap: 10px;
+          gap: 26px;
 
-          margin-top: 28px;
+          margin-top: 32px;
 
-          font-size: 16px;
-
-          line-height: 1.5;
+          flex-wrap: wrap;
         }
 
-        .pricing-hero-work > span {
-          color: var(--pricing-soft);
-        }
-
-        .pricing-hero-work-link {
+        .pricing-hero-btn {
           display: inline-flex;
 
           align-items: center;
 
-          gap: 6px;
+          gap: 8px;
 
-          color: var(--pricing-ink);
+          padding: 12px 24px;
+
+          border-radius: 8px;
+
+          background: var(--pricing-green);
+
+          color: #ffffff;
+
+          font-size: 13.5px;
 
           font-weight: 500;
 
           transition:
-            transform .16s ease,
-            opacity .16s ease;
+            background .18s ease,
+            transform .18s ease;
         }
 
-        .pricing-hero-work-link:hover {
+        .pricing-hero-btn:hover {
+          background: #154b30;
+
+          color: #ffffff;
+
+          transform: translateY(-2px);
+        }
+
+        .pricing-hero-link {
+          padding-bottom: 2px;
+
+          border-bottom: 1px solid var(--pricing-ink);
+
           color: var(--pricing-ink);
 
-          transform: translateX(3px);
+          font-size: 13.5px;
+
+          font-weight: 400;
+
+          transition: opacity .16s ease;
+        }
+
+        .pricing-hero-link:hover {
+          color: var(--pricing-ink);
 
           opacity: .7;
+        }
+
+        #how-pricing {
+          scroll-margin-top: 80px;
         }
 
         /* =========================================================
@@ -592,9 +716,54 @@ export function Pricing() {
 
           color: var(--pricing-soft);
 
-          font-size: 20px;
+          font-size: 18px;
 
           line-height: 1.7;
+        }
+
+        /* =========================================================
+           FOR BRANDS PILL
+        ========================================================== */
+
+        .pricing-pill-row {
+          display: flex;
+
+          align-items: center;
+
+          justify-content: center;
+
+          gap: 22px;
+
+          max-width: 620px;
+
+          margin: 0 auto 26px;
+        }
+
+        .pricing-pill-row::before,
+        .pricing-pill-row::after {
+          content: "";
+
+          flex: 1;
+
+          height: 1px;
+
+          background: #e2e2e2;
+        }
+
+        .pricing-pill {
+          padding: 8px 22px;
+
+          border-radius: 999px;
+
+          background: #eaf4ee;
+
+          color: var(--pricing-green);
+
+          font-size: 13px;
+
+          font-weight: 500;
+
+          letter-spacing: .04em;
         }
 
         /* =========================================================
@@ -612,15 +781,30 @@ export function Pricing() {
 
           grid-template-columns:
             minmax(0, 1fr)
-            minmax(400px, .8fr);
+            minmax(0, 1fr);
 
-          border-top: 1px solid var(--pricing-line);
+          gap: 24px;
+        }
 
-          border-bottom: 1px solid var(--pricing-line);
+        .pricing-fee-block,
+        .pricing-example {
+          border: 1px solid #e6e6e6;
+
+          border-radius: 20px;
+
+          background: #ffffff;
         }
 
         .pricing-fee-block {
-          padding: 55px 45px;
+          display: flex;
+
+          flex-direction: column;
+
+          align-items: center;
+
+          justify-content: center;
+
+          padding: 48px 40px;
 
           text-align: center;
         }
@@ -628,43 +812,45 @@ export function Pricing() {
         .pricing-fee span {
           display: block;
 
-          font-family: 'League Spartan', sans-serif;
+          font-size: 84px;
 
-          font-size: 120px;
-
-          line-height: .82;
+          line-height: 1;
 
           font-weight: 300;
 
-          letter-spacing: -.055em;
+          letter-spacing: -.05em;
 
-          color: var(--pricing-ink);
+          color: var(--pricing-green);
         }
 
         .pricing-fee-label {
-          margin: 20px 0 0;
+          margin: 10px 0 0;
 
-          font-family: 'League Spartan', sans-serif;
+          font-size: 22px;
 
-          font-size: 28px;
-
-          line-height: 1.1;
+          line-height: 1.2;
 
           font-weight: 300;
 
-          color: var(--pricing-ink);
+          color: #666666;
         }
 
         .pricing-muted {
-          max-width: 400px;
+          width: 100%;
 
-          margin: 22px auto 0;
+          max-width: 340px;
+
+          margin: 28px auto 0;
+
+          padding-top: 22px;
+
+          border-top: 1px solid #e8e8e8;
 
           color: var(--pricing-soft);
 
-          font-size: 16px;
+          font-size: 15px;
 
-          line-height: 1.7;
+          line-height: 1.6;
         }
 
         /* =========================================================
@@ -672,15 +858,21 @@ export function Pricing() {
         ========================================================== */
 
         .pricing-example {
-          align-self: stretch;
-
-          padding: 42px 45px;
-
-          border-left: 1px solid var(--pricing-line);
+          padding: 36px 36px 30px;
         }
 
         .pricing-example .pricing-eyebrow {
+          margin: 0 0 12px;
+
           text-align: left;
+
+          font-size: 12px;
+
+          font-weight: 400;
+
+          letter-spacing: .32em;
+
+          color: #555555;
         }
 
         .pricing-example-row {
@@ -696,15 +888,15 @@ export function Pricing() {
 
           color: var(--pricing-soft);
 
-          font-size: 16px;
+          font-size: 15px;
 
-          border-bottom: 1px solid #eeeeee;
+          border-bottom: 1px solid #ececec;
         }
 
         .pricing-example-row strong {
           color: var(--pricing-ink);
 
-          font-size: 17px;
+          font-size: 15px;
 
           font-weight: 500;
 
@@ -712,15 +904,29 @@ export function Pricing() {
         }
 
         .pricing-example-total {
+          margin: 10px -14px 0;
+
+          padding: 16px 14px;
+
           border-bottom: 0;
 
-          padding-top: 20px;
+          border-radius: 14px;
+
+          background: #eef6f0;
 
           color: var(--pricing-ink);
         }
 
+        .pricing-example-total span {
+          font-weight: 500;
+        }
+
         .pricing-example-total strong {
-          font-size: 20px;
+          color: var(--pricing-green);
+
+          font-size: 17px;
+
+          font-weight: 600;
         }
 
         /* =========================================================
@@ -737,81 +943,100 @@ export function Pricing() {
           grid-template-columns:
             repeat(3, minmax(0, 1fr));
 
-          border-top: 1px solid var(--pricing-line);
-
-          border-bottom: 1px solid var(--pricing-line);
+          gap: 20px;
         }
 
         .pricing-feature {
           display: grid;
 
           grid-template-columns:
-            40px minmax(0, 1fr);
+            44px 1px minmax(0, 1fr);
 
-          gap: 18px;
+          gap: 20px;
+
+          align-items: stretch;
 
           min-width: 0;
 
-          padding: 36px 36px 38px;
+          padding: 30px 28px;
+
+          border: 1px solid #e6e6e6;
+
+          border-radius: 18px;
+
+          background: #ffffff;
 
           text-align: left;
+
+          transition:
+            border-color .18s ease,
+            box-shadow .18s ease;
         }
 
-        .pricing-feature:nth-child(3n + 2),
-        .pricing-feature:nth-child(3n + 3) {
-          border-left: 1px solid var(--pricing-line);
-        }
+        .pricing-feature:hover {
+          border-color: #cfe3d5;
 
-        .pricing-feature:nth-child(n + 4) {
-          border-top: 1px solid var(--pricing-line);
+          box-shadow: 0 8px 24px rgba(25, 80, 45, .06);
         }
 
         .pricing-feature-number {
-          color: #999999;
+          align-self: center;
 
-          font-size: 15px;
+          width: 44px;
 
-          line-height: 1.5;
-        }
+          height: 44px;
 
-        .pricing-feature-title-row {
           display: flex;
 
           align-items: center;
 
-          gap: 10px;
+          justify-content: center;
+
+          border-radius: 50%;
+
+          background: #eaf4ee;
+
+          color: var(--pricing-green);
+
+          font-size: 14px;
+
+          font-weight: 500;
         }
 
-        .pricing-feature-title-row svg {
-          flex-shrink: 0;
+        .pricing-feature-rule {
+          width: 1px;
+
+          background: #d9d9d9;
+        }
+
+        .pricing-feature-body {
+          align-self: center;
+
+          min-width: 0;
         }
 
         .pricing-feature h3 {
           margin: 0;
 
-          font-family: 'League Spartan', sans-serif;
+          font-size: 18px;
 
-          font-size: 25px;
+          line-height: 1.3;
 
-          line-height: 1.15;
+          font-weight: 500;
 
-          font-weight: 400;
-
-          letter-spacing: -0.02em;
+          letter-spacing: -0.01em;
 
           color: var(--pricing-ink);
         }
 
         .pricing-feature p {
-          max-width: 320px;
-
-          margin: 11px 0 0;
+          margin: 8px 0 0;
 
           color: var(--pricing-soft);
 
-          font-size: 15px;
+          font-size: 14.5px;
 
-          line-height: 1.7;
+          line-height: 1.6;
         }
 
         /* =========================================================
@@ -819,19 +1044,29 @@ export function Pricing() {
         ========================================================== */
 
         .pricing-creator-copy {
+          width: 100%;
+
           max-width: 760px;
 
           margin: 0 auto;
+
+          padding: 40px 40px 42px;
+
+          border: 1px solid #e6e6e6;
+
+          border-radius: 20px;
+
+          background: #ffffff;
         }
 
         .pricing-creator-copy p {
-          max-width: 760px;
+          max-width: 560px;
 
-          margin: 0 auto 28px;
+          margin: 0 auto 26px;
 
           color: var(--pricing-soft);
 
-          font-size: 20px;
+          font-size: 17px;
 
           line-height: 1.7;
         }
@@ -843,25 +1078,31 @@ export function Pricing() {
 
           justify-content: center;
 
-          gap: 7px;
+          gap: 8px;
 
-          color: var(--pricing-ink);
+          padding: 12px 24px;
 
-          font-size: 17px;
+          border-radius: 8px;
 
-          font-weight: 400;
+          background: var(--pricing-green);
+
+          color: #ffffff;
+
+          font-size: 14px;
+
+          font-weight: 500;
 
           transition:
-            transform .16s ease,
-            opacity .16s ease;
+            background .18s ease,
+            transform .18s ease;
         }
 
         .pricing-text-link:hover {
-          color: var(--pricing-ink);
+          background: #154b30;
 
-          transform: translateX(4px);
+          color: #ffffff;
 
-          opacity: .7;
+          transform: translateY(-2px);
         }
 
         /* =========================================================
@@ -869,36 +1110,50 @@ export function Pricing() {
         ========================================================== */
 
         .pricing-faq-list {
-          max-width: 1000px;
+          max-width: 900px;
 
           margin: 0 auto;
 
-          border-top: 1px solid var(--pricing-line);
+          display: grid;
+
+          gap: 14px;
         }
 
         .pricing-faq-item {
-          border-bottom: 1px solid var(--pricing-line);
+          border: 1px solid #e6e6e6;
+
+          border-radius: 16px;
+
+          background: #ffffff;
+
+          transition: border-color .18s ease;
+        }
+
+        .pricing-faq-item[open] {
+          border-color: #cfe3d5;
         }
 
         .pricing-faq-item summary {
           display: grid;
 
           grid-template-columns:
-            58px minmax(0, 1fr) 30px;
+            40px minmax(0, 1fr) 30px;
 
           align-items: center;
 
-          gap: 20px;
+          gap: 18px;
 
-          min-height: 84px;
+          padding: 18px 24px;
 
           cursor: pointer;
 
           list-style: none;
 
-          font-size: 17px;
+          font-size: 16px;
 
           font-weight: 500;
+
+          text-align: left;
 
           color: var(--pricing-ink);
         }
@@ -908,21 +1163,37 @@ export function Pricing() {
         }
 
         .pricing-faq-number {
-          color: #999999;
+          width: 40px;
 
-          font-size: 14px;
+          height: 40px;
 
-          font-weight: 400;
+          display: flex;
+
+          align-items: center;
+
+          justify-content: center;
+
+          border-radius: 50%;
+
+          background: #eaf4ee;
+
+          color: var(--pricing-green);
+
+          font-size: 13px;
+
+          font-weight: 500;
         }
 
         .pricing-faq-plus {
           justify-self: end;
 
-          font-size: 28px;
+          font-size: 26px;
 
           line-height: 1;
 
           font-weight: 300;
+
+          color: #555555;
 
           transition: transform .18s ease;
         }
@@ -932,17 +1203,19 @@ export function Pricing() {
         }
 
         .pricing-faq-answer {
-          padding: 0 50px 30px 78px;
+          padding: 0 60px 24px 82px;
+
+          text-align: left;
         }
 
         .pricing-faq-answer p {
-          max-width: 750px;
+          max-width: 700px;
 
           margin: 0;
 
           color: var(--pricing-soft);
 
-          font-size: 16px;
+          font-size: 15px;
 
           line-height: 1.7;
         }
@@ -995,7 +1268,7 @@ export function Pricing() {
 
           margin: 0 auto 24px;
 
-          font-size: 52px;
+          font-size: 44px;
         }
 
         .pricing-cta-text {
@@ -1005,7 +1278,7 @@ export function Pricing() {
 
           color: var(--pricing-soft);
 
-          font-size: 18px;
+          font-size: 17px;
 
           line-height: 1.7;
         }
@@ -1023,11 +1296,11 @@ export function Pricing() {
 
           padding: 0 28px;
 
-          border: 1px solid #197935;
+          border: 1px solid var(--pricing-green);
 
           border-radius: 8px;
 
-          background: #197935;
+          background: var(--pricing-green);
 
           color: #ffffff;
 
@@ -1043,9 +1316,9 @@ export function Pricing() {
         }
 
         .pricing-cta-button:hover {
-          background: #15672d;
+          background: #154b30;
 
-          border-color: #15672d;
+          border-color: #154b30;
 
           color: #ffffff;
 
@@ -1087,11 +1360,9 @@ export function Pricing() {
 
           margin-bottom: 12px;
 
-          font-family: 'League Spartan', sans-serif;
+          font-weight: 500;
 
-          font-weight: 400;
-
-          font-size: 21px;
+          font-size: 18px;
 
           color: var(--pricing-ink);
         }
@@ -1213,21 +1484,21 @@ export function Pricing() {
           }
 
           .pricing-hero h1 {
-            font-size: 72px;
+            font-size: 54px;
           }
 
           .pricing-section h2,
           .pricing-cta h2 {
-            font-size: 46px;
+            font-size: 40px;
           }
 
           .pricing-section-intro,
           .pricing-creator-copy p {
-            font-size: 18px;
+            font-size: 17px;
           }
 
           .pricing-fee span {
-            font-size: 105px;
+            font-size: 76px;
           }
         }
 
@@ -1236,42 +1507,25 @@ export function Pricing() {
         ========================================================== */
 
         @media (max-width: 900px) {
+          .pricing-hero {
+            padding: 80px 0 88px;
+          }
+
           .pricing-main-grid {
             grid-template-columns: 1fr;
           }
 
           .pricing-example {
-            border-left: 0;
-
-            border-top: 1px solid var(--pricing-line);
-
-            padding: 35px 32px;
+            padding: 32px 28px 26px;
           }
 
           .pricing-fee-block {
-            padding: 42px 32px 40px;
+            padding: 40px 28px;
           }
 
           .pricing-features-grid {
             grid-template-columns:
               repeat(2, minmax(0, 1fr));
-          }
-
-          .pricing-feature:nth-child(3n + 2),
-          .pricing-feature:nth-child(3n + 3) {
-            padding-left: 0;
-
-            border-left: 0;
-          }
-
-          .pricing-feature:nth-child(even) {
-            padding-left: 28px;
-
-            border-left: 1px solid var(--pricing-line);
-          }
-
-          .pricing-feature:nth-child(n + 3) {
-            border-top: 1px solid var(--pricing-line);
           }
         }
 
@@ -1284,16 +1538,8 @@ export function Pricing() {
             --section-space: 48px;
           }
 
-          .pricing-hero {
-            padding: 90px 0 75px;
-          }
-
           .pricing-hero h1 {
-            font-size: 60px;
-          }
-
-          .pricing-hero-copy {
-            font-size: 18px;
+            font-size: 46px;
           }
 
           .pricing-section {
@@ -1302,20 +1548,12 @@ export function Pricing() {
 
           .pricing-section h2,
           .pricing-cta h2 {
-            font-size: 43px;
+            font-size: 36px;
           }
 
           .pricing-section-intro,
           .pricing-creator-copy p {
-            font-size: 18px;
-          }
-
-          .pricing-feature h3 {
-            font-size: 23px;
-          }
-
-          .pricing-feature p {
-            font-size: 14px;
+            font-size: 16px;
           }
 
           .pricing-cta-inner {
@@ -1333,27 +1571,7 @@ export function Pricing() {
           }
 
           .pricing-hero {
-            padding: 80px 0 70px;
-          }
-
-          .pricing-hero h1 {
-            font-size: 52px;
-
-            line-height: 1;
-          }
-
-          .pricing-hero-copy {
-            max-width: 650px;
-
-            margin-top: 24px;
-
-            font-size: 17px;
-          }
-
-          .pricing-hero-work {
-            margin-top: 24px;
-
-            font-size: 15px;
+            padding: 64px 0 72px;
           }
 
           .pricing-section {
@@ -1372,72 +1590,63 @@ export function Pricing() {
 
           .pricing-section h2,
           .pricing-cta h2 {
-            font-size: 40px;
+            font-size: 34px;
           }
 
           .pricing-section-intro,
           .pricing-creator-copy p {
-            font-size: 17px;
+            font-size: 16px;
           }
 
           .pricing-eyebrow {
-            font-size: 15px;
+            font-size: 13px;
 
             margin-bottom: 18px;
           }
 
           .pricing-fee span {
-            font-size: 82px;
+            font-size: 64px;
           }
 
           .pricing-fee-label {
-            font-size: 25px;
+            font-size: 20px;
+          }
+
+          .pricing-pill-row {
+            gap: 14px;
           }
 
           .pricing-features-grid {
             grid-template-columns: 1fr;
           }
 
-          .pricing-feature,
-          .pricing-feature:nth-child(even),
-          .pricing-feature:nth-child(3n + 2),
-          .pricing-feature:nth-child(3n + 3) {
-            padding: 28px 0;
-
-            border-left: 0;
+          .pricing-feature {
+            padding: 24px 22px;
           }
 
-          .pricing-feature + .pricing-feature {
-            border-top: 1px solid var(--pricing-line);
-          }
-
-          .pricing-feature h3 {
-            font-size: 24px;
-          }
-
-          .pricing-feature p {
-            max-width: 500px;
-
-            font-size: 15px;
+          .pricing-creator-copy {
+            padding: 32px 24px 34px;
           }
 
           .pricing-faq-item summary {
             grid-template-columns:
-              38px minmax(0, 1fr) 20px;
+              36px minmax(0, 1fr) 22px;
 
-            gap: 10px;
+            gap: 12px;
 
-            min-height: 72px;
+            padding: 14px 16px;
 
             font-size: 15px;
+          }
+
+          .pricing-faq-number {
+            width: 36px;
+
+            height: 36px;
           }
 
           .pricing-faq-answer {
-            padding: 0 20px 24px 48px;
-          }
-
-          .pricing-faq-answer p {
-            font-size: 15px;
+            padding: 0 16px 20px 64px;
           }
 
           .pricing-cta-inner {
@@ -1446,12 +1655,8 @@ export function Pricing() {
             padding: 55px 24px;
           }
 
-          .pricing-cta h2 {
-            font-size: 40px;
-          }
-
           .pricing-cta-text {
-            font-size: 17px;
+            font-size: 16px;
           }
 
           .pricing-footer-cols {
@@ -1464,42 +1669,34 @@ export function Pricing() {
         ========================================================== */
 
         @media (max-width: 480px) {
-          .pricing-hero {
-            padding: 70px 0 60px;
-          }
-
           .pricing-hero h1 {
-            font-size: 42px;
+            font-size: 34px;
           }
 
           .pricing-hero-copy {
-            font-size: 16px;
-
-            line-height: 1.65;
+            font-size: 14.5px;
           }
 
-          .pricing-hero-work {
-            flex-direction: column;
+          .pricing-badge {
+            font-size: 12px;
 
-            gap: 5px;
-
-            font-size: 14px;
+            margin-bottom: 24px;
           }
 
           .pricing-section h2,
           .pricing-cta h2 {
-            font-size: 34px;
+            font-size: 30px;
           }
 
           .pricing-section-intro,
           .pricing-creator-copy p {
-            font-size: 16px;
+            font-size: 15px;
           }
 
           .pricing-eyebrow {
-            font-size: 13px;
+            font-size: 12px;
 
-            letter-spacing: .15em;
+            letter-spacing: .14em;
           }
 
           .pricing-main-grid {
@@ -1529,11 +1726,21 @@ export function Pricing() {
           }
 
           .pricing-fee span {
-            font-size: 72px;
+            font-size: 56px;
           }
 
           .pricing-fee-label {
-            font-size: 23px;
+            font-size: 18px;
+          }
+
+          .pricing-example-total {
+            margin-left: -10px;
+
+            margin-right: -10px;
+
+            padding-left: 10px;
+
+            padding-right: 10px;
           }
 
           .pricing-muted {
@@ -1542,13 +1749,23 @@ export function Pricing() {
 
           .pricing-feature {
             grid-template-columns:
-              32px minmax(0, 1fr);
+              38px 1px minmax(0, 1fr);
 
-            gap: 13px;
+            gap: 14px;
+
+            padding: 20px 16px;
+          }
+
+          .pricing-feature-number {
+            width: 38px;
+
+            height: 38px;
+
+            font-size: 13px;
           }
 
           .pricing-feature h3 {
-            font-size: 21px;
+            font-size: 17px;
           }
 
           .pricing-feature p {
@@ -1567,12 +1784,8 @@ export function Pricing() {
             padding: 45px 20px;
           }
 
-          .pricing-cta h2 {
-            font-size: 34px;
-          }
-
           .pricing-cta-text {
-            font-size: 16px;
+            font-size: 15px;
           }
 
           .pricing-cta-button {

@@ -126,18 +126,18 @@ const CAT_PAGE_STEP = 3;
 const WHY_ITEMS = [
   {
     number: "01",
-    title: "Discover Opportunities",
-    text: "Explore relevant campaigns and creator opportunities that match your skills, interests, and goals.",
+    title: "Opportunities That Fit You",
+    text: "Discover campaigns from businesses, explore collaboration opportunities and apply to projects that match your skills and interests.",
   },
   {
     number: "02",
-    title: "Build Meaningful Connections",
-    text: "Creators and businesses can connect around real campaign needs, not just through social media.",
+    title: "Fair Terms Through Negotiation",
+    text: "Discuss compensation and collaboration terms with businesses on campaigns where negotiation is enabled, before finalizing an agreement.",
   },
   {
     number: "03",
-    title: "Manage Collaborations with Ease",
-    text: "From applications to approvals and payments, keep your collaborations organized — all in one place.",
+    title: "Collaborations Made Simple",
+    text: "Manage applications, communication, deliverables and approvals through one platform, keeping your brand collaborations organized.",
   },
 ];
 
@@ -406,7 +406,7 @@ const HERO_CARDS: HeroCard[] = [
   { brand: "Bhatbhateni", title: "Lifestyle Creator", category: "Lifestyle", budget: "NPR 12,000", filter: "Lifestyle", pos: "p1", depth: "back", rot: "-6deg", dy: "-9px", dr: "1deg", dur: "8.2s", delay: "-1s", enter: ".10s" },
   { brand: "Himalayan Java", title: "Food Creator", category: "Food", budget: "NPR 6,500", filter: "Food", pos: "p2", depth: "front", rot: "4deg", dy: "-12px", dr: "-1.2deg", dur: "6.8s", delay: "-3s", enter: ".30s" },
   { brand: "Lali", title: "Beauty Content Creator", category: "Beauty", budget: "NPR 15,000", filter: "Beauty", pos: "p3", depth: "back", rot: "-3deg", dy: "-8px", dr: "1.2deg", dur: "9s", delay: "-5s", enter: ".50s" },
-  { brand: "CreatorHub", title: "UGC Creator", category: "UGC", budget: "NPR 8,000", pos: "p4", depth: "front", rot: "5deg", dy: "-11px", dr: "-1deg", dur: "7.4s", delay: "-2s", enter: ".20s" },
+  { brand: "creatorhub", title: "UGC Creator", category: "UGC", budget: "NPR 8,000", pos: "p4", depth: "front", rot: "5deg", dy: "-11px", dr: "-1deg", dur: "7.4s", delay: "-2s", enter: ".20s" },
   { brand: "Avani Nepal", title: "Beauty Creator", category: "Beauty", budget: "NPR 10,000", filter: "Beauty", pos: "p5", depth: "back", rot: "-4deg", dy: "-8px", dr: "1deg", dur: "8.6s", delay: "-4s", enter: ".40s" },
   { brand: "Daraz", title: "Fashion Creator", category: "Fashion", budget: "NPR 18,000", filter: "Fashion", pos: "p6", depth: "front", rot: "3deg", dy: "-10px", dr: "-1deg", dur: "7.8s", delay: "-1.5s", enter: ".60s", feature: true },
 ];
@@ -1834,6 +1834,8 @@ export function Landing() {
           visibility: hidden;
           max-height: 0;
           overflow: hidden;
+          text-align: justify;
+          text-justify: inter-word;
           transform: translateY(-4px);
           transition: opacity .18s ease, transform .18s ease, max-height .18s ease, visibility .18s ease;
         }
@@ -1946,6 +1948,8 @@ export function Landing() {
           max-width: 360px;
           font-size: 13px;
           line-height: 1.65;
+          text-align: justify;
+          text-justify: inter-word;
           color: var(--ink-soft);
         }
 
@@ -2695,14 +2699,13 @@ export function Landing() {
 
         <div className="hx-copy">
           <h1 className="hx-h1">
-            Where Brands
+           Find Your Next 
             <br />
-            Meet Creators
+            Brand Collaboration
           </h1>
 
           <p className="hx-sub">
-            Discover paid creator campaigns from businesses and turn your content
-            skills into real collaboration opportunities.
+            Discover campaigns from businesses, showcase your creativity, and connect with brands looking for talent like yours.
           </p>
 
           <div className="hx-actions">
@@ -2937,9 +2940,9 @@ export function Landing() {
                     alt="Creators building their professional profile"
                   />
                 </div>
-                <h3 className="lp-how-card-title">Build your profile</h3>
+                <h3 className="lp-how-card-title">Explore Campaigns</h3>
                 <p className="lp-how-card-text">
-                  Create a professional profile with your portfolio, skills, experience and social presence.
+                   Discover campaigns posted by businesses and find opportunities that match your skills, content niche and interests.
                 </p>
               </article>
 
@@ -2950,9 +2953,9 @@ export function Landing() {
                     alt="Creator discovering campaign opportunities"
                   />
                 </div>
-                <h3 className="lp-how-card-title">Find your next opportunity</h3>
+                <h3 className="lp-how-card-title">Apply to Campaigns</h3>
                 <p className="lp-how-card-text">
-                  Explore paid campaigns and apply to opportunities that fit your content and interests.
+                  Choose campaigns that interest you, review their requirements and submit your application directly to businesses
                 </p>
               </article>
 
@@ -2965,7 +2968,7 @@ export function Landing() {
                 </div>
                 <h3 className="lp-how-card-title">Collaborate &amp; grow</h3>
                 <p className="lp-how-card-text">
-                  Get selected by brands, complete your deliverables and build your collaboration history.
+                  Get selected by businesses, discuss collaboration terms and complete the agreed deliverables.
                 </p>
               </article>
             </div>
@@ -2980,7 +2983,7 @@ export function Landing() {
                 </div>
                 <h3 className="lp-how-card-title">Post a campaign</h3>
                 <p className="lp-how-card-text">
-                  Tell creators what you need, including campaign requirements, deliverables, budget and deadline.
+                  Publish your campaign with requirements, deliverables, budget and deadlines. Choose whether to allow creators to negotiate.
                 </p>
               </article>
 
@@ -2991,9 +2994,9 @@ export function Landing() {
                     alt="Business reviewing creator applications"
                   />
                 </div>
-                <h3 className="lp-how-card-title">Review applications</h3>
+                <h3 className="lp-how-card-title">Review &amp; Negotiate</h3>
                 <p className="lp-how-card-text">
-                  Receive applications from creators and explore their profiles, portfolios, skills and experience.
+                  Review creator applications, explore their profiles and portfolios, and discuss compensation or terms with applicants when negotiation is enabled.
                 </p>
               </article>
 
@@ -3006,7 +3009,7 @@ export function Landing() {
                 </div>
                 <h3 className="lp-how-card-title">Select &amp; collaborate</h3>
                 <p className="lp-how-card-text">
-                  Choose the right creator, start the collaboration and manage deliverables until completion.
+                  Choose your preferred creator, finalize the collaboration terms and manage communication and deliverables until completion.
                 </p>
               </article>
             </div>
@@ -3023,7 +3026,7 @@ export function Landing() {
       <section className="lp-why-section" id="why-creatorhub">
         <div className="lp-container lp-why-inner">
           <div className="lp-why-head">
-            <h2 className="lp-why-heading">Why CreatorHub?</h2>
+            <h2 className="lp-why-heading">Why creatorhub?</h2>
 
             <Link to="/about" className="lp-why-view-all">
               Show More
@@ -3098,7 +3101,7 @@ export function Landing() {
               </div>
 
               <div className="lp-price-row lp-price-total">
-                <span>Paid to CreatorHub</span>
+                <span>Paid to creatorhub</span>
                 <strong>NPR 1,000</strong>
               </div>
             </div>
@@ -3146,17 +3149,17 @@ export function Landing() {
               <div className="lp-footer-brand-row">
                 <LogoMark size={22} />
 
-                <span>Creator Marketplace</span>
+                <span>creatorhub</span>
               </div>
 
               <p className="lp-footer-tag">
-                Real campaigns. Real people. Real opportunities.
+                Your Next Collaboration Starts Here.
               </p>
             </div>
 
             <div className="lp-footer-cols">
               <div className="lp-footer-col">
-                <h4>Platform</h4>
+              
 
                 <a href="#home">Home</a>
                 <Link to="/campaigns?source=landing">Campaigns</Link>
@@ -3176,7 +3179,7 @@ export function Landing() {
 
           <div className="lp-footer-bottom">
             <span>
-              © 2026 Creator Marketplace. All rights reserved.
+              © 2026 creatorhub. All rights reserved.
             </span>
 
             <div className="lp-footer-social">

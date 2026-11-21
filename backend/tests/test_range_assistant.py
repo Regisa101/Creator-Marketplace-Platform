@@ -139,22 +139,24 @@ def test_in_chat_out_of_range_offer_is_not_forwarded(client):
     _apply(client, ids, h, 2200)
     app_id = _brand_apps(client, h)[0]["id"]
     conv = client.post(f"/api/conversations/by-application/{app_id}", headers=h["creator"]).json()
+    assert conv["negotiation_started"] is True  # the 2200 typed on the form is already an offer
 
     r = client.post(f"/api/conversations/{conv['id']}/offers", json={"amount": 9000}, headers=h["creator"])
     assert r.status_code == 200, r.text
     out = r.json()
-    assert out["range_prompt_open"] is True and out["pending_offer"] is None
+    # the out-of-range 9000 is not forwarded: the brand's earlier counter (1,500 + 20% of 700 = 1,640) stays pending
+    assert out["range_prompt_open"] is True and out["pending_offer"]["amount"] == 1640.0
 
     # Typing/offering is blocked until the creator answers.
     assert client.post(f"/api/conversations/{conv['id']}/offers", json={"amount": 2000}, headers=h["creator"]).status_code == 403
 
     ok = client.post(f"/api/conversations/{conv['id']}/range-response", json={"agree": True, "amount": 2800}, headers=h["creator"])
     assert ok.status_code == 200, ok.text
-    assert ok.json()["pending_offer"]["amount"] == 2800.0
+    assert ok.json()["pending_offer"]["amount"] == 1890.0
 
     # Brand sees the in-range offer; and "No thanks" path -> sorry, negotiation stays open.
     brand_view = client.get(f"/api/conversations/{conv['id']}", headers=h["brand"]).json()["conversation"]
-    assert brand_view["pending_offer"]["amount"] == 2800.0
+    assert brand_view["pending_offer"]["amount"] == 1890.0
 
 
 def test_in_chat_decline_keeps_application_visible(client):
@@ -167,3 +169,143 @@ def test_in_chat_decline_keeps_application_visible(client):
     assert r.status_code == 200
     assert r.json()["range_prompt_open"] is False
     assert len(_brand_apps(client, h)) == 1
+
+
+# ---------- applying: the chat exists at once and the proposed price appears in it ----------
+def _creator_thread(client, h, cid):
+    return client.get(f"/api/conversations/{cid}", headers=h["creator"]).json()
+
+
+def _brand_thread(client, h, cid):
+    return client.get(f"/api/conversations/{cid}", headers=h["brand"]).json()
+
+
+def test_applying_creates_the_chat_and_in_range_price_becomes_an_offer(client):
+    ids, h = _setup()
+    assert _apply(client, ids, h, 2200).status_code == 200
+    conv = _conv_for(client, h)  # exists without anyone pressing "Message"
+    assert conv["quick_replies"][0]["key"] == "hi"  # creator can greet right away
+    assert conv["negotiation_started"] is True
+    assert conv["pending_offer"]["amount"] == 1640.0  # the brand side already countered
+
+    kinds = [m["kind"] for m in _creator_thread(client, h, conv["id"])["messages"]]
+    assert kinds == ["offer", "assistant"]
+    brand_view = _brand_thread(client, h, conv["id"])
+    assert brand_view["conversation"]["pending_offer"]["amount"] == 1640.0
+    assert brand_view["messages"][0]["body"] == "Offered NPR 2,200.00"
+    assert "NPR 1,640" in brand_view["messages"][1]["body"]
+    # both sides see the same thread, each line on the right side
+    assert [m["mine"] for m in _creator_thread(client, h, conv["id"])["messages"]] == [True, False]
+    assert [m["mine"] for m in brand_view["messages"]] == [False, True]
+
+
+def test_applying_without_a_price_creates_a_quiet_chat(client):
+    ids, h = _setup()
+    assert _apply(client, ids, h, None).status_code == 200
+    conv = _conv_for(client, h)
+    assert conv["negotiation_started"] is False and conv["pending_offer"] is None
+    assert _creator_thread(client, h, conv["id"])["messages"] == []
+
+
+def test_out_of_range_price_on_the_form_is_shown_to_the_creator_only(client):
+    ids, h = _setup()
+    _apply(client, ids, h, 20000)
+    conv = _conv_for(client, h)
+    msgs = _creator_thread(client, h, conv["id"])["messages"]
+    assert [m["kind"] for m in msgs] == ["held", "assistant"]
+    assert msgs[0]["body"] == "My offer: NPR 20,000" and msgs[0]["mine"] is True
+    # the brand cannot see the application or the conversation at all yet
+    assert _brand_apps(client, h) == []
+    assert client.get(f"/api/conversations/{conv['id']}", headers=h["brand"]).status_code == 404
+
+
+def test_typed_out_of_range_price_in_chat_is_visible_to_both_sides(client):
+    ids, h = _setup()
+    _apply(client, ids, h, 2200)
+    cid = _conv_for(client, h)["id"]
+    client.post(f"/api/conversations/{cid}/offers", json={"amount": 20000}, headers=h["creator"])
+
+    creator = [(m["kind"], m["mine"]) for m in _creator_thread(client, h, cid)["messages"]]
+    assert creator == [("offer", True), ("assistant", False), ("held", True), ("assistant", False)]
+
+    # unread badge counts what the brand has not read yet (checked before opening the thread marks it read)
+    assert client.get("/api/conversations/unread-count", headers=h["brand"]).json()["count"] == 2  # offer + held
+    brand = _brand_thread(client, h, cid)
+    # the same four lines, mirrored: the creator's are "theirs", the brand's own are "mine"
+    assert [(m["kind"], m["mine"]) for m in brand["messages"]] == [(k, not mine) for k, mine in creator]
+    assert [m["body"] for m in brand["messages"]] == [m["body"] for m in _creator_thread(client, h, cid)["messages"]]
+
+
+def test_fixed_price_campaign_with_a_proposed_rate_gets_a_sorry(client):
+    ids, h = _setup()
+    db = SessionLocal()
+    camp = db.get(Campaign, ids["campaign"])
+    camp.price_type, camp.compensation_type, camp.budget = "fixed", "Custom amount", 10000
+    camp.budget_min = camp.budget_max = None
+    db.commit()
+    db.close()
+
+    assert _apply(client, ids, h, 15000).status_code == 200
+    conv = _conv_for(client, h)
+    msgs = _creator_thread(client, h, conv["id"])["messages"]
+    assert [m["kind"] for m in msgs] == ["held", "assistant"]
+    assert msgs[0]["body"] == "My offer: NPR 15,000"
+    assert "Sorry" in msgs[1]["body"] and "NPR 10,000" in msgs[1]["body"]
+    assert conv["pending_offer"] is None and conv["negotiation_started"] is False
+    # the application itself still goes to the brand, at the fixed price, without the sorry chatter
+    apps = _brand_apps(client, h)
+    assert len(apps) == 1 and apps[0]["status"] == "pending"
+    # ...and the brand sees the same exchange as the creator
+    assert [m["kind"] for m in _brand_thread(client, h, conv["id"])["messages"]] == ["held", "assistant"]
+
+
+def test_fixed_price_campaign_no_sorry_when_rate_equals_the_fixed_price(client):
+    ids, h = _setup()
+    db = SessionLocal()
+    camp = db.get(Campaign, ids["campaign"])
+    camp.price_type, camp.compensation_type, camp.budget = "fixed", "Custom amount", 10000
+    camp.budget_min = camp.budget_max = None
+    db.commit()
+    db.close()
+    _apply(client, ids, h, 10000)
+    assert _creator_thread(client, h, _conv_for(client, h)["id"])["messages"] == []
+
+
+# ---------- the replies read as the brand talking, and the creator's answers show up ----------
+def test_assistant_lines_speak_as_the_brand(client):
+    ids, h = _setup()
+    _apply(client, ids, h, 20000)
+    cid = _conv_for(client, h)["id"]
+    body = _creator_thread(client, h, cid)["messages"][-1]["body"]
+    assert "CreatorHub" not in body and "assistant" not in body.lower()
+    assert "NPR 1,500 – 3,000" in body and "NPR 20,000" in body
+
+
+def test_no_thanks_is_shown_as_the_creators_own_message_before_the_reply(client):
+    ids, h = _setup()
+    _apply(client, ids, h, 20000)
+    cid = _conv_for(client, h)["id"]
+    r = client.post(f"/api/conversations/{cid}/range-response", json={"agree": False}, headers=h["creator"])
+    assert r.status_code == 200
+    msgs = _creator_thread(client, h, cid)["messages"]
+    assert [m["kind"] for m in msgs] == ["held", "assistant", "held", "assistant"]
+    assert msgs[2]["body"] == "No thanks." and msgs[2]["mine"] is True
+    assert "Sorry" in msgs[3]["body"]
+
+
+def test_yes_continue_sends_the_price_as_a_normal_offer_message_then_a_reply(client):
+    ids, h = _setup()
+    _apply(client, ids, h, 20000)  # held from the brand
+    cid = _conv_for(client, h)["id"]
+    r = client.post(f"/api/conversations/{cid}/range-response", json={"agree": True, "amount": 2800}, headers=h["creator"])
+    assert r.status_code == 200, r.text
+    msgs = _creator_thread(client, h, cid)["messages"]
+    # asked -> creator's price -> thank-you -> the brand's first counter (1,500 + 20% of 1,300 = 1,760)
+    assert [m["kind"] for m in msgs] == ["held", "assistant", "offer", "assistant", "assistant"]
+    assert msgs[2]["body"] == "Offered NPR 2,800.00" and msgs[2]["mine"] is True
+    assert "Thank you" in msgs[3]["body"] and "NPR 1,760" in msgs[4]["body"]
+    # the application is now with the brand, who sees the whole exchange
+    assert len(_brand_apps(client, h)) == 1
+    brand = _brand_thread(client, h, cid)
+    assert [m["kind"] for m in brand["messages"]] == ["held", "assistant", "offer", "assistant", "assistant"]
+    assert brand["conversation"]["pending_offer"]["amount"] == 1760.0

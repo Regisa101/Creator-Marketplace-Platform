@@ -1303,11 +1303,13 @@ export interface Conversation {
   // Guided chat: free typing opens only after the brand selects the creator.
   free_chat?: boolean;
   quick_replies?: { key: string; label: string }[];
+  // True once price talk is open ("Negotiate price" / "Start negotiation"); the typed-price box needs it.
+  negotiation_started?: boolean;
 }
 
 export interface ChatMessage {
   id: number;
-  kind: 'user' | 'system' | 'offer' | 'assistant' | 'quick' | 'auto';
+  kind: 'user' | 'system' | 'offer' | 'assistant' | 'quick' | 'auto' | 'held';
   body: string;
   sender_id: number | null;
   mine: boolean;
